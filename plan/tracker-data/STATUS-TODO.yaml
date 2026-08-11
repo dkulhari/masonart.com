@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-09T15:59:33.911Z'
-total_tickets: 26
+last_updated: '2026-08-11T16:49:56.709Z'
+total_tickets: 18
 summary:
-  critical: 4
+  critical: 3
   high: 6
-  medium: 10
-  low: 6
+  medium: 6
+  low: 3
 priorities:
   critical:
     - feature: go-live
@@ -40,12 +40,6 @@ priorities:
           blocked_by: []
         - ticket_number: 544
           title: Replace mesonart development placeholder photography before production
-          assignee: unassigned
-          blocked_by: []
-    - feature: gift-cards
-      tickets:
-        - ticket_number: 573
-          title: Start the gift card delivery sweep — scheduled cards are never sent
           assignee: unassigned
           blocked_by: []
   high:
@@ -126,24 +120,6 @@ priorities:
           title: Two-row top strip — countdown announcement over utility bar
           assignee: unassigned
           blocked_by: []
-    - feature: gift-cards
-      tickets:
-        - ticket_number: 574
-          title: Index the delivery sweep's query, and drop the index it no longer uses
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 575
-          title: Prove the gift card code rate limit actually throttles
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 576
-          title: PaymentButton accepts neither orderData nor existingOrderId without complaint
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 577
-          title: Wire the store_credit refund type to issue a gift card
-          assignee: unassigned
-          blocked_by: []
   low:
     - feature: go-to-production
       tickets:
@@ -162,20 +138,6 @@ priorities:
       tickets:
         - ticket_number: 546
           title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
-          assignee: unassigned
-          blocked_by: []
-    - feature: gift-cards
-      tickets:
-        - ticket_number: 578
-          title: Cover a real payment end to end, including mint and delivery
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 579
-          title: Let a gift card be bought in the same checkout as a poster
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 580
-          title: The gift card suites hit the shared dev database
           assignee: unassigned
           blocked_by: []
 blocked_tickets:

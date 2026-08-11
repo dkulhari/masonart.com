@@ -34,17 +34,55 @@ description: |-
 feature: gift-cards
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T07:05:33.364Z'
-last_updated: '2026-08-07T07:05:33.364Z'
+last_updated: '2026-08-11T15:32:30.515Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-11T15:27:56.242Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-11T15:32:14.788Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-11T15:32:30.515Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f7e764f5` - fix(ui): make PaymentButton's missing payment target a compile error
+
+      Implemented as the ticket proposed — a `PaymentTarget` union with `?: never` on the opposite key, intersected with the rest of the props. Type-only change; both callers already satisfied one arm. The runtime `throw` stays.
+
+      **Discovery**: the type test would have been theatre
+
+      The plan was a `@ts-expect-error` pin, and the first version of it passed immediately — before the union existed. `packages/web/tsconfig.json` has `"include": ["app/**/*", ...]`, so files under `tests/` are outside the project and get no diagnostics at all. `vitest typecheck` reuses that tsconfig, so it reported "Type Errors: no errors" for a file that could contain anything. Confirmed by planting `const wrong: string = 123` in the suite and watching the run stay green.
+
+      So the ticket needed a bit of plumbing before its own step 2 could be honest:
+      - `packages/web/tsconfig.typecheck.json` — extends the app config, adds `tests/**/*`
+      - `vitest.config.ts` — `typecheck.tsconfig` points at it; `typecheck.include` matches `*.test-d.ts`; `ignoreSourceErrors: true` so the 25 pre-existing `app/**` unused-symbol errors do not drown the assertions
+      - `package.json` — `test:types` script
+
+      **Verify-fail** (step 2): with the props still optional, all three `@ts-expect-error` directives report `TypeCheckError: Unused '@ts-expect-error' directive` (TS2578) and 3 of 6 tests fail. After the union: 6/6 pass.
+
+      **Files Changed**:
+      - `packages/web/app/components/checkout/PaymentButton.tsx` - `PaymentTarget` union
+      - `packages/web/tests/components/checkout/PaymentButton.props.test-d.ts` (new) - 6 type tests: cart input alone, existing order alone, gift card codes on either arm, and rejection of neither / both / explicit `undefined`
+      - `packages/web/tsconfig.typecheck.json` (new)
+      - `packages/web/vitest.config.ts`, `packages/web/package.json`
+
+      **Tests**:
+      - `bun run test:types`: 6 passing
+      - `bun run typecheck`: 25 errors before the change, 25 after (compared against a `git stash`ed tree) — all pre-existing unused-symbol errors in unrelated routes; neither `checkout/index.tsx` nor `gift-cards/index.tsx` regressed
+      - `tests/components/checkout/`: 48 passing
+
+      **Note for later**: `ordersApi.create(orderData!)` keeps its non-null assertion. Destructuring the props splits the union into independent variables, so TypeScript cannot correlate `!existingOrderId` with `orderData` being present. Narrowing on the undestructured props object would remove the `!`, but it would rewrite the whole component body for a cosmetic gain — the union already stops the bad call site, which is what the ticket was about.
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -92,3 +130,5 @@ implementation_steps:
     command: 'git add packages/web/app/components/checkout/PaymentButton.tsx packages/web/tests/components/checkout && git commit -m "refactor(web): make PaymentButton''s payment target unambiguous"'
     status: pending
 current_step: 1
+started: '2026-08-11T15:27:56.242Z'
+completed: '2026-08-11T15:32:14.788Z'

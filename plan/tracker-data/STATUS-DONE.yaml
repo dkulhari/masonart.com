@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-09T15:59:34.038Z'
-total_tickets: 541
+last_updated: '2026-08-11T16:49:56.893Z'
+total_tickets: 549
 summary:
-  critical: 29
+  critical: 30
   high: 204
-  medium: 235
-  low: 73
+  medium: 239
+  low: 76
 priorities:
   critical:
     - feature: qa-testing
@@ -146,6 +146,12 @@ priorities:
       tickets:
         - ticket_number: 529
           title: Home hero — full-bleed image carousel with peek slides replaces the text hero
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 573
+          title: Start the gift card delivery sweep — scheduled cards are never sent
           assignee: unassigned
           blocked_by: []
   high:
@@ -2343,6 +2349,22 @@ priorities:
           blocked_by:
             - ticket_number: 558
               title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+        - ticket_number: 574
+          title: Index the delivery sweep's query, and drop the index it no longer uses
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 575
+          title: Prove the gift card code rate limit actually throttles
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 576
+          title: PaymentButton accepts neither orderData nor existingOrderId without complaint
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 577
+          title: Wire the store_credit refund type to issue a gift card
+          assignee: unassigned
+          blocked_by: []
     - feature: admin-frame-management
       tickets:
         - ticket_number: 585
@@ -2832,6 +2854,18 @@ priorities:
           blocked_by: []
         - ticket_number: 563
           title: E2E - buy a card, receive it, redeem part, spend the remainder
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 578
+          title: Cover a real payment end to end, including mint and delivery
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 579
+          title: Let a gift card be bought in the same checkout as a poster
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 580
+          title: The gift card suites hit the shared dev database
           assignee: unassigned
           blocked_by: []
     - feature: cart-checkout

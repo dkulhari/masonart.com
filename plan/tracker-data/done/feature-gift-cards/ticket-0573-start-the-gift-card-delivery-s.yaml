@@ -24,17 +24,48 @@ description: |-
 feature: gift-cards
 type: task
 priority: critical
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T07:05:33.295Z'
-last_updated: '2026-08-07T07:05:33.295Z'
+last_updated: '2026-08-11T15:18:44.690Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-11T15:16:09.600Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-11T15:18:31.736Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-11T15:18:44.690Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `03b038c6` - feat(api): start the gift card delivery sweep and the deadline checker
+
+      **Design Decision**: where periodic work starts
+
+      Added `packages/api/src/background.ts` as the single startup site, rather than calling `setInterval` starters inline from `src/index.ts`. Reasons: the block that starts the review media worker is already the app's "background work" section, and the sweeps needed a handle the existing SIGTERM/SIGINT shutdown could stop. `startDeadlineChecker` was started in the same place, as the ticket suggested — it had the same orphaned-export problem.
+
+      **Design Decision**: multiple API processes
+
+      Every instance runs both sweeps. Safe, not accidental: gift card minting races through the unique constraint on `gift_card.purchase_order_id` (covered by `gift-card-delivery.test.ts`), and the deadline checker marks reminders sent before continuing. The cost is duplicate polling, so `DISABLE_BACKGROUND_WORKERS=true` opts an instance out entirely. Not converted to BullMQ — that is a separate decision, and the immediate problem was that they did not run at all.
+
+      **Files Changed**:
+      - `packages/api/src/background.ts` (new) - `startBackgroundWorkers()` starting both sweeps, returning an idempotent `stop()`
+      - `packages/api/src/index.ts` - calls it in the `NODE_ENV !== "test"` block; stops it in the shutdown handler before closing the review media queue
+      - `packages/api/tests/background-workers.test.ts` (new) - coverage
+
+      **Tests**:
+      - `tests/background-workers.test.ts`: 7 passing — both sweeps started, `stop()` clears them, double stop is safe, `DISABLE_BACKGROUND_WORKERS` starts nothing, and two source-level assertions that `src/index.ts` actually calls and stops them (the startup block is behind `NODE_ENV !== "test"`, so importing it proves nothing — an exported starter nobody calls is exactly this bug)
+      - `tests/services/gift-card-delivery.test.ts`: 15 passing against live Postgres, unchanged — confirms a scheduled card mints and delivers end to end once the sweep runs
+
+      Typecheck: no new errors (`@chobii/shared` export errors in `routes/admin/frames.ts` and `routes/admin/products.ts` are pre-existing, unrelated).
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -98,3 +129,5 @@ implementation_steps:
     command: 'git add packages/api/src/index.ts packages/api/tests/startup && git commit -m "fix(api): actually start the gift card delivery sweep"'
     status: pending
 current_step: 1
+started: '2026-08-11T15:16:09.600Z'
+completed: '2026-08-11T15:18:31.736Z'

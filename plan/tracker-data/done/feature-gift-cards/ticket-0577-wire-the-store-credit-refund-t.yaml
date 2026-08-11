@@ -1,0 +1,127 @@
+ticket_number: 577
+title: Wire the store_credit refund type to issue a gift card
+description: |-
+  ## Task
+  `packages/api/src/database/schema/returns.ts:54` has offered a `store_credit` refund type since long before gift cards existed. Nothing implements it — `grep store_credit packages/api/src/routes/returns.ts` returns nothing. A return marked for store credit currently produces no credit at all.
+
+  Gift cards are the instrument that makes it buildable: processing such a return issues a card for the refund amount and emails it to the customer.
+
+  ## Two things to get right
+  **It is not the tender split.** An ordinary refund goes back proportionally to what paid for the order (#557). Store credit is a deliberate substitution — the customer is given a card *instead of* their money back — so it must be an explicit choice, recorded, and never the default fallback when a Razorpay refund fails.
+
+  **Consent.** Converting a card payment into store credit without agreement is what invites chargebacks. Whatever flow chooses `store_credit` needs the customer to have accepted it, and the return record should carry when.
+
+  ## Context
+  Part of feature: gift-cards
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §8, listed there as out of scope for v1 precisely because the returns flow is its own surface.
+
+  `issueGiftCard()` already does the work; this is about where it is called from and under what authority.
+feature: gift-cards
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:33.371Z'
+last_updated: '2026-08-11T15:38:27.291Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-11T15:32:36.961Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-11T15:38:06.663Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-11T15:38:27.291Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `515a74ca` - feat(api): settle a return as store credit by issuing a gift card
+
+      **Design Decision**: it is not the tender split, and the code makes that structural
+
+      `issueStoreCredit()` is a named function called from exactly one place, guarded by `refundType === "store_credit"`. It is not reachable from any error path — a test asserts the source has no `catch` block within 400 characters of an `issueGiftCard` call, so a future "the Razorpay refund failed, give them credit instead" cannot be added quietly. That is the failure mode the ticket named: substituting a voucher for someone's card payment is what invites chargebacks.
+
+      **Design Decision**: consent is a stored timestamp, captured by the customer
+
+      `store_credit_accepted_at` on `return_requests`, set when the customer opts in via `acceptStoreCredit` on the return request. Optional and defaulting to null, so an older client simply creates returns that cannot be settled as store credit. An admin processing store credit without a timestamp gets 400 and nothing is created — no card, no email.
+
+      The alternative was an admin-side "customer agreed" checkbox. Rejected: the record would then attest to what an admin clicked, not what the customer accepted, which is exactly what a chargeback dispute would ask about.
+
+      **Design Decision**: `refund_type` moves onto the request
+
+      `return_policies.refund_type` said what a policy *prefers*; nothing recorded what a given return actually *became*. Money returned to a card and money returned as a voucher are different liabilities and reporting could not tell them apart. Now every processed refund records its type, not just store credit ones.
+
+      **Constraint found**: a card has a floor
+
+      `GIFT_CARD_MIN_PAISE` is Rs 500 and `GIFT_CARD_MAX_PAISE` is Rs 50,000, but a refund has no such range. A Rs 300 refund cannot become a card. It returns 400 telling the admin to refund the original payment method instead, rather than rounding a customer's money to fit the instrument. Same for anything above the ceiling.
+
+      **Ordering**: the card is issued *before* the return is marked refunded. If issuing or emailing throws, the return stays at `received` and can be settled again — better than a return closed as refunded with nothing behind it.
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/returns.ts` - `refundType`, `storeCreditAcceptedAt`, `storeCreditGiftCardId` (FK to `gift_card`, `ON DELETE SET NULL` — deleting a card must not delete the record that a return happened)
+      - `packages/api/src/database/migrations/0016_return_store_credit.sql` (new) + journal entry 16, hand-written for the same reason as 0014/0015
+      - `packages/api/src/routes/admin/returns.ts` - `issueStoreCredit()` and the guards in `process-refund`
+      - `packages/api/src/routes/returns.ts` - `acceptStoreCredit` on the create schema, consent timestamp on insert, echoed in the 201
+      - `packages/api/tests/routes/admin/returns-store-credit.test.ts` (new) - 16 tests
+
+      **Applied**: `drizzle-kit migrate` against the dev database; columns and FK confirmed present.
+
+      **Tests**: 80 passing across `returns-store-credit.test.ts` (16), `returns.test.ts`, `admin-gift-card-refund.test.ts`, `gift-card-refund.test.ts`, `gift-card-issue.test.ts`. Verify-fail was real: all 13 original tests failed on the missing columns before the migration. Typecheck unchanged at the same 6 pre-existing `@chobii/shared` errors.
+
+      **Not done, deliberately**: no admin UI for choosing store credit, and no customer-facing checkbox on the returns form. The API contract and the record are in place; the surfaces are `packages/web` work and belong with whoever designs the returns flow, which the ticket itself called "its own surface".
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for store credit refunds
+    file: packages/api/tests/routes/returns-store-credit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/returns-store-credit.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('a return refunded as store credit', () => {
+        it('issues a gift card for the refund amount', async () => {})
+        it('emails the card to the customer', async () => {})
+        it('does not also refund Razorpay', async () => {
+          // store credit replaces the refund; doing both pays twice
+        })
+        it('is never chosen automatically when a gateway refund fails', async () => {
+          // substituting credit for money must be a decision, not a fallback
+        })
+        it('records that the customer accepted store credit', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/returns-store-credit.test.ts
+    expected_result: FAIL - store_credit is inert
+    status: pending
+  - id: 3
+    action: implement
+    description: Issue a card when a return is settled as store credit
+    file: packages/api/src/routes/returns.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/returns-store-credit.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit store credit refunds
+    command: 'git add packages/api/src/routes/returns.ts packages/api/tests/routes/returns-store-credit.test.ts && git commit -m "feat(api): settle store-credit returns as a gift card"'
+    status: pending
+current_step: 1
+started: '2026-08-11T15:32:36.961Z'
+completed: '2026-08-11T15:38:06.663Z'

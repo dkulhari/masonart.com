@@ -1,0 +1,134 @@
+ticket_number: 580
+title: The gift card suites hit the shared dev database
+description: |-
+  ## The situation
+  Six gift card suites open a real Postgres connection from `DATABASE_URL` and create their own rows:
+
+  - `tests/services/gift-card-redeem.test.ts`
+  - `tests/services/gift-card-refund.test.ts`
+  - `tests/services/gift-card-delivery.test.ts`
+  - `tests/routes/gift-card-purchase.test.ts`, `gift-card-quote.test.ts`, `gift-card-payment.test.ts`, `gift-card-release.test.ts`
+  - `tests/routes/admin/gift-cards.test.ts`
+
+  That was deliberate and is defended in each file: the properties under test are a `SELECT ... FOR UPDATE` row lock, a unique constraint settling a race, and transactional rollback. A mocked `db` can only assert that the words were written, not that the lock holds — removing `FOR UPDATE` was confirmed to fail the concurrency test, so the coverage is real.
+
+  ## What it costs
+  - They **skip silently** without `DATABASE_URL`, so CI without a database reports green while testing nothing.
+  - They run against the shared dev database, not a disposable one. They create and delete only their own rows and drop nothing, so they sit outside the `getDestructiveDbUrl` guard (`tests/helpers/destructive-db.ts`) — but that guard exists because of a real incident (#332), and "outside the guard" is a judgement, not a guarantee.
+  - Several agents run suites concurrently on this machine. Fixtures are keyed by pid so they do not collide today; a shared global like the admin liability total is not so lucky, which already forced `tests/e2e/gift-cards.spec.ts` into serial mode.
+
+  ## Options
+  Point them at a disposable `_test` database via `TEST_DATABASE_URL` and fail loudly rather than skipping when none is configured. Or wrap each test in a transaction that always rolls back, which removes the cleanup code entirely.
+
+  The one thing not to do is convert them to mocks. That would delete the only evidence the locking works.
+
+  ## Context
+  Part of feature: gift-cards
+  See `tests/helpers/destructive-db.ts` for the existing convention.
+feature: gift-cards
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:06:27.284Z'
+last_updated: '2026-08-11T16:43:14.302Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-11T16:34:33.656Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-11T16:42:51.068Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-11T16:43:14.302Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `8706cc8c` - test(api): make the live-database gift card suites loud, and runnable off a disposable database
+
+      Both options the ticket offered, and neither instead of the other. The suites stay against live Postgres and none became mocks.
+
+      **Loud, not silent**: `tests/helpers/live-db.ts` decides where they connect, and every suite now opens with `it("has one")` calling `assertLiveDbReachable`. With nothing reachable the run fails with `Could not reach postgresql://***@localhost:59999/nothing. These tests assert a row lock, a unique constraint and transactional rollback — properties a mock cannot have...` (credentials redacted). `ALLOW_MISSING_DB=true` skips out loud instead — verified both ways.
+
+      **Disposable database**: they prefer `TEST_DATABASE_URL` when set. Unlike `getDestructiveDbUrl`, a non-disposable value is not refused — these suites drop nothing, and the dev database stays a supported second-best.
+
+      **Design Decision**: `tests/setup.ts` points the *whole run* at `TEST_DATABASE_URL`, not just the suites
+
+      Each suite opens its own connection for fixtures, but the code under test connects through `src/database`, which reads `DATABASE_URL`. Setting only the suites splits the two: fixtures land in the throwaway database, routes write to the dev one, and every foreign key between them fails — which is exactly what happened on the first attempt.
+
+      ---
+
+      **Two things found while proving it works. Both matter more than the isolation.**
+
+      **1. A fresh database could not be built at all.**
+
+      ```
+      PostgresError: unsafe use of new value "gift_card" of enum type order_type
+      ```
+
+      Migration 0011 adds `gift_card` to the `order_type` enum; 0015 (mine, from #574) used that value in an index predicate. drizzle-kit applies the whole batch in ONE transaction, and Postgres refuses to use a new enum value in the transaction that added it. It worked on every existing database only because 0011 had been committed months earlier — so the chain had been unappliable-from-scratch since #574 landed, and nothing would have caught it until someone tried to create a database.
+
+      Fixed by predicating on `gift_card_purchase IS NOT NULL AND payment_status = 'paid'` — same rows, and both conjuncts appear in the sweep's own WHERE clause, so the planner still proves the implication. Re-benchmarked at 200k rows: **6.2ms bitmap scan**, identical to the measurement in #574, still using the index. 0018 converges databases migrated before the fix; the dev database was migrated and verified.
+
+      **2. The concurrency test did not test concurrency.**
+
+      The ticket says "removing `FOR UPDATE` was confirmed to fail the concurrency test, so the coverage is real". It does not fail. I removed `FOR UPDATE` from `redeemGiftCards` and the suite passed 13/13; removed it from `lockBalance` too, still 13/13.
+
+      The cause: `Promise.all` of two redeems leaves interleaving to the event loop, and in practice the window does not open. The test now holds the card row from a third connection while both redeems start, so both are guaranteed to be in flight before either can write. With the lock they queue and the second re-reads a spent card; without it they both read 50000, compute the same new balance in JS, and both write it:
+
+      ```
+      AssertionError: expected 100000 to be 50000
+      ```
+
+      The balance given away twice — the double-spend the lock exists to prevent, now actually caught. Which means the justification for running these against live Postgres is true again rather than merely asserted.
+
+      **Files Changed**:
+      - `packages/api/tests/helpers/live-db.ts` (new)
+      - `packages/api/tests/setup.ts`
+      - 11 suites: `liveDbUrl()` instead of `process.env.DATABASE_URL`, plus the loud guard
+      - `packages/api/tests/services/gift-card-redeem.test.ts` - the barrier
+      - `packages/api/src/database/migrations/0015_*.sql`, `0018_*.sql` (new), journal, `schema/orders.ts`
+      - `.env.example`
+
+      **Tests**: 415 passing against the shared dev database and 415 against a `poster_app_test` built from scratch (42 tables, migrated from empty). Typecheck 0 errors.
+
+      **Not done**: the transaction-rollback alternative the ticket floated. Wrapping each test in a transaction that always rolls back would remove the cleanup code, but the concurrency test needs two real transactions racing — it cannot live inside one — so that path would have split the suites into two idioms.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Make a missing database loud instead of silent
+    file: packages/api/tests/helpers/live-db.ts
+    status: pending
+    code: |-
+      // A suite that skips itself when DATABASE_URL is absent reports green while
+      // testing nothing. Skipping is fine locally; in CI it should fail.
+  - id: 2
+    action: implement
+    description: Point the gift card suites at a disposable database
+    file: packages/api/tests/services/gift-card-redeem.test.ts
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Confirm they still pass, and still fail without the row lock
+    command: cd packages/api && bunx vitest run tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the isolation
+    command: 'git add packages/api/tests && git commit -m "test(api): isolate the live-database gift card suites"'
+    status: pending
+current_step: 1
+started: '2026-08-11T16:34:33.656Z'
+completed: '2026-08-11T16:42:51.068Z'

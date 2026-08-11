@@ -19,18 +19,56 @@ description: |-
 feature: gift-cards
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T07:05:33.348Z'
-last_updated: '2026-08-07T07:05:33.348Z'
+last_updated: '2026-08-11T15:27:51.323Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
   - testing
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-11T15:23:57.561Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-11T15:27:33.784Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-11T15:27:51.323Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2d850be1` - test(api): prove the gift card code throttle actually returns 429
+
+      **Design Decision**: two layers, so neither can skip itself
+
+      The ticket offered "stand up Redis" or "assert the middleware is mounted at the router level". Both, because each covers the other's blind spot:
+
+      1. **The endpoint, faked Redis.** `vi.mock` on `lib/redis` with a sliding window in a `Map`, and the gift card service mocked out so no database is needed. Drives `POST /api/gift-cards/balance` through Hono and asserts the eleventh check in a minute is a 429. Runs everywhere, always, with no infrastructure — it cannot degrade into a silent skip the way the old assertion did.
+      2. **The real window, real Redis.** `vi.importActual` past the mock, `initRedis()`, then eleven calls to the actual `checkRateLimit`. Proves the counting is not fictional.
+
+      **Design Decision**: layer 2 fails loudly instead of skipping
+
+      If Redis is unreachable, the suite fails with `Redis (redis://localhost:6380) is not reachable, so the rate limit cannot be proven`. `ALLOW_MISSING_REDIS=true` opts out explicitly. A suite that reports green without a Redis would recreate the exact gap this ticket was filed for.
+
+      **Design Decision**: the key stays IP-only
+
+      The ticket flagged that `getClientIp` puts a whole NAT'd office in one bucket and asked whether IP+user would be fairer. It would be fairer and it would be worse. Identity is attacker-chosen: accounts are cheap, so one bucket per account from a single address multiplies the oracle by however many accounts someone bothers to make. And half this surface has no user at all — reading a balance requires no account by design (G2) — so a mixed scheme just lets a sweeper sign out and take whichever bucket is roomier. The failure cost the other way is a rare 429 with `Retry-After` on a page people visit once or twice. Limit left at 10/60s; loosening a money guard without usage data is not something to do quietly. Reasoning is now in the code next to the limiter, not only here.
+
+      **Verify-fail** (step 2): removing `giftCardCodeRateLimit` from `POST /balance` fails 5 of the 15 tests (429, no-lookup, headers, no-leak, spoofed-XFF). Restored, `git diff` clean, then re-run green.
+
+      **Files Changed**:
+      - `packages/api/tests/routes/gift-card-rate-limit.test.ts` (new) - 15 tests across both layers
+      - `packages/api/tests/routes/gift-card-quote.test.ts` - removed the assertion that always returned early; replaced with a comment pointing at the new suite and why it could not live there
+      - `packages/api/src/routes/gift-cards.ts` - the IP-only key decision recorded at the limiter
+
+      **Tests**: 33 passing across `gift-card-rate-limit.test.ts` (15), `gift-card-quote.test.ts`, `middleware/rate-limit.test.ts`. Real-Redis layer confirmed connected against `localhost:6380` on this run — not skipped.
+
+      **Also asserted, incidentally**: with Redis down there is no throttle at all. That is documented graceful degradation, and it is now visible in a test rather than implied by a comment.
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -87,3 +125,5 @@ implementation_steps:
     command: 'git add packages/api/tests/routes/gift-card-rate-limit.test.ts packages/api/src/routes/gift-cards.ts && git commit -m "test(api): prove the gift card code limiter throttles"'
     status: pending
 current_step: 1
+started: '2026-08-11T15:23:57.561Z'
+completed: '2026-08-11T15:27:33.784Z'

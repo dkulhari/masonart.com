@@ -1,0 +1,132 @@
+ticket_number: 579
+title: Let a gift card be bought in the same checkout as a poster
+description: |-
+  ## The limitation
+  A customer cannot buy a gift card and a poster in one order. Buying a card goes through `/gift-cards` and creates its own order; posters go through the cart. Two purchases, two payments, two receipts.
+
+  Shopify allows it. This was accepted as a v1 scope cut (design G7), not overlooked.
+
+  ## Why it was cut
+  `cart_items.productId` and `cart_items.variantId` are both NOT NULL (`schema/cart.ts:115-121`), and the cart derives `lineTotal` from the product and variant rows. A gift card has neither and its price is whatever the customer typed. Putting one in the cart needs either dummy product and variant rows — which then have to be excluded by hand from listing, facets, search, the sitemap and the sale resolver, each a place to forget — or a cart that tolerates a line with no product behind it.
+
+  ## The real fix
+  Make `cart_items.productId` and `variantId` nullable and give cart lines a type, the way `order_items.productId` already is nullable. Then a gift card is just a line the cart prices from stored values rather than from a product.
+
+  That touches every cart read, the merge-on-login path, and the sale resolver — which is exactly why it was not done inside the gift card feature.
+
+  ## Watch out for
+  The rule that a gift card order cannot be paid with a gift card (`routes/orders.ts`) is currently enforced on `orderType === 'gift_card'`. A mixed order has no single type, so that check has to become per-line, or the balance-cycling it prevents comes back.
+
+  ## Context
+  Part of feature: gift-cards
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §5, G7
+
+  Worth doing when someone asks for it. Not before.
+feature: gift-cards
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:06:27.267Z'
+last_updated: '2026-08-11T16:49:56.291Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - frontend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-11T16:03:59.367Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-11T16:49:44.351Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `fae6b867` - feat(cart): let a gift card be bought in the same checkout as a poster
+
+      Done as the ticket's "real fix" describes: `cart_items.productId` and `variantId` are nullable, cart lines have a type, and a gift card is a line the cart prices from stored values.
+
+      **Design Decision**: minting identity moved from the order to the line
+
+      The part the ticket did not call out, and the riskiest. `gift_card.purchaseOrderId` was UNIQUE, and that constraint is the whole idempotency guarantee for minting — a retried payment verification and the sweep both reach the insert, and exactly one may win. One card per *order* is only the right rule while a gift card has to be an order of its own; an order buying two cards needs two.
+
+      So `purchaseOrderItemId` is now unique and carries it. The old constraint was **replaced, not dropped**: a partial unique index covers the rows where `purchase_order_item_id IS NULL`, which is exactly the standalone `/gift-cards` flow (its order has no line items). Dropping the blanket unique without that would have silently removed the protection from every card bought before this. Both are asserted, including that a second insert against the same line and against the same standalone order each still throw.
+
+      **Design Decision**: the gift-card-pays-gift-card rule is now measured, not typed
+
+      The ticket flagged this. `orderType === 'gift_card'` cannot answer for a mixed order, so gift card tender is capped at `order total − stored value in the order`. Tender pays for the posters and never for the cards. A standalone gift card order counts its whole total as stored value, which keeps that path refusing tender exactly as before — caught by an existing test when I first implemented the cap from lines alone, since a standalone order has no lines.
+
+      **Not discounted, and I checked rather than assumed**: `resolvePromotionDiscounts` and `priceCartLine` both skip lines with no product, so stored value cannot go on sale. ₹2000 of balance sold for ₹1600 would mint money. Asserted in the cart read test.
+
+      Also: a gift card line is never merged with another (two ₹2000 cards can go to two different people, and the "same item" test compares product+variant — both null), and cannot be PATCHed (quantity would have to mean "how many codes", each with its own recipient; editing the amount would be an endpoint for editing money). Saving for later and removing still work.
+
+      **Delivery** reads both shapes: `deliverImmediateGiftCard` mints per line and still handles an order-level purchase, and the sweep runs a second query over order lines. A mixed order is not a gift card order, so the line query cannot lean on `order_type`. `isMintCollision` now recognises both constraint names — it matched the old one by substring, and neither new name contains it.
+
+      **Files Changed** (API): `schema/cart.ts` (`lineType`, nullable product/variant, `giftCardPurchase`), `schema/orders.ts` (`orderItems.giftCardPurchase`), `schema/gift-cards.ts` (`purchaseOrderItemId` + both constraints), migration `0017` + journal, `routes/cart.ts` (`POST /api/cart/gift-cards`, merge and PATCH guards), `routes/orders.ts` (validation skip, gift card snapshot, tender cap), `services/gift-card.ts`, `services/gift-card-delivery.ts`.
+
+      **Files Changed** (web): `lib/cart-projection.ts` (a card line titles itself and says who it is for), `stores/cart.ts`, `routes/cart/index.tsx` (`lineKey` for lines with no product), `components/cart/CartItem.tsx` (no link — `/posters/undefined` is a 404 — no image, no stepper), `components/gift-cards/GiftCardPurchaseForm.tsx` + `routes/gift-cards/index.tsx` ("Add to cart" beside "Continue to payment", behind the same validation).
+
+      **Tests**:
+      - `tests/routes/cart-gift-card-lines.test.ts` (new): 16 against live Postgres
+      - `tests/database/gift-card-delivery-schema.test.ts`: updated to the new invariant, plus the partial index
+      - Regression: 1004 passing across `tests/services/`, `tests/database/`, all gift card route suites, `cart.test.ts`, `cart-guest-merge.test.ts`, `cart-sale-pricing.test.ts`, `cart-frame-pricing.test.ts`, `orders.test.ts`
+      - Web: 248 passing across `tests/lib/`, `tests/components/cart/`, `tests/components/checkout/`, `tests/stores/`, including 7 new projection tests
+      - E2E: a mixed-cart journey in `tests/e2e/gift-cards.spec.ts` — poster added, card added from `/gift-cards`, both in one cart, card titled from its amount, no `/posters/undefined` link
+      - Typecheck: API 0 errors; web 22, down from 25 before this session
+
+      **Scope note**: this ticket was an epic, not a ticket — its own text says "worth doing when someone asks for it". It rewrote the minting idempotency guarantee, every cart read, the merge-on-login path, order creation, and the payment guard. It is complete and green, but it is the change in this feature most worth a second pair of eyes before it ships.
+  - author: system
+    timestamp: '2026-08-11T16:49:56.291Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for a mixed cart
+    file: packages/api/tests/routes/cart-gift-card-line.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/cart-gift-card-line.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('a cart holding a gift card and a poster', () => {
+        it('prices the gift card line from what the customer chose', async () => {})
+        it('leaves the gift card out of the sale resolver', async () => {
+          // tender is not a product; a promotion must not discount it
+        })
+        it('refuses to pay the gift card line with a gift card', async () => {
+          // per line now, since a mixed order has no single orderType
+        })
+        it('mints only the gift card line on payment', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/cart-gift-card-line.test.ts
+    expected_result: FAIL - the cart cannot hold a line with no product
+    status: pending
+  - id: 3
+    action: implement
+    description: Make cart lines tolerate having no product behind them
+    file: packages/api/src/database/schema/cart.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the whole cart suite still passes
+    command: cd packages/api && bunx vitest run tests/routes/cart.test.ts tests/routes/cart-gift-card-line.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit mixed carts
+    command: 'git add packages/api/src packages/api/tests && git commit -m "feat(api): allow a gift card and a poster in one cart"'
+    status: pending
+current_step: 1
+started: '2026-08-11T16:03:59.367Z'
+completed: '2026-08-11T16:49:56.291Z'
