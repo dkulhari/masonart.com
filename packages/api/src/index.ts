@@ -62,6 +62,7 @@ import {
   startReviewMediaWorker,
   closeReviewMediaQueue,
 } from "./queues/review-media";
+import { startBackgroundWorkers, type BackgroundWorkers } from "./background";
 
 const app = new Hono();
 
@@ -376,8 +377,14 @@ app.onError((err, c) => {
 // pulled in by routes/ai). Review media transcoding is started explicitly here
 // instead: it shells out to ffmpeg, so it must not spin up inside test runs or
 // one-off scripts that merely import this module.
+let backgroundWorkers: BackgroundWorkers | undefined;
+
 if (process.env.NODE_ENV !== "test") {
   startReviewMediaWorker();
+
+  // Periodic sweeps: scheduled gift card delivery and approval deadlines.
+  // See src/background.ts for why every instance runs them and how to opt out.
+  backgroundWorkers = startBackgroundWorkers();
 
   let shuttingDown = false;
 
@@ -387,6 +394,9 @@ if (process.env.NODE_ENV !== "test") {
     // server.
     if (shuttingDown) return;
     shuttingDown = true;
+
+    logger.info({ signal }, "Shutting down: stopping background workers");
+    backgroundWorkers?.stop();
 
     logger.info({ signal }, "Shutting down: closing review media queue");
     try {
