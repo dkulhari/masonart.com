@@ -114,7 +114,12 @@ export const giftCards = pgTable(
     purchaseOrderUnique: unique("gift_card_purchase_order_id_unique").on(
       table.purchaseOrderId,
     ),
-    sendAtIdx: index("gift_card_send_at_idx").on(table.sendAt),
+    // No index on `sendAt`. It was added when the sweep was expected to ask
+    // `gift_card` what was due, and minting then moved to delivery time — a
+    // scheduled card does not exist yet at the moment the sweep looks for it.
+    // The sweep now reads `orders` (see `orders_gift_card_delivery_idx`), and
+    // `gift_card.sendAt` is a record of what the buyer chose, copied at mint,
+    // that nothing queries.
   }),
 );
 

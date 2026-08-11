@@ -53,3 +53,41 @@ describe("orders.giftCardPurchase", () => {
     expect(orders.giftCardPurchase.notNull).toBe(false);
   });
 });
+
+describe("what the sweep costs to run", () => {
+  it("indexes orders, which is the table the sweep actually reads", () => {
+    const { indexes } = getTableConfig(orders);
+
+    const deliveryIndex = indexes.find(
+      (index) => index.config.name === "orders_gift_card_delivery_idx",
+    );
+
+    // Every five minutes, forever, against the largest table here. Without
+    // this the sweep scans all of orders to find the fraction of a percent
+    // that are gift cards.
+    expect(deliveryIndex).toBeDefined();
+  });
+
+  it("keeps that index partial, or it indexes the whole orders table", () => {
+    const { indexes } = getTableConfig(orders);
+
+    const deliveryIndex = indexes.find(
+      (index) => index.config.name === "orders_gift_card_delivery_idx",
+    );
+
+    expect(deliveryIndex?.config.where).toBeDefined();
+  });
+
+  it("does not index gift_card.send_at, which nothing queries", () => {
+    const { indexes } = getTableConfig(giftCards);
+
+    const sendAtIndex = indexes.find(
+      (index) => index.config.name === "gift_card_send_at_idx",
+    );
+
+    // The sweep decides what is due from orders — a scheduled card does not
+    // exist yet at that point. gift_card.send_at is a record of what the buyer
+    // chose, copied at mint, and an index on it is write cost for no reads.
+    expect(sendAtIndex).toBeUndefined();
+  });
+});
