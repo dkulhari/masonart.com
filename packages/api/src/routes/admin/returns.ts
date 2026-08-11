@@ -27,9 +27,17 @@ import {
   refundTypeEnum,
   type ReturnStatus,
   type ReturnReason,
+  type RefundType,
 } from "../../database/schema/returns";
 import { orders, type PaymentStatus } from "../../database/schema/orders";
 import { users } from "../../database/schema/users";
+import { giftCards } from "../../database/schema/gift-cards";
+import { issueGiftCard } from "../../services/gift-card";
+import { sendGiftCardEmail } from "../../services/gift-card-delivery";
+import {
+  GIFT_CARD_MIN_PAISE,
+  GIFT_CARD_MAX_PAISE,
+} from "@chobii/shared";
 import {
   requireAuth,
   requireAdmin,
@@ -91,6 +99,48 @@ const processRefundSchema = z.object({
   refundAmount: z.number().positive(),
   refundType: z.enum(REFUND_TYPE_VALUES as unknown as [string, ...string[]]),
 });
+
+/**
+ * Settles a return as store credit: a gift card for the refund amount, emailed
+ * to the customer.
+ *
+ * Deliberately its own function, called from exactly one place under an
+ * explicit `refundType === "store_credit"` test. Store credit is a
+ * substitution — the customer is given a voucher *instead of* their money —
+ * and an ordinary refund goes back proportionally to whatever paid for the
+ * order (#557). It must never become what happens when a gateway refund
+ * fails: doing that to someone's card payment without their agreement is what
+ * invites chargebacks.
+ *
+ * Consent is checked by the caller before anything is created.
+ */
+async function issueStoreCredit(input: {
+  returnId: string;
+  orderId: string;
+  orderNumber: string;
+  refundAmountPaise: number;
+  customerEmail: string;
+  customerName: string | null;
+}): Promise<{ giftCardId: string }> {
+  const { card, code } = await issueGiftCard({
+    amountPaise: input.refundAmountPaise,
+    recipientEmail: input.customerEmail,
+    recipientName: input.customerName,
+    senderName: "chobii.art",
+    // The code exists once, in this return value. It is emailed below and
+    // never stored, logged, or returned to the admin caller.
+    description: `Store credit for return ${input.returnId.slice(0, 8)} on order ${input.orderId.slice(0, 8)} (${input.orderNumber})`,
+  });
+
+  await sendGiftCardEmail(card, code);
+
+  await db
+    .update(giftCards)
+    .set({ sentAt: new Date() })
+    .where(eq(giftCards.id, card.id));
+
+  return { giftCardId: card.id };
+}
 
 // ============================================================================
 // Route Handler
@@ -632,13 +682,19 @@ adminReturnsApp.post(
           id: returnRequests.id,
           status: returnRequests.status,
           orderId: returnRequests.orderId,
+          storeCreditAcceptedAt: returnRequests.storeCreditAcceptedAt,
+          storeCreditGiftCardId: returnRequests.storeCreditGiftCardId,
+          customerEmail: users.email,
+          customerName: users.name,
           order: {
             id: orders.id,
             total: orders.total,
+            orderNumber: orders.orderNumber,
           },
         })
         .from(returnRequests)
         .innerJoin(orders, eq(returnRequests.orderId, orders.id))
+        .innerJoin(users, eq(returnRequests.userId, users.id))
         .where(eq(returnRequests.id, returnId))
         .limit(1);
 
@@ -670,6 +726,68 @@ adminReturnsApp.post(
         );
       }
 
+      const isStoreCredit = refundType === "store_credit";
+      let storeCreditGiftCardId: string | null = null;
+
+      if (isStoreCredit) {
+        // Consent, checked before anything is created. The customer has to
+        // have agreed to take a voucher instead of their money; substituting
+        // it silently is what invites chargebacks.
+        if (!existing.storeCreditAcceptedAt) {
+          return c.json(
+            {
+              error:
+                "This return cannot be settled as store credit: the customer has not accepted store credit for it.",
+            },
+            400,
+          );
+        }
+
+        // Belt to the status guard's braces. Re-settling is already blocked
+        // because the return leaves the refundable statuses, but a duplicate
+        // here is duplicated money.
+        if (existing.storeCreditGiftCardId) {
+          return c.json(
+            { error: "Store credit has already been issued for this return" },
+            400,
+          );
+        }
+
+        const refundAmountPaise = Math.round(refundAmount * 100);
+
+        // A card has a floor and a ceiling, and a refund does not. Say so
+        // rather than quietly rounding someone's money to fit.
+        if (refundAmountPaise < GIFT_CARD_MIN_PAISE) {
+          return c.json(
+            {
+              error: `Store credit must be at least Rs ${GIFT_CARD_MIN_PAISE / 100}. Refund this return to the original payment method instead.`,
+            },
+            400,
+          );
+        }
+        if (refundAmountPaise > GIFT_CARD_MAX_PAISE) {
+          return c.json(
+            {
+              error: `Store credit cannot exceed Rs ${GIFT_CARD_MAX_PAISE / 100}. Refund this return to the original payment method instead.`,
+            },
+            400,
+          );
+        }
+
+        // Before the return is marked refunded: if issuing or emailing fails,
+        // the return stays settleable rather than closing with nothing behind
+        // it.
+        const issued = await issueStoreCredit({
+          returnId,
+          orderId: existing.orderId,
+          orderNumber: existing.order.orderNumber,
+          refundAmountPaise,
+          customerEmail: existing.customerEmail,
+          customerName: existing.customerName,
+        });
+        storeCreditGiftCardId = issued.giftCardId;
+      }
+
       const now = new Date();
 
       // Update the return request
@@ -678,6 +796,8 @@ adminReturnsApp.post(
         .set({
           status: "refunded",
           refundAmount: refundAmount.toFixed(2),
+          refundType: refundType as RefundType,
+          storeCreditGiftCardId,
           processedAt: now,
           updatedAt: now,
         })
@@ -698,12 +818,18 @@ adminReturnsApp.post(
         .where(eq(orders.id, existing.orderId));
 
       return c.json({
-        message: "Refund processed successfully",
+        message: isStoreCredit
+          ? "Store credit issued and emailed to the customer"
+          : "Refund processed successfully",
         return: refundedReturn,
         refund: {
           amount: refundAmount,
           type: refundType,
           processedAt: now.toISOString(),
+          // The id, never the code. The plaintext went to the customer's
+          // inbox; putting it here would leave a bearer instrument in a
+          // support tool's network log.
+          storeCreditGiftCardId,
         },
       });
     } catch (error) {

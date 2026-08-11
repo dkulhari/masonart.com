@@ -16,6 +16,7 @@ import {
 import { relations } from "drizzle-orm";
 import { orders } from "./orders";
 import { users } from "./users";
+import { giftCards } from "./gift-cards";
 
 // ============================================================================
 // Enums
@@ -115,6 +116,39 @@ export const returnRequests = pgTable(
 
     // Refund information
     refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }),
+
+    /**
+     * How this return was actually settled. Null until a refund is processed.
+     *
+     * `return_policies.refundType` says what a policy prefers; this says what
+     * happened to this return. Reporting cannot tell money returned to a card
+     * apart from money returned as store credit without it, and they are not
+     * the same liability.
+     */
+    refundType: refundTypeEnum("refund_type"),
+
+    /**
+     * When the customer agreed to take store credit instead of their money.
+     *
+     * Required before a store credit refund can be processed. Converting a
+     * card payment into credit without agreement is what invites chargebacks,
+     * so the agreement is a stored fact rather than an assumption about what
+     * some screen showed.
+     */
+    storeCreditAcceptedAt: timestamp("store_credit_accepted_at", {
+      withTimezone: true,
+    }),
+
+    /**
+     * The card issued for a store credit settlement.
+     *
+     * Also the idempotency guard: a return that already has one cannot be
+     * settled as store credit twice.
+     */
+    storeCreditGiftCardId: uuid("store_credit_gift_card_id").references(
+      () => giftCards.id,
+      { onDelete: "set null" },
+    ),
 
     // Admin notes
     adminNotes: text("admin_notes"),

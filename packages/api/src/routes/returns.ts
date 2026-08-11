@@ -54,6 +54,15 @@ const RETURN_REASON_VALUES = returnReasonEnum.enumValues;
 const createReturnSchema = z.object({
   reason: z.enum(RETURN_REASON_VALUES as unknown as [string, ...string[]]),
   reasonDetails: z.string().min(10).max(2000),
+  /**
+   * The customer accepts store credit instead of their money back.
+   *
+   * Opt-in, defaulting to false: taking someone's card payment and returning
+   * a voucher without their agreement is what invites chargebacks. The
+   * acceptance is stored with a timestamp, and an admin cannot settle a
+   * return as store credit without one (#577).
+   */
+  acceptStoreCredit: z.boolean().optional(),
 });
 
 // ============================================================================
@@ -315,7 +324,7 @@ returnsApp.post(
   zValidator("json", createReturnSchema),
   async (c) => {
     const orderId = c.req.param("orderId");
-    const { reason, reasonDetails } = c.req.valid("json");
+    const { reason, reasonDetails, acceptStoreCredit } = c.req.valid("json");
     const user = c.get("user");
 
     // Validate UUID format
@@ -340,6 +349,9 @@ returnsApp.post(
           reason: reason as ReturnReason,
           reasonDetails,
           status: "pending",
+          // When, not whether: an admin settling this as store credit later
+          // needs to point at the moment the customer agreed.
+          storeCreditAcceptedAt: acceptStoreCredit ? new Date() : null,
         })
         .returning();
 
@@ -353,6 +365,7 @@ returnsApp.post(
             reasonDetails: newReturn!.reasonDetails,
             status: newReturn!.status,
             requestedAt: newReturn!.requestedAt,
+            storeCreditAcceptedAt: newReturn!.storeCreditAcceptedAt,
           },
         },
         201
