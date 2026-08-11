@@ -64,16 +64,34 @@ interface RazorpayResponse {
 
 type PaymentStatus = 'idle' | 'creating_order' | 'initiating_payment' | 'processing' | 'verifying' | 'success' | 'error'
 
-interface PaymentButtonProps {
-  /** Order input data. Not needed when `existingOrderId` is given. */
-  orderData?: OrderInput
-  /**
-   * Pay for an order that already exists, skipping creation.
-   *
-   * Used by the gift card flow, which builds its own order because a gift
-   * card cannot go through the cart.
-   */
-  existingOrderId?: string
+/**
+ * What this payment is for. Exactly one, enforced at compile time.
+ *
+ * The button used to require `orderData`. Gift card purchases made it optional
+ * — a gift card order already exists by the time the button renders — and for
+ * a while that meant neither was required: passing both, or neither, compiled
+ * and then threw at the click, on the most expensive screen in the product.
+ *
+ * `?: never` is what makes the arms exclusive rather than merely optional.
+ */
+type PaymentTarget =
+  | {
+      /** Order input data; the order is created when the customer pays. */
+      orderData: OrderInput
+      existingOrderId?: never
+    }
+  | {
+      /**
+       * Pay for an order that already exists, skipping creation.
+       *
+       * Used by the gift card flow, which builds its own order because a gift
+       * card cannot go through the cart.
+       */
+      existingOrderId: string
+      orderData?: never
+    }
+
+type PaymentButtonProps = PaymentTarget & {
   /** Gift card codes to spend on this order. Debited at initiation. */
   giftCardCodes?: string[]
   /** Total amount to be paid */

@@ -1,0 +1,18 @@
+{
+  // Type-level test suites (`*.test-d.ts`), run by `bun run test:types`.
+  //
+  // tsconfig.json covers app/** only, and vitest's typecheck runner reuses it:
+  // a test file outside the project gets no diagnostics at all, so a
+  // `@ts-expect-error` there guards nothing and the run reports "no errors"
+  // however wrong the file is (#576). This adds tests/ to the project.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["app/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist", ".output", ".vinxi"]
+}

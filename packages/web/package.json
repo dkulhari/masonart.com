@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf .output .vinxi dist .turbo node_modules/.vite",
     "test": "vitest run",
+    "test:types": "vitest --typecheck.only --run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
