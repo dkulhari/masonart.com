@@ -322,22 +322,11 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/balance", () => {
     expect(response.status).toBe(400);
   });
 
-  it("is rate limited", async () => {
-    if (!reachable) return;
-
-    // The limiter no-ops without Redis and is bypassed by
-    // DISABLE_RATE_LIMIT outside production, so assert the throttle only when
-    // it can actually engage. Claiming a pass otherwise would be a lie.
-    const { isRedisConnected } = await import("../../src/lib/redis");
-    if (!isRedisConnected() || process.env.DISABLE_RATE_LIMIT === "true") {
-      return;
-    }
-
-    const responses = [];
-    for (let attempt = 0; attempt < 12; attempt++) {
-      responses.push((await balance("ZZZZZZZZZZZZZZZZ")).status);
-    }
-
-    expect(responses).toContain(429);
-  });
+  // The throttle is proven in tests/routes/gift-card-rate-limit.test.ts.
+  //
+  // It used to be asserted here, and never was: this suite runs with a real
+  // database but no Redis and with DISABLE_RATE_LIMIT set, so the assertion
+  // returned early on every run and reported green (#575). Driving the
+  // limiter needs the Redis primitives faked and the bypass removed, which
+  // are not things this suite wants — so it moved rather than pretending.
 });

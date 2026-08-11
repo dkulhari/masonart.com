@@ -71,6 +71,19 @@ const giftCardsApp = new Hono<{ Variables: AuthVariables }>();
  * free-money oracle when left open. Sixteen Crockford characters are
  * unguessable, but admin-issued cards are a smaller, shorter-lived population
  * and an unthrottled check invites a sweep.
+ *
+ * Keyed on IP alone, and that is a decision rather than an inheritance from
+ * `otpRateLimit` (#575). Adding the user id would be fairer to a whole office
+ * behind one NAT — they share ten checks a minute — but it hands the attacker
+ * the key: accounts are cheap and an identity they choose means one bucket
+ * per account from a single address. Half of this surface has no user to key
+ * on anyway, because reading a balance deliberately requires no account (G2),
+ * so a mixed scheme would just let a sweeper sign out and take the roomier
+ * bucket. The cost of being wrong this way is a rare 429 with a Retry-After
+ * on a page people visit once or twice; the other way it is unmetered
+ * guessing at money.
+ *
+ * Proven to engage in `tests/routes/gift-card-rate-limit.test.ts`.
  */
 const giftCardCodeRateLimit = rateLimit({
   limit: 10,
