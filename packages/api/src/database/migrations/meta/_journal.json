@@ -127,6 +127,13 @@
       "when": 1786406520000,
       "tag": "0017_mixed_cart_gift_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786406580000,
+      "tag": "0018_gift_card_delivery_index_predicate",
+      "breakpoints": true
     }
   ]
 }

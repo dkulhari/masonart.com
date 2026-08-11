@@ -39,6 +39,10 @@ import { orders, orderItems } from "../../src/database/schema/orders";
 import { giftCards } from "../../src/database/schema/gift-cards";
 import { users } from "../../src/database/schema/users";
 import * as schema from "../../src/database/schema";
+import {
+  liveDbUrl,
+  assertLiveDbReachable,
+} from "../helpers/live-db";
 
 vi.mock("../../src/services/email", () => ({
   sendTemplateEmail: vi.fn().mockResolvedValue(undefined),
@@ -60,7 +64,7 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   }),
 }));
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = liveDbUrl();
 
 let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -148,6 +152,21 @@ function addGiftCard(body: Record<string, unknown> = GIFT_CARD_BODY) {
     body: JSON.stringify(body),
   });
 }
+
+
+/**
+ * Loud, not silent (#580).
+ *
+ * Everything below asserts something a mock cannot have — a row lock, a unique
+ * constraint settling a race, transactional rollback — and every one of those
+ * assertions is behind `if (!reachable) return`. Without this, a run with no
+ * database reports green having tested nothing.
+ */
+describe("this suite needs a real database", () => {
+  it("has one", () => {
+    assertLiveDbReachable(reachable);
+  });
+});
 
 describe("POST /api/cart/gift-cards", () => {
   it("adds a line with no product and no variant behind it", async () => {

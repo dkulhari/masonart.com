@@ -21,6 +21,10 @@ import { orders, orderItems } from "../../src/database/schema/orders";
 import { giftCards, giftCardTransactions } from "../../src/database/schema/gift-cards";
 import { users } from "../../src/database/schema/users";
 import * as schema from "../../src/database/schema";
+import {
+  liveDbUrl,
+  assertLiveDbReachable,
+} from "../helpers/live-db";
 
 const sendTemplateEmailMock = vi.fn();
 
@@ -28,7 +32,7 @@ vi.mock("../../src/services/email", () => ({
   sendTemplateEmail: (...args: unknown[]) => sendTemplateEmailMock(...args),
 }));
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = liveDbUrl();
 
 let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -167,6 +171,21 @@ const nextWeek = () => new Date(Date.now() + 7 * 86_400_000);
 // ============================================================================
 // Tests
 // ============================================================================
+
+
+/**
+ * Loud, not silent (#580).
+ *
+ * Everything below asserts something a mock cannot have — a row lock, a unique
+ * constraint settling a race, transactional rollback — and every one of those
+ * assertions is behind `if (!reachable) return`. Without this, a run with no
+ * database reports green having tested nothing.
+ */
+describe("this suite needs a real database", () => {
+  it("has one", () => {
+    assertLiveDbReachable(reachable);
+  });
+});
 
 describe.skipIf(!DATABASE_URL)("sweepScheduledGiftCards", () => {
   it("mints and sends when the send date has arrived", async () => {

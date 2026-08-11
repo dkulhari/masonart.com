@@ -14,4 +14,16 @@ DROP INDEX IF EXISTS "gift_card_send_at_idx";--> statement-breakpoint
 -- The send date stays out of the index: (gift_card_purchase ->> 'sendAt')
 -- ::timestamptz is STABLE, not IMMUTABLE, and Postgres rejects it outright.
 -- Measured at 200k orders: 17.1ms sequential scan to 6.3ms bitmap scan, 48kB.
-CREATE INDEX IF NOT EXISTS "orders_gift_card_delivery_idx" ON "orders" USING btree ("id") WHERE "orders"."order_type" = 'gift_card' AND "orders"."payment_status" = 'paid';
+--
+-- The predicate deliberately does NOT say `order_type = 'gift_card'`.
+--
+-- That value is added to the enum by 0011, and drizzle-kit runs the whole
+-- migration batch in ONE transaction — so on a fresh database Postgres refuses
+-- with `unsafe use of new value "gift_card" of enum type order_type`, and the
+-- entire chain fails to apply. It worked on already-migrated databases only
+-- because 0011 had been committed months earlier (#580).
+--
+-- `gift_card_purchase IS NOT NULL` selects exactly the same rows: it is the
+-- column the standalone purchase lives on, and the sweep's WHERE clause
+-- carries that conjunct too, so the planner can still prove the predicate.
+CREATE INDEX IF NOT EXISTS "orders_gift_card_delivery_idx" ON "orders" USING btree ("id") WHERE "orders"."gift_card_purchase" IS NOT NULL AND "orders"."payment_status" = 'paid';

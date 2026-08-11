@@ -22,6 +22,10 @@ import { orders } from "../../src/database/schema/orders";
 import { users } from "../../src/database/schema/users";
 import * as schema from "../../src/database/schema";
 import { hashGiftCardCode } from "../../src/lib/gift-card-code";
+import {
+  liveDbUrl,
+  assertLiveDbReachable,
+} from "../helpers/live-db";
 
 // Partial mock: the orders route pulls in cart, which needs optionalAuth and
 // the rest of the real middleware. Only the session check is swapped out.
@@ -35,7 +39,7 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   }),
 }));
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = liveDbUrl();
 
 let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -192,6 +196,21 @@ function balance(code: string) {
 // ============================================================================
 // Quote against an order
 // ============================================================================
+
+
+/**
+ * Loud, not silent (#580).
+ *
+ * Everything below asserts something a mock cannot have — a row lock, a unique
+ * constraint settling a race, transactional rollback — and every one of those
+ * assertions is behind `if (!reachable) return`. Without this, a run with no
+ * database reports green having tested nothing.
+ */
+describe("this suite needs a real database", () => {
+  it("has one", () => {
+    assertLiveDbReachable(reachable);
+  });
+});
 
 describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/gift-card", () => {
   it("reports what the card could pay without debiting it", async () => {

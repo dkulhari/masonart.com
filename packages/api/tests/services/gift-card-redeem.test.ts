@@ -27,8 +27,12 @@ import {
 import { orders } from "../../src/database/schema/orders";
 import * as schema from "../../src/database/schema";
 import { hashGiftCardCode } from "../../src/lib/gift-card-code";
+import {
+  liveDbUrl,
+  assertLiveDbReachable,
+} from "../helpers/live-db";
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = liveDbUrl();
 
 let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -157,6 +161,21 @@ async function balanceOf(cardId: string): Promise<number> {
 // Tests
 // ============================================================================
 
+
+/**
+ * Loud, not silent (#580).
+ *
+ * Everything below asserts something a mock cannot have — a row lock, a unique
+ * constraint settling a race, transactional rollback — and every one of those
+ * assertions is behind `if (!reachable) return`. Without this, a run with no
+ * database reports green having tested nothing.
+ */
+describe("this suite needs a real database", () => {
+  it("has one", () => {
+    assertLiveDbReachable(reachable);
+  });
+});
+
 describe.skipIf(!DATABASE_URL)("redeemGiftCards", () => {
   it("debits no more than the amount due", async () => {
     if (!reachable) return;
@@ -210,13 +229,39 @@ describe.skipIf(!DATABASE_URL)("redeemGiftCards", () => {
     const orderA = await makeOrder("500.00");
     const orderB = await makeOrder("500.00");
 
-    // Two different orders, same code, at the same moment. Without the row
-    // lock both read 50000, both debit, and the business gives away the
-    // balance twice.
-    const [resultA, resultB] = await Promise.allSettled([
+    /**
+     * A barrier, so the race is real rather than hoped for (#580).
+     *
+     * Firing two redeems with `Promise.all` and trusting them to interleave
+     * does not test the lock: whether the window opens is up to the event
+     * loop, and in practice it usually does not — this test passed with
+     * `FOR UPDATE` deleted, which is exactly the reassurance it exists to
+     * provide.
+     *
+     * So the row is held from a third connection while both redeems start.
+     * `FOR UPDATE` makes them queue behind it and then behind each other, so
+     * the second re-reads a spent card. Without it they read the same 50000
+     * under MVCC, compute the same new balance in JS, and both write it —
+     * the business gives away the balance twice.
+     */
+    const barrier = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
+    const released = barrier.begin(async (tx) => {
+      await tx`SELECT id FROM gift_card WHERE id = ${id} FOR UPDATE`;
+      // Long enough for both redeems below to reach their own read.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    // Let the barrier take the lock before the racers ask for it.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const race = Promise.allSettled([
       db.transaction((tx) => redeemGiftCards(tx, orderA, [code], 50_000, null)),
       db.transaction((tx) => redeemGiftCards(tx, orderB, [code], 50_000, null)),
     ]);
+
+    await released;
+    const [resultA, resultB] = await race;
+    await barrier.end();
 
     const totalApplied = [resultA, resultB]
       .filter((r) => r.status === "fulfilled")

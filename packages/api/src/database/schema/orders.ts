@@ -323,7 +323,12 @@ export const orders = pgTable(
     giftCardDeliveryIdx: index("orders_gift_card_delivery_idx")
       .on(table.id)
       .where(
-        sql`${table.orderType} = 'gift_card' AND ${table.paymentStatus} = 'paid'`,
+        // NOT `order_type = 'gift_card'`, deliberately. That enum value is
+        // added by migration 0011, drizzle-kit applies the whole batch in one
+        // transaction, and Postgres refuses to USE a new enum value in the
+        // transaction that added it — so a predicate naming it makes the chain
+        // unappliable to any fresh database (#580). This selects the same rows.
+        sql`${table.giftCardPurchase} IS NOT NULL AND ${table.paymentStatus} = 'paid'`,
       ),
   })
 );
