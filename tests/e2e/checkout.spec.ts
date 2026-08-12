@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { seedGuestCart, clearGuestCart, waitForCartToLoad } from './helpers/cart';
+
 /**
  * Checkout Page E2E Tests
  *
@@ -23,6 +25,15 @@ import { test, expect, type Page } from '@playwright/test';
  * - packages/web/app/components/checkout/OrderSummary.tsx
  * - packages/web/app/components/checkout/PaymentButton.tsx
  */
+
+/**
+ * Every test here seeds a cart and then waits for the server cart to arrive
+ * (see `helpers/cart.ts`), against a dev server that several sessions may be
+ * hammering at once. At the 30s default a slow load spent the whole test
+ * budget inside that wait and reported as a timeout rather than as slowness.
+ * Raising it only changes how long a genuinely stuck test takes to give up.
+ */
+test.describe.configure({ timeout: 60_000 });
 
 // ============================================================================
 // Helper Functions
@@ -83,7 +94,24 @@ async function setupShippingMock(page: Page, cartTotal = 2999) {
 }
 
 /**
- * Add a test item to cart via localStorage
+ * Put an item in the cart the checkout page will actually read (#359).
+ *
+ * Was a write to the zustand store's `localStorage` key, which `CartSync`
+ * overwrites from the server cart on mount (#511) — so the item vanished a
+ * moment after load and every assertion below it raced that fetch. Now it
+ * seeds the server cart through the real API, using a real catalogue row.
+ *
+ * Call it from a page that is NOT `/checkout`: setups seed from `/` and then
+ * navigate to `/checkout`, rather than loading `/checkout` empty and reloading
+ * it. Two reasons — it halves the number of checkout loads per test, and the
+ * empty checkout page can navigate away underneath the seeding request, which
+ * killed it with "Execution context was destroyed".
+ *
+ * The signature is unchanged so call sites did not have to move. `unitPrice`
+ * still decides which side of the ₹999 free shipping threshold the line lands
+ * on; the exact figure comes from the catalogue, because prices cannot be
+ * invented. `productTitle` is now only a label for whoever reads the test —
+ * the title on screen is the real product's.
  */
 async function addItemToCart(page: Page, itemOverrides?: Partial<{
   id: string;
@@ -92,31 +120,21 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
   framePrice: number;
   quantity: number;
 }>) {
-  const item = {
-    id: itemOverrides?.id || 'test_item_1',
-    productId: 'prod_123',
-    variantId: 'var_123',
-    frameId: null,
-    quantity: itemOverrides?.quantity || 1,
-    productTitle: itemOverrides?.productTitle || 'Test Poster',
-    productSlug: 'abstract/test-poster',
-    thumbnailUrl: '',
-    sizeLabel: '24x32 inches',
-    widthInches: 24,
-    heightInches: 32,
-    unitPrice: itemOverrides?.unitPrice || 2999,
-    framePrice: itemOverrides?.framePrice || 0,
-    isAiGenerated: false,
-    addedAt: new Date().toISOString(),
-  };
+  const seeded = await seedGuestCart(page, {
+    unitPrice: itemOverrides?.unitPrice,
+    quantity: itemOverrides?.quantity,
+    exclude: seededVariants.get(page) ?? [],
+  });
 
-  await page.evaluate((cartItem) => {
-    const existing = localStorage.getItem('chobii-cart-storage');
-    let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
-    data.state.items.push(cartItem);
-    localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
-  }, item);
+  // Track what this test has used, so a second call is a second line rather
+  // than a bigger quantity on the first.
+  const used = seededVariants.get(page) ?? [];
+  used.push(seeded.variantId);
+  seededVariants.set(page, used);
 }
+
+/** Variant ids already seeded, per page, so repeat calls make distinct lines. */
+const seededVariants = new WeakMap<Page, string[]>();
 
 /**
  * Fill address form with valid data
@@ -137,10 +155,11 @@ async function fillValidAddressForm(page: Page) {
 
 test.describe('Checkout Page - Header', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Test Poster', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display page title', async ({ page }) => {
@@ -180,7 +199,7 @@ test.describe('Checkout Page - Empty Cart State', () => {
   test.beforeEach(async ({ page }) => {
     // Need to navigate first to access localStorage
     await page.goto('/');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await clearGuestCart(page);
     await page.goto('/checkout');
   });
 
@@ -217,10 +236,11 @@ test.describe('Checkout Page - Empty Cart State', () => {
 
 test.describe('Checkout Page - Progress Steps', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Progress Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display all checkout steps', async ({ page }) => {
@@ -231,8 +251,10 @@ test.describe('Checkout Page - Progress Steps', () => {
   });
 
   test('should highlight current step', async ({ page }) => {
-    // Shipping should be the current step initially
-    const shippingStep = page.locator('.bg-brand-500').first();
+    // Shipping should be the current step initially. The highlight is
+    // `bg-primary` since the monochrome sweep (3b57467e); `bg-brand-500` has
+    // not existed on this route since.
+    const shippingStep = page.locator('.bg-primary').first();
     await expect(shippingStep).toBeVisible();
   });
 
@@ -257,10 +279,11 @@ test.describe('Checkout Page - Progress Steps', () => {
 
 test.describe('Checkout Page - Shipping Step', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Shipping Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display Shipping Address section title', async ({ page }) => {
@@ -374,10 +397,11 @@ test.describe('Checkout Page - Shipping Step', () => {
 
 test.describe('Checkout Page - Address Form Validation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Validation Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should show error for empty full name', async ({ page }) => {
@@ -530,10 +554,11 @@ test.describe('Checkout Page - Address Form Validation', () => {
 test.describe('Checkout Page - Delivery Step', () => {
   test.beforeEach(async ({ page }) => {
     await setupShippingMock(page);
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Delivery Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
 
     // Fill valid address and proceed to delivery
     await fillValidAddressForm(page);
@@ -570,14 +595,17 @@ test.describe('Checkout Page - Delivery Step', () => {
 
   test('should have Standard Delivery selected by default', async ({ page }) => {
     const standardOption = page.getByRole('button', { name: /Standard Delivery/ });
-    await expect(standardOption).toHaveClass(/border-brand-500/);
+    // aria-pressed, not a colour class: the checkout routes moved onto the
+    // monochrome system in 3b57467e and `border-brand-500` no longer exists,
+    // so this assertion had been checking a token rather than the selection.
+    await expect(standardOption).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('should allow selecting Express Delivery', async ({ page }) => {
     const expressOption = page.getByRole('button', { name: /Express Delivery/ });
     await expressOption.click();
 
-    await expect(expressOption).toHaveClass(/border-brand-500/);
+    await expect(expressOption).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('should display Shipping To summary', async ({ page }) => {
@@ -635,11 +663,12 @@ test.describe('Checkout Page - Delivery Step', () => {
 test.describe('Checkout Page - Free Shipping', () => {
   test('should show FREE for standard when over threshold', async ({ page }) => {
     await setupShippingMock(page, 1500);
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     // Add item over ₹999 threshold
     await addItemToCart(page, { productTitle: 'Free Shipping Test', unitPrice: 1500 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
 
     // Fill valid address and proceed to delivery
     await fillValidAddressForm(page);
@@ -653,11 +682,12 @@ test.describe('Checkout Page - Free Shipping', () => {
 
   test('should show free shipping notice when qualified', async ({ page }) => {
     await setupShippingMock(page, 1500);
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     // Add item over ₹999 threshold
     await addItemToCart(page, { productTitle: 'Free Shipping Test', unitPrice: 1500 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
 
     // Fill valid address and proceed to delivery
     await fillValidAddressForm(page);
@@ -671,11 +701,12 @@ test.describe('Checkout Page - Free Shipping', () => {
 
   test('should show shipping price when under threshold', async ({ page }) => {
     await setupShippingMock(page, 500);
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     // Add item under ₹999 threshold
     await addItemToCart(page, { productTitle: 'Paid Shipping Test', unitPrice: 500 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
 
     // Fill valid address and proceed to delivery
     await fillValidAddressForm(page);
@@ -695,10 +726,11 @@ test.describe('Checkout Page - Free Shipping', () => {
 test.describe('Checkout Page - Payment Step', () => {
   test.beforeEach(async ({ page }) => {
     await setupShippingMock(page);
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Payment Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
 
     // Navigate to payment step
     await fillValidAddressForm(page);
@@ -757,10 +789,11 @@ test.describe('Checkout Page - Payment Step', () => {
 
 test.describe('Checkout Page - Order Summary Sidebar', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Summary Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display Order Summary heading', async ({ page }) => {
@@ -805,10 +838,11 @@ test.describe('Checkout Page - Order Summary Sidebar', () => {
 
 test.describe('Checkout Page - Trust Badges', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Trust Badge Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display Secure Checkout notice', async ({ page }) => {
@@ -822,8 +856,13 @@ test.describe('Checkout Page - Trust Badges', () => {
   });
 
   test('should display free shipping badge', async ({ page }) => {
-    const freeShippingBadge = page.locator('text=Free shipping on orders over ₹999');
-    await expect(freeShippingBadge).toBeVisible();
+    // Scoped to the page body: the same sentence is also in the announcement
+    // bar's aria-live paragraph, so an unscoped text selector matches two
+    // elements and fails strict mode rather than the assertion.
+    const freeShippingBadge = page
+      .locator('#main-content')
+      .getByText(/Free shipping on orders over ₹/);
+    await expect(freeShippingBadge.first()).toBeVisible();
   });
 
   test('should display secure checkout badge', async ({ page }) => {
@@ -843,10 +882,11 @@ test.describe('Checkout Page - Trust Badges', () => {
 
 test.describe('Checkout Page - Customer Notes', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Notes Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display Order Notes textarea', async ({ page }) => {
@@ -881,10 +921,11 @@ test.describe('Checkout Page - Customer Notes', () => {
 
 test.describe('Checkout Page - Step Navigation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Navigation Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should allow clicking on completed steps', async ({ page }) => {
@@ -928,10 +969,11 @@ test.describe('Checkout Page - Step Navigation', () => {
 
 test.describe('Checkout Page - Responsive Design', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Responsive Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display properly on mobile', async ({ page }) => {
@@ -990,10 +1032,11 @@ test.describe('Checkout Page - Responsive Design', () => {
 
 test.describe('Checkout Page - Accessibility', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'A11y Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
     await page.waitForLoadState('networkidle');
   });
 
@@ -1058,7 +1101,7 @@ test.describe('Checkout Page - Performance', () => {
   test('should load page within acceptable time', async ({ page }) => {
     // Navigate first to access localStorage
     await page.goto('/');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await clearGuestCart(page);
 
     const startTime = Date.now();
     await page.goto('/checkout');
@@ -1072,10 +1115,11 @@ test.describe('Checkout Page - Performance', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'JS Test', unitPrice: 2999 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
     await page.waitForTimeout(1000);
 
     // Filter out expected network errors
@@ -1094,9 +1138,10 @@ test.describe('Checkout Page - Performance', () => {
 test.describe('Checkout Page - Navigation', () => {
   test('should navigate to checkout from cart', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await clearGuestCart(page);
     await addItemToCart(page, { productTitle: 'Nav Test', unitPrice: 2999 });
     await page.reload();
+    await waitForCartToLoad(page);
 
     const checkoutButton = page.locator('a[href="/checkout"]:has-text("Proceed to Checkout")');
     await checkoutButton.click();
@@ -1149,11 +1194,12 @@ test.describe('Checkout Page - Error Handling', () => {
 
 test.describe('Checkout Page - Multi-Item Cart', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
+    await page.goto('/');
+    await clearGuestCart(page);
     await addItemToCart(page, { id: 'item_1', productTitle: 'Poster One', unitPrice: 1500, quantity: 1 });
     await addItemToCart(page, { id: 'item_2', productTitle: 'Poster Two', unitPrice: 2000, quantity: 2 });
-    await page.reload();
+    await page.goto('/checkout');
+    await waitForCartToLoad(page);
   });
 
   test('should display correct item count in summary', async ({ page }) => {
@@ -1175,39 +1221,20 @@ test.describe('Checkout Page - Multi-Item Cart', () => {
 // ============================================================================
 
 test.describe('Checkout Page - Item with Frame', () => {
+  /** What was actually seeded, so assertions name the real product (#359). */
+  let seeded: Awaited<ReturnType<typeof seedGuestCart>>;
+
   test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await clearGuestCart(page);
+
+    // A real product bought with a real frame. The frame id used to be
+    // invented ('frame_001'), which the API would reject outright — the line
+    // only ever existed in localStorage, never in a cart the server knew about.
+    seeded = await seedGuestCart(page, { unitPrice: 2499, withFrame: true });
+
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
-
-    // Add item with frame
-    const item = {
-      id: 'test_item_frame',
-      productId: 'prod_frame_test',
-      variantId: 'var_frame_test',
-      frameId: 'frame_001',
-      quantity: 1,
-      productTitle: 'Framed Poster',
-      productSlug: 'abstract/framed-poster',
-      thumbnailUrl: '',
-      sizeLabel: '18x24 inches',
-      widthInches: 18,
-      heightInches: 24,
-      frameName: 'Black Wood Frame',
-      frameType: 'wood',
-      unitPrice: 2499,
-      framePrice: 999,
-      isAiGenerated: false,
-      addedAt: new Date().toISOString(),
-    };
-
-    await page.evaluate((cartItem) => {
-      const existing = localStorage.getItem('chobii-cart-storage');
-      let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
-      data.state.items.push(cartItem);
-      localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
-    }, item);
-
-    await page.reload();
+    await waitForCartToLoad(page);
   });
 
   test('should display item in order summary', async ({ page }) => {
@@ -1217,7 +1244,7 @@ test.describe('Checkout Page - Item with Frame', () => {
       await showItems.click();
     }
 
-    const productTitle = page.getByText('Framed Poster', { exact: true });
-    await expect(productTitle).toBeVisible();
+    const productTitle = page.getByText(seeded.productTitle, { exact: true });
+    await expect(productTitle.first()).toBeVisible();
   });
 });
