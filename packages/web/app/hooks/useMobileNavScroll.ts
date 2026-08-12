@@ -1,63 +1,48 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Mobile chrome visibility, driven by scroll POSITION (#597).
+ *
+ * Mesonart's two mobile bars trade places around a single point near the top
+ * of the page: the top bar owns the top of the page, the tab bar owns the rest
+ * of it. Neither reads scroll direction — measured on mesonart at mobile
+ * width, the top bar sits at `translateY(-72px)` once you are past the
+ * threshold and stays there no matter how far back up you scroll, and the tab
+ * bar holds `translateY(0)` through travel in both directions.
+ *
+ * That is why there is no `lastY` and no jitter guard here: with direction
+ * gone there is no sign to debounce, and a crawl across the threshold has to
+ * register rather than be swallowed as wobble.
+ *
+ * Desktop is a different rule and a different hook — `useNavReveal` (#421)
+ * reveals the nav rows on scroll-up, and those rows are `md:block` while the
+ * header's transform is `md:translate-y-0`, so the two never both apply.
+ */
+
+import { useEffect, useState } from 'react'
 
 export interface MobileNavScrollState {
-  /**
-   * Top menu visible state in mobile view:
-   * Visible at top of page (y <= THRESHOLD) or when scrolling DOWN.
-   * Hidden when scrolling UP (y > THRESHOLD).
-   */
+  /** Top bar: visible only at the top of the page (y <= THRESHOLD). */
   isTopMenuVisible: boolean
-  /**
-   * Bottom tab bar visible state in mobile view:
-   * Visible at top of page (y <= THRESHOLD) or when scrolling UP.
-   * Hidden when scrolling DOWN (y > THRESHOLD).
-   */
+  /** Bottom tab bar: the mirror of the top bar — visible once scrolled. */
   isBottomMenuVisible: boolean
 }
 
+/** Within this distance of the top, the page counts as "at the top". */
 const THRESHOLD_PX = 60
-const JITTER_PX = 6
 
 export function useMobileNavScroll(): MobileNavScrollState {
-  const [scrollState, setScrollState] = useState<MobileNavScrollState>({
-    isTopMenuVisible: true,
-    isBottomMenuVisible: true,
-  })
-  const lastY = useRef(0)
+  // One boolean rather than the state object: React bails out of a re-render
+  // when the value is unchanged, and every scroll event re-sets this. A fresh
+  // object would re-render the header on each one instead.
+  const [isAtTop, setIsAtTop] = useState(true)
 
   useEffect(() => {
-    lastY.current = window.scrollY
+    // A route change can land mid-page; measure rather than assume zero.
+    const sync = () => setIsAtTop(window.scrollY <= THRESHOLD_PX)
 
-    const onScroll = () => {
-      const y = window.scrollY
-      const delta = y - lastY.current
-
-      if (y <= THRESHOLD_PX) {
-        lastY.current = y
-        setScrollState({
-          isTopMenuVisible: true,
-          isBottomMenuVisible: true,
-        })
-        return
-      }
-
-      if (Math.abs(delta) < JITTER_PX) return
-
-      lastY.current = y
-      // Page moves UP when scrollY increases (delta > 0).
-      // Both top and bottom menus show when page moves UP (delta > 0),
-      // and hide when page moves DOWN (delta < 0).
-      const isPageMovingUp = delta > 0
-
-      setScrollState({
-        isTopMenuVisible: isPageMovingUp,
-        isBottomMenuVisible: isPageMovingUp,
-      })
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    sync()
+    window.addEventListener('scroll', sync, { passive: true })
+    return () => window.removeEventListener('scroll', sync)
   }, [])
 
-  return scrollState
+  return { isTopMenuVisible: isAtTop, isBottomMenuVisible: !isAtTop }
 }

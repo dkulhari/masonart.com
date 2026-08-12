@@ -96,6 +96,11 @@ export function Header() {
   // Scroll down leaves the compact bar — wordmark and actions; scroll up
   // brings both nav rows back wherever the page happens to be (#421).
   const isNavRevealed = useNavReveal()
+
+  // Mobile is position, not direction (#597): the top bar owns the top of the
+  // page and the tab bar owns the rest. Separate hook because it is a separate
+  // breakpoint — the rows above are md:block, the transform below is
+  // md:translate-y-0.
   const { isTopMenuVisible, isBottomMenuVisible } = useMobileNavScroll()
 
   // The revealed nav rows push everything sticky below them down, rather
