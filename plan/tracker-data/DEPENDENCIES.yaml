@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-11T16:49:57.212Z'
+  last_updated: '2026-08-12T13:13:22.673Z'
   features:
     admin-frame-management:
       - ticket_number: 585
@@ -1158,6 +1158,19 @@ dependencies:
         blocked_by:
           - ticket_number: 344
             title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+    mobile-responsive-jul2026:
+      - ticket_number: 599
+        title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+        blocks: []
+        blocked_by:
+          - ticket_number: 598
+            title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+      - ticket_number: 600
+        title: 'Mobile drawer footer: pinned account/login row and social icons'
+        blocks: []
+        blocked_by:
+          - ticket_number: 598
+            title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
 metadata:
   format_version: 1
   description: Ticket dependency tracking with bidirectional relationships

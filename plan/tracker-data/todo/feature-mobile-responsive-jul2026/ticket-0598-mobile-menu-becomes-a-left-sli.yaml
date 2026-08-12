@@ -1,0 +1,77 @@
+ticket_number: 598
+title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+description: |-
+  ## Task
+  Our mobile menu drops down from under the header (`Header.tsx:567`: `fixed inset-x-0 top-16`, full width, `max-h-[calc(100vh-4rem)]`). mesonart's is a left slide-in panel.
+
+  Measured on mesonart.com:
+  - `menu-drawer drawer drawer--start`, `drawer__inner` is `width:100%; max-width:576px`, full viewport height, white
+  - enters from x = -576 to 0 under `transform .6s cubic-bezier(0.7, 0, 0.2, 1)`
+  - drag handle pill at the top centre, close X at the top right
+  - the link list scrolls inside the panel while the footer stays pinned
+
+  This ticket is the container only — the link inventory is a separate ticket, and the footer another.
+
+  ## Context
+  - `Header.tsx:552-630` — the current drawer and its scrim
+  - Keep it a SIBLING of `<header>` (see the note at `Header.tsx:340`): the header sets `backdrop-blur`, and a backdrop-filter is a containing block for fixed descendants — nested, the scrim collapsed to the 64px header box (#348)
+  - Scroll lock and Escape are already wired at `Header.tsx:168-183`; reuse, don't duplicate
+  - `MobileFiltersSheet` on /posters is the existing slide-in sheet in this codebase — follow its transform/scrim pattern
+  - E2E lives at `tests/e2e/`; the feature convention is one E2E pass per feature, so extend rather than add a file if a mobile-nav spec already exists
+feature: mobile-responsive-jul2026
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-12T12:56:23.322Z'
+last_updated: '2026-08-12T12:56:23.322Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - layout
+  - mesonart-parity
+  - mobile
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the drawer mounts with left-edge slide classes, a max-width of 576px and full height, and that the close control is present
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL - drawer is currently inset-x-0 top-16
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the drawer assertions fail
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Convert the drawer to a left slide-in with a close button and internal scroll
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+    code: |-
+      // nav: fixed inset-y-0 left-0 z-50 flex w-full max-w-[576px] flex-col bg-background
+      //      transition-transform duration-[600ms] [transition-timing-function:cubic-bezier(.7,0,.2,1)]
+      //      isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+      // scrim: fixed inset-0 z-40 bg-black/50 (full viewport, not top-16)
+  - id: 4
+    action: verify-pass
+    description: Structure tests green, no type regression
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx && pnpm --filter @chobii/web exec tsc --noEmit
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the drawer container
+    command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile menu slides in from the left like mesonart''s"'
+    status: pending
+current_step: 1

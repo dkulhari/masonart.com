@@ -1,0 +1,77 @@
+ticket_number: 596
+title: 'Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px'
+description: |-
+  ## Task
+  The mobile top bar is structurally different from mesonart's, which is the first thing that reads as "not the same site" on a phone.
+
+  Measured live on mesonart.com at mobile width (DOM, not screenshots):
+  - bar height 56px (`header header--center`, sticky top:0, z=11)
+  - left cluster: hamburger + search, icon hit boxes 35x44
+  - wordmark absolutely centred at ALL widths
+  - right cluster: wishlist (with count) + cart (with count)
+  - no account icon in the bar — Account lives in the dock and the drawer footer
+
+  Ours today (`packages/web/app/components/layout/Header.tsx:208`): 64px bar, wordmark LEFT on mobile (centred only from `md`), right cluster is cart + hamburger only. No search, no wishlist.
+
+  ## Context
+  - `Header.tsx:208` — `relative flex h-16 items-center justify-between md:justify-end`; drop `md:justify-end` and make the height `h-14 md:h-16`
+  - `Header.tsx:215-217` — wordmark `Link`; the centring classes are `md:absolute md:left-1/2 md:-translate-x-1/2`, drop the `md:` prefixes
+  - `Header.tsx:285-312` — the mobile action cluster to rebuild; search opens the existing `isSearchOpen` state, wishlist links `/wishlist` with `displayWishlistCount`, both already exist in the desktop cluster at `:240-281`
+  - `HEADER_HEIGHT_CLASS` at `Header.tsx:51` is the shared contract with the collection toolbar's `sticky top-16` and `--chrome-offset`. Nothing sticky sits under the header below `md`, so keep the constant at `h-16` for `md`+ and only shrink the mobile bar — do not repoint the constant.
+  - Existing structure test: `packages/web/tests/components/layout/Header.structure.test.tsx`
+feature: mobile-responsive-jul2026
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-12T12:56:23.259Z'
+last_updated: '2026-08-12T12:56:23.259Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - layout
+  - mesonart-parity
+  - mobile
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the mobile bar renders search + wishlist and the wordmark is centred without a breakpoint prefix
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL - mobile cluster today only renders cart + hamburger
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the new assertions fail against the current bar
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: 'Rebuild the mobile bar: h-14 md:h-16, justify-between at every width, centred wordmark, [menu][search] left and [wishlist][cart] right'
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+    code: |-
+      // :208  <div className="relative flex h-14 items-center justify-between md:h-16">
+      // :217  className="flex items-center space-x-2 absolute left-1/2 -translate-x-1/2"
+      // :285  left cluster = menu button + search button; right cluster = wishlist link + cart button
+  - id: 4
+    action: verify-pass
+    description: Structure test green and no type regression
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx && pnpm --filter @chobii/web exec tsc --noEmit
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the mobile bar
+    command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile top bar takes mesonart''s icon layout and 56px height"'
+    status: pending
+current_step: 1

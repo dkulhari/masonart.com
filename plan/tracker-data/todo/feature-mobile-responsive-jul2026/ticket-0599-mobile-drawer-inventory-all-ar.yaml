@@ -1,0 +1,77 @@
+ticket_number: 599
+title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+description: |-
+  ## Task
+  The mobile drawer is a second, independent nav tree and it carries far less than the desktop rows do. Today (`Header.tsx:569-627`) it is 7 page links at `text-base` plus Wishlist and Account. None of the 12 styles are reachable on a phone at all, and neither is All Art.
+
+  mesonart's drawer carries 21 entries, in this order:
+  All Art (chevron, opens a second sliding panel) · Best Sellers · New Arrivals · the 12 styles · Artists · Reviews · Sale · Trade Program · Commission Art · Gift Card · About
+
+  Measured type: 24px, weight 300, letter-spacing -0.6px, colour rgb(23,23,23), row padding 10px 0.
+
+  ## Context
+  - Generate the styles from `STYLE_OPTIONS` in `@chobii/shared`, the way nav row 2 does at `Header.tsx:511` — twelve hardcoded links here would restart the drift #395 closed
+  - `MobileNavLink` at `Header.tsx:726` carries the type; bump it to the measured scale rather than styling links inline
+  - Sale already has its mobile half: `SaleMobileNavLink` at `Header.tsx:676` — promotion-gated, absent rather than disabled
+  - All Art's submenu can reuse `AllArtMegaMenu`'s data source (`packages/web/app/components/layout/AllArtMegaMenu.tsx`); as a second panel inside the drawer, not the desktop mega panel
+  - Only link to routes that exist — Artists / Trade Program / Commission Art / Gift Card may not all have pages yet; skip the ones that don't rather than shipping dead links
+  - Depends on the left slide-in drawer ticket landing first
+feature: mobile-responsive-jul2026
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-12T12:56:23.344Z'
+last_updated: '2026-08-12T12:56:23.344Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - layout
+  - mesonart-parity
+  - mobile
+  - navigation
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 598
+    feature: mobile-responsive-jul2026
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the drawer renders every STYLE_OPTIONS entry plus All Art, and that the links carry the 24px scale
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL - drawer today has no styles and no All Art
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the inventory assertions fail
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add All Art with its sliding submenu, map STYLE_OPTIONS into the drawer, add the remaining pages that have routes, and retype MobileNavLink
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+    code: |-
+      // MobileNavLink: 'flex items-center py-[10px] text-2xl font-light tracking-[-0.6px] text-foreground'
+      // {STYLE_OPTIONS.map((style) => (<MobileNavLink key={style.id} to="/posters" search={{ styles: style.id }} …>{style.label}</MobileNavLink>))}
+  - id: 4
+    action: verify-pass
+    description: Structure tests green, no type regression
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx && pnpm --filter @chobii/web exec tsc --noEmit
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the drawer inventory
+    command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile drawer carries All Art and the full style list"'
+    status: pending
+current_step: 1

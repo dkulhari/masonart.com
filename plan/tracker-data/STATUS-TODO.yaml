@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-11T16:49:56.709Z'
-total_tickets: 18
+last_updated: '2026-08-12T13:13:22.268Z'
+total_tickets: 21
 summary:
   critical: 3
-  high: 6
+  high: 8
   medium: 6
-  low: 3
+  low: 4
 priorities:
   critical:
     - feature: go-live
@@ -86,6 +86,16 @@ priorities:
           title: 'Layout: Prevent horizontal page overflow and right-edge clipping on narrowed viewports'
           assignee: unassigned
           blocked_by: []
+    - feature: mobile-responsive-jul2026
+      tickets:
+        - ticket_number: 596
+          title: 'Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 598
+          title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:
@@ -102,14 +112,16 @@ priorities:
           blocked_by: []
     - feature: mobile-responsive-jul2026
       tickets:
-        - ticket_number: 359
-          title: 'TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests'
-          assignee: unassigned
-          blocked_by: []
         - ticket_number: 361
           title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 599
+          title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 598
+              title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
     - feature: home-page-parity
       tickets:
         - ticket_number: 537
@@ -140,6 +152,14 @@ priorities:
           title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
           assignee: unassigned
           blocked_by: []
+    - feature: mobile-responsive-jul2026
+      tickets:
+        - ticket_number: 600
+          title: 'Mobile drawer footer: pinned account/login row and social icons'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 598
+              title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
 blocked_tickets:
   - ticket_number: 294
     title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
@@ -190,8 +210,20 @@ blocked_tickets:
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
+  - ticket_number: 599
+    title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+    blocked_by:
+      - ticket_number: 598
+        title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
+  - ticket_number: 600
+    title: 'Mobile drawer footer: pinned account/login row and social icons'
+    blocked_by:
+      - ticket_number: 598
+        title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown

@@ -1,33 +1,17 @@
 status: in-progress
-last_updated: '2026-08-11T16:49:56.715Z'
+last_updated: '2026-08-12T13:13:22.272Z'
 total_tickets: 1
 summary:
   critical: 0
   high: 0
-  medium: 0
-  low: 1
+  medium: 1
+  low: 0
 priorities:
-  low:
-    - feature: admin-frame-management
+  medium:
+    - feature: mobile-responsive-jul2026
       tickets:
-        - ticket_number: 593
-          title: E2E - an admin reprices a frame and the storefront charges it
+        - ticket_number: 359
+          title: 'TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests'
           assignee: unassigned
-          blocked_by:
-            - ticket_number: 586
-              title: Admin API - archive a frame, never hard delete, and never the last one
-            - ticket_number: 591
-              title: Admin UI - live price preview through the shared frameAddition
-            - ticket_number: 592
-              title: Storefront - FrameSelector groups on category instead of guessing
-blocked_tickets:
-  - ticket_number: 593
-    title: E2E - an admin reprices a frame and the storefront charges it
-    blocked_by:
-      - ticket_number: 586
-        title: Admin API - archive a frame, never hard delete, and never the last one
-      - ticket_number: 591
-        title: Admin UI - live price preview through the shared frameAddition
-      - ticket_number: 592
-        title: Storefront - FrameSelector groups on category instead of guessing
-    description: Admin API - archive a frame, never hard delete, and never the last one, Admin UI - live price preview through the shared frameAddition, Storefront - FrameSelector groups on category instead of guessing
+          blocked_by: []
+blocked_tickets: []

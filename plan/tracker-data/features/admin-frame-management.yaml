@@ -1,7 +1,7 @@
 name: admin-frame-management
 title: Admin Frame Management
 priority: high
-created: '2026-08-07T10:11:58.369Z'
+created: "2026-08-07T10:11:58.369Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -88,48 +88,48 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 12
-  total_duration: '00:38:00'
+  total_duration: "00:38:00"
   total_tokens: 0
   agents:
     claude-code:
       sessions: 12
-      duration: '00:38:00'
+      duration: "00:38:00"
       tokens: 0
 tickets:
   todo: {}
-  in_progress:
-    '593': E2E - an admin reprices a frame and the storefront charges it
+  in_progress: {}
   done:
-    '582': Schema - frame type becomes text, new frame_category enum column
-    '583': Shared - frame input schemas and price bounds
-    '584': Shared - lift the image upload guards out of admin/products
-    '585': Admin API - frames list, get, create, patch with cache busting
-    '586': Admin API - archive a frame, never hard delete, and never the last one
-    '587': Admin API - swatch upload through StoragePaths.FRAMES
-    '588': Public API - category joins the frames response
-    '589': Admin UI - frames list screen and sidebar entry
-    '590': Admin UI - create and edit form with swatch upload
-    '591': Admin UI - live price preview through the shared frameAddition
-    '592': Storefront - FrameSelector groups on category instead of guessing
+    "582": Schema - frame type becomes text, new frame_category enum column
+    "583": Shared - frame input schemas and price bounds
+    "584": Shared - lift the image upload guards out of admin/products
+    "585": Admin API - frames list, get, create, patch with cache busting
+    "586": Admin API - archive a frame, never hard delete, and never the last one
+    "587": Admin API - swatch upload through StoragePaths.FRAMES
+    "588": Public API - category joins the frames response
+    "589": Admin UI - frames list screen and sidebar entry
+    "590": Admin UI - create and edit form with swatch upload
+    "591": Admin UI - live price preview through the shared frameAddition
+    "592": Storefront - FrameSelector groups on category instead of guessing
+    "593": E2E - an admin reprices a frame and the storefront charges it
 total_tickets: 12
-completion_percentage: 92
-is_completed: false
+completion_percentage: 100
+is_completed: true
 design:
-  approach: 'Extend the existing `frames` table rather than add a pricing table, and mirror the admin/products CRUD shape rather than invent a new one. The frames table already carries per-row priceModifier and priceAddition, so per-type pricing needs no new storage — only a write path. `frame_type` becomes free text (the enum''s ten values are a hard ceiling incompatible with admin-created frames) and a new closed `frame_category` enum carries the Rolled/Frameless/Framed display grouping that FrameSelector currently guesses from the type string. Admin CRUD lands at /api/admin/frames with archive-not-delete semantics, swatch upload through the existing unused StoragePaths.FRAMES prefix, and an in-form live price preview that calls the shared frameAddition() directly. Blocked on ticket #566, which must land first: this feature is the event that arms that bug.'
+  approach: "Extend the existing `frames` table rather than add a pricing table, and mirror the admin/products CRUD shape rather than invent a new one. The frames table already carries per-row priceModifier and priceAddition, so per-type pricing needs no new storage — only a write path. `frame_type` becomes free text (the enum's ten values are a hard ceiling incompatible with admin-created frames) and a new closed `frame_category` enum carries the Rolled/Frameless/Framed display grouping that FrameSelector currently guesses from the type string. Admin CRUD lands at /api/admin/frames with archive-not-delete semantics, swatch upload through the existing unused StoragePaths.FRAMES prefix, and an in-form live price preview that calls the shared frameAddition() directly. Blocked on ticket #566, which must land first: this feature is the event that arms that bug."
   decisions:
-    - '#566 is a blocking prerequisite, fixed first and alone in its existing cart-checkout home. frameAddition() (shared/constants/frames.ts:570) is THE frame-pricing formula and the cart uses it, but the PDP re-derives from the percentage alone and drops priceAddition (posters/$slug.tsx:127). Harmless today only because every seeded frame has priceAddition 0.00. The first admin to type a flat addition makes the PDP quote low while checkout charges correctly, so the fix must land against the all-zero data where it can be verified in isolation.'
-    - '`type` becomes text with a unique index and ^[a-z0-9-]$ validation. The frame_type enum has ten values, seven used and three dead (none/walnut/oak) — a hard ceiling, with the free slots named for woods nobody stocks. Unique because getFramePreviewColor (FrameSelector.tsx:409) keys its swatch color map on type, so two frames sharing a type are indistinguishable to any type-keyed lookup.'
-    - '`category` is a NEW pg enum rather than more free text, because unlike type it is genuinely closed: it is the three rungs frameGroupLabel (FrameSelector.tsx:158) renders as ''Rolled Canvas/Frameless/Framed''. Today frameCategoryLabel (FrameSelector.tsx:146) infers the rung from type — an inference that puts an admin-created moulding in the right bucket only by accident and an admin-created format in the wrong one with no error anywhere. Making it a column turns a client-side guess into data.'
-    - 'The migration is hand-written, not drizzle-kit generate output. Generate emits no backfill, and dropping the enum before backfilling destroys the source data. Order is load-bearing: add category nullable, backfill via CASE on type::text, create frame_category enum + convert + SET NOT NULL, convert type to text, DROP TYPE frame_type last (Postgres refuses to drop a type a column still references).'
-    - 'DELETE archives (isActive: false) mirroring admin/products.ts:642, never hard deletes. cartItems.frameId and orderItems.frameId are both onDelete ''set null'', so a hard delete would silently strip the frame off historical orders. Archiving the last active frame is refused: a PDP with no format options is a broken buy panel.'
+    - "#566 is a blocking prerequisite, fixed first and alone in its existing cart-checkout home. frameAddition() (shared/constants/frames.ts:570) is THE frame-pricing formula and the cart uses it, but the PDP re-derives from the percentage alone and drops priceAddition (posters/$slug.tsx:127). Harmless today only because every seeded frame has priceAddition 0.00. The first admin to type a flat addition makes the PDP quote low while checkout charges correctly, so the fix must land against the all-zero data where it can be verified in isolation."
+    - "`type` becomes text with a unique index and ^[a-z0-9-]$ validation. The frame_type enum has ten values, seven used and three dead (none/walnut/oak) — a hard ceiling, with the free slots named for woods nobody stocks. Unique because getFramePreviewColor (FrameSelector.tsx:409) keys its swatch color map on type, so two frames sharing a type are indistinguishable to any type-keyed lookup."
+    - "`category` is a NEW pg enum rather than more free text, because unlike type it is genuinely closed: it is the three rungs frameGroupLabel (FrameSelector.tsx:158) renders as 'Rolled Canvas/Frameless/Framed'. Today frameCategoryLabel (FrameSelector.tsx:146) infers the rung from type — an inference that puts an admin-created moulding in the right bucket only by accident and an admin-created format in the wrong one with no error anywhere. Making it a column turns a client-side guess into data."
+    - "The migration is hand-written, not drizzle-kit generate output. Generate emits no backfill, and dropping the enum before backfilling destroys the source data. Order is load-bearing: add category nullable, backfill via CASE on type::text, create frame_category enum + convert + SET NOT NULL, convert type to text, DROP TYPE frame_type last (Postgres refuses to drop a type a column still references)."
+    - "DELETE archives (isActive: false) mirroring admin/products.ts:642, never hard deletes. cartItems.frameId and orderItems.frameId are both onDelete 'set null', so a hard delete would silently strip the frame off historical orders. Archiving the last active frame is refused: a PDP with no format options is a broken buy panel."
     - Swatch upload calls uploadOptimizedImage directly with prefix StoragePaths.FRAMES (lib/storage.ts:76, an existing prefix with zero consumers), NOT buildProductMedia. No matting, no art-box measurement, no crop window — those exist because artwork must never be cropped blindly, and a frame swatch is product photography that fills its square. The variant ladder maps thumbnail->thumbnailUrl and card->imageUrl, so one upload fills both columns and the form needs no second image field.
-    - 'The in-form price preview calls frameAddition() from @chobii/shared directly — not a reimplementation, not a display-formatted copy. This is the entire lesson of #566: that bug exists because the PDP re-derived a formula the server already owned. A preview with its own arithmetic would be the same bug in a worse place, since it is the screen whose job is to convince the admin the number is right. It shows three reference print prices rather than one, because a frame is priced as a percentage precisely so its cost tracks the size of the piece — a single sample would conceal the behaviour being chosen.'
+    - "The in-form price preview calls frameAddition() from @chobii/shared directly — not a reimplementation, not a display-formatted copy. This is the entire lesson of #566: that bug exists because the PDP re-derived a formula the server already owned. A preview with its own arithmetic would be the same bug in a worse place, since it is the screen whose job is to convince the admin the number is right. It shows three reference print prices rather than one, because a frame is priced as a percentage precisely so its cost tracks the size of the piece — a single sample would conceal the behaviour being chosen."
     - Every mutation busts CacheKeys.PRODUCT + 'frames'. Without it the 15-minute TTL on GET /api/products/frames (products.ts:862) means an admin saves a price, reloads the PDP, sees the old number, and saves again.
     - PRODUCT_IMAGE_TYPES and MAX_PRODUCT_IMAGE_MB are module-private in admin/products.ts:209-210 and are lifted to a shared module rather than copied into the frames route — the same class of duplicate this feature is already cleaning up elsewhere.
     - availableSizes stays out of the admin form. The column exists on frames and is selected into the public response (products.ts:882) but nothing reads it; surfacing it would promise a per-size availability filter the storefront does not enforce.
-    - 'Two dead frame catalogues are recorded but not touched: ~500 lines of static frame/mat/glass constants in shared/constants/frames.ts, and frameTypeSchema (shared/schemas/product.ts:548) over a disjoint hyphenated vocabulary whose own test asserts it rejects the DB''s values, plus its only consumers cartItemSchema/orderItemSchema (shared/schemas/checkout.ts:153,300). All have zero consumers in api and web, so no live risk — filed for a separate non-blocking cleanup so nobody wires up the wrong catalogue next to the editable one.'
+    - "Two dead frame catalogues are recorded but not touched: ~500 lines of static frame/mat/glass constants in shared/constants/frames.ts, and frameTypeSchema (shared/schemas/product.ts:548) over a disjoint hyphenated vocabulary whose own test asserts it rejects the DB's values, plus its only consumers cartItemSchema/orderItemSchema (shared/schemas/checkout.ts:153,300). All have zero consumers in api and web, so no live risk — filed for a separate non-blocking cleanup so nobody wires up the wrong catalogue next to the editable one."
   approved: true
-  approved_at: '2026-08-07T10:12:23.437Z'
+  approved_at: "2026-08-07T10:12:23.437Z"
 plan:
   phases:
     - name: Schema
@@ -162,4 +162,4 @@ plan:
       location: tests/e2e
       tickets:
         - 593
-  generated_at: '2026-08-07T10:33:38.962Z'
+  generated_at: "2026-08-07T10:33:38.962Z"

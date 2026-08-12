@@ -1,0 +1,73 @@
+ticket_number: 600
+title: 'Mobile drawer footer: pinned account/login row and social icons'
+description: |-
+  ## Task
+  mesonart's drawer has a footer pinned below the scrolling link list: a currency selector row (`India (INR ₹)`), a Login pill button, and Facebook / Instagram / YouTube / Pinterest icons. Ours ends the list with plain Wishlist and Account links and has no footer at all.
+
+  Ship the account control and the socials. Skip the currency selector — we are single-currency, and a selector with one option is worse than none.
+
+  ## Context
+  - `Header.tsx:552-630` — the drawer; the footer sits outside the scrolling list so it stays pinned
+  - Signed-in vs signed-out follows what `MobileTabBar` already does (`MobileTabBar.tsx:169-181`): `/account` when there is a session, otherwise `/auth/login` with `search={{ redirect: '/account' }}` so the round trip is pre-filled
+  - Social URLs already exist in `packages/web/app/components/layout/Footer.tsx` — read them from there rather than retyping the hrefs
+  - Depends on the left slide-in drawer ticket landing first
+feature: mobile-responsive-jul2026
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-12T12:56:23.361Z'
+last_updated: '2026-08-12T12:56:23.361Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - layout
+  - mesonart-parity
+  - mobile
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 598
+    feature: mobile-responsive-jul2026
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the drawer renders a pinned footer with the account/login control and the social links
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL - no drawer footer exists
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the footer assertions fail
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the pinned footer below the scrolling list
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+    code: |-
+      // <div className="mt-auto border-t border-border px-4 py-4 flex items-center justify-between">
+      //   {isSignedIn ? <Link to="/account">…</Link> : <Link to="/auth/login" search={{ redirect: '/account' }}>Login</Link>}
+      //   <ul className="flex items-center gap-4">{/* socials, hrefs shared with Footer.tsx */}</ul>
+      // </div>
+  - id: 4
+    action: verify-pass
+    description: Structure tests green, no type regression
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx && pnpm --filter @chobii/web exec tsc --noEmit
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the drawer footer
+    command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile drawer gains a pinned account and socials footer"'
+    status: pending
+current_step: 1
