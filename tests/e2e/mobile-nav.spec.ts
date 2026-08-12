@@ -18,8 +18,15 @@ import { test, expect, type Page } from '@playwright/test'
 
 const IPHONE = { width: 390, height: 844 }
 
-async function openMenu(page: Page) {
-  await page.setViewportSize(IPHONE)
+/**
+ * Wide enough that the 576px drawer does not cover the whole screen (#598).
+ * On a phone it does — mesonart's panel is `width:100%; max-width:576px`, so
+ * below 576 there is no scrim left showing to tap.
+ */
+const NARROW_TABLET = { width: 740, height: 900 }
+
+async function openMenu(page: Page, viewport = IPHONE) {
+  await page.setViewportSize(viewport)
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   // The toggle is server-rendered, so it is clickable before React has
@@ -36,6 +43,15 @@ async function openMenu(page: Page) {
 /** The drawer panel — the element that must be opaque. */
 function panel(page: Page) {
   return page.locator('[role="dialog"][aria-label*="menu" i]')
+}
+
+/**
+ * The first level of the drawer. Scoped rather than searching the whole
+ * panel: the All Art panel below it carries the same twelve styles, so an
+ * unscoped `getByRole('link', {name: 'Pop Art'})` matches twice (#599).
+ */
+function list(page: Page) {
+  return page.locator('[data-testid="mobile-nav-list"]')
 }
 
 test.describe('mobile nav drawer', () => {
@@ -63,10 +79,15 @@ test.describe('mobile nav drawer', () => {
   })
 
   test('tapping the scrim closes the drawer', async ({ page }) => {
-    await openMenu(page)
+    // At phone width the panel covers the scrim entirely, so this is a
+    // tablet-width behaviour — the drawer caps at 576px and everything to the
+    // right of it is scrim.
+    await openMenu(page, NARROW_TABLET)
     await expect(panel(page)).toBeVisible()
 
-    await page.locator('[data-testid="mobile-nav-scrim"]').click()
+    await page
+      .locator('[data-testid="mobile-nav-scrim"]')
+      .click({ position: { x: 700, y: 400 } })
 
     await expect(panel(page)).toBeHidden()
   })
@@ -111,10 +132,81 @@ test.describe('mobile nav drawer', () => {
 
     // Guard against a vacuous suite: if the drawer ever renders empty, the
     // opacity and semantics assertions above would still pass.
-    for (const label of ['Posters', 'Gallery', 'About']) {
+    //
+    // "Posters" is deliberately not in this list any more (#599): All Art
+    // took that slot, the way mesonart's drawer has it, and the unfiltered
+    // catalogue lives one level down inside its panel.
+    for (const label of ['Gallery', 'Reviews', 'About']) {
       await expect(
-        panel(page).getByRole('link', { name: label, exact: true })
+        list(page).getByRole('link', { name: label, exact: true })
       ).toBeVisible()
     }
+  })
+
+  test('the twelve styles are reachable from the drawer (#599)', async ({
+    page,
+  }) => {
+    await openMenu(page)
+
+    // None of them were on a phone before — the styles row is desktop-only.
+    const popArt = list(page).getByRole('link', {
+      name: 'Pop Art',
+      exact: true,
+    })
+    await expect(popArt).toBeVisible()
+    await expect(popArt).toHaveAttribute('href', /styles=pop-art/)
+
+    // 24px/300, measured on theirs.
+    const size = await popArt.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { fontSize: style.fontSize, weight: style.fontWeight }
+    })
+    expect(size).toEqual({ fontSize: '24px', weight: '300' })
+  })
+
+  test('All Art opens a second panel over the list (#599)', async ({
+    page,
+  }) => {
+    await openMenu(page)
+
+    const allArtPanel = page.locator(
+      '[data-testid="mobile-nav-all-art-panel"]'
+    )
+    await expect(allArtPanel).toBeHidden()
+
+    await page.locator('[data-testid="mobile-nav-all-art"]').click()
+    await expect(allArtPanel).toBeVisible()
+
+    // The whole facet vocabulary, not just the styles that are already on
+    // the level above.
+    await expect(
+      allArtPanel.getByRole('link', { name: 'Orientation', exact: true })
+    ).toHaveCount(0)
+    await expect(allArtPanel.getByText('Orientation')).toBeVisible()
+    await expect(
+      allArtPanel.getByRole('link', { name: 'Subject', exact: true })
+    ).toHaveCount(0)
+
+    // Back returns to the list rather than closing the drawer.
+    await allArtPanel.getByRole('button', { name: /back to menu/i }).click()
+    await expect(allArtPanel).toBeHidden()
+    await expect(panel(page)).toBeVisible()
+  })
+
+  test('Escape unwinds All Art before the drawer (#599)', async ({ page }) => {
+    await openMenu(page)
+    await page.locator('[data-testid="mobile-nav-all-art"]').click()
+
+    const allArtPanel = page.locator(
+      '[data-testid="mobile-nav-all-art-panel"]'
+    )
+    await expect(allArtPanel).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(allArtPanel).toBeHidden()
+    await expect(panel(page)).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(panel(page)).toBeHidden()
   })
 })

@@ -190,6 +190,96 @@ describe('mobile drawer container (#598)', () => {
   })
 })
 
+describe('mobile drawer inventory (#599)', () => {
+  // The drawer is a second, independent nav tree, and it carried seven page
+  // links against the desktop rows' twenty-odd — none of the twelve styles
+  // were reachable on a phone at all. Theirs runs All Art · Best Sellers ·
+  // New Arrivals · the 12 styles · Artists · Reviews · Sale · Trade Program ·
+  // Commission Art · Gift Card · About, set at 24px/300 at -0.6px tracking.
+  const start = src.indexOf('data-testid="mobile-nav-drawer"')
+  const drawer = src.slice(start, src.indexOf('</nav>', start))
+
+  it('generates the styles from the shared vocabulary, not twelve links', () => {
+    // Hardcoding them here restarts the drift #395 closed — the same call the
+    // desktop styles row makes.
+    expect(drawer).toContain('STYLE_OPTIONS.map')
+    expect(drawer).toMatch(/search=\{\{ styles: style\.id \}\}/)
+  })
+
+  it('carries All Art as a door to a second panel, not a flat link', () => {
+    expect(drawer).toContain('data-testid="mobile-nav-all-art"')
+    expect(drawer).toContain('ChevronRight')
+  })
+
+  it('feeds that panel from the mega menu’s vocabulary', () => {
+    // One source for the facet vocabulary; a second hand-written copy would
+    // drift from the desktop panel the first time a facet moved.
+    expect(src).toContain('MEGA_COLUMNS')
+    expect(src).toMatch(/from '\.\/AllArtMegaMenu'/)
+  })
+
+  it('slides the second panel in from the right over the first', () => {
+    const panelStart = src.indexOf('data-testid="mobile-nav-all-art-panel"')
+    expect(panelStart).toBeGreaterThan(-1)
+    const panel = src.slice(panelStart, src.indexOf('</div>', panelStart))
+    expect(panel).toContain('absolute inset-0')
+    expect(panel).toContain('translate-x-full')
+  })
+
+  it('offers a way back out of the second panel', () => {
+    expect(drawer).toContain('Back to menu')
+  })
+
+  it('carries the pages that have routes', () => {
+    for (const to of ['/posters', '/reviews', '/gift-cards', '/about']) {
+      expect(drawer).toContain(`to="${to}"`)
+    }
+    expect(drawer).toContain('BEST_SELLERS_SEARCH')
+    expect(drawer).toContain('NEW_IN_SEARCH')
+  })
+
+  it('ships no dead links for the pages we do not have', () => {
+    // Artists / Trade Program / Commission Art are on theirs and have no
+    // route here. A nav entry to a 404 is worse than an absent one.
+    expect(drawer).not.toMatch(/to="\/artists"|to="\/trade[^"]*"|to="\/commission[^"]*"/)
+  })
+
+  it('keeps Sale promotion-gated rather than always-on', () => {
+    expect(drawer).toContain('SaleMobileNavLink')
+  })
+
+  it('sets the drawer links at mesonart’s 24px scale', () => {
+    // Measured: 24px, weight 300, letter-spacing -0.6px, rgb(23,23,23),
+    // padding 10px 0. One constant, so the generated styles and the
+    // hand-written pages cannot end up on two scales.
+    const declStart = src.indexOf('const MOBILE_DRAWER_LINK_CLASS')
+    const decl = src.slice(declStart, src.indexOf('\n\n', declStart))
+    expect(decl).toContain('text-2xl')
+    expect(decl).toContain('font-light')
+    expect(decl).toContain('tracking-[-0.6px]')
+    expect(decl).toContain('text-foreground')
+    expect(decl).not.toContain('text-muted-foreground')
+    expect(decl).toContain('py-2.5')
+  })
+
+  it('puts that scale on MobileNavLink rather than on each row', () => {
+    const linkStart = src.indexOf('function MobileNavLink')
+    const link = src.slice(linkStart, src.indexOf('\n}\n', linkStart))
+    expect(link).toContain('className={MOBILE_DRAWER_LINK_CLASS}')
+    // The 16px muted row it replaces.
+    expect(link).not.toContain('text-base')
+    expect(link).not.toContain('text-muted-foreground')
+  })
+
+  it('sets the mobile Sale link at the same scale', () => {
+    const saleStart = src.indexOf('export function SaleMobileNavLink')
+    const sale = src.slice(saleStart, src.indexOf('\n}\n', saleStart))
+    expect(sale).toContain('text-2xl')
+    expect(sale).toContain('font-light')
+    expect(sale).toContain('text-sale')
+  })
+})
+
 describe('behaviour a restructure must not delete', () => {
   it('keeps the mobile drawer scroll-lock and Escape (#348)', () => {
     expect(src).toContain("document.body.style.overflow = 'hidden'")

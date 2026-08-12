@@ -54,13 +54,13 @@ import { cn } from '~/lib/utils'
  * (#401 / #421).
  */
 
-interface MegaLink {
+export interface MegaLink {
   id: string
   label: string
   search: Record<string, unknown>
 }
 
-interface MegaColumn {
+export interface MegaColumn {
   /** Also the column's test id suffix. */
   key: string
   heading: string
@@ -90,7 +90,12 @@ const facetLinks = (
     search: { [param]: option.id },
   }))
 
-const MEGA_COLUMNS: readonly MegaColumn[] = [
+/**
+ * Exported for the mobile drawer's All Art panel (#599). The phone shows the
+ * same vocabulary as a stack rather than five columns, and a second
+ * hand-written copy would drift from this one the first time a facet moved.
+ */
+export const MEGA_COLUMNS: readonly MegaColumn[] = [
   {
     /**
      * Theirs lists eight monthly drops (New Art-202607 …). We have no timed

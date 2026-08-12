@@ -1,5 +1,7 @@
 import { Link, useRouteContext } from '@tanstack/react-router'
 import {
+  ChevronLeft,
+  ChevronRight,
   Heart,
   LayoutDashboard,
   Menu,
@@ -25,7 +27,7 @@ import {
 } from '~/lib/admin-nav'
 import { STYLE_OPTIONS } from '@chobii/shared'
 import { SearchDrawer } from './SearchDrawer'
-import { AllArtMegaMenu } from './AllArtMegaMenu'
+import { AllArtMegaMenu, MEGA_COLUMNS } from './AllArtMegaMenu'
 import { MobileTabBar } from './MobileTabBar'
 
 /**
@@ -68,6 +70,19 @@ const MOBILE_BADGE_CLASS =
   'absolute right-0 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground'
 
 /**
+ * One drawer row, at mesonart's measured scale.
+ *
+ * Measured on their `menu-drawer`: 24px, weight 300, letter-spacing -0.6px,
+ * colour rgb(23,23,23), padding 10px 0. Ours was 16px muted — a phone menu
+ * reading like a settings list rather than the shop's own type.
+ *
+ * A constant rather than a class on `MobileNavLink` alone: All Art and the
+ * Back control are buttons, not links, and they belong on the same rhythm.
+ */
+const MOBILE_DRAWER_LINK_CLASS =
+  'flex w-full items-center py-2.5 text-2xl font-light tracking-[-0.6px] text-foreground transition-colors hover:text-foreground/70'
+
+/**
  * The two row-1 entries that are a sort, not a page.
  *
  * Both ids exist in `SORT_OPTIONS` (`salesCount-desc`, `createdAt-desc`) —
@@ -90,6 +105,11 @@ const NEW_IN_SEARCH = { sortBy: 'createdAt', sortOrder: 'desc' }
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+
+  // All Art's second panel inside the drawer (#599). Closing the drawer
+  // resets it, so reopening never lands mid-tree on a panel the user left
+  // behind two navigations ago.
+  const [isMobileAllArtOpen, setIsMobileAllArtOpen] = useState(false)
 
   // The mega panel opens itself; the header only needs to know so it can
   // raise the scrim. The scrim cannot live inside the panel: the nav-rows
@@ -182,6 +202,7 @@ export function Header() {
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false)
+    setIsMobileAllArtOpen(false)
   }
 
   // Lock body scroll and wire Escape while the drawer is open, so the page
@@ -193,8 +214,17 @@ export function Header() {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
+    // Escape unwinds one level at a time: out of All Art first, out of the
+    // drawer only from the top level. Closing both at once loses the place
+    // the user was in for a key that means "back".
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsMobileMenuOpen(false)
+      if (event.key === 'Escape') {
+        if (isMobileAllArtOpen) {
+          setIsMobileAllArtOpen(false)
+          return
+        }
+        setIsMobileMenuOpen(false)
+      }
     }
     document.addEventListener('keydown', onKeyDown)
 
@@ -202,7 +232,7 @@ export function Header() {
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [isMobileMenuOpen])
+  }, [isMobileMenuOpen, isMobileAllArtOpen])
 
   return (
     <>
@@ -680,12 +710,29 @@ export function Header() {
           </button>
         </div>
 
-        {/* The list scrolls; the head above and the footer below stay put. */}
-        <div className="flex-1 overflow-y-auto pb-4">
-              <div className="container-wide flex flex-col space-y-3">
-              <MobileNavLink to="/posters" onClick={closeMobileMenu}>
-                Posters
-              </MobileNavLink>
+        {/* The list scrolls; the head above and the footer below stay put.
+            `relative` so the All Art panel, which covers exactly this area,
+            measures against it rather than the whole drawer — the head stays
+            reachable while the second panel is up. */}
+        <div className="relative flex-1 overflow-hidden">
+          <div
+            data-testid="mobile-nav-list"
+            className="h-full overflow-y-auto pb-4"
+          >
+            <div className="container-wide flex flex-col">
+              {/* All Art is a door, not a link — the same call the desktop
+                  styles row makes (#476), except the phone gets the
+                  vocabulary as a second sliding panel rather than a sheet. */}
+              <button
+                type="button"
+                data-testid="mobile-nav-all-art"
+                onClick={() => setIsMobileAllArtOpen(true)}
+                aria-expanded={isMobileAllArtOpen}
+                className={cn(MOBILE_DRAWER_LINK_CLASS, 'justify-between')}
+              >
+                All Art
+                <ChevronRight className="h-5 w-5" />
+              </button>
               <MobileNavLink
                 to="/posters"
                 search={BEST_SELLERS_SEARCH}
@@ -693,6 +740,9 @@ export function Header() {
               >
                 Best Sellers
               </MobileNavLink>
+              {/* Theirs says "New Arrivals". Ours says New In in the desktop
+                  row, in the mega panel and in SORT_OPTIONS — one site
+                  disagreeing with itself is the worse of the two. */}
               <MobileNavLink
                 to="/posters"
                 search={NEW_IN_SEARCH}
@@ -700,19 +750,31 @@ export function Header() {
               >
                 New In
               </MobileNavLink>
+              {/* The twelve styles, generated — none of them were reachable
+                  on a phone before. From STYLE_OPTIONS for the reason nav row
+                  2 is: twelve hardcoded links restart the drift #395 closed. */}
+              {STYLE_OPTIONS.map((style) => (
+                <MobileNavLink
+                  key={style.id}
+                  to="/posters"
+                  search={{ styles: style.id }}
+                  onClick={closeMobileMenu}
+                >
+                  {style.label}
+                </MobileNavLink>
+              ))}
+              {/* Ours, not theirs — /create and /gallery have no mesonart
+                  counterpart, and a phone is where the drawer is the only
+                  way to either. */}
               <MobileNavLink to="/create" onClick={closeMobileMenu}>
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Sparkles className="mr-2 h-5 w-5" />
                 Create with AI
               </MobileNavLink>
               <MobileNavLink to="/gallery" onClick={closeMobileMenu}>
                 Gallery
               </MobileNavLink>
-              {/* The mobile half of the pair added above. */}
               <MobileNavLink to="/reviews" onClick={closeMobileMenu}>
                 Reviews
-              </MobileNavLink>
-              <MobileNavLink to="/about" onClick={closeMobileMenu}>
-                About
               </MobileNavLink>
               {/* The drawer is a second, independent nav tree — patching only
                   the desktop row is the classic miss, and a phone would have
@@ -721,6 +783,16 @@ export function Header() {
                 promotion={activePromotion}
                 onClick={closeMobileMenu}
               />
+              {/* Theirs also carries Artists, Trade Program and Commission
+                  Art. None of the three has a route here, and a nav entry
+                  into a 404 is worse than an absent one — they land when the
+                  pages do. */}
+              <MobileNavLink to="/gift-cards" onClick={closeMobileMenu}>
+                Gift Card
+              </MobileNavLink>
+              <MobileNavLink to="/about" onClick={closeMobileMenu}>
+                About
+              </MobileNavLink>
               <div className="my-2 border-t border-border" />
               {staffLabel && staffHref && (
                 <MobileNavLink
@@ -728,19 +800,87 @@ export function Header() {
                   search={staffSearch}
                   onClick={closeMobileMenu}
                 >
-                  <LayoutDashboard className="mr-2 inline h-4 w-4" />
+                  <LayoutDashboard className="mr-2 inline h-5 w-5" />
                   {staffLabel}
                 </MobileNavLink>
               )}
-                <MobileNavLink to="/wishlist" onClick={closeMobileMenu}>
-                  <Heart className="mr-2 inline h-4 w-4" />
-                  Wishlist
-                </MobileNavLink>
-                <MobileNavLink to="/account" onClick={closeMobileMenu}>
-                  <User className="mr-2 h-4 w-4" />
-                  Account
-                </MobileNavLink>
+              <MobileNavLink to="/wishlist" onClick={closeMobileMenu}>
+                <Heart className="mr-2 inline h-5 w-5" />
+                Wishlist
+              </MobileNavLink>
+              <MobileNavLink to="/account" onClick={closeMobileMenu}>
+                <User className="mr-2 h-5 w-5" />
+                Account
+              </MobileNavLink>
+            </div>
+          </div>
+
+          {/* All Art, panel two. Enters from the right over the list, the way
+              theirs does, on the drawer's own curve and duration. Fed from
+              MEGA_COLUMNS so the phone and the desktop panel cannot end up
+              offering different facets. */}
+          <div
+            data-testid="mobile-nav-all-art-panel"
+            aria-label="All Art"
+            className={cn(
+              'absolute inset-0 flex flex-col bg-background transition-transform duration-[600ms] motion-reduce:transition-none',
+              isMobileAllArtOpen
+                ? 'translate-x-0'
+                : 'invisible translate-x-full'
+            )}
+            style={{ transitionTimingFunction: 'cubic-bezier(0.7, 0, 0.2, 1)' }}
+          >
+            <div className="container-wide">
+              <button
+                type="button"
+                onClick={() => setIsMobileAllArtOpen(false)}
+                className={cn(MOBILE_DRAWER_LINK_CLASS, 'gap-2')}
+              >
+                <ChevronLeft className="h-5 w-5" />
+                Back to menu
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto pb-4">
+              <div className="container-wide flex flex-col">
+                {MEGA_COLUMNS.map((column) => (
+                  <div key={column.key} className="py-2">
+                    {/* The heading is a destination in its own right where
+                        the desktop panel makes it one; elsewhere it is a
+                        label for a group with no page, so it stays text. */}
+                    {column.headingSearch ? (
+                      <MobileNavLink
+                        to="/posters"
+                        search={column.headingSearch}
+                        onClick={closeMobileMenu}
+                      >
+                        {column.heading}
+                      </MobileNavLink>
+                    ) : (
+                      <p className="py-2.5 text-2xl font-light tracking-[-0.6px] text-foreground">
+                        {column.heading}
+                      </p>
+                    )}
+                    {/* The options themselves are one step down: a stack of
+                        24px rows would run to five screens of scroll. */}
+                    <ul className="flex flex-col pl-4">
+                      {column.links.map((link) => (
+                        <li key={link.id}>
+                          <Link
+                            to="/posters"
+                            search={link.search}
+                            onClick={closeMobileMenu}
+                            className="flex py-2 text-base font-light tracking-[-0.4px] text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            {link.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
+            </div>
+          </div>
         </div>
       </nav>
     </>
@@ -787,7 +927,7 @@ export function SaleNavLink({ promotion }: SaleNavLinkProps) {
   )
 }
 
-/** The same link in the mobile drawer, at the drawer's touch target size. */
+/** The same link in the drawer, on the drawer's own 24px rhythm (#599). */
 export function SaleMobileNavLink({
   promotion,
   onClick,
@@ -799,7 +939,9 @@ export function SaleMobileNavLink({
       to="/sale"
       onClick={onClick}
       data-testid="sale-mobile-nav-link"
-      className="flex items-center px-2 py-2 text-base font-medium text-sale transition-colors hover:text-sale/70"
+      // Everything but the colour comes from the shared row class: this is
+      // the one entry that keeps --sale, for the reason SaleNavLink does.
+      className="flex w-full items-center py-2.5 text-2xl font-light tracking-[-0.6px] text-sale transition-colors hover:text-sale/70"
     >
       Sale
     </Link>
@@ -836,7 +978,15 @@ function NavLink({
 }
 
 /**
- * Mobile navigation link component with larger touch target.
+ * One row of the mobile drawer.
+ *
+ * Carries `MOBILE_DRAWER_LINK_CLASS` — mesonart's measured 24px/300 at -0.6px
+ * tracking — rather than styling each row inline, so the twelve generated
+ * styles and the hand-written pages cannot end up on two different scales.
+ *
+ * No `activeProps`. At full-strength foreground there is nothing left for an
+ * active state to say, which is the same call nav row 2 makes; and the drawer
+ * closes on navigation, so the row it highlighted is off-screen anyway.
  */
 function MobileNavLink({
   to,
@@ -854,10 +1004,7 @@ function MobileNavLink({
       to={to}
       search={search}
       onClick={onClick}
-      className="flex items-center px-2 py-2 text-base font-medium text-muted-foreground transition-colors hover:text-foreground"
-      activeProps={{
-        className: 'text-foreground',
-      }}
+      className={MOBILE_DRAWER_LINK_CLASS}
     >
       {children}
     </Link>
