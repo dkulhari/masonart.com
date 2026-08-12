@@ -280,6 +280,66 @@ describe('mobile drawer inventory (#599)', () => {
   })
 })
 
+describe('mobile drawer footer (#600)', () => {
+  // Theirs pins a footer below the scrolling list: a currency row, a Login
+  // pill and four social icons. Ours ended the list with plain Wishlist and
+  // Account links and had no footer at all.
+  const start = src.indexOf('data-testid="mobile-nav-drawer"')
+  const drawer = src.slice(start, src.indexOf('</nav>', start))
+  const footerStart = src.indexOf('data-testid="mobile-nav-footer"')
+
+  it('renders a footer inside the drawer', () => {
+    expect(footerStart).toBeGreaterThan(-1)
+    expect(footerStart).toBeLessThan(src.indexOf('</nav>', start))
+  })
+
+  it('pins it outside the scrolling area so the list moves under it', () => {
+    // The All Art panel is the last thing inside the scroll wrapper; a footer
+    // before it would scroll away with the links.
+    expect(footerStart).toBeGreaterThan(
+      src.indexOf('data-testid="mobile-nav-all-art-panel"')
+    )
+    const footer = src.slice(footerStart, src.indexOf('</div>', footerStart))
+    expect(footer).toContain('shrink-0')
+  })
+
+  it('sends signed-out visitors to login with the round trip pre-filled', () => {
+    // Same contract MobileTabBar's account tab already keeps.
+    expect(drawer).toContain('isSignedIn')
+    expect(drawer).toContain('to="/auth/login"')
+    expect(drawer).toMatch(/search=\{\{ redirect: '\/account' \}\}/)
+  })
+
+  it('sends signed-in visitors straight to the account area', () => {
+    expect(drawer).toContain('to="/account"')
+  })
+
+  it('reads the social links from the shared list, not retyped hrefs', () => {
+    expect(src).toContain('SOCIAL_LINKS')
+    expect(drawer).toContain('SOCIAL_LINKS.map')
+    // A second copy of the hrefs is how the footer and the drawer end up
+    // pointing at different accounts.
+    expect(drawer).not.toMatch(/https:\/\/(instagram|facebook|twitter)\.com/)
+  })
+
+  it('ships no currency selector', () => {
+    // Single-currency storefront: a selector with one option is worse than
+    // none. Deliberately dropped from the parity list.
+    // The comment explaining the omission says the word, so match on what a
+    // selector would actually render: their label and a control.
+    expect(drawer).not.toMatch(/INR|₹/)
+    expect(drawer).not.toContain('<select')
+  })
+
+  it('drops the Account row from the list now the footer carries it', () => {
+    const listStart = src.indexOf('data-testid="mobile-nav-list"')
+    const list = src.slice(listStart, footerStart)
+    expect(list).not.toContain('to="/account"')
+    // Wishlist has no footer control and stays a row.
+    expect(list).toContain('to="/wishlist"')
+  })
+})
+
 describe('behaviour a restructure must not delete', () => {
   it('keeps the mobile drawer scroll-lock and Escape (#348)', () => {
     expect(src).toContain("document.body.style.overflow = 'hidden'")

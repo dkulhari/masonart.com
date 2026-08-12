@@ -28,6 +28,7 @@ import {
 import { STYLE_OPTIONS } from '@chobii/shared'
 import { SearchDrawer } from './SearchDrawer'
 import { AllArtMegaMenu, MEGA_COLUMNS } from './AllArtMegaMenu'
+import { SOCIAL_LINKS } from '~/lib/socialLinks'
 import { MobileTabBar } from './MobileTabBar'
 
 /**
@@ -81,6 +82,17 @@ const MOBILE_BADGE_CLASS =
  */
 const MOBILE_DRAWER_LINK_CLASS =
   'flex w-full items-center py-2.5 text-2xl font-light tracking-[-0.6px] text-foreground transition-colors hover:text-foreground/70'
+
+/**
+ * The account control in the drawer's pinned footer (#600).
+ *
+ * A pill, as theirs is, and not on the 24px row rhythm above it: the footer is
+ * a different register — one action, not another destination in the list. Full
+ * width because it is the only control on its line, and 48px tall for the same
+ * reason the icon boxes are 44: it is a thumb target at the bottom of a phone.
+ */
+const MOBILE_DRAWER_ACTION_CLASS =
+  'flex h-12 w-full items-center justify-center gap-2 rounded-full border border-foreground text-base font-medium text-foreground transition-colors hover:bg-foreground hover:text-background'
 
 /**
  * The two row-1 entries that are a sort, not a page.
@@ -154,6 +166,10 @@ export function Header() {
   }
   const staffLabel = staffAreaLabel(session?.user?.role)
   const staffHref = staffAreaHref(session?.user?.role)
+  // Which of the two the drawer footer's account control is (#600). Read off
+  // the same session MobileTabBar reads, so the dock and the drawer cannot
+  // send the same visitor to two different places.
+  const isSignedIn = Boolean(session?.user)
   const staffSearch =
     staffHref === '/admin/products' ? ADMIN_PRODUCTS_SEARCH : undefined
 
@@ -804,13 +820,11 @@ export function Header() {
                   {staffLabel}
                 </MobileNavLink>
               )}
+              {/* Wishlist stays a row: unlike the account, it has no control
+                  in the footer below. */}
               <MobileNavLink to="/wishlist" onClick={closeMobileMenu}>
                 <Heart className="mr-2 inline h-5 w-5" />
                 Wishlist
-              </MobileNavLink>
-              <MobileNavLink to="/account" onClick={closeMobileMenu}>
-                <User className="mr-2 h-5 w-5" />
-                Account
               </MobileNavLink>
             </div>
           </div>
@@ -881,6 +895,65 @@ export function Header() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* The pinned footer (#600).
+         *
+         * OUTSIDE the scrolling area above, which is what pins it: the links
+         * travel under it and the account control stays on screen at the
+         * bottom of a twenty-row list.
+         *
+         * Theirs opens with a country-and-currency row. Deliberately absent
+         * here: the storefront prices in one currency only, and a selector
+         * with one option is a control that cannot be used.
+         *
+         * The bar sits above the safe area, not in it — a footer flush to the
+         * bottom edge puts the login pill under the home indicator. */}
+        <div
+          data-testid="mobile-nav-footer"
+          className="shrink-0 border-t border-border px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4"
+        >
+          {/* Signed in it goes to the account area, signed out to login with
+              the round trip pre-filled — the same contract the dock's account
+              tab keeps, so the two cannot answer the same tap differently. */}
+          {isSignedIn ? (
+            <Link
+              to="/account"
+              onClick={closeMobileMenu}
+              className={MOBILE_DRAWER_ACTION_CLASS}
+            >
+              <User className="h-4 w-4" />
+              Account
+            </Link>
+          ) : (
+            <Link
+              to="/auth/login"
+              search={{ redirect: '/account' }}
+              onClick={closeMobileMenu}
+              className={MOBILE_DRAWER_ACTION_CLASS}
+            >
+              <User className="h-4 w-4" />
+              Log in
+            </Link>
+          )}
+
+          {/* Same accounts as the page footer, from the same list — see
+              ~/lib/socialLinks. Icon-only, so each carries its own name. */}
+          <ul className="mt-4 flex items-center gap-2">
+            {SOCIAL_LINKS.map(({ id, label, href, Icon }) => (
+              <li key={id}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+                >
+                  <Icon className="h-5 w-5" />
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       </nav>
     </>

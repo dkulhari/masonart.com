@@ -1,13 +1,7 @@
 import { Link } from '@tanstack/react-router'
-import {
-  Facebook,
-  Instagram,
-  Twitter,
-  Mail,
-  MapPin,
-  MessageCircle,
-} from 'lucide-react'
+import { Mail, MapPin, MessageCircle } from 'lucide-react'
 import { SUPPORT_EMAIL } from '@chobii/shared'
+import { SOCIAL_LINKS } from '~/lib/socialLinks'
 
 /**
  * Footer component for the chobii.art e-commerce platform.
@@ -43,16 +37,15 @@ export function Footer() {
               Premium posters and frames for your space. Create custom AI-generated
               art or choose from our curated collection.
             </p>
+            {/* From `~/lib/socialLinks` since #600: the mobile drawer's
+                footer carries the same accounts, and two copies of the hrefs
+                is how the two end up pointing at different ones. */}
             <div className="flex space-x-4">
-              <SocialLink href="https://instagram.com" label="Instagram">
-                <Instagram className="h-5 w-5" />
-              </SocialLink>
-              <SocialLink href="https://facebook.com" label="Facebook">
-                <Facebook className="h-5 w-5" />
-              </SocialLink>
-              <SocialLink href="https://twitter.com" label="Twitter">
-                <Twitter className="h-5 w-5" />
-              </SocialLink>
+              {SOCIAL_LINKS.map(({ id, label, href, Icon }) => (
+                <SocialLink key={id} href={href} label={label}>
+                  <Icon className="h-5 w-5" />
+                </SocialLink>
+              ))}
             </div>
           </div>
 

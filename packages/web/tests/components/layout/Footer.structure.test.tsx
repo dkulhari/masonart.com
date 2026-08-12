@@ -74,6 +74,16 @@ describe('contact column', () => {
   })
 })
 
+describe('social links (#600)', () => {
+  // The mobile drawer's footer carries the same accounts. Two hand-written
+  // copies of the hrefs is how the two end up pointing at different ones.
+  it('reads them from the shared list rather than inline hrefs', () => {
+    expect(src).toContain('SOCIAL_LINKS')
+    expect(src).toContain('SOCIAL_LINKS.map')
+    expect(src).not.toMatch(/href="https:\/\/(instagram|facebook|twitter)\.com/)
+  })
+})
+
 describe('styling', () => {
   it('sits on the measured beige band', () => {
     expect(src).toContain('bg-band')

@@ -38,6 +38,12 @@ async function openMenu(page: Page, viewport = IPHONE) {
       page.getByRole('button', { name: /close menu/i })
     ).toHaveAttribute('aria-expanded', 'true', { timeout: 1000 })
   }).toPass({ timeout: 15000 })
+
+  // The panel takes 600ms to arrive (#598). Measuring anything mid-slide
+  // reads a transient x — settle on the left edge first.
+  await expect
+    .poll(async () => (await panel(page).boundingBox())?.x)
+    .toBeGreaterThanOrEqual(0)
 }
 
 /** The drawer panel — the element that must be opaque. */
@@ -191,6 +197,43 @@ test.describe('mobile nav drawer', () => {
     await allArtPanel.getByRole('button', { name: /back to menu/i }).click()
     await expect(allArtPanel).toBeHidden()
     await expect(panel(page)).toBeVisible()
+  })
+
+  test('the footer stays pinned while the list scrolls (#600)', async ({
+    page,
+  }) => {
+    await openMenu(page)
+
+    const footer = page.locator('[data-testid="mobile-nav-footer"]')
+    await expect(footer).toBeVisible()
+    const before = await footer.boundingBox()
+
+    // Twenty-odd rows: the list has somewhere to go.
+    await list(page).evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    await expect
+      .poll(async () => list(page).evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0)
+
+    expect(await footer.boundingBox()).toEqual(before)
+  })
+
+  test('the footer offers login with the round trip pre-filled (#600)', async ({
+    page,
+  }) => {
+    // This project runs signed out, which is the branch with the redirect.
+    await openMenu(page)
+
+    const footer = page.locator('[data-testid="mobile-nav-footer"]')
+    const login = footer.getByRole('link', { name: /log in/i })
+    await expect(login).toBeVisible()
+    await expect(login).toHaveAttribute('href', /\/auth\/login\?redirect=/)
+
+    // The same accounts as the page footer, named for a screen reader.
+    for (const label of ['Instagram', 'Facebook', 'Twitter']) {
+      await expect(footer.getByRole('link', { name: label })).toBeVisible()
+    }
   })
 
   test('Escape unwinds All Art before the drawer (#599)', async ({ page }) => {
