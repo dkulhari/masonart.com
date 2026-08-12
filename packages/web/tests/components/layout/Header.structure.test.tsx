@@ -112,12 +112,81 @@ describe('mobile top bar parity (#596)', () => {
     expect(rightCluster).not.toMatch(/to="\/account"/)
   })
 
-  it('drops the mobile drawer and its scrim at the bar, not 8px under it', () => {
-    // top-16 against a 56px bar leaves a band of live page showing between
-    // the two.
-    expect(src).toContain('fixed inset-0 top-14')
-    expect(src).toContain('fixed inset-x-0 top-14')
-    expect(src).toContain('max-h-[calc(100vh-3.5rem)]')
+  // The "drop the drawer at 56px rather than 64" assertion that used to live
+  // here is superseded by #598: the drawer is no longer a panel hanging off
+  // the bottom of the bar at all, it is a full-height panel sliding in from
+  // the left edge. See the drawer container block below.
+})
+
+describe('mobile drawer container (#598)', () => {
+  // Measured on mesonart: `drawer__inner` is width:100%, max-width:576px,
+  // full viewport height, entering from x = -576 under
+  // `transform .6s cubic-bezier(0.7, 0, 0.2, 1)`. Ours dropped from under the
+  // header at full width instead — a top dropdown, not a drawer.
+  const start = src.indexOf('data-testid="mobile-nav-drawer"')
+  const drawer = src.slice(start, src.indexOf('</nav>', start))
+
+  it('renders the drawer panel', () => {
+    expect(start).toBeGreaterThan(-1)
+  })
+
+  it('pins the panel to the left edge for the full viewport height', () => {
+    expect(drawer).toContain('fixed inset-y-0 left-0')
+    // A panel hanging off the bar is the shape being replaced.
+    expect(drawer).not.toMatch(/top-14|top-16/)
+    expect(drawer).not.toContain('max-h-[calc(100vh-3.5rem)]')
+  })
+
+  it('is full width up to mesonart’s 576px cap', () => {
+    expect(drawer).toMatch(/w-full/)
+    expect(drawer).toContain('max-w-[576px]')
+  })
+
+  it('slides in from off the left edge rather than mounting in place', () => {
+    // Mounted only while open there is nothing to transition from, so the
+    // panel has to stay mounted and move.
+    expect(drawer).toContain('-translate-x-full')
+    expect(drawer).toContain('translate-x-0')
+    expect(drawer).toContain('transition-transform')
+  })
+
+  it('takes the closed panel out of the tab order', () => {
+    // Translated off-screen it is still focusable; `invisible` is what
+    // removes it without deleting the animation (same call as the nav rows).
+    expect(drawer).toContain('invisible')
+  })
+
+  it('carries mesonart’s 600ms easing', () => {
+    expect(drawer).toContain('cubic-bezier(0.7, 0, 0.2, 1)')
+    expect(drawer).toMatch(/duration-\[600ms\]/)
+    expect(drawer).toContain('motion-reduce:transition-none')
+  })
+
+  it('has a close control of its own', () => {
+    // The bar’s hamburger is under the panel once it is open, so the panel
+    // needs its own way out. Named distinctly from the dock toggle’s
+    // "Close menu" so neither test nor screen reader has two of the same.
+    expect(drawer).toContain('Close site menu')
+  })
+
+  it('scrolls the link list inside the panel, not the panel itself', () => {
+    // The footer stays pinned on theirs; a panel that scrolls whole would
+    // take it with it.
+    expect(drawer).toContain('overflow-y-auto')
+    expect(drawer).toMatch(/flex-1/)
+  })
+
+  it('covers the whole viewport with the scrim, not just below the bar', () => {
+    const scrimStart = src.indexOf('data-testid="mobile-nav-scrim"')
+    const scrim = src.slice(scrimStart, src.indexOf('/>', scrimStart))
+    expect(scrim).toContain('fixed inset-0')
+    expect(scrim).not.toContain('top-14')
+  })
+
+  it('keeps the panel above the header, which is z-50 and sticky', () => {
+    expect(drawer).toContain('z-50')
+    const headerClose = src.indexOf('</header>')
+    expect(start).toBeGreaterThan(headerClose)
   })
 })
 

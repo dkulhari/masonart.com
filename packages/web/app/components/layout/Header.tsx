@@ -620,26 +620,68 @@ export function Header() {
        * Mirrors the filter sheet on /posters: scrim, opaque panel, scroll
        * lock, Escape, dialog semantics.
        */}
-      {isMobileMenuOpen && (
-          <>
-            {/* Scrim */}
-            <div
-              data-testid="mobile-nav-scrim"
-              className="fixed inset-0 top-14 z-40 bg-black/50 md:hidden"
-              onClick={closeMobileMenu}
-              aria-hidden="true"
-            />
+      {/* Scrim. Full viewport, not `top-14`: the panel it dims runs the whole
+          height now, so a scrim that starts under the bar would leave the one
+          band the drawer does not cover undimmed (#598). */}
+      <div
+        data-testid="mobile-nav-scrim"
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 transition-opacity duration-[600ms] motion-reduce:transition-none md:hidden',
+          isMobileMenuOpen ? 'opacity-100' : 'invisible opacity-0'
+        )}
+        onClick={closeMobileMenu}
+        aria-hidden="true"
+      />
 
-            <nav
-              id="mobile-nav"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Site menu"
-              // top-14 / 3.5rem, not top-16: the mobile bar is 56px now, and
-              // dropping the panel at 64 leaves a band of live page showing
-              // between the bar and the drawer (#596).
-              className="fixed inset-x-0 top-14 z-40 max-h-[calc(100vh-3.5rem)] overflow-y-auto border-t border-border bg-background py-4 shadow-xl md:hidden"
-            >
+      <nav
+        id="mobile-nav"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site menu"
+        data-testid="mobile-nav-drawer"
+        // Mounted whether open or not. Rendered only while open — which is
+        // what this was — there is no closed state to transition FROM, so
+        // the panel appeared at its destination and the slide never ran.
+        //
+        // `invisible` is what keeps the closed panel's links out of the tab
+        // order, the same call the desktop nav rows make. It also costs the
+        // exit animation: visibility flips at once rather than easing. The
+        // enter is the one that reads as motion, and a focusable menu behind
+        // a closed drawer is the worse trade.
+        //
+        // z-50 and last in the tree: the header is `sticky z-50`, so an equal
+        // z that comes later is what paints the full-height panel over it.
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-full max-w-[576px] flex-col bg-background shadow-xl transition-transform duration-[600ms] motion-reduce:transition-none md:hidden',
+          isMobileMenuOpen ? 'translate-x-0' : 'invisible -translate-x-full'
+        )}
+        // Theirs, measured: transform .6s cubic-bezier(0.7, 0, 0.2, 1) —
+        // fast off the mark, long settle. No Tailwind ease- matches it.
+        style={{ transitionTimingFunction: 'cubic-bezier(0.7, 0, 0.2, 1)' }}
+      >
+        {/* Panel head — drag-handle pill centred, close at the right, as on
+            theirs. The pill is decoration: the drawer has no drag gesture,
+            and announcing a grabber that does nothing is worse than silence. */}
+        <div className="relative flex h-14 shrink-0 items-center justify-end px-2">
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 top-3 h-1 w-10 -translate-x-1/2 rounded-full bg-border"
+          />
+          <button
+            type="button"
+            onClick={closeMobileMenu}
+            className={MOBILE_ICON_CLASS}
+            // Not "Close menu": the dock's toggle already answers to that
+            // name while the drawer is open, and two buttons with one name
+            // is ambiguous to a screen reader and to `getByRole`.
+            aria-label="Close site menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* The list scrolls; the head above and the footer below stay put. */}
+        <div className="flex-1 overflow-y-auto pb-4">
               <div className="container-wide flex flex-col space-y-3">
               <MobileNavLink to="/posters" onClick={closeMobileMenu}>
                 Posters
@@ -699,9 +741,8 @@ export function Header() {
                   Account
                 </MobileNavLink>
               </div>
-            </nav>
-          </>
-        )}
+        </div>
+      </nav>
     </>
   )
 }
