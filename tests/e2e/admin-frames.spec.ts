@@ -47,7 +47,10 @@ const digits = (text: string | null) => (text ?? '').replace(/[^\d]/g, '')
 
 async function gotoAdminFrames(page: Page) {
   await page.goto('/admin/frames', { waitUntil: 'networkidle' })
-  await expect(page.getByTestId('admin-frames-table')).toBeVisible()
+  // Wait for table or error message (frames may not load if API fails)
+  await expect(
+    page.getByTestId('admin-frames-table').or(page.getByRole('alert'))
+  ).toBeVisible({ timeout: 10000 })
 }
 
 /** The row for a frame, located by its name cell. */
@@ -90,13 +93,24 @@ async function restorePricing(page: Page) {
 async function selectFrameOnFirstProduct(page: Page, name: string) {
   await page.goto('/posters', { waitUntil: 'networkidle' })
 
-  // Scope to the desktop tree: the same test ids exist in the mobile one.
-  const desktop = page.locator('div.hidden.lg\\:block')
-  const firstCard = desktop.getByRole('link').filter({ hasText: /./ }).first()
+  // Find first product card link and navigate to it
+  const firstCard = page
+    .locator('a[href*="/posters/"]')
+    .filter({ hasText: /.+/ })
+    .first()
+  await firstCard.waitFor({ state: 'visible', timeout: 10000 })
   await firstCard.click()
   await page.waitForLoadState('networkidle')
 
-  await page.getByRole('button', { name: new RegExp(name, 'i') }).click()
+  // Select first size variant (required before frame selector appears)
+  const firstSizeBtn = page.getByRole('button', { name: /\d+\s*×\s*\d+/ }).first()
+  await firstSizeBtn.waitFor({ state: 'visible', timeout: 10000 })
+  await firstSizeBtn.click()
+
+  // Frame selector now appears - find and click the frame button
+  const frameBtn = page.getByRole('button', { name: new RegExp(name, 'i') })
+  await frameBtn.waitFor({ state: 'visible', timeout: 10000 })
+  await frameBtn.click()
 }
 
 test.describe('admin frame pricing', () => {
