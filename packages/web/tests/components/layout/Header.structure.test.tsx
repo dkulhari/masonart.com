@@ -61,6 +61,66 @@ describe('three-row structure', () => {
   })
 })
 
+describe('mobile top bar parity (#596)', () => {
+  // Measured live on mesonart at mobile width: a 56px bar, [hamburger][search]
+  // left, wordmark absolutely centred, [wishlist][cart] right. Ours was a 64px
+  // bar with a LEFT wordmark and cart + hamburger only — no search, no
+  // wishlist, which is the first thing that reads as a different site.
+  const leftStart = src.indexOf('data-testid="mobile-bar-left"')
+  const rightStart = src.indexOf('data-testid="mobile-bar-right"')
+  const headerClose = src.indexOf('</header>')
+  // Each cluster to its OWN closing tag. Slicing from one testid to the next
+  // spans the desktop block that sits between them, which is where the
+  // Account link this file asserts against still lives.
+  const leftCluster = src.slice(leftStart, src.indexOf('</div>', leftStart))
+  const rightCluster = src.slice(rightStart, src.indexOf('</div>', rightStart))
+
+  it('stands 56px tall on a phone and 64 from md up', () => {
+    // md keeps h-16 because HEADER_HEIGHT_CLASS is the number the collection
+    // toolbar pins against — and nothing sticky sits under the bar below md,
+    // so the mobile row is free to shrink on its own.
+    expect(src).toMatch(/className="relative flex h-14 [^"]*md:h-16/)
+  })
+
+  it('centres the wordmark at every width, not only from md', () => {
+    expect(src).toMatch(/className="absolute left-1\/2 [^"]*-translate-x-1\/2/)
+    expect(src).not.toContain('md:absolute md:left-1/2')
+  })
+
+  it('has both mobile clusters, left before right', () => {
+    expect(leftStart).toBeGreaterThan(-1)
+    expect(rightStart).toBeGreaterThan(leftStart)
+    expect(headerClose).toBeGreaterThan(rightStart)
+  })
+
+  it('puts the hamburger and search on the left', () => {
+    expect(leftCluster).toContain('toggleMobileMenu')
+    expect(leftCluster).toContain('setIsSearchOpen(true)')
+  })
+
+  it('puts the wishlist and the cart on the right', () => {
+    expect(rightCluster).toMatch(/to="\/wishlist"/)
+    expect(rightCluster).toContain('displayWishlistCount')
+    expect(rightCluster).toContain('openCartDrawer')
+    expect(rightCluster).toContain('displayCartCount')
+  })
+
+  it('keeps Account out of the bar — it lives in the dock and the drawer', () => {
+    // Six icons in a 56px bar is theirs minus one; mesonart has no account
+    // icon up here either. MobileTabBar carries it.
+    expect(leftCluster).not.toMatch(/to="\/account"/)
+    expect(rightCluster).not.toMatch(/to="\/account"/)
+  })
+
+  it('drops the mobile drawer and its scrim at the bar, not 8px under it', () => {
+    // top-16 against a 56px bar leaves a band of live page showing between
+    // the two.
+    expect(src).toContain('fixed inset-0 top-14')
+    expect(src).toContain('fixed inset-x-0 top-14')
+    expect(src).toContain('max-h-[calc(100vh-3.5rem)]')
+  })
+})
+
 describe('behaviour a restructure must not delete', () => {
   it('keeps the mobile drawer scroll-lock and Escape (#348)', () => {
     expect(src).toContain("document.body.style.overflow = 'hidden'")

@@ -51,6 +51,23 @@ import { MobileTabBar } from './MobileTabBar'
 export const HEADER_HEIGHT_CLASS = 'h-16'
 
 /**
+ * A mobile bar icon's hit box — 35x44, measured off theirs (#596).
+ *
+ * Narrower than it is tall on purpose: 44px is the touch-target floor, but four
+ * 44-wide boxes plus their gaps eat into the centred wordmark on a 390px
+ * screen. Height carries the target, width carries the layout.
+ *
+ * No hover tint like the desktop cluster's: there is no pointer to hover with,
+ * and a rounded-full plate under a 35-wide box is an oval.
+ */
+const MOBILE_ICON_CLASS =
+  'flex h-11 w-[35px] items-center justify-center text-foreground'
+
+/** Cart and wishlist counts, sized for the smaller box above. */
+const MOBILE_BADGE_CLASS =
+  'absolute right-0 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground'
+
+/**
  * The two row-1 entries that are a sort, not a page.
  *
  * Both ids exist in `SORT_OPTIONS` (`salesCount-desc`, `createdAt-desc`) —
@@ -208,18 +225,59 @@ export function Header() {
         {/* The compact bar. Wordmark + actions only — the pages row moved out
             below it (mesonart puts nav under the wordmark line, not beside
             it), which is also what frees this row to carry more links.
-            `md:justify-end` because the wordmark is absolute at that width, so
-            the actions cluster is the only child left in flow. */}
-        <div className="relative flex h-16 items-center justify-between md:justify-end">
+
+            56px on a phone, 64 from md up. Only the mobile row shrinks:
+            `HEADER_HEIGHT_CLASS` is the number the collection toolbar pins
+            against, and nothing sticky sits under this bar below md, so the
+            two heights do not have to be one number (#596).
+
+            `md:justify-end` because the wordmark is out of flow at every
+            width: on mobile the two icon clusters are the flow children and
+            justify-between separates them, but from md the desktop cluster is
+            the only child left and justify-between would strand it at the left
+            edge. */}
+        <div className="relative flex h-14 items-center justify-between md:h-16 md:justify-end">
+          {/* Mobile left cluster — [hamburger][search] (#596).
+           *
+           * First in the DOM as well as on screen, so the tab order runs
+           * menu, search, wordmark, wishlist, cart the way it reads. */}
+          <div
+            data-testid="mobile-bar-left"
+            className="flex items-center md:hidden"
+          >
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-nav"
+              className={MOBILE_ICON_CLASS}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Search"
+              className={MOBILE_ICON_CLASS}
+            >
+              <Search className="h-5 w-5" />
+            </button>
+          </div>
+
           {/* Wordmark.
            *
-           * Absolutely centred on desktop so it stays centred regardless of
-           * how wide the nav and action clusters happen to be. Left-aligned on
-           * mobile — centring on a narrow viewport squeezes the actions, and
-           * mesonart's own mobile header is left-aligned too. */}
+           * Absolutely centred at EVERY width, the way theirs is — it stays
+           * centred regardless of how wide the clusters either side of it
+           * happen to be, and a mobile bar with icons on both sides has no
+           * other way to keep it on the middle of the screen. */}
           <Link
             to="/"
-            className="flex items-center space-x-2 md:absolute md:left-1/2 md:-translate-x-1/2"
+            className="absolute left-1/2 flex -translate-x-1/2 items-center space-x-2"
             onClick={closeMobileMenu}
           >
             {/* One word, one weight. The `.art` used to be tinted with the
@@ -286,32 +344,40 @@ export function Header() {
             </Link>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex items-center space-x-2 md:hidden">
+          {/* Mobile right cluster — [wishlist][cart] (#596).
+           *
+           * No Account icon: theirs has none up here either, and ours already
+           * carries it twice below — the dock's sixth tab and the drawer
+           * footer. A fifth icon in a 56px bar buys nothing and crowds the
+           * wordmark. */}
+          <div
+            data-testid="mobile-bar-right"
+            className="flex items-center md:hidden"
+          >
+            <Link
+              to="/wishlist"
+              onClick={closeMobileMenu}
+              className={cn(MOBILE_ICON_CLASS, 'relative')}
+              aria-label={`Wishlist${displayWishlistCount > 0 ? `, ${displayWishlistCount} items` : ''}`}
+            >
+              <Heart className="h-5 w-5" />
+              {displayWishlistCount > 0 && (
+                <span className={MOBILE_BADGE_CLASS}>
+                  {displayWishlistCount > 99 ? '99+' : displayWishlistCount}
+                </span>
+              )}
+            </Link>
             <button
               type="button"
               onClick={openCartDrawer}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className={cn(MOBILE_ICON_CLASS, 'relative')}
               aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
             >
               <ShoppingCart className="h-5 w-5" />
               {displayCartCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                <span className={MOBILE_BADGE_CLASS}>
                   {displayCartCount > 99 ? '99+' : displayCartCount}
                 </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={toggleMobileMenu}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={isMobileMenuOpen}
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
               )}
             </button>
           </div>
@@ -559,7 +625,7 @@ export function Header() {
             {/* Scrim */}
             <div
               data-testid="mobile-nav-scrim"
-              className="fixed inset-0 top-16 z-40 bg-black/50 md:hidden"
+              className="fixed inset-0 top-14 z-40 bg-black/50 md:hidden"
               onClick={closeMobileMenu}
               aria-hidden="true"
             />
@@ -569,7 +635,10 @@ export function Header() {
               role="dialog"
               aria-modal="true"
               aria-label="Site menu"
-              className="fixed inset-x-0 top-16 z-40 max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-border bg-background py-4 shadow-xl md:hidden"
+              // top-14 / 3.5rem, not top-16: the mobile bar is 56px now, and
+              // dropping the panel at 64 leaves a band of live page showing
+              // between the bar and the drawer (#596).
+              className="fixed inset-x-0 top-14 z-40 max-h-[calc(100vh-3.5rem)] overflow-y-auto border-t border-border bg-background py-4 shadow-xl md:hidden"
             >
               <div className="container-wide flex flex-col space-y-3">
               <MobileNavLink to="/posters" onClick={closeMobileMenu}>
