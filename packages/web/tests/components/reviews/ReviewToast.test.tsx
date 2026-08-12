@@ -225,6 +225,19 @@ describe('where the toast is allowed to appear', () => {
     expect(isReviewToastSuppressed('/posters/kyoto-rain')).toBe(false)
   })
 
+  it('treats the query flag as suppressed regardless of route', () => {
+    expect(isReviewToastSuppressed('/', true)).toBe(true)
+    expect(isReviewToastSuppressed('/', false)).toBe(false)
+  })
+
+  it('renders nothing when ?hideReviewToast=1 is on the URL — the capture escape hatch (#547)', async () => {
+    await renderToast('/?hideReviewToast=1')
+    await advance(REVIEW_TOAST_INITIAL_DELAY_MS + 1000)
+
+    expect(screen.queryByTestId('review-toast')).toBeNull()
+    expect(useReviewFeedMock).not.toHaveBeenCalled()
+  })
+
   it('renders nothing on /checkout, and fetches nothing either', async () => {
     await renderToast('/checkout')
     await advance(REVIEW_TOAST_INITIAL_DELAY_MS + 1000)
@@ -371,6 +384,40 @@ describe('stacking and motion', () => {
     expect(toast.className).not.toContain('animate-slide-in-from-left')
     expect(toast.className).not.toMatch(/animate-slide/)
     expect(toast.getAttribute('data-reduced-motion')).toBe('true')
+  })
+})
+
+// ============================================================================
+// Scroll — only rides along for the first screen (#547)
+// ============================================================================
+
+describe('hiding past the first screen', () => {
+  function scrollTo(y: number) {
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: y })
+    act(() => {
+      window.dispatchEvent(new Event('scroll'))
+    })
+  }
+
+  it('hides once the visitor scrolls past one viewport, without dismissing the session', async () => {
+    await renderToast('/')
+    await advance(REVIEW_TOAST_INITIAL_DELAY_MS)
+    expect(screen.getByTestId('review-toast')).toBeTruthy()
+
+    scrollTo(window.innerHeight + 1)
+    expect(screen.queryByTestId('review-toast')).toBeNull()
+    expect(sessionStore.get(REVIEW_TOAST_DISMISSED_KEY)).toBeFalsy()
+  })
+
+  it('reappears if the visitor scrolls back up — this is not a dismissal', async () => {
+    await renderToast('/')
+    await advance(REVIEW_TOAST_INITIAL_DELAY_MS)
+
+    scrollTo(window.innerHeight + 1)
+    expect(screen.queryByTestId('review-toast')).toBeNull()
+
+    scrollTo(0)
+    expect(screen.getByTestId('review-toast')).toBeTruthy()
   })
 })
 

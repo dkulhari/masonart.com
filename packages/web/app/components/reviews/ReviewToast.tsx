@@ -6,7 +6,7 @@
  * navigation and fetches one page for the whole visit rather than one per
  * route.
  *
- * Three things here are load-bearing rather than decorative:
+ * Four things here are load-bearing rather than decorative:
  *
  * 1. **Suppression comes first.** `/checkout` and every `/admin` route bail out
  *    of `ReviewToast` BEFORE `ReviewToastCard` is rendered, which is what keeps
@@ -24,6 +24,18 @@
  * 3. **Dismissal is `sessionStorage`, not `localStorage`.** "Not right now"
  *    should last the visit, not forever — a returning visitor next week gets
  *    the toast again.
+ *
+ * 4. **It only rides along for the first screen (#547).** Past one viewport of
+ *    scroll it hides itself — not dismissed, just out of the way — because
+ *    every band below the fold on the home page is full-bleed with nothing
+ *    reserved in the lower-left, so a `fixed` card there sits on top of real
+ *    tiles and links rather than beside them. A visitor who scrolls back up
+ *    sees it again; this is about not permanently occupying a corner of a
+ *    page that has no corner to spare, not a second dismissal. `?hideReviewToast=1`
+ *    suppresses it outright, same idea as the route gate above, for whoever is
+ *    driving a browser to capture this page for parity comparison — mesonart
+ *    has no equivalent element, and it must not be a permanent, position-
+ *    dependent artifact in every one of our screenshots.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -57,13 +69,16 @@ export const REVIEW_TOAST_PAGE_SIZE = 10
 const EXCERPT_MAX_CHARS = 90
 
 /**
- * Routes the toast must never appear on.
+ * Routes the toast must never appear on, or an explicit request to hide it.
  *
  * `startsWith` rather than equality on purpose: `/checkout/success` and every
- * `/admin/*` page are covered by the same two prefixes.
+ * `/admin/*` page are covered by the same two prefixes. `hideViaQuery` carries
+ * `?hideReviewToast=1` — the escape hatch for parity captures, kept as a
+ * separate boolean argument rather than parsed here so this stays a pure
+ * function the tests can call with a bare pathname.
  */
-export function isReviewToastSuppressed(pathname: string): boolean {
-  return pathname.startsWith('/checkout') || pathname.startsWith('/admin')
+export function isReviewToastSuppressed(pathname: string, hideViaQuery = false): boolean {
+  return pathname.startsWith('/checkout') || pathname.startsWith('/admin') || hideViaQuery
 }
 
 // ============================================================================
@@ -134,6 +149,37 @@ function usePrefersReducedMotion(): boolean {
 }
 
 // ============================================================================
+// Scroll — the toast only rides along for the first screen (#547)
+// ============================================================================
+
+/**
+ * Has the visitor scrolled past one viewport of height?
+ *
+ * Every band below the fold on the home page is full-bleed, with nothing
+ * reserved in the lower-left for a `fixed` card to sit beside rather than on
+ * top of — so past that point the toast hides itself rather than riding along
+ * over real tiles and links. `window.innerHeight` rather than a fixed pixel
+ * count so the threshold scales with the device instead of meaning a
+ * different fraction of the screen on a phone than a desktop.
+ *
+ * Absent `false` (SSR, jsdom without a scroll) — the toast should default to
+ * showing, the same bias every other guard in this file takes.
+ */
+function useScrolledPastFirstScreen(): boolean {
+  const [past, setPast] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onScroll = () => setPast(window.scrollY > window.innerHeight)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return past
+}
+
+// ============================================================================
 // Content helpers
 // ============================================================================
 
@@ -163,6 +209,12 @@ function thumbnailOf(review: ReviewFeedItem): string | null {
  */
 export function ReviewToast() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const hideViaQuery = useRouterState({
+    // TanStack's default `parseSearch` coerces a numeric-looking value, so
+    // `?hideReviewToast=1` lands as the number `1`, not the string `'1'`.
+    select: (state) =>
+      String((state.location.search as Record<string, unknown>)?.hideReviewToast) === '1',
+  })
   const [dismissed, setDismissed] = useState(readDismissed)
 
   const handleDismiss = useCallback(() => {
@@ -170,7 +222,7 @@ export function ReviewToast() {
     setDismissed(true)
   }, [])
 
-  if (isReviewToastSuppressed(pathname)) return null
+  if (isReviewToastSuppressed(pathname, hideViaQuery)) return null
   if (dismissed) return null
 
   return <ReviewToastCard onDismiss={handleDismiss} />
@@ -188,6 +240,7 @@ function ReviewToastCard({ onDismiss }: { onDismiss: () => void }) {
   const [visible, setVisible] = useState(false)
   const [index, setIndex] = useState(0)
   const reducedMotion = usePrefersReducedMotion()
+  const scrolledPastFirstScreen = useScrolledPastFirstScreen()
 
   // The opening delay. Keyed on `count` so it starts when the feed lands, not
   // when the component mounted with nothing to show.
@@ -207,7 +260,7 @@ function ReviewToastCard({ onDismiss }: { onDismiss: () => void }) {
     return () => clearInterval(interval)
   }, [visible, count])
 
-  if (!visible || count === 0) return null
+  if (!visible || count === 0 || scrolledPastFirstScreen) return null
 
   // `noUncheckedIndexedAccess` is on, and the modulo alone does not convince
   // the compiler. The guard is real anyway: `index` survives a feed refetch
