@@ -1,9 +1,9 @@
 status: done
-last_updated: '2026-08-12T13:13:22.465Z'
-total_tickets: 551
+last_updated: '2026-08-12T14:05:47.986Z'
+total_tickets: 552
 summary:
   critical: 30
-  high: 205
+  high: 206
   medium: 239
   low: 77
 priorities:
@@ -711,6 +711,10 @@ priorities:
           blocked_by: []
         - ticket_number: 352
           title: 'BUG: PDP ''You May Also Like'' is a hardcoded permanent skeleton — never implemented'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 596
+          title: 'Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px'
           assignee: unassigned
           blocked_by: []
         - ticket_number: 597

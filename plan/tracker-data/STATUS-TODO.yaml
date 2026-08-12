@@ -1,9 +1,9 @@
 status: todo
-last_updated: '2026-08-12T13:13:22.268Z'
-total_tickets: 21
+last_updated: '2026-08-12T14:05:47.572Z'
+total_tickets: 20
 summary:
   critical: 3
-  high: 8
+  high: 7
   medium: 6
   low: 4
 priorities:
@@ -88,10 +88,6 @@ priorities:
           blocked_by: []
     - feature: mobile-responsive-jul2026
       tickets:
-        - ticket_number: 596
-          title: 'Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px'
-          assignee: unassigned
-          blocked_by: []
         - ticket_number: 598
           title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
           assignee: unassigned

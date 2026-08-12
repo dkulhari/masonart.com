@@ -22,11 +22,11 @@ description: |-
 feature: mobile-responsive-jul2026
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-12T12:56:23.259Z'
-last_updated: '2026-08-12T12:56:23.259Z'
+last_updated: '2026-08-12T14:06:01.692Z'
 time_spent_minutes: 0
 labels:
   - web
@@ -34,7 +34,34 @@ labels:
   - mesonart-parity
   - mobile
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-12T14:05:45.291Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-12T14:06:01.692Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c1301f1d` — feat(web): mobile top bar takes mesonart's shape
+
+      **Files Changed**
+      - `packages/web/app/components/layout/Header.tsx` — bar `h-14 md:h-16`; wordmark absolutely centred at every width; two new mobile clusters (`mobile-bar-left` = hamburger + search, `mobile-bar-right` = wishlist + cart) at 35x44 hit boxes; drawer and scrim repointed to `top-14` / `max-h-[calc(100vh-3.5rem)]`
+      - `packages/web/tests/components/layout/Header.structure.test.tsx` — new `mobile top bar parity (#596)` block, 7 assertions
+
+      **Verified live at 414px** (Playwright, real viewport — not screenshots):
+      - bar 56px (header 57 with its border)
+      - wordmark centre 207 against a viewport centre of 207 — exact
+      - left cluster at x=20, icons `[Open menu][Search]` 35x44 each
+      - right cluster ending at x=394, icons `[Wishlist][Shopping cart]` 35x44 each
+
+      **Tests**: 142/142 in `tests/components/layout/`; full web unit suite 2933 passing. The one red test, `tests/routes/wishlist-page.test.ts > has no auth guard of its own either`, is pre-existing — `app/routes/wishlist.tsx` is untouched by this branch.
+      `npx tsc --noEmit`: 22 errors, all pre-existing, none in Header or MobileTabBar.
+
+      **Deviation from the ticket** — `md:justify-end` stays.
+      The ticket said to drop it. It cannot go: the wordmark is now `absolute` at EVERY width, so from `md` the desktop action cluster is the only child left in flow and `justify-between` would strand it at the left edge. Below `md` the two icon clusters are the flow children and `justify-between` separates them correctly, which is the part that mattered. The existing assertion at `Header.structure.test.tsx` ("pushes the actions cluster right now that nothing else is in flow") still holds and still passes.
+
+      **Known follow-up, deliberately not done here**: `useChromeOffset.COMPACT_BAR_HEIGHT_PX` is a hardcoded 64, so on a phone `--chrome-offset` now runs 8px below the 56px bar and the collection toolbar floats with a thin gap under it. Not a break — nothing overlaps — and the ticket explicitly said not to repoint the constant. Fixing it properly means measuring the bar rather than naming its height.
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -75,3 +102,4 @@ implementation_steps:
     command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile top bar takes mesonart''s icon layout and 56px height"'
     status: pending
 current_step: 1
+completed: '2026-08-12T14:05:45.291Z'

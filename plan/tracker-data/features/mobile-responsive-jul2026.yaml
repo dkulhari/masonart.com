@@ -20,7 +20,6 @@ work_session_summary:
 tickets:
   todo:
     "361": "DECISION: order numbers still use the masonart MA- prefix after the rebrand"
-    "596": "Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px"
     "598": Mobile menu becomes a left slide-in drawer instead of a top dropdown
     "599": "Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart's 24px scale"
     "600": "Mobile drawer footer: pinned account/login row and social icons"
@@ -39,7 +38,8 @@ tickets:
     "357": "BUG: Home 'Minimalist' style card caption is illegible — grey overlay too weak over a light image"
     "358": "BUG: Track page placeholder shows stale 'MA-2024-001234' masonart order prefix"
     "360": "Product grid card sizing: residual height variance + home/listing ratio mismatch"
+    "596": "Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px"
     "597": Mobile chrome scroll rule is inverted — top bar and tab bar both behave opposite to mesonart
 total_tickets: 19
-completion_percentage: 68
+completion_percentage: 74
 is_completed: false
