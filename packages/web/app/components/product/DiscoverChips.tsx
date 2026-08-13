@@ -38,7 +38,7 @@
  */
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '~/lib/utils'
 import { buttonVariants } from '~/components/ui/Button'
@@ -126,12 +126,35 @@ export interface DiscoverChipsProps {
   className?: string
 }
 
+/** Pointer travel, in px, past which a press is a drag and not a click. */
+const DRAG_THRESHOLD = 4
+
 export function DiscoverChips({
   collections,
   activeSlug,
   className,
 }: DiscoverChipsProps) {
   const railRef = useRef<HTMLUListElement>(null)
+
+  /**
+   * The in-flight mouse drag, or null.
+   *
+   * A ref rather than state because every field is read inside pointermove and
+   * none of them should re-render the rail 60 times a second. `isDragging`
+   * below is the one bit the render DOES need — it turns off smooth scrolling
+   * and snapping for the duration, both of which fight a scrollLeft the hand is
+   * already setting.
+   */
+  const dragRef = useRef<{
+    pointerId: number
+    startX: number
+    startScroll: number
+    moved: boolean
+  } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  /** Set when a drag ends, so the click it would otherwise fire is swallowed. */
+  const suppressClickRef = useRef(false)
 
   // Nothing to discover is not an empty rail with arrows — it is no rail.
   if (collections.length === 0) return null
@@ -142,13 +165,74 @@ export function DiscoverChips({
     rail.scrollBy({ left: direction * rail.clientWidth * 0.8, behavior: 'smooth' })
   }
 
+  /**
+   * Grab-to-scroll, for mice only.
+   *
+   * Touch and pen already pan a `overflow-x-auto` rail natively, with momentum
+   * and rubber-banding this cannot reproduce — so those pointer types are left
+   * entirely alone. A mouse has no such gesture, which is what the arrows were
+   * standing in for; on mobile the arrows are gone and this is what remains for
+   * anyone driving a pointer.
+   */
+  const onPointerDown = (event: ReactPointerEvent<HTMLUListElement>) => {
+    suppressClickRef.current = false
+    if (event.pointerType !== 'mouse' || event.button !== 0) return
+    const rail = railRef.current
+    if (!rail) return
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScroll: rail.scrollLeft,
+      moved: false,
+    }
+  }
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLUListElement>) => {
+    const drag = dragRef.current
+    const rail = railRef.current
+    if (!drag || !rail || event.pointerId !== drag.pointerId) return
+
+    const dx = event.clientX - drag.startX
+    if (!drag.moved) {
+      if (Math.abs(dx) < DRAG_THRESHOLD) return
+      drag.moved = true
+      setIsDragging(true)
+      // Capture only once it IS a drag: capturing on every mousedown would
+      // steal the click from the chip under the cursor.
+      rail.setPointerCapture(drag.pointerId)
+    }
+
+    rail.scrollLeft = drag.startScroll - dx
+  }
+
+  const endDrag = (event: ReactPointerEvent<HTMLUListElement>) => {
+    const drag = dragRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+
+    if (drag.moved) {
+      // The pointerup that ends a drag still fires a click on whichever chip
+      // it landed over. Without this, dragging the rail navigates.
+      suppressClickRef.current = true
+      railRef.current?.releasePointerCapture(drag.pointerId)
+      setIsDragging(false)
+    }
+    dragRef.current = null
+  }
+
   return (
     <div className={cn('relative flex items-center gap-2', className)}>
       <button
         type="button"
         aria-label="Scroll left"
         onClick={() => scrollBy(-1)}
-        className={cn(buttonVariants({ variant: 'outline', size: 'icon' }), 'shrink-0')}
+        className={cn(
+          buttonVariants({ variant: 'outline', size: 'icon' }),
+          // Hidden on phones and tablets: there the rail is panned by finger,
+          // and two 40px circles either side of it eat the width three chips
+          // need. Desktop keeps them — a mouse has no swipe.
+          'hidden shrink-0 lg:inline-flex'
+        )}
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -156,7 +240,29 @@ export function DiscoverChips({
       <ul
         ref={railRef}
         aria-label="Discover collections"
-        className="flex flex-1 snap-x snap-mandatory list-none gap-5 overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={(event) => {
+          if (!suppressClickRef.current) return
+          suppressClickRef.current = false
+          event.preventDefault()
+          event.stopPropagation()
+        }}
+        /**
+         * `scroll-smooth` and snapping are both correct for the arrows and
+         * wrong for a hand: smooth animates every scrollLeft the drag writes,
+         * and mandatory snapping drags the rail back mid-gesture.
+         */
+        style={
+          isDragging ? { scrollBehavior: 'auto', scrollSnapType: 'none' } : undefined
+        }
+        className={cn(
+          'flex flex-1 snap-x snap-mandatory list-none gap-5 overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          'cursor-grab select-none',
+          isDragging && 'cursor-grabbing'
+        )}
       >
         {collections.map((collection) => {
           const isActive = collection.slug === activeSlug
@@ -172,6 +278,9 @@ export function DiscoverChips({
                  * that could be un-pressed, and these navigate.
                  */
                 aria-current={isActive ? 'page' : undefined}
+                // An anchor is draggable by default, and dragging one is a
+                // link-drag, not a rail pan.
+                draggable={false}
                 className="flex w-24 flex-col items-center gap-2 text-center"
               >
                 <span
@@ -187,6 +296,9 @@ export function DiscoverChips({
                       src={collection.image}
                       alt=""
                       loading="lazy"
+                      // Otherwise a mouse drag starts the browser's own image
+                      // drag and the rail never moves.
+                      draggable={false}
                       /**
                        * Matted product images are enlarged and centre-cropped
                        * so the circle cuts INSIDE the artwork — see
@@ -226,7 +338,10 @@ export function DiscoverChips({
         type="button"
         aria-label="Scroll right"
         onClick={() => scrollBy(1)}
-        className={cn(buttonVariants({ variant: 'outline', size: 'icon' }), 'shrink-0')}
+        className={cn(
+          buttonVariants({ variant: 'outline', size: 'icon' }),
+          'hidden shrink-0 lg:inline-flex'
+        )}
       >
         <ChevronRight className="h-4 w-4" />
       </button>

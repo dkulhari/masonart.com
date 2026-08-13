@@ -11,8 +11,8 @@
  * lives in the route, or the rail refires on every filter change.
  */
 
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import {
   createRootRoute,
   createRoute,
@@ -240,5 +240,87 @@ describe('the rail itself', () => {
     renderChips()
     expect(await screen.findByRole('button', { name: /scroll left/i })).toBeTruthy()
     expect(await screen.findByRole('button', { name: /scroll right/i })).toBeTruthy()
+  })
+
+  it('hides the arrows below lg — a finger pans the rail there', async () => {
+    // Two 40px circles either side of a 320px viewport cost three chips of
+    // width, and touch already scrolls the rail natively.
+    renderChips()
+    for (const name of [/scroll left/i, /scroll right/i]) {
+      const button = await screen.findByRole('button', { name })
+      expect(button.className).toContain('hidden')
+      expect(button.className).toContain('lg:inline-flex')
+    }
+  })
+
+  it('lets a mouse grab the rail', async () => {
+    // The gesture that replaces the arrows on small screens. Touch is left to
+    // the browser; a mouse has no native pan, so the rail moves scrollLeft
+    // itself.
+    const { container } = renderChips()
+    await screen.findByRole('link', { name: /Wabi-Sabi Art/ })
+    const rail = container.querySelector('ul') as HTMLUListElement
+    rail.setPointerCapture = () => {}
+    rail.releasePointerCapture = () => {}
+    rail.scrollLeft = 100
+
+    fireEvent.pointerDown(rail, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 200 })
+    fireEvent.pointerMove(rail, { pointerType: 'mouse', pointerId: 1, clientX: 140 })
+
+    expect(rail.scrollLeft).toBe(160)
+  })
+
+  it('ignores a press that never moves, so a chip still opens', async () => {
+    const { container } = renderChips()
+    await screen.findByRole('link', { name: /Wabi-Sabi Art/ })
+    const rail = container.querySelector('ul') as HTMLUListElement
+    rail.scrollLeft = 100
+
+    fireEvent.pointerDown(rail, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 200 })
+    fireEvent.pointerMove(rail, { pointerType: 'mouse', pointerId: 1, clientX: 202 })
+
+    // Under the drag threshold: a hand shakes, and 2px of shake is a click.
+    expect(rail.scrollLeft).toBe(100)
+  })
+
+  it('leaves touch to the browser', async () => {
+    // A touch rail already pans, with momentum and rubber-banding this cannot
+    // reproduce. Driving scrollLeft on top of it fights the platform.
+    const { container } = renderChips()
+    await screen.findByRole('link', { name: /Wabi-Sabi Art/ })
+    const rail = container.querySelector('ul') as HTMLUListElement
+    rail.scrollLeft = 100
+
+    fireEvent.pointerDown(rail, { pointerType: 'touch', button: 0, pointerId: 1, clientX: 200 })
+    fireEvent.pointerMove(rail, { pointerType: 'touch', pointerId: 1, clientX: 100 })
+
+    expect(rail.scrollLeft).toBe(100)
+  })
+
+  it('swallows the click that ends a drag', async () => {
+    // pointerup over a chip fires a click on it. Without suppression, panning
+    // the rail navigates to whatever the cursor landed on.
+    const { container } = renderChips()
+    await screen.findByRole('link', { name: /Wabi-Sabi Art/ })
+    const rail = container.querySelector('ul') as HTMLUListElement
+    rail.setPointerCapture = () => {}
+    rail.releasePointerCapture = () => {}
+    const link = await screen.findByRole('link', { name: /Wabi-Sabi Art/ })
+
+    fireEvent.pointerDown(rail, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 200 })
+    fireEvent.pointerMove(rail, { pointerType: 'mouse', pointerId: 1, clientX: 120 })
+    fireEvent.pointerUp(rail, { pointerType: 'mouse', pointerId: 1, clientX: 120 })
+
+    // The rail's capture handler stops the click before the chip's own
+    // listener — which is what TanStack's Link navigates from — ever sees it.
+    const onChipClick = vi.fn()
+    link.addEventListener('click', onChipClick)
+
+    fireEvent.click(link)
+    expect(onChipClick).not.toHaveBeenCalled()
+
+    // ...and only that one click. The next press is a fresh gesture.
+    fireEvent.click(link)
+    expect(onChipClick).toHaveBeenCalledTimes(1)
   })
 })
