@@ -38,7 +38,6 @@ import {
 } from '~/components/product/ProductGrid'
 import {
   ProductFilters,
-  MobileFilterButton,
   type FilterState,
 } from '~/components/product/ProductFilters'
 import {
@@ -46,7 +45,10 @@ import {
   type DiscoverCollection,
 } from '~/components/product/DiscoverChips'
 import { ActiveFilterTags } from '~/components/product/ActiveFilterTags'
-import { MobileFiltersSheet } from '~/components/product/MobileFiltersSheet'
+import {
+  FilterSortButton,
+  FilterSortDrawer,
+} from '~/components/product/FilterSortDrawer'
 import { PromoTile } from '~/components/product/PromoTile'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
@@ -543,19 +545,17 @@ function CollectionPage() {
           </aside>
 
           <div className="flex-1">
-            <div className="mb-6 flex flex-col gap-4 lg:hidden">
-              <MobileFilterButton
-                activeCount={activeFilterCount}
-                onClick={() => setIsMobileFiltersOpen(true)}
-              />
-              {activeFilterCount > 0 && (
+            {/* Active filters (mobile); the button that headed this row is the
+                floating FilterSortButton below now. */}
+            {activeFilterCount > 0 && (
+              <div className="mb-6 lg:hidden">
                 <ActiveFilterTags
                   filters={filters}
                   onRemoveFilter={removeFilter}
                   onClearAll={clearAllFilters}
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             {products.length > 0 ? (
               <>
@@ -598,11 +598,25 @@ function CollectionPage() {
         </div>
       </div>
 
-      <MobileFiltersSheet
+      <FilterSortButton
+        isOpen={isMobileFiltersOpen}
+        onClick={() => setIsMobileFiltersOpen(true)}
+      />
+      <FilterSortDrawer
         isOpen={isMobileFiltersOpen}
         onClose={() => setIsMobileFiltersOpen(false)}
         filters={filters}
         onFiltersChange={handleFiltersChange}
+        /* The sort the API applied, as the toolbar takes it — a collection can
+           BE a sort, and the sheet must not disagree with the pill. */
+        sortId={`${loaderData.appliedSort?.sortBy ?? filters.sortBy ?? 'createdAt'}-${loaderData.appliedSort?.sortOrder ?? filters.sortOrder ?? 'desc'}`}
+        onSortChange={handleSortChange}
+        totalProducts={loaderData.total}
+        onClearAll={clearAllFilters}
+        onRemoveFilter={removeFilter}
+        /* This collection's counts, not the catalogue's — same reason the rail
+           above takes them. */
+        facetCounts={toFacetCountMaps(loaderData.facets)}
       />
     </div>
   )

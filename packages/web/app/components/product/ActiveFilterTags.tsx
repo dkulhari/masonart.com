@@ -26,6 +26,14 @@ export interface ActiveFilterTagsProps {
    * the bar. Overflow scrolls sideways instead — see CollectionToolbar.
    */
   variant?: 'wrap' | 'row'
+  /**
+   * Whether the row ends with its own "Clear all".
+   *
+   * False only where a caller pins that control itself: FilterSortDrawer's
+   * chips lane scrolls sideways, and a Clear all at the end of the scroll is a
+   * Clear all the shopper has to go looking for.
+   */
+  showClearAll?: boolean
 }
 
 export function ActiveFilterTags({
@@ -33,6 +41,7 @@ export function ActiveFilterTags({
   onRemoveFilter,
   onClearAll,
   variant = 'wrap',
+  showClearAll = true,
 }: ActiveFilterTagsProps) {
   /**
    * One derivation, shared with the badge (#453). Written out by hand here,
@@ -77,16 +86,18 @@ export function ActiveFilterTags({
           <X className="h-3.5 w-3.5" />
         </button>
       ))}
-      <button
-        type="button"
-        onClick={onClearAll}
-        className={cn(
-          'text-sm text-muted-foreground hover:text-foreground',
-          isRow && 'shrink-0 whitespace-nowrap'
-        )}
-      >
-        Clear all
-      </button>
+      {showClearAll && (
+        <button
+          type="button"
+          onClick={onClearAll}
+          className={cn(
+            'text-sm text-muted-foreground hover:text-foreground',
+            isRow && 'shrink-0 whitespace-nowrap'
+          )}
+        >
+          Clear all
+        </button>
+      )}
     </div>
   )
 }

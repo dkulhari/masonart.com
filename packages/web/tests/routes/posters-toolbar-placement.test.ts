@@ -73,9 +73,12 @@ describe('the sticky rail clears the sticky toolbar', () => {
   })
 })
 
-describe('mobile is untouched', () => {
-  it('still offers the drawer button in the lg:hidden block', () => {
-    expect(routeSrc).toContain('<MobileFilterButton')
-    expect(routeSrc).toContain('mb-6 flex flex-col gap-4 lg:hidden')
+describe('mobile keeps its own way into the filters', () => {
+  it('offers the floating filter-and-sort pill and the sheet it opens', () => {
+    // Was an in-flow `<MobileFilterButton>` at the top of the products column,
+    // which scrolled away with it. Now fixed to the viewport, and carrying
+    // sort as well — the toolbar's sort pill is desktop-only.
+    expect(routeSrc).toContain('<FilterSortButton')
+    expect(routeSrc).toContain('<FilterSortDrawer')
   })
 })

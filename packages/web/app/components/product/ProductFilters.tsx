@@ -9,9 +9,8 @@
  */
 
 import { useState, useCallback } from 'react'
-import { X, SlidersHorizontal, ChevronUp, Check } from 'lucide-react'
+import { ChevronUp, Check } from 'lucide-react'
 import { cn } from '~/lib/utils'
-import { countActiveFilters } from '~/lib/activeFilters'
 import { FACET_GROUPS, type FacetOption } from '@chobii/shared'
 
 // ============================================================================
@@ -95,10 +94,6 @@ export interface ProductFiltersProps {
    * rather than flashing zeros.
    */
   facetCounts?: Record<string, Map<string, number>> | null
-  /** Whether to show in mobile mode */
-  isMobile?: boolean
-  /** Callback to close mobile filters */
-  onClose?: () => void
   /** Custom className */
   className?: string
 }
@@ -119,8 +114,6 @@ export function ProductFilters({
   filters,
   onFiltersChange,
   facetCounts,
-  isMobile = false,
-  onClose,
   className,
 }: ProductFiltersProps) {
   // Track which sections are expanded
@@ -161,88 +154,8 @@ export function ProductFilters({
     [filters, onFiltersChange]
   )
 
-  // Set a single-select filter value
-  // Handle sort change
-  // Clear all filters
-  const clearAllFilters = useCallback(() => {
-    onFiltersChange({
-      styles: [],
-      subjects: [],
-      colors: [],
-      rooms: [],
-      vibe: [],
-      aesthetic: [],
-      medium: [],
-      uniqueness: undefined,
-      availability: undefined,
-      orientation: undefined,
-      priceMin: undefined,
-      priceMax: undefined,
-      isAiGenerated: undefined,
-      isFeatured: undefined,
-      sortBy: 'createdAt',
-      sortOrder: 'desc',
-    })
-  }, [onFiltersChange])
-
-  // The drawer's own count — same derivation as the chips and the mobile
-  // badge, rather than a third hand-written sum that disagrees with both
-  // (#453).
-  const activeFilterCount = countActiveFilters(filters)
-
-
   return (
-    <div
-      className={cn(
-        'flex flex-col bg-background',
-        isMobile && 'h-full',
-        className
-      )}
-    >
-      {/* Header — mobile only.
-       *
-       * mesonart's rail carries no header at all (analysis §1.3.4): no title,
-       * no active count, no "Clear all". It does not need one — active values
-       * render as removable chips above the grid, so a second clear affordance
-       * inside the rail is redundant furniture.
-       *
-       * The drawer is a different case. It has no chips above it and no other
-       * way out, so it keeps the row. */}
-      {isMobile && (
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Filters</h2>
-            {activeFilterCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-                {activeFilterCount}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Clear all
-              </button>
-            )}
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-accent"
-                aria-label="Close filters"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
+    <div className={cn('flex flex-col bg-background', className)}>
       {/* Filter Sections
        *
        * Driven by FACET_GROUPS from @chobii/shared rather than a section
@@ -250,7 +163,11 @@ export function ProductFilters({
        * consumed by the schema, the API, the seed and here. Nine groups
        * written out by hand is also where the previous copy started drifting
        * from the API's idea of the same values. */}
-      <div className={cn('flex-1', isMobile && 'overflow-y-auto px-4')}>
+      {/* The rail and the sheet render the same list. Neither the scroll
+          container nor the horizontal padding lives here: on desktop the rail
+          scrolls with the page (#415), and inside FilterSortDrawer the sheet
+          owns both. */}
+      <div className="flex-1">
         {FACET_GROUPS.map((group) => {
           const counts = facetCounts?.[group.key]
           const options: FilterOption[] = group.options.map(
@@ -309,19 +226,6 @@ export function ProductFilters({
         })}
       </div>
 
-      {/* Mobile Apply Button */}
-      {isMobile && (
-        <div className="border-t border-border p-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Apply Filters
-            {activeFilterCount > 0 && ` (${activeFilterCount})`}
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -448,39 +352,11 @@ function FilterCheckbox({
   )
 }
 
-// ============================================================================
-// Mobile Filter Button Component
-// ============================================================================
-
-export interface MobileFilterButtonProps {
-  activeCount?: number
-  onClick: () => void
-  className?: string
-}
-
-export function MobileFilterButton({
-  activeCount = 0,
-  onClick,
-  className,
-}: MobileFilterButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent',
-        className
-      )}
-    >
-      <SlidersHorizontal className="h-4 w-4" />
-      Filters
-      {activeCount > 0 && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-medium text-primary-foreground">
-          {activeCount}
-        </span>
-      )}
-    </button>
-  )
-}
+/*
+ * MobileFilterButton used to live here: a bordered "Filters" pill rendered in
+ * the page flow above the grid, which scrolled away with the top of the
+ * column. It is `FilterSortButton` in FilterSortDrawer.tsx now — fixed to the
+ * viewport, carrying sort as well, as mesonart's does.
+ */
 
 export default ProductFilters

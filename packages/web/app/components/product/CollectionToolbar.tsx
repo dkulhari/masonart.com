@@ -218,7 +218,17 @@ export function CollectionToolbar({
         </div>
       )}
 
-      <div className="relative" ref={menuRef}>
+      {/* Sort — desktop only.
+       *
+       * On a phone it is the first control inside FilterSortDrawer, as it is on
+       * theirs: a 56px pill that opens a 320px panel over the page needs room
+       * this layout does not have at 390px, where it shared one row with the
+       * result count and won. The sheet's native select is the better control
+       * on a touch screen anyway.
+       *
+       * `hidden lg:block`, matching the Hide-filters pill above — below `lg`
+       * the toolbar is the count alone. */}
+      <div className="relative hidden lg:block" ref={menuRef}>
         <button
           type="button"
           onClick={() => setIsOpen((open) => !open)}

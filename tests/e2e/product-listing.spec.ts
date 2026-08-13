@@ -419,101 +419,210 @@ test.describe('Product Listing - Mobile Filters', () => {
     await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
-  // Helper to get the mobile filter button (the one with border and icon, not the h2 header)
-  const getMobileFilterButton = (page: import('@playwright/test').Page) =>
-    page.locator('button.rounded-lg.border:has-text("Filters")');
+  /**
+   * The floating pill (#602). Fixed to the viewport 20px above the tab bar,
+   * carrying sort as well as filters — it replaced an in-flow "Filters" button
+   * that scrolled away with the top of the products column, and the sheet it
+   * opens rises from the bottom edge rather than sliding in from the right.
+   */
+  const filterSortButton = (page: import('@playwright/test').Page) =>
+    page.getByTestId('filter-sort-button');
+  const sheet = (page: import('@playwright/test').Page) =>
+    page.getByTestId('filter-sort-drawer');
 
   test('should hide desktop filter sidebar on mobile', async ({ page }) => {
     const filterSidebar = page.locator('aside.hidden.lg\\:block');
     await expect(filterSidebar).not.toBeVisible();
   });
 
-  test('should display mobile filter button', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    await expect(filterButton).toBeVisible();
+  test('should display the floating filter-and-sort pill', async ({ page }) => {
+    await expect(filterSortButton(page)).toBeVisible();
   });
 
-  test('should display filter count badge when filters active', async ({ page }) => {
-    await page.goto(`/posters?styles=${STYLE.id}`);
-
-    const filterButton = getMobileFilterButton(page);
-    await expect(filterButton).toBeVisible();
-
-    // Should show badge with count
-    const badge = filterButton.locator('.rounded-full.bg-primary');
-    await expect(badge).toBeVisible();
+  test('keeps the pill in reach after scrolling down the grid', async ({
+    page,
+  }) => {
+    // The point of the change: filters are wanted where the grid disappoints,
+    // which is a long way below where the old in-flow button sat.
+    await page.mouse.wheel(0, 3000);
+    await expect(filterSortButton(page)).toBeVisible();
   });
 
-  test('should open mobile filter sheet on button click', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    // Wait for button to be visible and ready
-    await expect(filterButton).toBeVisible();
-    await filterButton.click();
+  test('should open the sheet on pill click', async ({ page }) => {
+    await expect(filterSortButton(page)).toBeVisible();
+    await filterSortButton(page).click();
 
-    // Filter sheet should be visible (with longer timeout for state update)
-    const filterSheet = page.locator('div[role="dialog"][aria-label="Filters"]');
-    await expect(filterSheet).toBeVisible({ timeout: 10000 });
+    await expect(sheet(page)).toBeVisible({ timeout: 10000 });
   });
 
-  test('should display filter options in mobile sheet', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    await filterButton.click();
+  test('rises from the bottom edge rather than the right', async ({ page }) => {
+    await filterSortButton(page).click();
+    await expect(sheet(page)).toBeVisible();
 
-    // Sort is not in the drawer either — it is a toolbar pill (#416). The
-    // drawer keeps its own "Filters" header, which the rail does not (#415).
-    const dialog = page.locator('div[role="dialog"][aria-label="Filters"]');
-    await expect(dialog.getByRole('heading', { name: 'Filters' })).toBeVisible();
+    // Measured AFTER the 600ms slide settles, and viewport-relative: mid
+    // animation the panel is still translated a full height below the fold,
+    // and boundingBox() would report page coordinates including the scroll.
+    const box = await sheet(page).evaluate(async (node) => {
+      await Promise.all(node.getAnimations().map((a) => a.finished));
+      const rect = node.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, width: rect.width };
+    });
+    const viewport = page.viewportSize()!;
+
+    // Flush to the bottom, full width, and stopping short of the top.
+    expect(Math.round(box.bottom)).toBe(viewport.height);
+    expect(Math.round(box.width)).toBe(viewport.width);
+    expect(box.top).toBeGreaterThan(0);
+  });
+
+  test('carries sort as well as the facets', async ({ page }) => {
+    await filterSortButton(page).click();
+    const dialog = sheet(page);
+
+    await expect(
+      dialog.getByRole('heading', { name: 'Filter and sort' })
+    ).toBeVisible();
+    await expect(dialog.getByTestId('filter-sort-select')).toBeVisible();
     await expect(
       dialog.getByRole('button', { name: 'Orientation', exact: true })
     ).toBeVisible();
     await expect(
       dialog.getByRole('button', { name: 'Style', exact: true })
     ).toBeVisible();
-    await expect(dialog.getByRole('button', { name: /Sort/ })).toHaveCount(0);
   });
 
-  test('should display Apply Filters button in mobile sheet', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    await filterButton.click();
+  test('sorting from the sheet updates the URL', async ({ page }) => {
+    await filterSortButton(page).click();
+    await sheet(page)
+      .getByTestId('filter-sort-select')
+      .selectOption('basePrice-asc');
 
-    const applyButton = page.locator('button:has-text("Apply Filters")');
-    await expect(applyButton).toBeVisible();
+    await expect(page).toHaveURL(/sortBy=basePrice/, { timeout: 10000 });
   });
 
-  test('should close mobile filter sheet on Apply Filters', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    await filterButton.click();
+  test('closes on the View results button, which carries the count', async ({
+    page,
+  }) => {
+    await filterSortButton(page).click();
+    const apply = sheet(page).getByTestId('filter-sort-apply');
 
-    const applyButton = page.locator('button:has-text("Apply Filters")');
-    await applyButton.click();
+    await expect(apply).toHaveText(/View results \(\d/);
+    await apply.click();
 
-    // Sheet should close
-    const filterSheet = page.locator('div[role="dialog"][aria-label="Filters"]');
-    await expect(filterSheet).not.toBeVisible();
+    await expect(sheet(page)).toBeHidden();
   });
 
-  test('should close mobile filter sheet on backdrop click', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    await filterButton.click();
+  test('closes on the scrim', async ({ page }) => {
+    await filterSortButton(page).click();
+    await expect(sheet(page)).toBeVisible();
 
-    const filterSheet = page.locator('div[role="dialog"][aria-label="Filters"]');
-    await expect(filterSheet).toBeVisible();
+    // The sheet stops 60px short of the top, so the scrim is tappable there.
+    await page.getByTestId('filter-sort-scrim').click({ position: { x: 20, y: 20 } });
 
-    // Click the visible backdrop area (left side, not covered by the sheet)
-    // Sheet is w-[85vw] from right, so visible backdrop is the left ~15% of viewport
-    const backdrop = page.locator('.bg-black\\/50');
-    await backdrop.click({ position: { x: 20, y: 300 } });
-
-    // Sheet should close
-    await expect(filterSheet).not.toBeVisible();
+    await expect(sheet(page)).toBeHidden();
   });
 
-  test('should display close button in mobile sheet', async ({ page }) => {
-    const filterButton = getMobileFilterButton(page);
-    await filterButton.click();
+  test('closes on its own close button', async ({ page }) => {
+    await filterSortButton(page).click();
 
-    const closeButton = page.locator('button[aria-label="Close filters"]');
-    await expect(closeButton).toBeVisible();
+    await page.getByRole('button', { name: 'Close filter and sort' }).click();
+
+    await expect(sheet(page)).toBeHidden();
+  });
+
+  test('survives a shopper with a dozen filters on', async ({ page }) => {
+    // The chips lane wraps, and unbounded it grew until the facet list under
+    // it was gone and the sheet read as blank. It is capped and scrolls now.
+    await page.goto(
+      '/posters?styles=wabi-sabi-art,minimalist-art,surrealist-art,bohemian-art,hyperrealism-art,ukiyo-e-art&subjects=minimalism,people,animal,cartoon,love&colors=white,blue',
+      { waitUntil: 'networkidle' }
+    );
+    await filterSortButton(page).click();
+    await expect(sheet(page)).toBeVisible();
+
+    // The chips scroll inside the lane; the lane itself does not, so Clear all
+    // stays put rather than scrolling away with them.
+    const chips = page.getByTestId('filter-sort-chips').locator('> div').first();
+    const box = await chips.evaluate((node) => ({
+      height: node.getBoundingClientRect().height,
+      scrollHeight: node.scrollHeight,
+    }));
+
+    // Taller than the cap means it wraps; the cap means it scrolls instead of
+    // pushing the list off the sheet.
+    expect(box.scrollHeight).toBeGreaterThan(box.height);
+    expect(box.height).toBeLessThanOrEqual(120);
+
+    await chips.evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
+    await expect(
+      page.getByTestId('filter-sort-chips').getByText('Clear all')
+    ).toBeVisible();
+
+    // The facets and the footer are both still there.
+    await expect(
+      sheet(page).getByRole('button', { name: 'Orientation', exact: true })
+    ).toBeVisible();
+    await expect(sheet(page).getByTestId('filter-sort-apply')).toBeVisible();
+  });
+
+  test('stays on screen when a facet deep in the list is ticked', async ({
+    page,
+  }) => {
+    // Ticking one of the last groups focused its sr-only checkbox; the
+    // browser scrolled every scrollable ancestor to reveal it, including the
+    // panel itself, which dragged all four rows out of an overflow-hidden box
+    // and left a blank white sheet.
+    await filterSortButton(page).click();
+    const dialog = sheet(page);
+    await expect(dialog).toBeVisible();
+
+    // Uniqueness sits near the bottom of the ten groups and is collapsed.
+    const group = dialog.getByRole('button', { name: 'Uniqueness', exact: true });
+    await group.click();
+    await dialog.locator('label[for^="uniqueness-"]').first().click();
+
+    await expect(page).toHaveURL(/uniqueness=/, { timeout: 10000 });
+
+    const scrollTop = await dialog.evaluate((node) => node.scrollTop);
+    expect(scrollTop).toBe(0);
+
+    // The head and the footer are both still where they belong.
+    await expect(
+      dialog.getByRole('heading', { name: 'Filter and sort' })
+    ).toBeVisible();
+    await expect(dialog.getByTestId('filter-sort-apply')).toBeVisible();
+  });
+
+  test('applies the facets the URL used to swallow', async ({ page }) => {
+    // vibe, aesthetic, medium, uniqueness and availability were missing from
+    // /posters' search serializer: ticking one navigated to a URL without it
+    // and the tick undid itself, so five of the ten groups were inert.
+    await filterSortButton(page).click();
+    const dialog = sheet(page);
+
+    for (const facet of ['Vibe', 'Aesthetic', 'Medium'] as const) {
+      await dialog.getByRole('button', { name: facet, exact: true }).click();
+      await dialog
+        .locator(`label[for^="${facet.toLowerCase()}-"]`)
+        .first()
+        .click();
+      await expect(page).toHaveURL(
+        new RegExp(`${facet.toLowerCase()}=`),
+        { timeout: 10000 }
+      );
+    }
+  });
+
+  test('offers Clear all only once a filter is on', async ({ page }) => {
+    await filterSortButton(page).click();
+    await expect(sheet(page).getByText('Clear all')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    await page.goto(`/posters?styles=${STYLE.id}`, { waitUntil: 'networkidle' });
+    await filterSortButton(page).click();
+    await expect(sheet(page).getByText('Clear all')).toBeVisible();
   });
 });
 
@@ -1102,9 +1211,8 @@ test.describe('Product Listing - Responsive Design', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/posters');
 
-    // Use specific selector for the mobile filter button (has border class)
-    const filterButton = page.locator('button.rounded-lg.border:has-text("Filters")');
-    await expect(filterButton).toBeVisible();
+    // The floating filter-and-sort pill (#602).
+    await expect(page.getByTestId('filter-sort-button')).toBeVisible();
   });
 
   test('should hide filter sidebar on mobile', async ({ page }) => {
@@ -1224,19 +1332,19 @@ test.describe('Product Listing - Accessibility', () => {
     // Reload with networkidle to ensure hydration after viewport change
     await page.goto('/posters', { waitUntil: 'networkidle' });
 
-    // Use specific selector for the mobile filter button (has border class)
-    const filterButton = page.locator('button.rounded-lg.border:has-text("Filters")');
+    const filterButton = page.getByTestId('filter-sort-button');
     await expect(filterButton).toBeVisible();
     await filterButton.click();
 
-    const dialog = page.locator('div[role="dialog"]');
+    const dialog = page.getByTestId('filter-sort-drawer');
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
     const ariaModal = await dialog.getAttribute('aria-modal');
     expect(ariaModal).toBe('true');
 
-    const ariaLabel = await dialog.getAttribute('aria-label');
-    expect(ariaLabel).toBe('Filters');
+    // Labelled BY its own heading now, not by a hardcoded aria-label — the
+    // sheet carries a visible "Filter and sort" title.
+    await expect(dialog).toHaveAccessibleName('Filter and sort');
   });
 
   test('should have accessible close button for mobile filters', async ({ page }) => {
@@ -1244,15 +1352,16 @@ test.describe('Product Listing - Accessibility', () => {
     // Reload with networkidle to ensure hydration after viewport change
     await page.goto('/posters', { waitUntil: 'networkidle' });
 
-    // Use specific selector for the mobile filter button (has border class)
-    const filterButton = page.locator('button.rounded-lg.border:has-text("Filters")');
+    const filterButton = page.getByTestId('filter-sort-button');
     await expect(filterButton).toBeVisible();
     await filterButton.click();
 
-    const dialog = page.locator('div[role="dialog"]');
+    const dialog = page.getByTestId('filter-sort-drawer');
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
-    const closeButton = page.locator('button[aria-label="Close filters"]');
+    const closeButton = page.locator(
+      'button[aria-label="Close filter and sort"]'
+    );
     await expect(closeButton).toBeVisible();
   });
 

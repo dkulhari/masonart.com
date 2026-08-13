@@ -29,7 +29,6 @@ import {
 } from '~/components/product/ProductGrid'
 import {
   ProductFilters,
-  MobileFilterButton,
   type FilterState,
   type Orientation,
   type SortOption,
@@ -42,7 +41,10 @@ import {
 import { PromoTile } from '~/components/product/PromoTile'
 // Extracted in #470 so /collections/$slug shares them rather than copying.
 import { ActiveFilterTags } from '~/components/product/ActiveFilterTags'
-import { MobileFiltersSheet } from '~/components/product/MobileFiltersSheet'
+import {
+  FilterSortButton,
+  FilterSortDrawer,
+} from '~/components/product/FilterSortDrawer'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { Button } from '~/components/ui/Button'
@@ -520,17 +522,34 @@ function PostersPage() {
         page: 1, // Reset to page 1 when filters change
       }
 
-      if (newFilters.styles.length > 0) {
-        newSearch.styles = newFilters.styles.join(',')
+      /*
+       * Every array facet, from one list.
+       *
+       * Written out one `if` per facet, this covered the four original groups
+       * and silently dropped vibe, aesthetic and medium — the three added with
+       * the expanded vocabulary. Ticking one of them navigated to a URL
+       * without it, the effect below re-read the URL, and the tick undid
+       * itself: the facet was inert everywhere it appeared. `/collections/$slug`
+       * loops over its FACET_ARRAYS and never had the bug.
+       */
+      for (const key of [
+        'styles',
+        'subjects',
+        'colors',
+        'rooms',
+        'vibe',
+        'aesthetic',
+        'medium',
+      ] as const) {
+        const values = newFilters[key]
+        if (values?.length) newSearch[key] = values.join(',')
       }
-      if (newFilters.subjects.length > 0) {
-        newSearch.subjects = newFilters.subjects.join(',')
+      // Single-valued, and dropped by the same omission.
+      if (newFilters.uniqueness) {
+        newSearch.uniqueness = newFilters.uniqueness
       }
-      if (newFilters.colors.length > 0) {
-        newSearch.colors = newFilters.colors.join(',')
-      }
-      if (newFilters.rooms.length > 0) {
-        newSearch.rooms = newFilters.rooms.join(',')
+      if (newFilters.availability) {
+        newSearch.availability = newFilters.availability
       }
       if (newFilters.orientation) {
         newSearch.orientation = newFilters.orientation
@@ -771,22 +790,18 @@ function PostersPage() {
 
           {/* Products Content */}
           <div className="flex-1">
-            {/* Mobile Filter Button and Active Filters */}
-            <div className="mb-6 flex flex-col gap-4 lg:hidden">
-              <MobileFilterButton
-                activeCount={activeFilterCount}
-                onClick={() => setIsMobileFiltersOpen(true)}
-              />
-
-              {/* Active Filters Tags (Mobile) */}
-              {activeFilterCount > 0 && (
+            {/* Active filters (mobile). The button that used to head this row
+                is now the floating pill at the bottom of the viewport — see
+                FilterSortButton below. */}
+            {activeFilterCount > 0 && (
+              <div className="mb-6 lg:hidden">
                 <ActiveFilterTags
                   filters={filters}
                   onRemoveFilter={removeFilter}
                   onClearAll={clearAllFilters}
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Product Grid */}
             {visibleProducts.length > 0 ? (
@@ -848,12 +863,22 @@ function PostersPage() {
         </div>
       </div>
 
-      {/* Mobile Filters Sheet */}
-      <MobileFiltersSheet
+      {/* Filter and sort, on a phone: one floating pill, one bottom sheet. */}
+      <FilterSortButton
+        isOpen={isMobileFiltersOpen}
+        onClick={() => setIsMobileFiltersOpen(true)}
+      />
+      <FilterSortDrawer
         isOpen={isMobileFiltersOpen}
         onClose={() => setIsMobileFiltersOpen(false)}
         filters={filters}
         onFiltersChange={handleFiltersChange}
+        sortId={`${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`}
+        onSortChange={handleSortChange}
+        totalProducts={pagination.total}
+        onClearAll={clearAllFilters}
+        onRemoveFilter={removeFilter}
+        facetCounts={facetCounts}
       />
     </div>
   )

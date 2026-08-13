@@ -168,48 +168,54 @@ test.describe.skip('Catalog Flow - Filter Application', () => {
 // Mobile Filter Flow
 // ============================================================================
 
-// Skipped: Mobile filter UI doesn't use a dialog as expected
-test.describe.skip('Catalog Flow - Mobile Filter Experience', () => {
+/**
+ * The sheet is a real dialog now (#602) — this used to be skipped because the
+ * mobile filter UI was an in-flow button and a right-hand panel with no dialog
+ * semantics worth asserting.
+ */
+test.describe('Catalog Flow - Mobile Filter Experience', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/posters');
+    await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
-  test('should open mobile filter sheet, apply filter, and close', async ({ page }) => {
-    // Click filters button
-    const filterButton = page.locator('button:has-text("Filters")');
+  test('should open the filter-and-sort sheet, apply a filter, and close', async ({
+    page,
+  }) => {
+    const filterButton = page.getByTestId('filter-sort-button');
     await expect(filterButton).toBeVisible();
     await filterButton.click();
 
-    // Filter sheet should open
-    const filterSheet = page.locator('div[role="dialog"]');
-    await expect(filterSheet).toBeVisible();
+    const sheet = page.getByTestId('filter-sort-drawer');
+    await expect(sheet).toBeVisible();
 
-    // Apply a filter (expand style section and select)
-    const styleSection = page.locator('button:has-text("Style")');
-    if (await styleSection.isVisible()) {
-      await styleSection.click();
-    }
-    const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
-    await abstractLabel.click();
+    // Orientation is open by default. Scoped by `for=` because the first
+    // <label> in the sheet is the sort select's, not a facet.
+    await sheet.locator('label[for^="orientation-"]').first().click();
 
-    // Apply filters button
-    const applyButton = page.locator('button:has-text("Apply Filters")');
-    await applyButton.click();
+    await sheet.getByTestId('filter-sort-apply').click();
 
-    // Sheet should close and URL should update
-    await expect(filterSheet).not.toBeVisible();
-    await expect(page).toHaveURL(/styles=abstract/);
+    await expect(sheet).toBeHidden();
+    await expect(page).toHaveURL(/orientation=/);
   });
 
-  test('should show filter count badge when filters active', async ({ page }) => {
-    // Navigate with filters
-    await page.goto('/posters?styles=abstract&orientation=portrait');
+  test('names the active filters in the chips row, not on the pill', async ({
+    page,
+  }) => {
+    // Deliberately no count badge on the floating pill — the chips above the
+    // grid already name every applied value and can clear them.
+    // Real ids from the shared vocabulary — `abstract` is a subject, not a
+    // style, and an unknown value builds no chip at all.
+    await page.goto('/posters?styles=minimalist-art&orientation=portrait', {
+      waitUntil: 'networkidle',
+    });
 
-    // Filter button should show badge
-    const filterButton = page.locator('button:has-text("Filters")');
-    const badge = filterButton.locator('.rounded-full.bg-primary');
-    await expect(badge).toBeVisible();
+    await expect(page.getByTestId('filter-sort-button')).toBeVisible();
+    // Both trees render the chips — the toolbar copy is `hidden lg:flex`, so
+    // scope to the mobile one rather than taking whichever comes first.
+    await expect(
+      page.locator('.lg\\:hidden [data-testid="active-filter-tags"]')
+    ).toBeVisible();
   });
 });
 

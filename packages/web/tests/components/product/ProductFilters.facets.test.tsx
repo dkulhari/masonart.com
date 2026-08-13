@@ -93,8 +93,17 @@ describe('the new facets are wired end to end', () => {
   it('clear-all clears the new facets too', () => {
     // A filter the clear-all handler forgets is a filter the shopper cannot
     // remove without editing the URL.
+    //
+    // The handler is the ROUTE's now: the rail never had one (the chips clear
+    // the filters), and the copy that lived inside this component existed only
+    // for the old mobile sheet's header. FilterSortDrawer takes the route's
+    // via `onClearAll`, so there is one reset per page instead of two.
+    const routeSrc = readFileSync(
+      join(process.cwd(), 'app/routes/posters/index.tsx'),
+      'utf8'
+    )
     for (const key of ['vibe', 'aesthetic', 'medium', 'uniqueness', 'availability']) {
-      expect(src, `clear-all does not reset ${key}`).toMatch(
+      expect(routeSrc, `clear-all does not reset ${key}`).toMatch(
         new RegExp(`${key}:\\s*(\\[\\]|undefined)`)
       )
     }
@@ -137,18 +146,27 @@ describe('the rail carries their chrome, not ours', () => {
     expect(screen.queryByText('Clear all')).toBeNull()
   })
 
-  it('keeps the header in the mobile drawer', () => {
-    // The drawer has no chips above it and no other way out.
+  it('renders the same bare list wherever it is mounted', () => {
+    // The header, the Apply button and the `isMobile` switch that gated them
+    // are gone: FilterSortDrawer owns the sheet's chrome now, so this renders
+    // one list for both surfaces instead of two shapes behind a boolean.
+    const filtersSrc = readFileSync(
+      join(process.cwd(), 'app/components/product/ProductFilters.tsx'),
+      'utf8'
+    )
+
+    expect(filtersSrc).not.toContain('isMobile')
+    expect(filtersSrc).not.toContain('Apply Filters')
+
     render(
       <ProductFilters
         filters={{ ...emptyFilters, styles: [firstStyle.id] }}
         onFiltersChange={() => {}}
-        isMobile
       />
     )
 
-    expect(screen.getByRole('heading', { name: 'Filters' })).toBeTruthy()
-    expect(screen.getByText('Clear all')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Filters' })).toBeNull()
+    expect(screen.queryByText('Clear all')).toBeNull()
   })
 
   it('renders group titles at the body weight', () => {

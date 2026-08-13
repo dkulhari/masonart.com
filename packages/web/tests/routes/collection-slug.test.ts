@@ -70,7 +70,8 @@ describe('the route', () => {
   it('renders the shared shell components rather than its own copies', () => {
     // #470 extracted these so the two collection pages cannot drift.
     expect(src).toContain('ActiveFilterTags')
-    expect(src).toContain('MobileFiltersSheet')
+    expect(src).toContain('FilterSortDrawer')
+    expect(src).toContain('FilterSortButton')
     expect(src).toContain('CollectionToolbar')
     expect(src).toContain('ProductFilters')
     expect(src).toContain('ProductGrid')

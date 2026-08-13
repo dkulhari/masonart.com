@@ -57,9 +57,11 @@ describe('the chips ride in the toolbar', () => {
     expect(routeSrc.split('<ActiveFilterTags')).toHaveLength(3)
   })
 
-  it('keeps the mobile copy in the lg:hidden block, untouched', () => {
-    expect(routeSrc).toContain('mb-6 flex flex-col gap-4 lg:hidden')
-    expect(routeSrc).toContain('<MobileFilterButton')
+  it('keeps the mobile copy in its own lg:hidden block', () => {
+    // The button that used to head this row is the floating pill now, so the
+    // row is the chips alone — and renders only when there are chips to show.
+    expect(routeSrc).toContain('mb-6 lg:hidden')
+    expect(routeSrc).toContain('<FilterSortButton')
   })
 })
 

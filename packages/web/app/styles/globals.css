@@ -210,6 +210,15 @@
      */
     --drawer-radius: 34px;
 
+    /*
+     * The bottom sheet's corner, and deliberately not the 34px above. Measured
+     * on their facet drawer, which is the one drawer that rises from below:
+     * `20px 20px 0 0`. A sheet spans the full width, so its two corners sit
+     * far apart and read heavier than the single corner on a side panel — they
+     * cut the radius accordingly, and so do we.
+     */
+    --drawer-radius-sheet: 20px;
+
     /* --animation-primary / --animation-fast on mesonart */
     --ease-primary: cubic-bezier(.3, 1, .3, 1);
     --ease-fast: cubic-bezier(.7, 0, .3, 1);
