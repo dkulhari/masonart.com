@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-12T14:05:47.986Z'
-total_tickets: 552
+last_updated: '2026-08-13T09:56:20.117Z'
+total_tickets: 559
 summary:
   critical: 30
-  high: 206
-  medium: 239
-  low: 77
+  high: 210
+  medium: 241
+  low: 78
 priorities:
   critical:
     - feature: qa-testing
@@ -721,6 +721,10 @@ priorities:
           title: Mobile chrome scroll rule is inverted — top bar and tab bar both behave opposite to mesonart
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 598
+          title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+          assignee: unassigned
+          blocked_by: []
     - feature: product-grid-alignment
       tickets:
         - ticket_number: 364
@@ -1137,6 +1141,18 @@ priorities:
           blocked_by: []
         - ticket_number: 542
           title: Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 545
+          title: Product orientation column contradicts the artwork for 6 of 14 collection representatives
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 547
+          title: Review toast covers page content on every screen and has no counterpart on the reference
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 601
+          title: Panoramic products sell a portrait size ladder — every step is stored tall
           assignee: unassigned
           blocked_by: []
     - feature: admin-frame-management
@@ -1829,6 +1845,16 @@ priorities:
           title: 'UX: /create ''Generate Poster'' CTA sits 3.2 screens down on mobile'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 359
+          title: 'TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 599
+          title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 598
+              title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
     - feature: product-grid-alignment
       tickets:
         - ticket_number: 368
@@ -2676,6 +2702,12 @@ priorities:
           title: 'Product grid card sizing: residual height variance + home/listing ratio mismatch'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 600
+          title: 'Mobile drawer footer: pinned account/login row and social icons'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 598
+              title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
     - feature: product-grid-alignment
       tickets:
         - ticket_number: 374
@@ -3714,6 +3746,12 @@ blocked_tickets:
       - ticket_number: 588
         title: Public API - category joins the frames response
     description: Schema - frame type becomes text, new frame_category enum column, Public API - category joins the frames response
+  - ticket_number: 599
+    title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+    blocked_by:
+      - ticket_number: 598
+        title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:
@@ -3930,3 +3968,9 @@ blocked_tickets:
       - ticket_number: 592
         title: Storefront - FrameSelector groups on category instead of guessing
     description: Admin API - archive a frame, never hard delete, and never the last one, Admin UI - live price preview through the shared frameAddition, Storefront - FrameSelector groups on category instead of guessing
+  - ticket_number: 600
+    title: 'Mobile drawer footer: pinned account/login row and social icons'
+    blocked_by:
+      - ticket_number: 598
+        title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown

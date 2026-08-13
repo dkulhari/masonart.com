@@ -1,0 +1,72 @@
+ticket_number: 547
+title: Review toast covers page content on every screen and has no counterpart on the reference
+description: |-
+  A social-proof toast ("Warmer than expected — Test Customer · Cosmic Harmony", 4 stars, thumbnail, dismiss X) is pinned bottom-left and appears in EVERY screenshot of our home page, desktop and mobile, at every scroll position. It sits over real content — in the assembled captures it covers part of the Shop by Room band's overlay title.
+
+  mesonart has nothing equivalent anywhere on their home page.
+
+  Three separate problems:
+  1. Parity — it is an element the reference does not have, permanently occupying the lower-left of the viewport.
+  2. It obscures content underneath rather than reserving space, so whatever it covers is unreachable until dismissed.
+  3. It corrupts the parity process itself: it appears in every capture, so every blind critic sees it in our crops and it identifies which image is ours.
+
+  Decide whether it stays at all. If it stays, it needs a rule for when it may appear and it must not overlap content. Either way it should be suppressible for captures so the critic loop judges the page rather than the toast.
+
+  Note for whoever picks this up: it shares z-30 with the mobile tab bar but sits at bottom-24, so it clears the 62px bar — that part is already handled, per #542.
+feature: home-page-parity
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T12:56:40.575Z'
+last_updated: '2026-08-12T16:36:27.284Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - blind-ab
+  - ux
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-12T16:35:48.937Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-12T16:36:02.410Z'
+    text: |-
+      **Design Decision**: keep the toast, fix the overlap, add a capture escape hatch.
+
+      Options considered:
+      - Remove it entirely for strict parity — mesonart has nothing equivalent. Rejected: it's a real, deliberately-built conversion feature (extensive rationale already in the file for suppression/stacking/dismissal), not decoration; nuking it is a large regression for a parity nit.
+      - Leave it as-is and just add a query-param suppression for captures — fixes problems 1/3 but not problem 2 (it genuinely obscures real content for real visitors, confirmed live: it fully covered a Shop By Popular tile at ~scrollY 1800px on localhost:3001).
+      - Chosen: (a) it now hides itself once the visitor scrolls past one viewport (`window.innerHeight`, not a fixed px) — not a dismissal, it reappears scrolling back up — because every band below the fold on the home page is full-bleed with no reserved margin for a fixed card to sit beside; (b) `?hideReviewToast=1` suppresses it outright for whoever is driving a browser to capture the page for blind parity comparison, same mechanism as the existing `/checkout` + `/admin` route gate.
+
+      Verified live on localhost:3001: toast visible near top, disappears once scrolled past ~1 viewport, reappears scrolling back to top, and is fully suppressed with `?hideReviewToast=1`.
+  - author: system
+    timestamp: '2026-08-12T16:36:14.951Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-12T16:36:27.284Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `bf5b6e0e` - fix(reviews): review toast no longer covers page content or every parity capture
+
+      **Files Changed**:
+      - `packages/web/app/components/reviews/ReviewToast.tsx` — added `useScrolledPastFirstScreen`, hides the toast past one viewport of scroll (reappears scrolling back up); extended `isReviewToastSuppressed` with a `hideViaQuery` flag read from `?hideReviewToast=1`
+      - `packages/web/tests/components/reviews/ReviewToast.test.tsx` — new tests for the query suppression and the scroll hide/reappear behavior
+
+      **Summary**:
+      Kept the toast (real conversion feature, extensively built out) but scoped when it's allowed to occupy screen real estate: it now hides itself once the visitor scrolls past one viewport — the home page's bands below the fold are full-bleed with no reserved lower-left margin, so a `fixed` card there sat on top of real content (confirmed live: it fully covered a Shop By Popular tile). Scrolling back to the top brings it back — this is not a session dismissal. `?hideReviewToast=1` suppresses it outright, for whoever drives a browser to capture the page for the blind parity critic, so it no longer appears as a permanent, mesonart-has-nothing-like-it artifact in every screenshot.
+
+      **Tests Added**:
+      - `ReviewToast.test.tsx`: `isReviewToastSuppressed` with the query flag; renders nothing with `?hideReviewToast=1` on the URL and makes no fetch; hides past one viewport without writing the dismiss flag to sessionStorage; reappears on scrolling back up.
+
+      All 20 tests in the file pass; typecheck shows no new errors against the ~22-23 pre-existing baseline.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-12T16:35:48.937Z'
+completed: '2026-08-12T16:36:14.951Z'

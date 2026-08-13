@@ -24,14 +24,12 @@ work_session_summary:
 tickets:
   todo:
     "537": Customer Reviews band restyled to the bar
-    "541": Mobile home layout at 390 — the whole page, band by band
     "543": Two-row top strip — countdown announcement over utility bar
     "544": Replace mesonart development placeholder photography before production
-    "545": Product orientation column contradicts the artwork for 6 of 14 collection representatives
     "546": Seed catalogue artwork carries a MESON ART watermark baked into the pixels
-    "547": Review toast covers page content on every screen and has no counterpart on the reference
     "564": Best Sellers band is missing the category pill row the reference carries on both viewports
-  in_progress: {}
+  in_progress:
+    "541": Mobile home layout at 390 — the whole page, band by band
   done:
     "529": Home hero — full-bleed image carousel with peek slides replaces the text hero
     "530": Best Sellers product rail — rating stars, review count, title-left price-right
@@ -45,10 +43,13 @@ tickets:
     "539": Trust icons row above the footer
     "540": Section rhythm, type scale and button system pass across the whole page
     "542": Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+    "545": Product orientation column contradicts the artwork for 6 of 14 collection representatives
+    "547": Review toast covers page content on every screen and has no counterpart on the reference
     "571": /create's mobile action bar must stack above the tab bar, not paint over it
     "572": "Document: Mobile tab bar active state design choice"
     "594": Card art framing — measure artBox server-side and re-frame each piece on equal ink area
+    "601": Panoramic products sell a portrait size ladder — every step is stored tall
   undefined: {}
-total_tickets: 23
-completion_percentage: 65
+total_tickets: 24
+completion_percentage: 75
 is_completed: false

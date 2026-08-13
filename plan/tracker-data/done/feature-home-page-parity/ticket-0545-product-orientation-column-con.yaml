@@ -1,0 +1,158 @@
+ticket_number: 545
+title: Product orientation column contradicts the artwork for 6 of 14 collection representatives
+description: |-
+  Found by the #531 builder while cropping tiles, and it is not a home page problem.
+
+  Trimming the mat off all fourteen collection representative products shows six of them declare an orientation that contradicts the actual picture. Example: `colorful-art`'s representative declares `panoramic` while the artwork measures 0.52:1 — portrait.
+
+  What this already breaks in production code, not just on the home page: the round Discover chips on `/posters` and `/collections/$slug` size their crop from `chipArtScale(orientation)`. With a wrong orientation the crop is wrong, so those chips render with white arcs today. Nobody filed it because the chips look plausible rather than obviously broken.
+
+  #531 worked around it by using a single crop constant sized for the narrowest artwork measured (2.36) with `bg-mat` as a backstop, rather than trusting the column. That is a workaround, not a fix.
+
+  To close: find why the column disagrees with the pixels — seed data, an import, or a derivation that never ran — fix the data, then let the Discover chips and the popular tiles go back to deriving their crop from orientation. Check the whole catalogue, not just the fourteen representatives.
+feature: home-page-parity
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T12:19:02.364Z'
+last_updated: '2026-08-13T07:49:49.694Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - data-quality
+  - collection-page
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T14:07:13.481Z'
+    text: |-
+      ## Mostly fixed while re-doing #531. Data corrected, workaround retired.
+
+      ### Why the column disagreed with the pixels
+
+      The seed authors a fictional product — title, copy, styles, orientation — and then staples real fixture artwork onto it through `REFERENCE_MEDIA` in `seed.ts`. The `orientation` described the invented product; the pixels came from a photograph of somebody else's canvas. Nothing ever reconciled the two, so the column was not "stale" or "never derived" — it was authored about a different object.
+
+      ### What was measured
+
+      All 41 active products, not just the fourteen representatives. Trim the mat off the stored 1500x1500 master, compare the artwork box to the canvas:
+
+      - **27 of 41 declared an orientation the picture contradicted.** Not six — six was only the representatives.
+      - Two of them are not a proportion problem at all: `digital-cosmos` and `paper-layers` are photographs of **two panels with a wall gutter between them** (54px and 34px wide at dead centre on a 1500px master). A gutter detector over all 41 fires on exactly these two and nothing else.
+
+      ### What changed
+
+      `packages/api/src/database/seed.ts` — every `orientation` re-derived from the pixels, with the rule written into the file:
+
+      ```
+      >= 1.8 panoramic | >= 1.15 landscape | >= 0.87 square | else portrait
+      ```
+
+      plus `set-of-2-3` for the two diptychs. That value is panel count rather than proportion, which is exactly what `ORIENTATION_OPTIONS` documents it as, and `LADDERED_ORIENTATIONS` in the seed already falls back to the portrait ladder for it — so both products keep their variants and stay purchasable.
+
+      Applied to the live dev DB per slug as well, so the running app matches without a reseed. New spread: portrait 14, square 10, panoramic 8, landscape 7, set-of-2-3 2.
+
+      ### The workaround is gone
+
+      `PopularCategoriesSection` no longer carries `ART_CROP_SCALE = 2.36`. It has `tileArtScale(orientation)`, the same shape as `chipArtScale` but sized for a 7:4 window instead of a circle. Popular tiles derive their crop from the column again, as this ticket asked.
+
+      `collection-imagery.ts` now also *ranks* candidate artwork by orientation before merchandising order (`REPRESENTATIVE_ORIENTATION_ORDER`: landscape, square, panoramic, portrait, then `set-of-2-3` and anything unknown). That was only possible because the column became true.
+
+      ### Discover chips
+
+      Fixed as a consequence, with no code change: `chipArtScale(orientation)` was always right, it was being fed a lie. Screenshotted `/posters` after — no white arcs on the rail, all fourteen chips crop inside their artwork.
+
+      Two small things still worth someone's time on the chips:
+      - `NARROW_SIDE_RATIO` in `DiscoverChips.tsx` has no `set-of-2-3` key, so one would fall back to the square ratio. Unreachable today because the representative ranking now sorts diptychs last, but it is a hole.
+      - A few chips still show a slice of white **wall** rather than mat — the artwork bounding box includes the frame moulding and its shadow, so a crop that clears the mat does not necessarily clear the wall. The home tiles solve this with a 1.12 margin; the chips have 1.08.
+
+      ### Still open — do not close this yet
+
+      **The live dev DB's `product_variants` were generated from the OLD orientation**, so their size ladders no longer match the corrected column (e.g. `desert-bloom` is now panoramic but carries the square ladder). I did not regenerate them by hand: `order_items.variant_id` is `ON DELETE SET NULL` and `cart_items` is `ON DELETE CASCADE`, so a delete/reinsert would blank variant links on existing dev orders and empty live carts mid-flight.
+
+      `bun run seed` rebuilds products and variants together from the corrected seed and resolves it. Closing this ticket should mean either running that, or writing a migration that rebuilds variants without touching the two referencing tables.
+
+      Second thing left open: this only measured the products the dev seed creates. A real upload path still lets an admin type an orientation that contradicts their own photograph — nothing validates it. `matToSquare` in `image-processing.ts` knows the artwork's exact box at composite time and currently throws it away; deriving or at least warning from there would stop this recurring.
+  - author: system
+    timestamp: '2026-08-13T07:32:38.376Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-13T07:49:14.752Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-13T07:49:49.694Z'
+    text: |-
+      ✅ **Completed** — both open items closed, plus two rows the improved measurement caught.
+
+      **Commit**: `d2bb1fb1` — fix(products): measure orientation against the artwork instead of trusting it
+
+      ### The variant blocker was already gone
+
+      The previous session left this open because the dev DB's `product_variants` had been generated from the OLD orientation. They have since been rebuilt — every product now carries the ladder its current orientation asks for, and the seed and the database agree on all 41 slugs:
+
+      ```
+      square    10 products × 13 square steps
+      portrait  14 × 17 tall
+      landscape  7 × 17 wide
+      panoramic  8 × 13
+      set-of-2-3 2 × 17  (portrait fallback, as documented)
+      ```
+
+      ### Two rows were still wrong, and it was not carelessness
+
+      Re-measuring all 41 against their stored `artBox` found four disagreements. Two are the diptychs and are correct by design. The other two are real:
+
+      - `cosmic-harmony` — declared square, measures **0.51**
+      - `create-every-day` — declared square, measures **0.78**
+
+      Both are photographs of a canvas hanging on a near-white wall, and the wall was inside the measured box when this ticket first corrected the column: cosmic-harmony read 1.04 then, which is square. `measureArtBox` learned to peel a photographed wall off the edges in #594, and 1.04 became 0.51. So the column was not re-broken — the measurement got better and the column had not caught up. Confirmed by eye on both masters before changing anything; neither is remotely square.
+
+      Fixed in `seed.ts` and applied to the live dev DB, ladders included: variants rebuilt on the portrait ladder (13 → 17 steps), the one cosmic-harmony variant carrying real order history **retired** (`is_active = false`) rather than deleted, so the `ON DELETE SET NULL` on `order_items.variant_id` never fired. `SELECT count(*) FROM order_items WHERE variant_id IS NULL` is still 0. A full `bun run seed` was deliberately not run — it would have flattened every other session's dev data.
+
+      Audit after: **41/41 orientations agree with their artwork.**
+
+      ### Recurrence stopped at the boundary
+
+      `orientationFromRatio` / `orientationContradictingArt` now live in `@chobii/shared` — the `>= 1.8 | 1.15 | 0.87` rule that had only ever existed in a seed comment. `set-of-2-3` and `round` are exempt by name: the first counts panels, the second measures 1.0 whatever the piece is.
+
+      The admin create and update paths refuse a write that would **create** a disagreement, in either direction — a new orientation over the old artwork, or new artwork under the old orientation. The second is how the catalogue drifted originally. A row that is already wrong stays editable, because renaming a product is not the moment to demand its data be fixed. `orientationOverride: true` still gets through: the measurement is a heuristic over a photograph, and an admin who knows better must not be wedged — the value is that contradicting the picture now takes a deliberate act instead of no act at all.
+
+      Two related holes found while wiring it:
+
+      - **`productImageSchema` did not declare `artBox`.** Zod strips what it does not know, so the admin path had been silently discarding the measurement on every save — the upload endpoint returns it and the admin posts it straight back. Only the seed was writing it. Declared now, with a test that asserts it survives a create.
+      - **`set-of-2-3` was missing from the admin orientation enum**, though it has been on the postgres enum and in `ORIENTATION_OPTIONS` since #535. The two diptychs were un-editable through the API.
+
+      `backfill-art-box` also reports contradictions now, since it is the one place holding a measured box and a declared column for every product at once. Reports, never rewrites — that column decides which ladder the product sells, which is the seed's job.
+
+      ### Discover chips
+
+      `NARROW_SIDE_RATIO` gets `'set-of-2-3': 0.55` — the shallower of the two diptychs (1.6:1 and 2.1:1). The other chip note in the earlier comment, the wall sliver at 1.08 vs the tiles' 1.12, is gone on its own: it was the wall inside the artBox, and #594's wall trim removed the cause.
+
+      `tileArtScale` needed no change — `PopularCategoriesSection` already routes `set-of-2-3` to `FALLBACK_ASPECT` on purpose.
+
+      ### Filed, not fixed: #601
+
+      The audit turned up a defect this ticket did not cover. All 8 panoramic products sell a ladder stored **short side first** — `12" × 36"`, `18" × 36"` — so a panorama is offered as a tall poster. `PANORAMIC_SIZES` is written width-first and `orientFor` in `seed-variants.ts` transposes only landscape, on the strength of a comment claiming "panoramic is already stored wide". Wrong layer to fix from here, and it needs its own variant rebuild.
+
+      **Files changed**
+      - `packages/shared/src/constants/orientation.ts` — new; the rule, and what it declines to judge
+      - `packages/shared/src/{index,constants/index}.ts` — barrels
+      - `packages/api/src/routes/admin/products.ts` — the guard, `artBox` on the image schema, `set-of-2-3` on the enum, `orientationOverride`
+      - `packages/api/src/database/seed.ts` — the two corrected orientations, each with its measurement
+      - `packages/api/src/database/backfill-art-box.ts` — audits the column it now has a second opinion on
+      - `packages/web/app/components/product/DiscoverChips.tsx` — `set-of-2-3` crop depth
+
+      **Tests**
+      - `packages/shared/tests/constants/orientation.test.ts` — 11 new, covering the band boundaries, the catalogue measurements this ticket was filed over, and the exemptions
+      - `packages/api/tests/routes/admin/product-orientation-guard.test.ts` — 11 new, create and update, both directions of drift, override, `artBox` survival, and the unrelated-edit case that must not 400
+      - `packages/web/tests/components/product/DiscoverChips.test.tsx` — set-of-2-3 crops deeper than square, shallower than panoramic
+
+      **Verification**: shared 956 passed; web components 653 passed (33 files); api admin + seed-variants + image-processing 753 passed. Two pre-existing failures untouched by this work — `products-role-access.test.ts` (the `unitsSoldSql` timeout recorded on 2026-08-04) and two shared files that import `bun:test` and cannot run under vitest. API typecheck clean; web app-source errors 22, unchanged and none in the files above.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-13T07:32:38.375Z'
+completed: '2026-08-13T07:49:14.752Z'

@@ -1,17 +1,17 @@
 status: in-progress
-last_updated: '2026-08-12T14:05:47.580Z'
+last_updated: '2026-08-13T09:56:18.773Z'
 total_tickets: 1
 summary:
-  critical: 0
+  critical: 1
   high: 0
-  medium: 1
+  medium: 0
   low: 0
 priorities:
-  medium:
-    - feature: mobile-responsive-jul2026
+  critical:
+    - feature: home-page-parity
       tickets:
-        - ticket_number: 359
-          title: 'TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests'
+        - ticket_number: 541
+          title: Mobile home layout at 390 — the whole page, band by band
           assignee: unassigned
           blocked_by: []
 blocked_tickets: []

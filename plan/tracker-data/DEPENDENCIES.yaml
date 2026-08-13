@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-12T14:05:48.469Z'
+  last_updated: '2026-08-13T09:56:21.157Z'
   features:
     admin-frame-management:
       - ticket_number: 585
@@ -447,6 +447,19 @@ dependencies:
         blocked_by:
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
+    mobile-responsive-jul2026:
+      - ticket_number: 599
+        title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
+        blocks: []
+        blocked_by:
+          - ticket_number: 598
+            title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+      - ticket_number: 600
+        title: 'Mobile drawer footer: pinned account/login row and social icons'
+        blocks: []
+        blocked_by:
+          - ticket_number: 598
+            title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
     product-grid-alignment:
       - ticket_number: 365
         title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
@@ -1158,19 +1171,6 @@ dependencies:
         blocked_by:
           - ticket_number: 344
             title: 'Content-Security-Policy for SSR pages (deferred from #264)'
-    mobile-responsive-jul2026:
-      - ticket_number: 599
-        title: 'Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart''s 24px scale'
-        blocks: []
-        blocked_by:
-          - ticket_number: 598
-            title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
-      - ticket_number: 600
-        title: 'Mobile drawer footer: pinned account/login row and social icons'
-        blocks: []
-        blocked_by:
-          - ticket_number: 598
-            title: Mobile menu becomes a left slide-in drawer instead of a top dropdown
 metadata:
   format_version: 1
   description: Ticket dependency tracking with bidirectional relationships

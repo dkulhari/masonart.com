@@ -29,11 +29,11 @@ description: |-
 feature: mobile-responsive-jul2026
 type: task
 priority: medium
-status: in-progress
+status: done
 assignee: unassigned
 reporter: cli
 created: '2026-07-28T15:37:49.241Z'
-last_updated: '2026-08-11T19:13:16.382Z'
+last_updated: '2026-08-12T17:04:44.325Z'
 time_spent_minutes: 0
 labels:
   - testing
@@ -98,6 +98,40 @@ comments:
   - author: system
     timestamp: '2026-08-11T19:13:16.382Z'
     text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-12T17:04:42.286Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `83bab096` — test(e2e): seed checkout carts on the server, not in localStorage
+
+      **Files Changed**:
+      - `tests/e2e/helpers/cart.ts` — the fixture: `seedGuestCart` / `clearGuestCart` / `waitForCartToLoad`, catalogue discovered once per worker
+      - `tests/e2e/checkout.spec.ts` — all 18 seeding setups converted; two colour-token assertions repaired
+      - `tests/e2e/checkout-cart-seeding.spec.ts` — new smoke spec for the fixture itself
+
+      **Summary**:
+      The cookie theory in the description is closed — the guest cookie survives the dev origin split, so no injection is needed and the Vite proxy is not wanted back. Seeding goes through `POST /api/cart/items` from inside the page, with real product/variant ids read from `GET /api/products` once per worker.
+
+      Two races surfaced that the earlier probe (which ran a single test at a time) could not see:
+
+      1. **Navigation race.** Setups used to `goto('/checkout')` on an empty cart, seed, then reload. The empty checkout page could navigate away mid-request — `page.evaluate: Execution context was destroyed`. Setups now seed from `/` and then navigate to `/checkout`, which also halves the checkout loads per test.
+
+      2. **Cookie race, the one that mattered.** `GET /api/cart` mints a fresh cart *and* a fresh `cart_session` cookie when none exists (`packages/api/src/routes/cart.ts:628`). The app fires one on mount, so seeding into a still-loading page put the item in cart A while the page's own request came back with a cookie for empty cart B. `/checkout` then rendered "Your cart is empty". `seedGuestCart` now waits for network idle, and — decisively — reads the cart back in the same `page.evaluate` and retries once if the item is not there. A 201 alone does not prove the item landed in the cart this context still holds a cookie for.
+
+      This one is worth remembering: it is invisible on an idle machine and takes out a third of the suite under load, which is exactly the shape of "flaky test" that gets dismissed.
+
+      Test timeout is 60s for these specs and the cart wait 45s, deliberately below it so a failure reports as "waiting for Order Summary" rather than an anonymous timeout.
+
+      **Not done**: `checkout-autofill.spec.ts` was not reinstated at browser level. AC3 makes it optional and the component test covers the same attributes faster; the fixture is now here if anyone wants it back.
+
+      **Tests**:
+      - `tests/e2e/checkout-cart-seeding.spec.ts` — 4 tests: seeds a real catalogue row a cold context can read back, `/checkout` renders `#fullName`, `unitPrice` lands on the correct side of the ₹999 threshold, a second seed is a second line
+      - `tests/e2e/checkout.spec.ts` — **112 passed / 1 skipped / 0 failed**, twice consecutively at load average 8.5 (a parallel vitest run next door). Was 86 failed / 26 passed.
+      - `tsc --noEmit`: no new errors; the one hit in this file (`'select' is declared but never read`, TS6133) predates the change.
+  - author: system
+    timestamp: '2026-08-12T17:04:44.325Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -133,3 +167,4 @@ implementation_steps:
     status: pending
 current_step: 1
 started: '2026-08-11T19:13:16.382Z'
+completed: '2026-08-12T17:04:44.325Z'

@@ -1,0 +1,114 @@
+ticket_number: 601
+title: Panoramic products sell a portrait size ladder — every step is stored tall
+description: |-
+  Found while auditing the catalogue for #545.
+
+  All 8 panoramic products in the dev catalogue carry the panoramic ladder — correct — but every step of it is stored SHORT SIDE FIRST, so the PDP offers a panorama in `12" × 36"`, `18" × 36"`, `16" × 48"` … which is a tall poster, not a wide one.
+
+  ```
+  SELECT p.orientation,
+         count(*) FILTER (WHERE v.width_inches > v.height_inches) AS wide,
+         count(*) FILTER (WHERE v.width_inches < v.height_inches) AS tall
+  FROM products p JOIN product_variants v ON v.product_id = p.id
+  GROUP BY 1;
+
+   panoramic  |  0  | 104
+  ```
+
+  Where it comes from: `PANORAMIC_SIZES` in `packages/shared/src/constants/sizes.ts` is written `[12, 36], [18, 36], [16, 48] …` — width first, so every literal is a 1:3 tall rectangle. `orientFor` in `packages/api/src/database/seed-variants.ts` transposes only `landscape`, on the strength of a comment that says "panoramic is already stored wide". It is not. That comment is the bug; the data disagrees with it and nothing tests the claim.
+
+  Compare `square` (13 square steps), `portrait` (17 tall) and `landscape` (17 wide) — all three are right. Panoramic is the only family whose stored dimensions contradict its own name.
+
+  To close: decide which layer owns the transposition — either write `PANORAMIC_SIZES` long-side-first, or extend `orientFor` to flip panoramic the way it flips landscape — then add the assertion that keeps it fixed, beside `swaps width and height for landscape against portrait` in `packages/api/tests/database/seed-variants.test.ts`. `sizeLabel`, `widthCm`/`heightCm` and `ProductSize.displayLabelDual` all follow from the same numbers, so check every one of them ends up oriented. Existing panoramic variants in the dev DB need rebuilding afterwards; `order_items.variant_id` is `ON DELETE SET NULL` and `cart_items` is `ON DELETE CASCADE`, so retire referenced rows rather than deleting them (see the approach recorded on #545).
+feature: home-page-parity
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-13T07:49:03.400Z'
+last_updated: '2026-08-13T09:55:51.510Z'
+time_spent_minutes: 0
+labels:
+  - data-quality
+  - sizes
+  - pdp
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-13T09:51:32.341Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-13T09:55:25.914Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-13T09:55:51.510Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e47aa077` — fix(sizes): a panoramic product sells wide sizes, not tall ones
+
+      ### Root cause
+
+      Two statements in the codebase contradicted the data, and neither was tested.
+
+      `PANORAMIC_SIZES` in `packages/shared/src/constants/sizes.ts` is written short-side-first — `[12, 36]`, `[18, 36]`, `[16, 48]` — exactly like `PORTRAIT_LANDSCAPE_SIZES`, because every ladder here is a list of manufacturing rectangles rather than a shape. Its own docstring said "wide format for landscape scenes" over literals that are 1:3 **tall**.
+
+      `orientFor` in `packages/api/src/database/seed-variants.ts:38` turned only `landscape`, on the strength of a comment reading "Square is unaffected; panoramic is already stored wide". It is not.
+
+      So the emitted rows were the ladder untouched: `12" × 36"` for a panorama.
+
+      **This was customer-facing.** `ChooseOptions.tsx` documents why — the size list has to be the product's real variants, because the cart carries `variantId` through to checkout, so it cannot be synthesised from `getSizesForOrientation()` on the client. The PDP and the Choose Options panel were reading these rows directly. Every one of the eight panoramic products offered a tall poster.
+
+      ### Which layer owns the transposition
+
+      Kept in the seed, in `orientFor`, now a `TURNED_ORIENTATIONS` set of `landscape` and `panoramic`.
+
+      Rewriting the ladder literals long-side-first was the alternative and is worse. `buildLadder` derives each step's id from its dimensions, so every `panoramic-12x36` becomes `panoramic-36x12` — churning ids across the shared tests for a **labelling** decision that is not the ladder's to make. And the ladder's model is already the right one: one set of manufacturing sizes, labelled per orientation, exactly as mesonart shares rect-14 between Vertical and Horizontal (§5.2). Panoramic simply belonged in the turned group all along.
+
+      Checked before deciding: `getSizesForOrientation` has exactly one real caller in the monorepo — `seed-variants.ts`. The three other hits (`ChooseOptions.tsx`, `schema/products.ts`, `facets.ts`) are all prose in comments. There is no `size_id` column on `product_variants`, so no persisted id depends on the literals either way.
+
+      The misleading docstring on `PANORAMIC_SIZES` is corrected to say short-side-first and to name who turns it.
+
+      ### Dev database
+
+      Rebuilt all 8 panoramic products' variants. Two variants carried real order history (`desert-bloom`, `ocean-horizon`) and were **retired** (`is_active = false`) rather than deleted, per the `ON DELETE SET NULL` / `ON DELETE CASCADE` hazard recorded on #545. `SELECT count(*) FROM order_items WHERE variant_id IS NULL` is still 0.
+
+      Every orientation's active variants now agree with its own name:
+
+      ```
+       orientation | wide | tall | sq  | retired
+      -------------+------+------+-----+---------
+       square      |    0 |    0 | 104 |       0
+       portrait    |    0 |  272 |   0 |       1
+       landscape   |  119 |    0 |   0 |       0
+       panoramic   |  104 |    0 |   0 |       2
+       set-of-2-3  |    0 |   34 |   0 |       0
+      ```
+
+      Live API after a cache purge — `GET /api/products/ocean-horizon`:
+
+      ```
+      orientation: panoramic
+      36" × 12" / 91 × 30 cm | 36" × 18" / 91 × 46 cm | 48" × 16" / 122 × 41 cm
+      variants: 13
+      ```
+
+      **Files changed**
+      - `packages/api/src/database/seed-variants.ts` — `TURNED_ORIENTATIONS`, and the comment that caused this rewritten to state which orientations turn and why
+      - `packages/shared/src/constants/sizes.ts` — `PANORAMIC_SIZES` docstring corrected
+
+      **Tests added** (`packages/api/tests/database/seed-variants.test.ts`, 4 new, all red first)
+      - every panoramic step is wider than it is tall
+      - every panoramic step lands in the panoramic band under `orientationFromRatio` — the same rule the orientation column is measured against (#545), applied to the poster instead of the picture, so "is it oriented" has one definition
+      - cm and `sizeLabel` turn with the inches rather than separately; `displayLabelDual` is written for the stored order and would have printed the sides backwards
+      - turning changes neither the price taper nor the ascending-area order
+
+      **Verification**: seed-variants 14 passed; shared 956 passed; api database + products + admin routes 1239 passed. Three pre-existing failures, none touched by this work — `products-role-access.test.ts` ×2 (the `unitsSoldSql` timeout recorded 2026-08-04) and `products.test.ts > should filter by styles`, which requests `styles=minimalist,abstract` and gets a 400 because neither is in the STYLE_OPTIONS vocabulary (`minimalist-art` is; `abstract` is a subject). API typecheck clean.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-13T09:51:32.341Z'
+completed: '2026-08-13T09:55:25.914Z'

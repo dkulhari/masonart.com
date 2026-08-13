@@ -21,11 +21,11 @@ description: |-
 feature: mobile-responsive-jul2026
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-12T12:56:23.322Z'
-last_updated: '2026-08-12T12:56:23.322Z'
+last_updated: '2026-08-12T14:47:07.509Z'
 time_spent_minutes: 0
 labels:
   - web
@@ -33,7 +33,32 @@ labels:
   - mesonart-parity
   - mobile
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-12T14:46:53.342Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-12T14:47:07.509Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `25719962` — feat(web): mobile menu slides in from the left edge
+
+      **Files Changed**:
+      - `packages/web/app/components/layout/Header.tsx` — drawer is now `fixed inset-y-0 left-0 z-50 w-full max-w-[576px]`, always mounted, translating between `-translate-x-full` (plus `invisible`) and `translate-x-0` over 600ms at `cubic-bezier(0.7, 0, 0.2, 1)`; scrim grew to `fixed inset-0`; new panel head with drag pill + close control; link list scrolls inside `flex-1 overflow-y-auto`
+      - `packages/web/tests/components/layout/Header.structure.test.tsx` — new `mobile drawer container (#598)` block (10 assertions); the #596 "drop the drawer at the bar" assertion is superseded and removed
+
+      **Design decisions**:
+      - **Mounted while closed.** Rendered only while open there is no state to transition FROM, so the panel appeared at its destination and the slide never ran. `invisible` while closed keeps the links out of the tab order (same call the desktop nav rows make); the cost is the exit animation, which flips rather than eases.
+      - **Close control named "Close site menu", not "Close menu".** The dock toggle already answers to "Close menu" while the drawer is open — two buttons with one accessible name is ambiguous to a screen reader and breaks `getByRole` strict mode in the existing E2E.
+      - **z-50, last in the tree.** The header is `sticky z-50`; an equal z later in document order is what lets a full-height panel paint over it. Scrim stays at z-40 per the app-wide scrim/panel convention.
+      - **Inline `transitionTimingFunction`.** No Tailwind `ease-` matches theirs.
+
+      **Verified**:
+      - `npx vitest run tests/components/layout/` — 151 passed (8 files), including the 10 new assertions after confirming all 10 failed first
+      - `npx tsc --noEmit` — no new errors; Header.tsx clean, the ~26 pre-existing repo errors unchanged
+
+      Not run: `tests/e2e/mobile-nav.spec.ts` — no dev server up on :3001 and E2E is the per-feature pass; it will run with #599, which lands the inventory the same spec covers.
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -75,3 +100,4 @@ implementation_steps:
     command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile menu slides in from the left like mesonart''s"'
     status: pending
 current_step: 1
+completed: '2026-08-12T14:46:53.342Z'

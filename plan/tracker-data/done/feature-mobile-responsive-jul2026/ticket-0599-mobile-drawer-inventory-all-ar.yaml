@@ -19,11 +19,11 @@ description: |-
 feature: mobile-responsive-jul2026
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-12T12:56:23.344Z'
-last_updated: '2026-08-12T12:56:23.344Z'
+last_updated: '2026-08-12T14:55:46.211Z'
 time_spent_minutes: 0
 labels:
   - web
@@ -32,7 +32,41 @@ labels:
   - mobile
   - navigation
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-12T14:55:22.592Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-12T14:55:46.211Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f8836dc5` — feat(web): the mobile drawer carries the whole nav tree
+
+      **Files Changed**:
+      - `packages/web/app/components/layout/Header.tsx` — drawer inventory rebuilt; `MOBILE_DRAWER_LINK_CLASS` (24px / 300 / -0.6px tracking / near-black / `py-2.5`) now carried by `MobileNavLink` and `SaleMobileNavLink`; All Art trigger + second sliding panel; `isMobileAllArtOpen` state, reset on close, Escape unwinds one level at a time
+      - `packages/web/app/components/layout/AllArtMegaMenu.tsx` — `MEGA_COLUMNS`, `MegaColumn`, `MegaLink` exported for the drawer panel
+      - `packages/web/tests/components/layout/Header.structure.test.tsx` — `mobile drawer inventory (#599)` block, 11 assertions
+      - `tests/e2e/mobile-nav.spec.ts` — 4 new tests, 2 existing ones moved to the new shape
+
+      **Inventory shipped**: All Art (panel) · Best Sellers · New In · the 12 `STYLE_OPTIONS` · Create with AI · Gallery · Reviews · Sale (promotion-gated) · Gift Card · About, then the divider and the staff/wishlist/account rows the footer ticket owns.
+
+      **Design decisions**:
+      - **Artists / Trade Program / Commission Art omitted.** No routes exist (`app/routes` has no artists, trade or commission entry). A nav row into a 404 is worse than an absent one; they land when the pages do.
+      - **"New In", not "New Arrivals".** Theirs says New Arrivals, but ours says New In in the desktop row, in `MEGA_COLUMNS` and in `SORT_OPTIONS`. One site disagreeing with itself is the worse of the two divergences.
+      - **No top-level Posters row.** All Art took that slot the way theirs has it; the unfiltered catalogue is one level down, as the first entry of the All Art panel.
+      - **Panel two is fed from `MEGA_COLUMNS`**, exported rather than copied — a second hand-written facet list would drift from the desktop sheet the first time a facet moved. Facet options render one step down at 16px: a stack of 24px rows would run to five screens.
+      - **`activeProps` dropped from `MobileNavLink`.** At full-strength foreground an active state has nothing left to say (same call nav row 2 makes), and the drawer closes on navigation anyway.
+      - **Escape unwinds one level.** Out of All Art first, out of the drawer only from the top level.
+
+      **Verified**:
+      - `npx vitest run tests/components/layout/` — 162 passed (8 files); the 11 new assertions were confirmed failing first (8 red, 2 already-true, 1 rewritten after the constant landed)
+      - `npx playwright test tests/e2e/mobile-nav.spec.ts` — **15 passed**, including the four new ones: styles reachable at a measured `24px`/`300`, All Art opening and Back returning to the list, and Escape unwinding one level
+      - `npx tsc --noEmit` — no errors in `components/layout/`; repo total unchanged from the pre-existing baseline
+
+      **E2E changes worth knowing**:
+      - The scrim-tap test now runs at 740×900. Below 576px the panel is full-bleed (`w-full max-w-[576px]`, as measured on theirs) and covers the scrim entirely, so there is nothing to tap on a phone — the old test failed for that reason, not a regression.
+      - Level-1 assertions are scoped to `[data-testid="mobile-nav-list"]`: the All Art panel carries the same twelve styles, so an unscoped `getByRole('link', {name: 'Pop Art'})` matches twice.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -75,3 +109,4 @@ implementation_steps:
     command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile drawer carries All Art and the full style list"'
     status: pending
 current_step: 1
+completed: '2026-08-12T14:55:22.592Z'

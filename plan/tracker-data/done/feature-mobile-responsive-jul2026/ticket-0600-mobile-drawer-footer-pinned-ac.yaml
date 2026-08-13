@@ -1,0 +1,107 @@
+ticket_number: 600
+title: 'Mobile drawer footer: pinned account/login row and social icons'
+description: |-
+  ## Task
+  mesonart's drawer has a footer pinned below the scrolling link list: a currency selector row (`India (INR ₹)`), a Login pill button, and Facebook / Instagram / YouTube / Pinterest icons. Ours ends the list with plain Wishlist and Account links and has no footer at all.
+
+  Ship the account control and the socials. Skip the currency selector — we are single-currency, and a selector with one option is worse than none.
+
+  ## Context
+  - `Header.tsx:552-630` — the drawer; the footer sits outside the scrolling list so it stays pinned
+  - Signed-in vs signed-out follows what `MobileTabBar` already does (`MobileTabBar.tsx:169-181`): `/account` when there is a session, otherwise `/auth/login` with `search={{ redirect: '/account' }}` so the round trip is pre-filled
+  - Social URLs already exist in `packages/web/app/components/layout/Footer.tsx` — read them from there rather than retyping the hrefs
+  - Depends on the left slide-in drawer ticket landing first
+feature: mobile-responsive-jul2026
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-12T12:56:23.361Z'
+last_updated: '2026-08-12T15:27:31.132Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - layout
+  - mesonart-parity
+  - mobile
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-12T15:27:14.618Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-12T15:27:31.132Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5d36ffbd` — feat(web): the mobile drawer gets a pinned footer
+
+      **Files Changed**:
+      - `packages/web/app/lib/socialLinks.ts` — new; `SOCIAL_LINKS` (Instagram / Facebook / Twitter, each with its lucide icon)
+      - `packages/web/app/components/layout/Header.tsx` — `data-testid="mobile-nav-footer"` pinned outside the scrolling area (`shrink-0`, safe-area padding); `MOBILE_DRAWER_ACTION_CLASS` pill; `isSignedIn` off the root-route session; Account row removed from the list
+      - `packages/web/app/components/layout/Footer.tsx` — maps `SOCIAL_LINKS` instead of three inline hrefs
+      - `packages/web/tests/components/layout/Header.structure.test.tsx` — `mobile drawer footer (#600)`, 7 assertions
+      - `packages/web/tests/components/layout/Footer.structure.test.tsx` — page footer reads the shared list
+      - `tests/e2e/mobile-nav.spec.ts` — 2 new tests, plus a settle-wait in the shared `openMenu` helper
+
+      **Design decisions**:
+      - **Currency row skipped**, per the ticket: single-currency storefront, and a selector with one option is a control that cannot be used.
+      - **Three socials, not theirs' four.** No YouTube or Pinterest accounts exist; a link to an account that does not exist is worse than an absent icon — same rule #599 applied to Artists / Trade Program / Commission Art.
+      - **`SOCIAL_LINKS` extracted rather than imported from Footer.** The ticket said read the URLs from `Footer.tsx`; they were inline JSX there, so a shared module is the version of that which cannot drift. The page footer now reads the same list. The hrefs are the bare domains that were already there — still handle-less, but wrong in exactly one place now.
+      - **Account control is a pill, not a 24px row.** The footer is a different register from the list: one action, not another destination.
+      - **Account row dropped from the list** now the footer carries it. Wishlist stays — it has no footer control.
+      - **Signed-in/out branch reads the same session `MobileTabBar` does**, so the dock and the drawer cannot send the same visitor to two different places.
+
+      **Verified**:
+      - `npx vitest run tests/components/layout/` — 170 passed (8 files); the 8 new assertions were confirmed failing first (6 red, 2 already true)
+      - `npx playwright test tests/e2e/mobile-nav.spec.ts` — **17 passed**, including the pinned-footer geometry test and the login-redirect/social test
+      - `npx vitest run tests/routes/reviews.test.tsx` — 17 passed (the other suite that renders Footer)
+      - `npx tsc --noEmit` — 22 errors, all pre-existing and none in `components/layout/` or `lib/`
+
+      **Worth knowing**: the pinned-footer test caught a latent flake in the shared `openMenu` helper — it returned as soon as the toggle reported `aria-expanded`, which is 600ms before the panel finishes sliding, so any geometry read was taken mid-transition. The helper now settles on the panel's left edge before returning; every test in the file benefits.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 598
+    feature: mobile-responsive-jul2026
+    description: Mobile menu becomes a left slide-in drawer instead of a top dropdown
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the drawer renders a pinned footer with the account/login control and the social links
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL - no drawer footer exists
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the footer assertions fail
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the pinned footer below the scrolling list
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+    code: |-
+      // <div className="mt-auto border-t border-border px-4 py-4 flex items-center justify-between">
+      //   {isSignedIn ? <Link to="/account">…</Link> : <Link to="/auth/login" search={{ redirect: '/account' }}>Login</Link>}
+      //   <ul className="flex items-center gap-4">{/* socials, hrefs shared with Footer.tsx */}</ul>
+      // </div>
+  - id: 4
+    action: verify-pass
+    description: Structure tests green, no type regression
+    command: pnpm --filter @chobii/web test -- tests/components/layout/Header.structure.test.tsx && pnpm --filter @chobii/web exec tsc --noEmit
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the drawer footer
+    command: 'git add packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/Header.structure.test.tsx && git commit -m "feat(web): mobile drawer gains a pinned account and socials footer"'
+    status: pending
+current_step: 1
+completed: '2026-08-12T15:27:14.618Z'

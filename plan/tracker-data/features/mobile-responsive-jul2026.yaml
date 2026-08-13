@@ -20,11 +20,7 @@ work_session_summary:
 tickets:
   todo:
     "361": "DECISION: order numbers still use the masonart MA- prefix after the rebrand"
-    "598": Mobile menu becomes a left slide-in drawer instead of a top dropdown
-    "599": "Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart's 24px scale"
-    "600": "Mobile drawer footer: pinned account/login row and social icons"
-  in_progress:
-    "359": "TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests"
+  in_progress: {}
   done:
     "348": "BUG: Mobile nav drawer is transparent — page content bleeds through, menu illegible"
     "349": "BUG: All form inputs render at 14px — iOS Safari auto-zooms the viewport on every focus"
@@ -37,9 +33,13 @@ tickets:
     "356": "UX: /create 'Generate Poster' CTA sits 3.2 screens down on mobile"
     "357": "BUG: Home 'Minimalist' style card caption is illegible — grey overlay too weak over a light image"
     "358": "BUG: Track page placeholder shows stale 'MA-2024-001234' masonart order prefix"
+    "359": "TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests"
     "360": "Product grid card sizing: residual height variance + home/listing ratio mismatch"
     "596": "Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px"
     "597": Mobile chrome scroll rule is inverted — top bar and tab bar both behave opposite to mesonart
+    "598": Mobile menu becomes a left slide-in drawer instead of a top dropdown
+    "599": "Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart's 24px scale"
+    "600": "Mobile drawer footer: pinned account/login row and social icons"
 total_tickets: 19
-completion_percentage: 74
+completion_percentage: 95
 is_completed: false
