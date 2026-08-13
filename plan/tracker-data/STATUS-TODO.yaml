@@ -1,9 +1,9 @@
 status: todo
-last_updated: '2026-08-13T15:42:31.962Z'
-total_tickets: 14
+last_updated: '2026-08-13T21:34:05.215Z'
+total_tickets: 13
 summary:
   critical: 2
-  high: 4
+  high: 3
   medium: 5
   low: 3
 priorities:
@@ -67,11 +67,6 @@ priorities:
           blocked_by:
             - ticket_number: 344
               title: 'Content-Security-Policy for SSR pages (deferred from #264)'
-    - tickets:
-        - ticket_number: 595
-          title: 'Layout: Prevent horizontal page overflow and right-edge clipping on narrowed viewports'
-          assignee: unassigned
-          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:

@@ -1,0 +1,29 @@
+name: qa-e2e-testing
+title: Qa E2e Testing
+priority: medium
+created: '2026-08-13T21:32:56.927Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Admin end-to-end test suite defects: networkidle timeouts and flaky waits in the Playwright admin specs.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    '184': 'Bug: admin-approvals status transition tests timeout with networkidle'
+    '185': 'Bug: admin-reviews bulk actions beforeEach times out waiting for stats card'
+    '186': 'Bug: Replace networkidle with domcontentloaded in all admin E2E tests'
+total_tickets: 3
+completion_percentage: 100
+is_completed: true

@@ -1,7 +1,7 @@
 name: wishlist-curation
 title: Wishlist Curation
 priority: medium
-created: "2026-08-05T19:42:24.952Z"
+created: '2026-08-05T19:42:24.952Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -73,27 +73,27 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: "00:00:00"
+  total_duration: '00:00:00'
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
-    "505": Bug - a late wishlist load() reverts a reorder made during it
+  todo: {}
   in_progress: {}
   done:
-    "500": API - PUT /api/wishlist to rewrite the order, permutation-guarded
-    "501": Store - reorder action, optimistic, guest and signed-in
-    "502": Web - drag and keyboard reordering on /wishlist
-    "503": "Web - staff staging bar: copy ids, or create a collection from them"
-    "504": E2E - order survives a reload, and staging reaches the storefront
+    '500': API - PUT /api/wishlist to rewrite the order, permutation-guarded
+    '501': Store - reorder action, optimistic, guest and signed-in
+    '502': Web - drag and keyboard reordering on /wishlist
+    '503': 'Web - staff staging bar: copy ids, or create a collection from them'
+    '504': E2E - order survives a reload, and staging reaches the storefront
+    '505': Bug - a late wishlist load() reverts a reorder made during it
 total_tickets: 6
-completion_percentage: 83
-is_completed: false
+completion_percentage: 100
+is_completed: true
 design:
-  approach: "The wishlist is already an ordered `text[]` column on the user row, so reordering is writing a reordered array — no migration, no join table, no position column. A single `PUT /api/wishlist` replaces the order, guarded to accept only a permutation of the stored set so a stale tab cannot silently drop items added elsewhere. The page gets HTML5 drag-and-drop following the existing `ProductForm` image-reorder idiom (no library), plus move-up/move-down buttons for keyboard and screen-reader users. On top of that ordering, a staff-only bar exports the list: Copy IDs, or Create collection from these — which posts a manual collection and its ordered membership directly, retiring the raw-UUID textarea limitation recorded on #473."
+  approach: 'The wishlist is already an ordered `text[]` column on the user row, so reordering is writing a reordered array — no migration, no join table, no position column. A single `PUT /api/wishlist` replaces the order, guarded to accept only a permutation of the stored set so a stale tab cannot silently drop items added elsewhere. The page gets HTML5 drag-and-drop following the existing `ProductForm` image-reorder idiom (no library), plus move-up/move-down buttons for keyboard and screen-reader users. On top of that ordering, a staff-only bar exports the list: Copy IDs, or Create collection from these — which posts a manual collection and its ordered membership directly, retiring the raw-UUID textarea limitation recorded on #473.'
   decisions:
     - Reordering writes the whole array, not per-row positions. `user.wishlist_product_ids` is a text[] column, so the array order IS the order — a join table with a position column would be new storage for something already stored.
-    - "PUT /api/wishlist accepts only a PERMUTATION of the stored set. A plain replace endpoint is a data-loss bug: a tab open since before an item was added elsewhere posts a stale list and silently drops it. Different set returns 409 with the current list so the client refreshes instead of overwriting."
+    - 'PUT /api/wishlist accepts only a PERMUTATION of the stored set. A plain replace endpoint is a data-loss bug: a tab open since before an item was added elsewhere posts a stale list and silently drops it. Different set returns 409 with the current list so the client refreshes instead of overwriting.'
     - Drag is accompanied by explicit move-up/move-down buttons, never replaced by them. Drag alone is unreachable by keyboard and invisible to a screen reader — the same call made on the admin collections list (#472).
     - No drag-and-drop library. ProductForm.tsx already reorders images with plain HTML5 draggable/onDragStart/onDragOver/onDrop; following it keeps one pattern in the codebase instead of two.
     - The staging bar is staff-only, gated on role like the header's staff entry. Product IDs are not secret — they are already in the DOM and API responses — so this is about not putting internal identifiers in every shopper's face, not about exposure.
@@ -101,4 +101,4 @@ design:
     - Reordering works signed-out. Guests persist to localStorage; only the persistence path differs, not the interaction.
     - The staging slot is single and shared with the admin's real wishlist. Stated in the UI rather than left to be discovered.
   approved: true
-  approved_at: "2026-08-05T19:42:38.768Z"
+  approved_at: '2026-08-05T19:42:38.768Z'

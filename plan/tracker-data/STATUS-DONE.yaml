@@ -1,9 +1,9 @@
 status: done
-last_updated: '2026-08-13T15:42:32.514Z'
-total_tickets: 560
+last_updated: '2026-08-13T21:34:06.159Z'
+total_tickets: 561
 summary:
   critical: 31
-  high: 210
+  high: 211
   medium: 241
   low: 78
 priorities:
@@ -715,6 +715,10 @@ priorities:
           blocked_by: []
         - ticket_number: 352
           title: 'BUG: PDP ''You May Also Like'' is a hardcoded permanent skeleton — never implemented'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 595
+          title: 'Layout: Prevent horizontal page overflow and right-edge clipping on narrowed viewports'
           assignee: unassigned
           blocked_by: []
         - ticket_number: 596

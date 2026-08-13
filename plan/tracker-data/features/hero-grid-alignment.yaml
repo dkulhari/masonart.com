@@ -1,7 +1,7 @@
 name: hero-grid-alignment
 title: Hero Page Product Grid Alignment
 priority: medium
-created: "2026-02-19T09:30:00.000Z"
+created: '2026-02-19T09:30:00.000Z'
 assignee: unassigned
 tags:
   - frontend
@@ -64,10 +64,13 @@ objectives:
   - Replace inline ProductCard with shared component
   - Add category images for style sections
 tickets:
-  - 287
-  - 288
-  - 289
-  - 290
-total_tickets: 0
-completion_percentage: 0
-is_completed: false
+  todo: {}
+  in_progress: {}
+  done:
+    '287': ProductCard - Add uniformAspectRatio prop
+    '288': ProductGrid - Pass uniformAspectRatio to ProductCard
+    '289': Hero Page - Replace inline ProductCard with shared component
+    '290': Hero Page - Add category images for Shop by Style section
+total_tickets: 4
+completion_percentage: 100
+is_completed: true

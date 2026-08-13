@@ -1,7 +1,7 @@
 name: home-page-parity
 title: Home Page Parity
 priority: high
-created: "2026-08-06T11:50:42.113Z"
+created: '2026-08-06T11:50:42.113Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -14,42 +14,41 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 3
-  total_duration: "00:30:00"
+  total_duration: '00:30:00'
   total_tokens: 0
   agents:
     claude-code:
       sessions: 3
-      duration: "00:30:00"
+      duration: '00:30:00'
       tokens: 0
 tickets:
   todo:
-    "537": Customer Reviews band restyled to the bar
-    "543": Two-row top strip — countdown announcement over utility bar
-    "544": Replace mesonart development placeholder photography before production
-    "546": Seed catalogue artwork carries a MESON ART watermark baked into the pixels
-    "564": Best Sellers band is missing the category pill row the reference carries on both viewports
+    '537': Customer Reviews band restyled to the bar
+    '543': Two-row top strip — countdown announcement over utility bar
+    '544': Replace mesonart development placeholder photography before production
+    '546': Seed catalogue artwork carries a MESON ART watermark baked into the pixels
   in_progress: {}
   done:
-    "529": Home hero — full-bleed image carousel with peek slides replaces the text hero
-    "530": Best Sellers product rail — rating stars, review count, title-left price-right
-    "531": Shop By Popular band — four photo tiles with labels below and a pill CTA
-    "532": Shop by Room split band — image panel left, olive list panel right with counts
-    "533": Three promo tiles — On Sale / Quick Ship / Custom Art
-    "534": New In carousel with circular prev/next controls
-    "535": Shop By Orientation chip row
-    "536": Featured Artists band — structure built, real data or graceful omission
-    "538": Brand Story band — olive panel with copy, Read More pill and media
-    "539": Trust icons row above the footer
-    "540": Section rhythm, type scale and button system pass across the whole page
-    "541": Mobile home layout at 390 — the whole page, band by band
-    "542": Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
-    "545": Product orientation column contradicts the artwork for 6 of 14 collection representatives
-    "547": Review toast covers page content on every screen and has no counterpart on the reference
-    "571": /create's mobile action bar must stack above the tab bar, not paint over it
-    "572": "Document: Mobile tab bar active state design choice"
-    "594": Card art framing — measure artBox server-side and re-frame each piece on equal ink area
-    "601": Panoramic products sell a portrait size ladder — every step is stored tall
-  undefined: {}
+    '529': Home hero — full-bleed image carousel with peek slides replaces the text hero
+    '530': Best Sellers product rail — rating stars, review count, title-left price-right
+    '531': Shop By Popular band — four photo tiles with labels below and a pill CTA
+    '532': Shop by Room split band — image panel left, olive list panel right with counts
+    '533': Three promo tiles — On Sale / Quick Ship / Custom Art
+    '534': New In carousel with circular prev/next controls
+    '535': Shop By Orientation chip row
+    '536': Featured Artists band — structure built, real data or graceful omission
+    '538': Brand Story band — olive panel with copy, Read More pill and media
+    '539': Trust icons row above the footer
+    '540': Section rhythm, type scale and button system pass across the whole page
+    '541': Mobile home layout at 390 — the whole page, band by band
+    '542': Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+    '545': Product orientation column contradicts the artwork for 6 of 14 collection representatives
+    '547': Review toast covers page content on every screen and has no counterpart on the reference
+    '564': Best Sellers band is missing the category pill row the reference carries on both viewports
+    '571': /create's mobile action bar must stack above the tab bar, not paint over it
+    '572': 'Document: Mobile tab bar active state design choice'
+    '594': Card art framing — measure artBox server-side and re-frame each piece on equal ink area
+    '601': Panoramic products sell a portrait size ladder — every step is stored tall
 total_tickets: 24
-completion_percentage: 79
+completion_percentage: 83
 is_completed: false
