@@ -81,6 +81,30 @@ const MOBILE_BADGE_CLASS =
  * A constant rather than a class on `MobileNavLink` alone: All Art and the
  * Back control are buttons, not links, and they belong on the same rhythm.
  */
+/**
+ * The drawer's motion, as inline style rather than Tailwind utilities.
+ *
+ * mesonart's, measured: `transform .6s cubic-bezier(0.7, 0, 0.2, 1)` — fast
+ * off the mark, long settle. The same 600ms and the same curve the cart drawer
+ * and the mobile facet sheet run on; `--ease-drawer` is that curve.
+ *
+ * WHY NOT `duration-[600ms]`
+ *
+ * Because it silently did nothing. The class sat in the markup and no rule was
+ * ever generated for it — `.duration-100/200/300/500/700` exist in the built
+ * CSS and no arbitrary-value duration does — so the panel inherited the 150ms
+ * that `transition-transform` ships with and slid in four times too fast
+ * against the two drawers it is supposed to match. An inline duration cannot
+ * be dropped by a scanner.
+ *
+ * `motion-reduce:transition-none` still wins: it sets `transition-property:
+ * none`, which no duration can revive.
+ */
+const DRAWER_MOTION = {
+  transitionDuration: '600ms',
+  transitionTimingFunction: 'var(--ease-drawer)',
+} as const
+
 const MOBILE_DRAWER_LINK_CLASS =
   'flex w-full items-center py-2.5 text-2xl font-light tracking-[-0.6px] text-foreground transition-colors hover:text-foreground/70'
 
@@ -684,10 +708,10 @@ export function Header() {
           // second opinion: both are the same gesture on the same site, and
           // bg-black/50 against the cart's bg-foreground/70 read as two
           // different scrims depending on which edge you opened.
-          'fixed inset-0 z-40 bg-foreground/70 transition-opacity duration-[600ms] motion-reduce:transition-none md:hidden',
+          'fixed inset-0 z-40 bg-foreground/70 transition-opacity motion-reduce:transition-none md:hidden',
           isMobileMenuOpen ? 'opacity-100' : 'invisible opacity-0'
         )}
-        style={{ transitionTimingFunction: 'var(--ease-drawer)' }}
+        style={DRAWER_MOTION}
         onClick={closeMobileMenu}
         aria-hidden="true"
       />
@@ -711,7 +735,7 @@ export function Header() {
         // z-50 and last in the tree: the header is `sticky z-50`, so an equal
         // z that comes later is what paints the full-height panel over it.
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-full max-w-[576px] flex-col bg-background shadow-2xl transition-transform duration-[600ms] motion-reduce:transition-none md:hidden',
+          'fixed inset-y-0 left-0 z-50 flex w-full max-w-[576px] flex-col bg-background shadow-2xl transition-transform motion-reduce:transition-none md:hidden',
           // The cart drawer's panel treatment, mirrored: same 576px cap, same
           // shadow, same 34px radius on the page-facing edge and square where
           // it meets the viewport — theirs is `0 34px 34px 0` because this is
@@ -720,10 +744,7 @@ export function Header() {
           'overflow-hidden rounded-r-[var(--drawer-radius)]',
           isMobileMenuOpen ? 'translate-x-0' : 'invisible -translate-x-full'
         )}
-        // Theirs, measured: transform .6s cubic-bezier(0.7, 0, 0.2, 1) — fast
-        // off the mark, long settle. No Tailwind ease- matches it, and it is
-        // the cart drawer's curve too, so it comes from the shared token.
-        style={{ transitionTimingFunction: 'var(--ease-drawer)' }}
+        style={DRAWER_MOTION}
       >
         {/* Panel head — drag-handle pill centred, close at the right, as on
             theirs. The pill is decoration: the drawer has no drag gesture,
@@ -863,12 +884,12 @@ export function Header() {
             data-testid="mobile-nav-all-art-panel"
             aria-label="All Art"
             className={cn(
-              'absolute inset-0 flex flex-col bg-background transition-transform duration-[600ms] motion-reduce:transition-none',
+              'absolute inset-0 flex flex-col bg-background transition-transform motion-reduce:transition-none',
               isMobileAllArtOpen
                 ? 'translate-x-0'
                 : 'invisible translate-x-full'
             )}
-            style={{ transitionTimingFunction: 'cubic-bezier(0.7, 0, 0.2, 1)' }}
+            style={DRAWER_MOTION}
           >
             <div className="container-wide">
               <button

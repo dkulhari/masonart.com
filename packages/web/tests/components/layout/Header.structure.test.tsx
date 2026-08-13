@@ -157,12 +157,30 @@ describe('mobile drawer container (#598)', () => {
   })
 
   it('carries mesonart’s 600ms easing', () => {
+    // Both numbers come from DRAWER_MOTION, an inline style, and NOT from
+    // `duration-[600ms]`: that class was in the markup for three panels and no
+    // rule was ever generated for any of it — only the fixed
+    // `.duration-100/200/300/500/700` exist in the built CSS. The drawer
+    // inherited the 150ms `transition-transform` ships with and slid four
+    // times faster than the cart drawer it is meant to match.
+    expect(drawer).toContain('style={DRAWER_MOTION}')
+    expect(src).toContain("transitionDuration: '600ms'")
     // `--ease-drawer` IS cubic-bezier(.7, 0, .2, 1) — see globals.css. Taken
     // from the token rather than retyped so this panel and the cart drawer
     // cannot drift onto two curves.
-    expect(drawer).toContain('var(--ease-drawer)')
-    expect(drawer).toMatch(/duration-\[600ms\]/)
+    expect(src).toContain("transitionTimingFunction: 'var(--ease-drawer)'")
     expect(drawer).toContain('motion-reduce:transition-none')
+  })
+
+  it('runs no panel on a duration Tailwind never emitted', () => {
+    // The regression guard for the above: any `duration-[…]` outside a comment
+    // is a number that looks set and is not. Use DRAWER_MOTION.
+    const live = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join('\n')
+
+    expect(live).not.toMatch(/duration-\[\d+ms\]/)
   })
 
   it('has a close control of its own', () => {
@@ -197,7 +215,7 @@ describe('mobile drawer container (#598)', () => {
     const scrimStart = src.indexOf('data-testid="mobile-nav-scrim"')
     const scrim = src.slice(scrimStart, src.indexOf('/>', scrimStart))
     expect(scrim).toContain('bg-foreground/70')
-    expect(scrim).toContain('var(--ease-drawer)')
+    expect(scrim).toContain('style={DRAWER_MOTION}')
   })
 
   it('closes with the storefront’s button, not a bare icon box', () => {
