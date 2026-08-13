@@ -671,6 +671,34 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await expect(page).toHaveURL(new RegExp(STYLE_2.id));
   });
 
+  test('keeps every chip when one facet value is one the API rejects', async ({
+    page,
+  }) => {
+    // The API 400s on an unknown value ("Unknown filter value"), the loader
+    // catches it, and it used to answer with an empty filter set: no chips, no
+    // ticked boxes, "No products", and nothing on screen naming the value that
+    // broke it — though the URL still carried both. Filters come off the URL
+    // now, so the bad one keeps its chip and can be removed.
+    await page.goto(`/posters?styles=${STYLE.id}&vibe=calm`, {
+      waitUntil: 'networkidle',
+    });
+
+    const chips = desktopChips(page);
+    await expect(
+      chips.locator(`button:has-text("${STYLE.chip}")`).first()
+    ).toBeVisible({ timeout: 10000 });
+
+    const badTag = chips.locator('button:has-text("calm")').first();
+    await expect(badTag).toBeVisible();
+
+    // And removing it gets the results back.
+    await badTag.click();
+    await expect(page).not.toHaveURL(/vibe=/, { timeout: 10000 });
+    await expect(
+      page.getByTestId('collection-toolbar').locator('text=/\\d+ products/')
+    ).toBeVisible({ timeout: 10000 });
+  });
+
   test('should display Clear all button with active filters', async ({ page }) => {
     await page.goto(`/posters?styles=${STYLE.id}`);
 

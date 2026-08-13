@@ -195,27 +195,23 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         hasNextPage: requestedPage * PAGE_SIZE < (response.total || 0),
         hasPreviousPage: requestedPage > 1,
       },
-      filters: {
-        styles: params.styles?.split(',').filter(Boolean) || [],
-        subjects: params.subjects?.split(',').filter(Boolean) || [],
-        colors: params.colors?.split(',').filter(Boolean) || [],
-        rooms: params.rooms?.split(',').filter(Boolean) || [],
-        vibe: params.vibe?.split(',').filter(Boolean) || [],
-        aesthetic: params.aesthetic?.split(',').filter(Boolean) || [],
-        medium: params.medium?.split(',').filter(Boolean) || [],
-        uniqueness: params.uniqueness,
-        availability: params.availability,
-        orientation: params.orientation,
-        priceMin: params.priceMin,
-        priceMax: params.priceMax,
-        isAiGenerated: params.isAiGenerated,
-        isFeatured: params.isFeatured,
-        sortBy: params.sortBy || 'createdAt',
-        sortOrder: params.sortOrder || 'desc',
-      },
+      filters: filtersFromSearch(params),
     }
   } catch {
-    // Return empty data on error
+    /**
+     * The grid is empty, the filters are NOT.
+     *
+     * This used to return an empty filter set too, and the URL is where the
+     * shopper's choices live: `?styles=wabi-sabi-art&vibe=calm` 400s on the
+     * unknown vibe, and the whole page came back as if nothing were filtered
+     * at all — no chips, no ticked boxes, "No products", and no way to see
+     * which of the two values was the problem or to remove it. The state was
+     * still in the URL; only the UI had forgotten it.
+     *
+     * Read off the search params, an unknown value keeps its chip, and one tap
+     * on the X gets the shopper their results back. `/collections/$slug` has
+     * always derived its filters from the URL and never had this.
+     */
     return {
       products: [],
       pagination: {
@@ -226,18 +222,37 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         hasNextPage: false,
         hasPreviousPage: false,
       },
-      filters: {
-        styles: [],
-        subjects: [],
-        colors: [],
-        rooms: [],
-        vibe: [],
-        aesthetic: [],
-        medium: [],
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-      },
+      filters: filtersFromSearch(params),
     }
+  }
+}
+
+/**
+ * What the URL says is filtering the grid.
+ *
+ * The one derivation, shared by the loaded page and the failed one — the
+ * chips, the rail's ticked boxes and the drawer all render from this.
+ */
+function filtersFromSearch(params: PostersSearchParams): FilterState {
+  const list = (value?: string) => value?.split(',').filter(Boolean) || []
+
+  return {
+    styles: list(params.styles),
+    subjects: list(params.subjects),
+    colors: list(params.colors),
+    rooms: list(params.rooms),
+    vibe: list(params.vibe),
+    aesthetic: list(params.aesthetic),
+    medium: list(params.medium),
+    uniqueness: params.uniqueness,
+    availability: params.availability,
+    orientation: params.orientation,
+    priceMin: params.priceMin,
+    priceMax: params.priceMax,
+    isAiGenerated: params.isAiGenerated,
+    isFeatured: params.isFeatured,
+    sortBy: params.sortBy || 'createdAt',
+    sortOrder: params.sortOrder || 'desc',
   }
 }
 
