@@ -13,7 +13,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getSizesForOrientation, priceForSize } from '@chobii/shared';
+import {
+  getSizesForOrientation,
+  orientationFromRatio,
+  priceForSize,
+} from '@chobii/shared';
 import { buildVariantsForOrientation } from '../../src/database/seed-variants';
 
 describe('seed variants derive from the shared ladder', () => {
@@ -69,6 +73,56 @@ describe('seed variants derive from the shared ladder', () => {
       expect(variant.widthCm).toBeGreaterThan(0);
       expect(variant.heightCm).toBeGreaterThan(0);
     }
+  });
+
+  it('emits a panoramic step wider than it is tall', () => {
+    // The literal ladder is written short-side-first — [12, 36] — like the
+    // rectangular one. Emitted unturned it put `12" × 36"` on the PDP of a
+    // panorama, which is a tall poster. #601.
+    for (const variant of buildVariantsForOrientation('panoramic', 1000)) {
+      expect(variant.widthInches).toBeGreaterThan(variant.heightInches);
+    }
+  });
+
+  it('lands every panoramic step inside the panoramic band', () => {
+    // The same rule the orientation column is measured against (#545), applied
+    // to the poster rather than the picture: if a step does not read panoramic
+    // it is not oriented, whatever the ladder is called.
+    for (const variant of buildVariantsForOrientation('panoramic', 1000)) {
+      expect(
+        orientationFromRatio(variant.widthInches / variant.heightInches)
+      ).toBe('panoramic');
+    }
+  });
+
+  it('turns cm and the label with the inches, not separately', () => {
+    // Three representations of one rectangle. `size.displayLabelDual` is
+    // written for the stored order, so reusing it on a turned step prints the
+    // sides backwards.
+    for (const variant of buildVariantsForOrientation('panoramic', 1000)) {
+      expect(variant.widthCm).toBeGreaterThan(variant.heightCm!);
+      expect(variant.sizeLabel).toContain(
+        `${variant.widthInches}" × ${variant.heightInches}"`
+      );
+      expect(variant.sizeLabel).toContain(
+        `${variant.widthCm} × ${variant.heightCm} cm`
+      );
+    }
+  });
+
+  it('turns the panoramic ladder without reordering or repricing it', () => {
+    // Turning a rectangle does not change its area, so nothing about the price
+    // taper or the ascending-area contract may move.
+    const ladder = getSizesForOrientation('panoramic');
+    const variants = buildVariantsForOrientation('panoramic', 1000);
+
+    variants.forEach((variant, i) => {
+      const step = ladder[i]!;
+      expect(variant.widthInches).toBe(step.heightInches);
+      expect(variant.heightInches).toBe(step.widthInches);
+      expect(variant.price).toBe(priceForSize(1000, step).toFixed(2));
+      expect(variant.sortOrder).toBe(i + 1);
+    });
   });
 
   it('swaps width and height for landscape against portrait', () => {

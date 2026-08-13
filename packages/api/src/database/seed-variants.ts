@@ -28,18 +28,35 @@ import type { NewProductVariant } from "./schema";
 type LadderedOrientation = "square" | "portrait" | "landscape" | "panoramic";
 
 /**
- * The shared ladder lists rectangular steps short-side-first, which reads as
- * portrait. Landscape is the same ladder with the long side moved — one set of
- * manufacturing sizes, two labellings, exactly as mesonart shares its rect-14
- * between Orientation_Vertical and Orientation_Horizontal (§5.2).
+ * EVERY shared ladder is stored short-side-first — a manufacturing list, not a
+ * shape. `[12, 36]` is one rectangle; whether it is sold 12 wide or 36 wide is
+ * the ORIENTATION's decision, not the ladder's. That is exactly how mesonart
+ * shares its rect-14 between Orientation_Vertical and Orientation_Horizontal
+ * with only the H/W labelling swapped (§5.2).
  *
- * Square is unaffected; panoramic is already stored wide.
+ * So two of the four turn the step and two do not:
+ *
+ *   portrait   as stored — short side first IS portrait
+ *   landscape  turned
+ *   panoramic  turned — 12x36 is a tall poster; a panorama is 36x12
+ *   square     unaffected either way
+ *
+ * Panoramic used to be in the first group, on the strength of a comment here
+ * claiming the ladder stored it wide. It does not, and nothing tested the
+ * claim, so all eight panoramic products in the catalogue offered a 1:3 TALL
+ * poster on the PDP and in Choose Options — the customer-facing size list is
+ * built from these rows, not from the ladder (#601).
  */
+const TURNED_ORIENTATIONS = new Set<LadderedOrientation>([
+  "landscape",
+  "panoramic",
+]);
+
 const orientFor = (
   orientation: LadderedOrientation,
   size: ProductSize
 ): { widthInches: number; heightInches: number } =>
-  orientation === "landscape"
+  TURNED_ORIENTATIONS.has(orientation)
     ? { widthInches: size.heightInches, heightInches: size.widthInches }
     : { widthInches: size.widthInches, heightInches: size.heightInches };
 
@@ -47,7 +64,7 @@ const cmFor = (
   orientation: LadderedOrientation,
   size: ProductSize
 ): { widthCm: number; heightCm: number } =>
-  orientation === "landscape"
+  TURNED_ORIENTATIONS.has(orientation)
     ? { widthCm: size.heightCm, heightCm: size.widthCm }
     : { widthCm: size.widthCm, heightCm: size.heightCm };
 

@@ -192,12 +192,18 @@ export const PORTRAIT_LANDSCAPE_SIZES: readonly ProductSize[] = buildLadder(
 // ============================================================================
 
 /**
- * Panoramic poster sizes (wide format for landscape scenes).
+ * Panoramic poster sizes.
  *
  * Our original four steps were uniformly 3:1 — one proportion scaled up.
  * mesonart's measured `pano-11` mixes 2:1 (×7), 3:1 (×3) and 8:3 (×1), which
  * is the same point as the rectangular ladder: the steps are manufacturing
  * sizes, not a single shape at four scales.
+ *
+ * Listed SHORT SIDE FIRST, like every ladder here — `[12, 36]` is the 3:1
+ * rectangle, and a panorama sells it 36 wide. Whoever emits a poster from a
+ * step is the one that turns it; `orientFor` in the seed does. This used to
+ * say "wide format" while storing the opposite, and eight products shipped a
+ * tall size list on the strength of it (#601).
  */
 export const PANORAMIC_SIZES: readonly ProductSize[] = buildLadder(
   [
