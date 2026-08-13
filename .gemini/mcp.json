@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ticketrack": {
+      "command": "node",
+      "args": [
+        ".claude/ticketrack-mcp.js"
+      ],
+      "env": {
+        "MCP_DATA_DIR": "plan/tracker-data",
+        "TRACKER_API_URL": "http://localhost:3333"
+      }
+    }
+  }
+}
