@@ -1,0 +1,158 @@
+# Docker Compose configuration for unified API+UI+MCP deployment
+# 
+# STANDALONE USAGE (without .env file):
+# This file includes sensible defaults for all variables, so it can be used
+# directly without any .env file:
+#   docker-compose up -d
+#   docker-compose -f /path/to/this/docker-compose.yml up -d
+#
+# WITH ENVIRONMENT OVERRIDES:
+# Copy .env.example to .env and modify values to override defaults:
+#   cp .env.example .env
+#   docker-compose up -d
+#
+# EXTERNAL PROJECT USAGE:
+# From another project directory (e.g., surveytrack):
+#   docker-compose -f ../ticketrack/docker-compose.yml up -d
+#   # Or with project-specific token filtering:
+#   PROJECT_DIR_HOST=$(pwd) docker-compose -f ../ticketrack/docker-compose.yml up -d
+#   # This ensures only tokens from this project are counted
+#
+# Single container serves API and UI, with MCP available via exec
+
+services:
+  # Unified API+UI+MCP Container
+  tracker:
+    # No `build:` here on purpose. The tracker image is built in the ticketrack
+    # repo, never in this one. A build block pointing at `context: .` would make
+    # a missing TRACKER_IMAGE_TAG silently build masonart.com's own Dockerfile
+    # and run it as the tracker, instead of failing with "image not found".
+    #
+    # Pin the image with TRACKER_IMAGE_TAG (defaults to latest):
+    #
+    #   docker compose -f docker-compose.ticketrack.yml up -d
+    #       -> tracker-unified:latest
+    #
+    #   TRACKER_IMAGE_TAG=pre-flat-layout \
+    #     docker compose -f docker-compose.ticketrack.yml up -d --force-recreate
+    #       -> tracker-unified:pre-flat-layout, the pre-flat-layout revert target
+    #          (built from ticketrack tag before-data-flattening, e5e786d)
+    #
+    # Reverting the image is only half a revert: the store must go back too, with
+    #   git checkout -- plan/tracker-data && git clean -fd plan/tracker-data
+    # New code on an old store, or old code on a flattened store, reads EMPTY.
+    image: tracker-unified:${TRACKER_IMAGE_TAG:-latest}
+    restart: unless-stopped
+
+    environment:
+      # Service configuration
+      - SERVICE=${SERVICE:-unified}
+      - NODE_ENV=${NODE_ENV:-production}
+
+      # API configuration
+      - API_PORT=${API_PORT:-3002}
+      - DATA_DIR=${DATA_DIR:-/app/data}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+      # MCP configuration (for exec usage)
+      - MCP_DATA_DIR=${MCP_DATA_DIR:-/app/data}
+      - MCP_LOG_FILE_DIR=${MCP_LOG_FILE_DIR:-/app/logs}
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-info}
+      - MCP_LOG_FORMAT=${MCP_LOG_FORMAT:-json}
+      - MCP_LOG_OUTPUT=${MCP_LOG_OUTPUT:-both}
+      - MCP_HEALTH_CHECK=${MCP_HEALTH_CHECK:-true}
+      - MCP_METRICS_ENABLED=${MCP_METRICS_ENABLED:-true}
+      - MCP_SCRIPT_PATH=${MCP_SCRIPT_PATH:-/app/packages/scripts/dist}
+
+      # Token Tracking - ALWAYS ENABLED BY DEFAULT
+      - TOKEN_TRACKING_ENABLED=${TOKEN_TRACKING_ENABLED:-true}
+      - TOKEN_AUTO_CALCULATE=${TOKEN_AUTO_CALCULATE:-true}
+      - CLAUDE_DATA_PATH=${CLAUDE_DATA_PATH:-/home/claude-data}
+      - TOKEN_CACHE_PATH=${TOKEN_CACHE_PATH:-/app/token-cache}
+      # Project directory for multi-project token filtering
+      - PROJECT_DIR_HOST=${PROJECT_DIR_HOST:-/Users/dhruv/work/masonart.com}
+      - TOKEN_MONITOR_INTERVAL=${TOKEN_MONITOR_INTERVAL:-2000}
+      - TOKEN_REPORTING_INTERVAL=${TOKEN_REPORTING_INTERVAL:-3600000}
+
+      # Shared configuration
+      - TZ=${TZ:-UTC}
+
+    volumes:
+      # Tracker data directory (shared between API and MCP)
+      - ${TRACKER_DATA_PATH:-./plan/tracker-data}:/app/data:rw
+      # Logs directory
+      - ${LOG_PATH:-./logs}:/app/logs:rw
+      # Config directory (optional)
+      - ${CONFIG_PATH:-./config}:/app/config:ro
+      # Claude data directory for token tracking (DISABLED - causes high CPU from Docker file watching)
+      # - ${CLAUDE_DATA_PATH:-~/.claude}:/home/claude-data:ro
+      # Token cache directory (READ-WRITE - for snapshots/session data)
+      - ${TOKEN_CACHE_PATH:-./token-cache}:/app/token-cache:rw
+
+
+    ports:
+      # API port (serves both API and UI)
+      # Note: Uses API_PORT from .env (defaults to 3000 in masonart.com)
+      - "3337:${API_PORT:-3002}"
+
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${API_PORT:-3002}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=tracker-unified"
+
+    labels:
+      - "service.name=tracker-unified"
+      - "service.version=1.0.0"
+      - "service.description=Unified API+UI+MCP container"
+      - "traefik.enable=true"
+      - "traefik.http.routers.tracker.rule=Host(`tracker.localhost`)"
+      - "traefik.http.services.tracker.loadbalancer.server.port=3002"
+
+  # Optional: Reverse proxy for better URL handling
+  # traefik:
+  #   image: traefik:v3.0
+  #   container_name: traefik
+  #   restart: unless-stopped
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #   ports:
+  #     - "80:80"
+  #     - "8080:8080"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   networks:
+  #     - tracker-network
+  #   profiles:
+  #     - proxy
+
+
+# Volumes
+volumes:
+  logs:
+    driver: local
+  config:
+    driver: local
