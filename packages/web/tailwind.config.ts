@@ -220,6 +220,15 @@ const config: Config = {
         'drawer-in-right': 'slide-in-from-right 0.6s var(--ease-drawer) both',
         /** The facet sheet, which is the same drawer rising from below. */
         'drawer-in-bottom': 'slide-in-from-bottom 0.6s var(--ease-drawer) both',
+        /**
+         * The search drawer — the same sheet, hung from the top edge instead.
+         *
+         * Search is reached from the header and the tab bar's Search tab, and
+         * a panel that answers a control at the top of the screen by climbing
+         * up from the bottom crosses the whole viewport to get there. Same
+         * 600ms and same curve as every other drawer, so only the edge differs.
+         */
+        'drawer-in-top': 'slide-in-from-top 0.6s var(--ease-drawer) both',
         'drawer-backdrop-in': 'fade-in 0.6s var(--ease-drawer) both',
         shimmer: 'shimmer 2s infinite',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',

@@ -142,6 +142,80 @@ describe('querying', () => {
   })
 })
 
+describe('the panel', () => {
+  // The shell is the facet sheet's, hung from the top edge: same scrim, same
+  // 20px sheet radius on the page-facing corners, same 600ms drawer curve,
+  // same 60px gap left to the far edge. It used to be a square, motionless
+  // slab on a bg-black/50 scrim nobody else in the app uses.
+  it('descends from the top on the drawer curve', () => {
+    render(<SearchDrawer isOpen onClose={() => {}} />)
+    const panel = screen.getByTestId('search-drawer')
+    expect(panel.className).toContain('top-0')
+    expect(panel.className).toContain('animate-drawer-in-top')
+    expect(panel.className).toContain('rounded-b-[var(--drawer-radius-sheet)]')
+    expect(panel.className).toContain('lg:max-h-[calc(100%-60px)]')
+  })
+
+  it('travels the facet sheet’s distance on the phone, so it moves at its speed', () => {
+    // Both animations are 0.6s var(--ease-drawer). A content-tall panel covers
+    // a third of the sheet's distance in that time and reads as a crawl beside
+    // it, so the phone panel takes the sheet's height — as mesonart's own
+    // search panel does (`100vh - 60px`, measured).
+    render(<SearchDrawer isOpen onClose={() => {}} />)
+    expect(screen.getByTestId('search-drawer').className).toContain(
+      'h-[calc(100%-60px)]'
+    )
+  })
+
+  it('dims the page with the drawers’ own scrim', () => {
+    render(<SearchDrawer isOpen onClose={() => {}} />)
+    const scrim = screen.getByTestId('search-scrim')
+    expect(scrim.className).toContain('bg-foreground/70')
+    expect(scrim.className).toContain('animate-drawer-backdrop-in')
+    expect(scrim.className).not.toContain('bg-black/50')
+  })
+
+  it('closes from the scrim', () => {
+    const onClose = vi.fn()
+    render(<SearchDrawer isOpen onClose={onClose} />)
+    fireEvent.click(screen.getByTestId('search-scrim'))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('draws the cart drawer’s close cursor over the scrim', () => {
+    // The whole scrim IS the close control, so the pointer says so — the same
+    // follower the cart drawer and the Quickview carry (#420).
+    render(<SearchDrawer isOpen onClose={() => {}} />)
+    const scrim = screen.getByTestId('search-scrim')
+    expect(scrim.className).toContain('cursor-none')
+    expect(screen.queryByTestId('search-drawer-cursor')).toBeNull()
+
+    fireEvent.mouseMove(scrim, { clientX: 120, clientY: 300 })
+    const follower = screen.getByTestId('search-drawer-cursor')
+    expect(follower.style.left).toBe('120px')
+    expect(follower.style.top).toBe('300px')
+
+    // Off the scrim — including onto the panel — and the follower goes with it,
+    // or a real pointer and a drawn one are on screen at once.
+    fireEvent.mouseLeave(scrim)
+    expect(screen.queryByTestId('search-drawer-cursor')).toBeNull()
+  })
+
+  it('closes on the drawers’ outline circle, not a bare icon box', () => {
+    const onClose = vi.fn()
+    render(<SearchDrawer isOpen onClose={onClose} />)
+    const close = screen.getByLabelText('Close search')
+    expect(close.className).toContain('rounded-full')
+    fireEvent.click(close)
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('keeps the field at 16px so iOS does not zoom the page on focus', () => {
+    render(<SearchDrawer isOpen onClose={() => {}} />)
+    expect(screen.getByRole('searchbox').className).toContain('text-base')
+  })
+})
+
 describe('the source guards', () => {
   it('cancels stale requests', () => {
     // Typing "abstract" is eight keystrokes. Without cancellation the last
