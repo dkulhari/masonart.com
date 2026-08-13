@@ -1,8 +1,8 @@
 status: done
-last_updated: '2026-08-13T09:56:20.117Z'
-total_tickets: 559
+last_updated: '2026-08-13T15:42:32.514Z'
+total_tickets: 560
 summary:
-  critical: 30
+  critical: 31
   high: 210
   medium: 241
   low: 78
@@ -146,6 +146,10 @@ priorities:
       tickets:
         - ticket_number: 529
           title: Home hero — full-bleed image carousel with peek slides replaces the text hero
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 541
+          title: Mobile home layout at 390 — the whole page, band by band
           assignee: unassigned
           blocked_by: []
     - feature: gift-cards

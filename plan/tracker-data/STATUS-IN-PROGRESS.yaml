@@ -1,17 +1,10 @@
 status: in-progress
-last_updated: '2026-08-13T09:56:18.773Z'
-total_tickets: 1
+last_updated: '2026-08-13T15:42:31.985Z'
+total_tickets: 0
 summary:
-  critical: 1
+  critical: 0
   high: 0
   medium: 0
   low: 0
-priorities:
-  critical:
-    - feature: home-page-parity
-      tickets:
-        - ticket_number: 541
-          title: Mobile home layout at 390 — the whole page, band by band
-          assignee: unassigned
-          blocked_by: []
+priorities: {}
 blocked_tickets: []

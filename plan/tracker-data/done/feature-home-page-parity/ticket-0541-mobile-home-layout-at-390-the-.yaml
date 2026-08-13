@@ -1,0 +1,82 @@
+ticket_number: 541
+title: Mobile home layout at 390 — the whole page, band by band
+description: |-
+  BAR: mesonart at 390 is 8414px tall and stays dense and shoppable — full-bleed hero image, a horizontally scrolling category chip rail under the Best Seller heading, two-up product grids, stacked split bands, tight type.
+
+  OURS TODAY: 7317px at 390 but mostly whitespace — the hero is a centred wall of text, the product cards put a 'Choose Options' button overlapping the artwork, and there is no chip rail. The collection page has the same mobile weakness, so whatever pattern lands here should be the one that page can adopt.
+
+  Go band by band at 390 and judge each against the bar's matching band. Do not fix mobile by hiding sections.
+feature: home-page-parity
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.188Z'
+last_updated: '2026-08-13T15:42:26.314Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - mobile
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-13T09:56:08.340Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-13T15:42:22.138Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `19d541fc` — feat(home): give the phone page the bar's band rhythm
+
+      **Method**: measured live on both sides at exactly 390 (headless Chromium, iPhone 12 profile, full scroll so lazy bands mount). Not from the reference stills — a headed Chrome cannot go below ~487px on macOS, so a headed "390" is not 390.
+
+      **What the page actually looked like when this ticket was picked up** — the ticket's own numbers were stale. The hero is already full-bleed (514px, identical to the bar's 514), the Best Seller chip rail exists, and the product card no longer puts Choose Options over the artwork; #530/#531/#538/#540 landed those. The page was 8853px, not 7317, and it was *looser* than the bar, not shorter.
+
+      **Root cause of the looseness**: the bar does not pad phone bands symmetrically. Band by band its content opens 24–45px under the seam and its last element ends ON the seam — a seam costs ~32px. Ours paid 64 above AND 64 below every band, plus a 36px grid row gap where the bar sets 16, plus 18px body copy in Brand Story where the bar sets 16.
+
+      **Band by band, ours → ours now (bar)**:
+      - Hero 514 → 514 (514) ✓ untouched
+      - Best Seller 733 → 653 (643)
+      - Shop By Popular 910 → 778 (736)
+      - Shop by Room 775 → 775 (780) ✓ untouched
+      - Promo tiles 465 → 433 (425)
+      - New In 661 → 589 (578)
+      - Shop By Orientation 296 → 296 (301) ✓ untouched
+      - Customer Reviews 986 → 922 (878) — the restyle itself is #537's
+      - Brand Story 1234 → 1023 (963)
+      - Stay Inspired 393 → 317 (no bar equivalent — theirs is a popup, ours stays inline)
+      - Trust row 500 → 500 (501) ✓ pinned at py-16 so the page default could not move it away from the bar
+
+      Page total 8853 → 8186. Excluding our inline newsletter, the comparable stack is 7869 against the bar's 7885 (bar total 8998 less its Featured Artists band, which #536 descoped).
+
+      **Files changed**:
+      - `packages/web/app/components/ui/SectionBand.tsx` — phone default `py-16` → `py-8`, `sm:py-24` untouched. This is the reusable pattern #541 asked for; the collection page picks it up for free.
+      - `packages/web/app/components/home/ProductRail.tsx` — `py-6 sm:py-14`, heading `mb-4`, chip row `mb-4`, View All `mt-6`
+      - `packages/web/app/components/home/PopularCategoriesSection.tsx` — row gap 36 → 24, column gap 12 → 16, heading `mb-5`, pill `mt-6`
+      - `packages/web/app/components/home/BrandStorySection.tsx` — phone heading 30 → 24, copy 18 → 16, panel and stack spacing tightened
+      - `packages/web/app/components/home/PromoTilesSection.tsx` — `py-4` on a phone
+      - `packages/web/app/components/home/TrustIconsRow.tsx` — pins `py-16` against the new default
+      - `packages/web/app/routes/index.tsx` — newsletter form `mt-5`
+
+      **Tests**: 207 pass across `tests/components/home` + `tests/components/ui`; full web suite 3015/3016, the one failure being `tests/routes/wishlist-page.test.ts`, which this diff does not touch (pre-existing). Typecheck adds no new errors — every error in the touched test files is the pre-existing `noUncheckedIndexedAccess` noise on `tiles()[0]` / `mock.calls[0]`.
+      - `SectionBand.test.tsx`: phone seam vs desktop band
+      - `ProductRail.test.tsx`: padding at both breakpoints (updated from py-12), plus the heading/pill pocket
+      - `PopularCategoriesSection.test.tsx`: phone row gap, heading and pill margins
+      - `TrustIconsRow.test.tsx`: keeps its own 64px when the page default drops
+
+      **Residual, deliberately not chased here**: Popular +42, Customer Reviews +44, Brand Story +60 against the bar. Reviews is #537's band to restyle. The other two are within ~6% and the remaining height is real content (our category labels are a size up from theirs; our Brand Story copy is two full paragraphs where theirs clips with a fade).
+
+      **Note for #546**: every tile in Shop By Popular renders a MESON ART watermark, and it is more legible now that the band is tighter.
+  - author: system
+    timestamp: '2026-08-13T15:42:26.314Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-13T09:56:08.340Z'
+completed: '2026-08-13T15:42:26.314Z'
