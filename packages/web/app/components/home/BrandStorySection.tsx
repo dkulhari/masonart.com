@@ -103,9 +103,9 @@ export function BrandStorySection() {
     <SectionBand
       bleed
       data-testid="home-brand-story"
-      className="px-2 py-8 sm:px-4 sm:py-12"
+      className="px-2 py-4 sm:px-4 sm:py-12"
     >
-      <div className="mx-auto max-w-[var(--page-width)] rounded-[24px] bg-band-strong px-5 py-8 lg:px-10 lg:py-16">
+      <div className="mx-auto max-w-[var(--page-width)] rounded-[24px] bg-band-strong px-5 py-6 sm:py-8 lg:px-10 lg:py-16">
         {/*
           Three blocks, two orders. Stacked on mobile the bar runs
           heading → media → lead → story → pill, which is why the media is its
@@ -113,10 +113,12 @@ export function BrandStorySection() {
           the second column and spans both rows, and the copy keeps its
           reading order in the first.
         */}
-        <div className="grid grid-cols-1 gap-y-8 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-x-14 lg:gap-y-12">
+        <div className="grid grid-cols-1 gap-y-5 sm:gap-y-8 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-x-14 lg:gap-y-12">
+          {/* 24px on a phone, which is what the bar sets for every one of its
+              band headings at 390 — this one was alone at 30 (#541). */}
           <DisplayHeading
             as="h2"
-            className="text-3xl text-foreground sm:text-4xl lg:col-start-1 lg:row-start-1 lg:text-5xl"
+            className="text-2xl text-foreground sm:text-4xl lg:col-start-1 lg:row-start-1 lg:text-5xl"
           >
             Brand Story
           </DisplayHeading>
@@ -156,11 +158,15 @@ export function BrandStorySection() {
             {/* The lead is the same size as the story on the bar, at both
                 widths — it is set apart by standing alone and by the full-ink
                 colour, not by a type step. */}
-            <p className="text-lg text-foreground lg:text-xl">
+            <p className="text-base text-foreground sm:text-lg lg:text-xl">
               Great walls make great rooms.
             </p>
 
-            <div className="mt-8 space-y-6 text-lg leading-relaxed text-foreground/80 lg:text-xl">
+            {/* 16px on a phone against the bar's 16, and it matters more here
+                than anywhere else on the page: at 18px in a panel that is
+                already inset twice, this copy ran 14 lines and made Brand
+                Story the tallest band we own — 1234px against 963 (#541). */}
+            <div className="mt-5 space-y-4 text-base leading-relaxed text-foreground/80 sm:mt-8 sm:space-y-6 sm:text-lg lg:text-xl">
               <p>
                 chobii.art is a poster and framing studio built around that one
                 idea. We curate premium posters across styles — wabi-sabi and
@@ -181,7 +187,7 @@ export function BrandStorySection() {
               href="/about"
               className={cn(
                 buttonVariants({ variant: 'outline', size: 'pill' }),
-                'mt-10'
+                'mt-6 sm:mt-10'
               )}
             >
               Read More

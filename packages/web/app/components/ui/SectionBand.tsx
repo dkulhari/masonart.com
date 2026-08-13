@@ -10,6 +10,14 @@
  * The band colours are measured — see --band / --band-strong / --highlight in
  * globals.css.
  *
+ * The vertical rhythm is two numbers, not one. At 390 the bar does not pad its
+ * bands symmetrically at all: measured band by band, its content sits 24–45px
+ * below the seam and its last element ends ON the seam, so a phone seam costs
+ * ~32px in total. Ours spent 64 above AND 64 below every band, which is where
+ * #541 found the page reading as whitespace between things to buy rather than
+ * a shop. `py-8` is that seam; `sm:py-24` is the desktop band, untouched,
+ * because above 640 the bar's own bands open back up.
+ *
  * By default the children are wrapped in `container-wide`, so a band is
  * full-bleed in colour and page-width in content. A band that is itself a
  * full-width inset panel wants `bleed` instead — see the prop.
@@ -64,7 +72,7 @@ export function SectionBand({
   ...props
 }: SectionBandProps) {
   return (
-    <section className={cn('py-16 sm:py-24', TONES[tone], className)} {...props}>
+    <section className={cn('py-8 sm:py-24', TONES[tone], className)} {...props}>
       {bleed ? children : <div className="container-wide">{children}</div>}
     </section>
   )

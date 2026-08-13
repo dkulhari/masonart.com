@@ -209,17 +209,22 @@ export function ProductRail({
      * At py-14 the pocket is 48 above / 56 below, which is the bar's own ratio
      * (it measures 46.5 above its pill and 63.5 below).
      *
+     * On a phone that ratio does not hold: measured at 390, the bar's Best
+     * Seller band opens 24px under the seam and its rail ends ON the next
+     * seam — 643px of band against our 733 for the same stack (#541). `py-6`
+     * is that 24, and the desktop pocket above stays exactly as it was.
+     *
      * Both breakpoints have to be named: twMerge only resolves a conflict
-     * within one variant, so `py-12` alone would leave `sm:py-24` standing.
+     * within one variant, so `py-6` alone would leave `sm:py-24` standing.
      */
     <SectionBand
       tone={tone}
       data-testid={testId}
-      className={cn('py-12 sm:py-14', className)}
+      className={cn('py-6 sm:py-14', className)}
     >
       {/* Heading to artwork: 32px on the bar, and the 56px arrows overhang the
           heading's box by ~6, so the margin is set a step under that. */}
-      <div className="mb-6 flex items-center justify-between gap-6 sm:mb-7">
+      <div className="mb-4 flex items-center justify-between gap-6 sm:mb-7">
         <DisplayHeading as="h2" id={headingId} className="text-section">
           {heading}
         </DisplayHeading>
@@ -259,7 +264,7 @@ export function ProductRail({
       {categoryChips && categoryChips.length > 0 && (
         <div
           data-testid="rail-category-pills"
-          className="mb-6 flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-[var(--page-padding)] px-[var(--page-padding)] lg:mx-0 lg:px-0"
+          className="mb-4 flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-[var(--page-padding)] px-[var(--page-padding)] sm:mb-6 lg:mx-0 lg:px-0"
         >
           {categoryChips.map((chip) => {
             const isSelected = selectedCategory
@@ -325,7 +330,7 @@ export function ProductRail({
       </ul>
 
       {/* The band's only CTA: one outline pill, centred, under the rail. */}
-      <div className="mt-10 flex justify-center sm:mt-12">
+      <div className="mt-6 flex justify-center sm:mt-12">
         <Link
           to="/posters"
           search={viewAllSearch}

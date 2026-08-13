@@ -220,7 +220,7 @@ function NewsletterSection() {
        * button's label are the same size on the same row.
        */}
       <form
-        className="mt-8 flex max-w-xl flex-col gap-3 sm:flex-row"
+        className="mt-5 flex max-w-xl flex-col gap-3 sm:mt-8 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault()
           // Newsletter signup will be implemented later

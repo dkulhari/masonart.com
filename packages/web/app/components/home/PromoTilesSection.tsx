@@ -211,7 +211,7 @@ export function PromoTilesRow({ tiles, className }: PromoTilesRowProps) {
        * padding, so the integrator can take the top to nothing with `pt-0`
        * through `className` if the stack ends up airier than theirs.
        */
-      className={cn('py-8 lg:py-10', className)}
+      className={cn('py-4 sm:py-8 lg:py-10', className)}
     >
       {/*
        * A list, because it is one: three doors of equal weight. The lead tile

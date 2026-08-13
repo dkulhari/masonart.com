@@ -262,4 +262,31 @@ describe('PopularCategoriesBand', () => {
     const pill = screen.getByRole('link', { name: 'View Popular Categories' })
     expect(pill).toHaveAttribute('href', VIEW_ALL_HREF)
   })
+
+  /**
+   * #541. Eight tiles cost 910px at 390 against the bar's 736 — four 36px row
+   * gaps, 32 under the heading and 40 above the pill, none of which the bar
+   * spends. The label still has to belong to the tile above it, so the gap
+   * above it (12) stays half the gap below (24) rather than going to nothing.
+   */
+  it('spends a phone-sized gap between the tile rows', () => {
+    const { container } = render(
+      <PopularCategoriesBand categories={[collection()]} />
+    )
+
+    const grid = container.querySelector('ul')!
+    expect(grid.className).toContain('gap-y-6')
+    expect(grid.className).toContain('sm:gap-y-10')
+    expect(grid.className).not.toContain('gap-y-9')
+
+    const heading = screen.getByRole('heading', { level: 2 })
+    expect(heading.className).toContain('mb-5')
+    expect(heading.className).toContain('sm:mb-10')
+
+    const pillRow = screen.getByRole('link', {
+      name: 'View Popular Categories',
+    }).parentElement
+    expect(pillRow?.className).toContain('mt-6')
+    expect(pillRow?.className).toContain('sm:mt-12')
+  })
 })

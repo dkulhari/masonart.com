@@ -213,8 +213,13 @@ describe('ProductRail — band rhythm', () => {
    * contents. The bar's own pill sits 46.5 above and 63.5 below.
    *
    * Both breakpoints have to be named: twMerge only resolves a conflict within
-   * one variant, so `py-12` alone leaves `sm:py-24` standing and the desktop
+   * one variant, so `py-6` alone leaves `sm:py-24` standing and the desktop
    * padding never changes.
+   *
+   * #541 took the phone figure down again, from 48 to 24. Measured at 390 the
+   * bar's Best Seller band is 643px and ours was 733 for the same heading,
+   * chip row, rail and pill; 24px is what it opens with, and its rail ends on
+   * the next band's seam rather than 48px above it.
    */
   it('overrides the band padding at BOTH breakpoints', () => {
     render(
@@ -226,10 +231,40 @@ describe('ProductRail — band rhythm', () => {
       />
     )
     const band = screen.getByTestId('rhythm-rail')
-    expect(band.className).toContain('py-12')
+    expect(band.className).toContain('py-6')
     expect(band.className).toContain('sm:py-14')
     expect(band.className).not.toContain('py-16')
+    expect(band.className).not.toContain('py-12')
     expect(band.className).not.toContain('sm:py-24')
+  })
+
+  /**
+   * The pill and the heading are the other two places the phone band was
+   * paying desktop money: 40px above the pill and 24 under the heading, on a
+   * band whose whole content stack is 600px. Both keep their `sm:` figures.
+   */
+  it('keeps the phone pocket around the heading and the pill tight', () => {
+    const { container } = render(
+      <ProductRail
+        heading="Best Seller"
+        products={PRODUCTS}
+        viewAllSearch={SEARCH}
+        testId="pocket-rail"
+      />
+    )
+
+    const headingRow = screen
+      .getByRole('heading', { level: 2, name: 'Best Seller' })
+      .closest('div')
+    expect(headingRow?.className).toContain('mb-4')
+    expect(headingRow?.className).toContain('sm:mb-7')
+
+    const pillRow = screen.getByTestId('rail-view-all').parentElement
+    expect(pillRow?.className).toContain('mt-6')
+    expect(pillRow?.className).toContain('sm:mt-12')
+
+    // and nothing reintroduced the old figures on the way past
+    expect(container.innerHTML).not.toContain('mt-10 flex justify-center')
   })
 })
 

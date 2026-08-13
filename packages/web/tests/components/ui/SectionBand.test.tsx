@@ -71,4 +71,18 @@ describe('SectionBand', () => {
     const { container } = render(<SectionBand id="why-us">x</SectionBand>)
     expect(container.querySelector('section')!.id).toBe('why-us')
   })
+
+  /**
+   * #541. At 390 the bar's bands open 24–45px under the seam and end on it,
+   * for a seam of roughly 32px; ours spent 64 above and 64 below every band,
+   * which is most of the 2000px of extra height the home page carried on a
+   * phone. The desktop band is untouched — above 640 the bar opens back up.
+   */
+  it('pays a phone-sized seam and the full desktop band', () => {
+    const { container } = render(<SectionBand>x</SectionBand>)
+    const cls = container.querySelector('section')!.className
+    expect(cls).toContain('py-8')
+    expect(cls).toContain('sm:py-24')
+    expect(cls).not.toContain('py-16')
+  })
 })

@@ -216,17 +216,24 @@ export function PopularCategoriesBand({
 
   return (
     <SectionBand tone={tone} data-testid="popular-categories">
-      <DisplayHeading as="h2" className="mb-8 text-section sm:mb-10">
+      <DisplayHeading as="h2" className="mb-5 text-section sm:mb-10">
         Shop By Popular
       </DisplayHeading>
 
       {/*
-        The row gap is deliberately much larger than the gap above a label.
-        A caption between two tiles belongs to exactly one of them, and the
-        only thing that says which is proximity: 16px up, 40px down. The bar's
-        own band sets 12.5 and 12, which is a coin toss four rows deep.
+        The row gap is deliberately larger than the gap above a label. A
+        caption between two tiles belongs to exactly one of them, and the only
+        thing that says which is proximity: 12px up, 24px down on a phone, 16
+        and 40 from `sm`. The bar's own band sets 12.5 and 12, which is a coin
+        toss four rows deep.
+
+        The phone figure was 36px down (#541): four rows of it, plus 32 under
+        the heading and 64 of band padding each side, put this band at 910px
+        against the bar's 736 for the same eight tiles. Halving the row gap
+        keeps the label owned by the tile above it and stops the band paying
+        for the ownership four times over.
       */}
-      <ul className="grid list-none grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-4">
+      <ul className="grid list-none grid-cols-2 gap-x-4 gap-y-6 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-4">
         {categories.map((category) => (
           <li key={category.id}>
             <a
@@ -290,7 +297,7 @@ export function PopularCategoriesBand({
         ))}
       </ul>
 
-      <div className="mt-10 flex justify-center sm:mt-12">
+      <div className="mt-6 flex justify-center sm:mt-12">
         <a
           href={VIEW_ALL_HREF}
           className={buttonVariants({ variant: 'outline', size: 'pill' })}

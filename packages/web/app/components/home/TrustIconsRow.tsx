@@ -133,6 +133,12 @@ export function trustClaimsFor(
  * this band is deliberately shorter than a content section, and it is the last
  * thing before the footer.
  *
+ * The base `py-16` is named too, and is the one band on the page that keeps
+ * 64px on a phone. #541 took the band default down to `py-8` for the whole
+ * page, but this row already measures 500px at 390 against the bar's 501 —
+ * it is the one band that was never loose, and taking 64px out of it would
+ * have moved it away from the bar rather than towards it.
+ *
  * Takes no props. There is nothing here to configure — a trust row whose
  * claims can be passed in from the outside is a trust row whose claims stop
  * being checked.
@@ -144,7 +150,7 @@ export function TrustIconsRow() {
   const claims = trustClaimsFor(useFreeShippingThresholdLabel())
 
   return (
-    <SectionBand data-testid="home-trust-row" className="sm:py-16">
+    <SectionBand data-testid="home-trust-row" className="py-16 sm:py-16">
       {/* Three layouts, and the last one is the point.
        *
        * On the reference the four groups are `space-between` across the page

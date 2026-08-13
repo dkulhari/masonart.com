@@ -105,6 +105,21 @@ describe('TrustIconsRow', () => {
     }
   })
 
+  /**
+   * #541 took SectionBand's phone padding from 64 to 32 for the whole page.
+   * This band opts back out: it already measures 500px at 390 against the
+   * bar's 501, so it is the one band on the page that was never loose, and
+   * the default would have moved it away from the bar rather than towards it.
+   */
+  it('keeps its own 64px padding when the page default drops', () => {
+    const { container } = render(<TrustIconsRow />)
+
+    const band = container.querySelector('section')!
+    expect(band.className).toContain('py-16')
+    expect(band.className).toContain('sm:py-16')
+    expect(band.className).not.toContain('py-8')
+  })
+
   it('hides the decorative icons from assistive tech', () => {
     const { container } = render(<TrustIconsRow />)
 
