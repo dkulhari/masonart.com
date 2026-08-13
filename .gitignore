@@ -93,3 +93,10 @@ deploy/pre-cutover-*.sql
 
 # ticketrack MCP per-process stdio log — local pids, no shared value
 plan/tracker-data/.mcp-exits.jsonl
+
+# Development reference imagery scraped from mesonart.com to build the home
+# page bands against. Not ours, must never ship or enter history. Ticket #544
+# replaces it with our own photography. The fetch script that repopulates it
+# is ignored alongside it.
+packages/web/public/dev-reference/
+scripts/dev/fetch-reference-imagery.sh
