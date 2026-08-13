@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
+import { Button, buttonVariants } from '~/components/ui/Button'
 import { useNavReveal } from '~/hooks/useNavReveal'
 import { useMobileNavScroll } from '~/hooks/useMobileNavScroll'
 import { useChromeOffset } from '~/hooks/useChromeOffset'
@@ -88,11 +89,18 @@ const MOBILE_DRAWER_LINK_CLASS =
  *
  * A pill, as theirs is, and not on the 24px row rhythm above it: the footer is
  * a different register — one action, not another destination in the list. Full
- * width because it is the only control on its line, and 48px tall for the same
- * reason the icon boxes are 44: it is a thumb target at the bottom of a phone.
+ * width because it is the only control on its line.
+ *
+ * The storefront's own outline pill rather than a hand-rolled one: this was a
+ * bordered div with a flat `hover:bg-foreground` swap, so the drawer's only
+ * action animated differently from every other button on the site — including
+ * the cart drawer's own View Cart directly opposite it. `buttonVariants` brings
+ * the measured wipe and the 56px `pill` scale with it.
  */
-const MOBILE_DRAWER_ACTION_CLASS =
-  'flex h-12 w-full items-center justify-center gap-2 rounded-full border border-foreground text-base font-medium text-foreground transition-colors hover:bg-foreground hover:text-background'
+const MOBILE_DRAWER_ACTION_CLASS = cn(
+  buttonVariants({ variant: 'outline', size: 'pill' }),
+  'w-full'
+)
 
 /**
  * The two row-1 entries that are a sort, not a page.
@@ -672,9 +680,14 @@ export function Header() {
       <div
         data-testid="mobile-nav-scrim"
         className={cn(
-          'fixed inset-0 z-40 bg-black/50 transition-opacity duration-[600ms] motion-reduce:transition-none md:hidden',
+          // Tint, timing and curve are the cart drawer's backdrop, not a
+          // second opinion: both are the same gesture on the same site, and
+          // bg-black/50 against the cart's bg-foreground/70 read as two
+          // different scrims depending on which edge you opened.
+          'fixed inset-0 z-40 bg-foreground/70 transition-opacity duration-[600ms] motion-reduce:transition-none md:hidden',
           isMobileMenuOpen ? 'opacity-100' : 'invisible opacity-0'
         )}
+        style={{ transitionTimingFunction: 'var(--ease-drawer)' }}
         onClick={closeMobileMenu}
         aria-hidden="true"
       />
@@ -698,32 +711,45 @@ export function Header() {
         // z-50 and last in the tree: the header is `sticky z-50`, so an equal
         // z that comes later is what paints the full-height panel over it.
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-full max-w-[576px] flex-col bg-background shadow-xl transition-transform duration-[600ms] motion-reduce:transition-none md:hidden',
+          'fixed inset-y-0 left-0 z-50 flex w-full max-w-[576px] flex-col bg-background shadow-2xl transition-transform duration-[600ms] motion-reduce:transition-none md:hidden',
+          // The cart drawer's panel treatment, mirrored: same 576px cap, same
+          // shadow, same 34px radius on the page-facing edge and square where
+          // it meets the viewport — theirs is `0 34px 34px 0` because this is
+          // the `drawer--start` one. overflow-hidden so the scrolling list
+          // cannot square the corners off as it passes under them.
+          'overflow-hidden rounded-r-[var(--drawer-radius)]',
           isMobileMenuOpen ? 'translate-x-0' : 'invisible -translate-x-full'
         )}
-        // Theirs, measured: transform .6s cubic-bezier(0.7, 0, 0.2, 1) —
-        // fast off the mark, long settle. No Tailwind ease- matches it.
-        style={{ transitionTimingFunction: 'cubic-bezier(0.7, 0, 0.2, 1)' }}
+        // Theirs, measured: transform .6s cubic-bezier(0.7, 0, 0.2, 1) — fast
+        // off the mark, long settle. No Tailwind ease- matches it, and it is
+        // the cart drawer's curve too, so it comes from the shared token.
+        style={{ transitionTimingFunction: 'var(--ease-drawer)' }}
       >
         {/* Panel head — drag-handle pill centred, close at the right, as on
             theirs. The pill is decoration: the drawer has no drag gesture,
             and announcing a grabber that does nothing is worse than silence. */}
-        <div className="relative flex h-14 shrink-0 items-center justify-end px-2">
+        <div className="relative flex shrink-0 items-center justify-end border-b border-border px-4 py-4">
           <div
             aria-hidden="true"
             className="absolute left-1/2 top-3 h-1 w-10 -translate-x-1/2 rounded-full bg-border"
           />
-          <button
-            type="button"
+          {/*
+            The cart drawer's close control, exactly: the outline pill's wipe
+            on a 48px circle. This was a bare 35x44 icon box — the mobile BAR's
+            affordance, borrowed into a modal surface where the cart, the
+            Quickview and this drawer otherwise all close the same way.
+          */}
+          <Button
+            variant="outline"
             onClick={closeMobileMenu}
-            className={MOBILE_ICON_CLASS}
+            className="h-12 w-12 shrink-0 rounded-full p-0"
             // Not "Close menu": the dock's toggle already answers to that
             // name while the drawer is open, and two buttons with one name
             // is ambiguous to a screen reader and to `getByRole`.
             aria-label="Close site menu"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {/* The list scrolls; the head above and the footer below stay put.

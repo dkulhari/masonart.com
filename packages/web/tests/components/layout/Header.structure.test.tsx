@@ -157,7 +157,10 @@ describe('mobile drawer container (#598)', () => {
   })
 
   it('carries mesonart’s 600ms easing', () => {
-    expect(drawer).toContain('cubic-bezier(0.7, 0, 0.2, 1)')
+    // `--ease-drawer` IS cubic-bezier(.7, 0, .2, 1) — see globals.css. Taken
+    // from the token rather than retyped so this panel and the cart drawer
+    // cannot drift onto two curves.
+    expect(drawer).toContain('var(--ease-drawer)')
     expect(drawer).toMatch(/duration-\[600ms\]/)
     expect(drawer).toContain('motion-reduce:transition-none')
   })
@@ -181,6 +184,35 @@ describe('mobile drawer container (#598)', () => {
     const scrim = src.slice(scrimStart, src.indexOf('/>', scrimStart))
     expect(scrim).toContain('fixed inset-0')
     expect(scrim).not.toContain('top-14')
+  })
+
+  it('wears the cart drawer’s chrome, mirrored to the left edge', () => {
+    // Two drawers on one site closing with two different buttons, over two
+    // different scrims, with one panel rounded and the other square is how a
+    // design system starts to drift. Same tokens, opposite edge.
+    expect(drawer).toContain('rounded-r-[var(--drawer-radius)]')
+    expect(drawer).toContain('overflow-hidden')
+    expect(drawer).toContain('shadow-2xl')
+
+    const scrimStart = src.indexOf('data-testid="mobile-nav-scrim"')
+    const scrim = src.slice(scrimStart, src.indexOf('/>', scrimStart))
+    expect(scrim).toContain('bg-foreground/70')
+    expect(scrim).toContain('var(--ease-drawer)')
+  })
+
+  it('closes with the storefront’s button, not a bare icon box', () => {
+    // The cart drawer's and the Quickview's close control: the outline pill's
+    // wipe on a 48px circle.
+    const close = drawer.slice(drawer.indexOf('Close site menu') - 400)
+    expect(close).toContain('h-12 w-12 shrink-0 rounded-full p-0')
+    expect(drawer).toMatch(/<Button\s+variant="outline"/)
+  })
+
+  it('gives the footer action the shared outline pill', () => {
+    // Was a hand-rolled bordered div with a flat hover swap — a different
+    // animation from every other button on the site.
+    expect(src).toContain('MOBILE_DRAWER_ACTION_CLASS = cn(')
+    expect(src).toMatch(/buttonVariants\(\{ variant: 'outline', size: 'pill' \}\)/)
   })
 
   it('keeps the panel above the header, which is z-50 and sticky', () => {
