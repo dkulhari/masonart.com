@@ -276,7 +276,7 @@ mcp__ticketrack__bulkCreateTickets:
   tickets:
     - title: "{concise title}"
       description: "{task context only — NO steps markdown}"
-      featureName: "{feature-name}"
+      feature: "{feature-name}"
       labels: ["{relevant labels}"]
       priority: "{priority}"
       implementation_steps: [{structured steps array from Step 5}]

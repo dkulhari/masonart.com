@@ -32,10 +32,15 @@ $ARGUMENTS: [<url-or-page>] [--ticket=<id>]
 
 ## Prerequisites
 
-Ensure dev servers are running:
+Ensure dev servers are running. This uses the project test entry point
+convention documented in `/tt-work-ticket` ("The project test entry point"):
+
 ```bash
-./scripts/run-tests.sh setup
+test -x ./scripts/run-tests.sh && ./scripts/run-tests.sh setup
 ```
+
+If the project has no such script, start its dev servers the way its `CLAUDE.md`
+says — the requirement is a reachable app, not this particular command.
 
 This starts Docker, DB, and dev servers at:
 - Web: http://localhost:3001

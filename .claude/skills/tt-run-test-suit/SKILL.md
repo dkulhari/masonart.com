@@ -91,6 +91,21 @@ Use `AskUserQuestion` tool with multiSelect enabled for suite selection.
 
 ### Step 2: Run Tests
 
+Every command in this step uses the project test entry point convention
+documented in `/tt-work-ticket` ("The project test entry point") — a bounded
+runner taking `--file=` and `--max-failures=`. **Confirm it exists first:**
+
+```bash
+test -x ./scripts/run-tests.sh && echo present || echo absent
+```
+
+If absent, translate each command below into the project's own runner from its
+`CLAUDE.md`, keeping the two things this skill's logic depends on: one file per
+invocation, and a per-file failure cap. The suite lists and the aggregation
+rules are unaffected — only the command changes. What the file names refer to
+is also the project's business; the `.spec.ts` names below are illustrative,
+not a required layout.
+
 For each selected suite, run the corresponding test file(s):
 
 ```bash

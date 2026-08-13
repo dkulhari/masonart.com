@@ -42,7 +42,7 @@ Get ticket counts and status breakdown:
 
 ```
 mcp__ticketrack__listTickets:
-  featureName: {feature}
+  feature: {feature}
 ```
 
 Calculate:
@@ -70,7 +70,7 @@ Find the specified feature. If not found, report error.
 
 ```
 mcp__ticketrack__listTickets:
-  featureName: {feature-name}
+  feature: {feature-name}
 ```
 
 #### Step 3: Analyze Tickets

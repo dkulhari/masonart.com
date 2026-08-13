@@ -193,6 +193,17 @@ via `createFeature` and hand its ticket breakdown to `/tt-plan-feature` (via
 the Skill tool). This skill never creates todo tickets itself. No pending
 work → skip silently.
 
+### Step 6b: Install the test-scope guard
+
+Run `/tt-guard-tests`. An adopted repo usually arrives with a real test suite
+already, which is exactly the case that hurts: `/tt-implement-feature` runs
+several tickets at once, each in its own agent, each told to verify by running
+tests. The skill detects the runners actually present and installs a
+`PreToolUse` hook that keeps those runs scoped.
+
+Its `.claude/settings.json` step merges rather than overwrites, so an adopted
+repo's existing hooks and permissions survive.
+
 ### Step 7: CLAUDE.md, commit, hand-off
 
 1. **CLAUDE.md**: append a "Ticketrack workflow" section to an existing root

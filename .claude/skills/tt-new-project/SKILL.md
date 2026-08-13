@@ -182,6 +182,19 @@ re-check; still short → stop (a partial skill set is worse than none).
 The `mcp__ticketrack__*` tools ARE available in this session — `.mcp.json`
 was materialized before the session opened, binding this project's tracker.
 
+### Step 11b: Install the test-scope guard
+
+Run `/tt-guard-tests`. It detects this project's runners and installs a
+`PreToolUse` hook that stops an agent from starting an unscoped suite.
+
+Do this once the stack is chosen but before any feature work: `/tt-implement-feature`
+runs several tickets at once, each in its own agent, and each is told to verify
+by running tests. Nothing else stops three of them from each starting a full
+suite on one machine.
+
+A project with no test runner yet gets nothing installed, which is correct —
+re-run the skill when the runner arrives.
+
 ### Step 12: CLAUDE.md, README, hand-off
 
 Write the project's root `CLAUDE.md` (what-it-is from SRS §1,

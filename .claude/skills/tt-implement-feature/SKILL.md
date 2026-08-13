@@ -2,89 +2,45 @@
 name: tt-implement-feature
 description: Deliver an entire feature by iterating through all tickets. Use when user wants to implement a complete feature automatically.
 allowed-tools:
-  - mcp__ticketrack__listFeatures
-  - mcp__ticketrack__listTickets
   - mcp__ticketrack__showTicketDetails
+  - mcp__ticketrack__listTickets
+  - mcp__ticketrack__listFeatures
   - mcp__ticketrack__updateTicketStatus
   - mcp__ticketrack__addComment
+  - mcp__ticketrack__updateImplementationStep
+  - mcp__ticketrack__recordVerification
+  - mcp__ticketrack__updateChecklist
   - mcp__plugin_claude-mem_mcp-search__search
   - mcp__plugin_claude-mem_mcp-search__timeline
   - mcp__plugin_claude-mem_mcp-search__get_observations
   - Read
-  - Write
-  - Edit
   - Glob
   - Grep
-  - Bash
   - Task
+  - AskUserQuestion
+  - Skill
 ---
 
 # /tt-implement-feature - Full Feature Delivery
 
-Delivers an entire feature by automatically implementing all tickets in order.
+Delivers an entire feature by implementing all tickets in phase order, with worktree isolation, code review checkpoints between phases, and subagent-isolated ticket implementation — independent tickets in parallel, interdependent ones one at a time.
 
-## ⚠️ CRITICAL: Continuous Execution Mode
+**Absorbs**: `superpowers:executing-plans`, `superpowers:subagent-driven-development`
+**Calls**: `superpowers:using-git-worktrees`, `superpowers:requesting-code-review`, `superpowers:finishing-a-development-branch`
+**Delegates to**: `/tt-work-ticket` for per-ticket TDD implementation
+
+## Continuous Execution Mode
 
 **This skill runs autonomously until all tickets are processed.** Do NOT stop or ask the user unless:
 
-1. **Genuine blocker**: Cannot proceed without user input (e.g., missing credentials, ambiguous requirements that affect multiple tickets)
-2. **User explicitly interrupts**: User sends a message or cancels
+1. **Genuine blocker**: Cannot proceed without user input (missing credentials, ambiguous requirements)
+2. **Code review feedback**: User review at phase checkpoints
+3. **User explicitly interrupts**
 
 **DO NOT stop to:**
-- Ask "should I continue?" - YES, always continue
-- Ask "is this approach okay?" - Make the decision and proceed
-- Confirm before each ticket - Just do it
-- Show progress and wait - Show progress AND continue immediately
-
-### Handling Failures
-
-**Build/Test failures:**
-1. Attempt to fix (up to 7 attempts)
-2. If still failing after 7 attempts:
-   - Check if ticket is in critical path (blocks other tickets)
-   - If NOT critical: Skip ticket, leave status as `in-progress`, add comment explaining failure
-   - If critical: Add comment, continue to next non-blocked ticket
-3. **Never stop the session** - always continue to next ticket
-
-**Skipped ticket comment format:**
-```
-mcp__ticketrack__addComment:
-  ticketId: {id}
-  comment: |
-    ⚠️ **Implementation Incomplete**
-
-    **Attempts**: 7
-    **Blocking Issue**: {description of what's failing}
-    **Error**: {error message}
-
-    Left in-progress for manual review.
-```
-
-### Session Completion
-
-The session ends when **no tickets remain in `todo` status** for the feature. This means:
-- All tickets are either `done` or `in-progress` (stuck)
-- Summary includes both successes AND failures
-
-**The goal is to process every ticket, not to achieve 100% success.**
-
-## Relationship to tt-work-ticket
-
-This skill **delegates to tt-work-ticket** for per-ticket operations:
-
-| Operation | Source |
-|-----------|--------|
-| File context gathering | → tt-work-ticket Step 4 |
-| Implementation guidance | → tt-work-ticket "Implementation Guidance by Label" |
-| Testing requirements | → tt-work-ticket "Testing Strategy (Per Ticket)" |
-| Design decision docs | → tt-work-ticket "During Implementation" |
-| Bug root cause docs | → tt-work-ticket "For Bug Tickets" |
-| Per-ticket commits | → tt-work-ticket Steps 7-9 |
-
-**tt-work-ticket is the source of truth** for these patterns. This skill adds:
-- Automated looping through all tickets
-- No user prompts (continuous execution)
-- E2E tests at feature completion
+- Ask "should I continue?" — YES, always continue
+- Confirm before each ticket — just do it
+- Show progress and wait — show progress AND continue immediately
 
 ## Arguments
 
@@ -96,329 +52,264 @@ $ARGUMENTS: <feature-name>
 
 **Example**: `/tt-implement-feature user-reviews`
 
-## Workflow Overview
+## Workflow
 
+### Step 1: Safety Checks
+
+Before starting:
+- Verify current branch (warn if on main/master)
+- Check for uncommitted changes (warn if dirty)
+
+If on main/master:
 ```
-┌─────────────────────────────────────────────┐
-│  Fetch feature and tickets                  │
-└──────────────────┬──────────────────────────┘
-                   ▼
-┌─────────────────────────────────────────────┐
-│  Determine ticket order from plan           │
-└──────────────────┬──────────────────────────┘
-                   ▼
-┌──────────────────────────────────────────────┐
-│  FOR EACH pending ticket:                    │
-│    ├─ Check dependencies → skip if blocked   │
-│    ├─ Load ticket context                    │
-│    ├─ Implement (code changes)               │
-│    ├─ Run tests                              │
-│    ├─ Commit changes                         │
-│    └─ Mark ticket done                       │
-└──────────────────┬───────────────────────────┘
-                   ▼
-┌─────────────────────────────────────────────┐
-│  Feature complete! Display summary          │
-└─────────────────────────────────────────────┘
+⚠️ Currently on branch: main
+Consider creating a feature branch first.
 ```
 
-## Detailed Workflow
+Use `AskUserQuestion` to confirm: "Create feature branch?" or "Continue on main?"
 
-### Step 1: Fetch Feature
+### Step 2: Set Up Worktree (Optional)
+
+If the user approves worktree isolation:
+
+**Invoke**: `superpowers:using-git-worktrees`
+
+This creates an isolated workspace for the feature work:
+1. Detects worktree directory (`.worktrees/`, `worktrees/`, or asks)
+2. Verifies directory is gitignored
+3. Creates worktree with feature branch
+4. Runs project setup (npm install, etc.)
+5. Verifies clean test baseline
+
+If worktree is declined or not applicable, continue on current branch.
+
+### Step 3: Fetch Feature and Tickets
 
 ```
-mcp__ticketrack__listFeatures
+mcp__ticketrack__listFeatures → find feature
+mcp__ticketrack__listTickets → get all tickets for feature
 ```
 
-Find the feature and extract:
-- Feature description
-- Implementation plan
+Extract:
+- Feature description with implementation plan
+- All tickets with their status, labels, blocked_by
 
-If feature not found: "Feature '{name}' not found."
+If no tickets: "Feature has no tickets. Run /tt-plan-feature {name} first."
 
-### Step 2: Fetch All Tickets
-
-```
-mcp__ticketrack__listTickets:
-  featureName: {feature-name}
-```
-
-Get all tickets for the feature.
-
-If no tickets: "Feature has no tickets. Run /tt-create-tickets {name} first."
-
-### Step 3: Determine Ticket Order
+### Step 4: Determine Execution Order
 
 Parse the implementation plan to determine phase order.
 
 **Ordering Rules**:
-1. Phase 1 (Database) tickets first
-2. Phase 2 (Backend) tickets second
-3. Phase 3 (Frontend) tickets third
-4. Phase 4 (Testing) tickets last
-5. Within phases, respect `blocked_by` relationships
-6. If no plan, order by: priority (high→low), then ticket ID
+1. Group tickets by phase labels (phase-1, phase-2, etc.)
+2. Within phases, respect `blocked_by` relationships
+3. If no phase labels, order by: priority (high→low), then ticket ID
+4. Independent tickets within the same phase can be parallelized
 
-Create ordered list of ticket IDs to process.
-
-### Step 4: Filter to Pending Tickets
-
-Remove tickets that are already `done` or `in-progress`.
-
-If all done: "All tickets for '{name}' are complete! 🎉"
-
-### Step 5: Implementation Loop
-
-For each pending ticket in order:
-
-#### 5a. Check Dependencies
-
+Build execution plan:
 ```
-If ticket.blocked_by contains any non-done tickets:
-  Skip ticket, add to "skipped" list
-  Continue to next ticket
+Phase 1: [ticket-A, ticket-B]  ← independent, can parallel
+Phase 2: [ticket-C]            ← depends on Phase 1
+Phase 3: [ticket-D, ticket-E]  ← depends on Phase 2
 ```
 
-#### 5b. Announce Ticket
+### Step 5: Filter to Pending Tickets
+
+Remove tickets that are already `done`. Keep `in-progress` tickets (resume them).
+
+If all done: "All tickets for '{name}' are complete!"
+
+### Step 6: Phase-Based Execution Loop
+
+For each phase:
+
+#### 6a. Announce Phase
 
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 Phase {N}: {Phase Name}
+Tickets: {count} ({list of #ids})
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+#### 6b. Execute Tickets in Phase
+
+**Default: dispatch every ticket to a subagent — sequential ones too.**
+
+*Whether* to dispatch is a **residency** decision. A ticket read inline is
+pinned for the session and re-sent every turn; the same read in a subagent is
+discarded when it returns. Ten tickets inline ≈ 15,000 resident tokens; ten in
+subagents ≈ ten summary lines.
+
+*How many at once* is a **machine** decision, and it is the one that bites.
+
+- **Independent** → parallel, max 3 at once.
+- **Interdependent** → one at a time in dependency order. Still a subagent —
+  sequencing is correctness, isolation is context.
+
+**Why 3 and not 10.** Every one of those agents runs `/tt-work-ticket`, and
+every one of them is told to verify by running tests. N agents are therefore N
+concurrent test runs on one machine — and a test runner is not one process. It
+forks per core by default, so a single unscoped run can already saturate the
+box on its own. Three of them is not three times the throughput; it is three
+runs each taking three times as long, plus a laptop that stops responding.
+
+Measured on an 8-core laptop: **load average 58** — one pathless unit run
+(~7 forks), one browser spec against every configured browser project, a
+second concurrent browser run, and a whole-workspace run leaked from a session
+killed the day before.
+
+Two consequences for this loop:
+
+1. **Scale the cap to the machine, not to the ticket count.** 3 assumes a
+   typical multi-core dev laptop and *scoped* test commands. On a smaller box,
+   or when the phase's tickets each touch a heavy suite, drop to 2 or 1. More
+   than 3 needs a reason beyond "there were more tickets".
+2. **A phase where agents run unscoped suites is worse than sequential.**
+   Before dispatching, confirm the tickets carry scoped test commands. If they
+   do not, the parallelism you are buying is negative.
+
+**When not to.** Each subagent re-pays the full fixed cost (tool schemas + skill
+chain), so dispatch only amortises on a long enough run:
+
+| Tickets remaining | Do |
+|---|---|
+| 3+ | Dispatch |
+| 1–2 | Run inline — dispatch costs more than it saves |
+
+**If `Task` is unavailable, run inline and say so — never silently:**
+
+```
+⚠️  Subagent dispatch unavailable — running inline.
+    Ticket reads will stay resident in this context.
+```
+
+Otherwise the failure shows up only as unexplained context growth. The
+mcp-local-runtime feature ran all 21 tickets inline for exactly this reason.
+
+**For each ticket** (dispatched or inline):
+
+##### Announce Ticket
+```
 🎫 Implementing Ticket #{id}: {title}
 Progress: {current}/{total} ({percentage}%)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-#### 5c. Update Status to In-Progress
+##### Delegate to tt-work-ticket
 
-```
-mcp__ticketrack__updateTicketStatus:
-  ticketId: {id}
-  status: "in-progress"
-```
+Follow `/tt-work-ticket` workflow for each ticket:
+1. Fetch ticket details and context
+2. Move to in-progress, start work session
+3. Execute TDD steps (structured or freeform)
+4. **Mark each implementation step done IMMEDIATELY after completing it** — call `mcp__ticketrack__updateImplementationStep(ticketNumber, stepId, "done")` after every step, not at the end
+5. Verify with hard gate (must show test evidence)
+6. Commit per-ticket
+7. End work session, mark done, add completion comment
 
-#### 5d. Load Context
+Note on sessions: a work session brackets **one reply**, not one ticket (see
+tt-work-ticket's Session Semantics). When this skill runs many tickets inside
+a single reply, each ticket still opens and closes its own session — and a
+ticket spanning several replies accumulates several sessions, which is the
+rework signal, not a bug to tidy up.
 
-**→ Follow `/tt-work-ticket` Step 4: Gather Relevant File Context**
+##### Handle Failures
 
-Use the exact patterns defined in tt-work-ticket's Step 4 based on ticket labels.
-Do NOT duplicate those patterns here - refer to tt-work-ticket as the source of truth.
+If implementation fails after 7 attempts:
+1. Check if ticket is in critical path (blocks other tickets)
+2. If NOT critical: Skip ticket, leave as `in-progress`, add comment:
+   ```
+   ⚠️ **Implementation Incomplete**
+   **Attempts**: 7
+   **Blocking Issue**: {description}
+   **Error**: {error message}
+   Left in-progress for manual review.
+   ```
+3. If critical: Add comment, continue to next non-blocked ticket
+4. **Never stop the session** — always continue to next ticket
 
-The key difference: tt-implement-feature doesn't pause for user input after gathering context.
-
-#### 5e. Implement
-
-**→ Follow `/tt-work-ticket` Implementation Guidance by Label**
-
-Use the implementation steps and testing requirements defined in tt-work-ticket's
-"Implementation Guidance by Label" section for:
-- Database/Schema tickets
-- Backend/API tickets
-- Frontend/UI tickets
-
-Also follow tt-work-ticket's "Testing Strategy (Per Ticket)" table for test requirements.
-
-Do NOT duplicate those patterns here - tt-work-ticket is the source of truth.
-
-**Key differences from tt-work-ticket:**
-1. No pause for user input - proceed directly to implementation
-2. Continue to next ticket after completion
-
-Use Edit, Write, and other tools to make changes.
-
-#### 5f. Document Design Decisions
-
-**→ Follow `/tt-work-ticket` "During Implementation: Document Design Decisions"**
-
-For significant decisions during implementation:
-```
-mcp__ticketrack__addComment:
-  ticketId: {id}
-  comment: |
-    **Design Decision**: {title}
-    Chose {approach} because {reasoning}
-```
-
-**For Bug Tickets** (if ticket type is `bug`):
-
-**→ Follow `/tt-work-ticket` "For Bug Tickets"**
-
-Document the root cause before fixing:
-```
-mcp__ticketrack__addComment:
-  ticketId: {id}
-  comment: |
-    **Root Cause**: {what caused the bug}
-    **Location**: `{file:line}`
-    **Fix**: {how it was fixed}
-```
-
-#### 5g. Verify
-
-**→ Follow `/tt-work-ticket` Step 7: Verify and Test**
-
-Discover and run the project's build/test commands:
-
-1. **Detect build system** from project files (package.json, Makefile, Cargo.toml, etc.)
-2. **Run tests** for changed files using the project's test runner
-3. **Run build** to verify compilation/type-checking passes
-
-If tests fail:
-- Attempt to fix
-- If unable to fix after 2 attempts, pause and report
-
-#### 5h. Commit (Per-Ticket)
-
-**→ Follow `/tt-work-ticket` Step 8: Commit the Ticket Work**
-
-**IMPORTANT**: Stage ONLY files related to THIS ticket, not all changes.
-
-```bash
-# Stage specific files (NOT git add .)
-git add {specific-files-for-this-ticket}
-
-# Commit with conventional format and ticket reference
-git commit -m "{type}({scope}): {brief description}
-
-{Detailed explanation of changes}
-
-Implements #{ticket-id} for {feature-name}
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
-```
-
-**Commit Types**:
-- `feat`: New feature/functionality
-- `fix`: Bug fix
-- `refactor`: Code restructuring
-- `test`: Adding/updating tests
-- `docs`: Documentation changes
-
-**Scope**: Match ticket area (schema, api, ui, service, etc.)
-
-#### 5i. Update Ticket with Completion Info
-
-**→ Follow `/tt-work-ticket` Step 9: Update Ticket**
-
-**⚠️ CRITICAL: Complete the POST-COMMIT CHECKLIST (both required!)**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  POST-COMMIT CHECKLIST                                      │
-├─────────────────────────────────────────────────────────────┤
-│  [ ] 1. Update ticket status to "done"                      │
-│  [ ] 2. Add completion comment with commit info             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Action 1**: `mcp__ticketrack__updateTicketStatus` with `newStatus: "done"`
-
-**Action 2**: `mcp__ticketrack__addComment` with completion details:
-```
-✅ **Completed**
-
-**Commit**: `{commit-hash}` - {commit-subject}
-
-**Files Changed**:
-- `{file1}` - {description}
-- `{file2}` - {description}
-
-**Summary**:
-{What was implemented and how}
-
-**Tests**:
-- {test-file}: {what it tests}
-```
-
-**DO NOT skip Action 2** - The completion comment links commits to tickets for traceability.
-
-#### 5j. Progress Update
-
+##### Progress Update
 ```
 ✅ Ticket #{id} complete
    Commit: {short-hash} - {commit-message}
    Files: +{additions} -{deletions}
 ```
 
-### Step 6: E2E Tests (Feature Level)
+#### 6c. Code Review Checkpoint (After Each Phase)
 
-After all tickets are implemented, create E2E tests for the feature:
+After all tickets in a phase are complete:
 
-**6a. Identify E2E Test Needs**
+**Invoke**: `superpowers:requesting-code-review`
 
-Based on the feature, determine what E2E tests are needed:
-- **New pages**: Create page-level E2E tests (`tests/e2e/{feature}.spec.ts`)
-- **User flows**: Create flow tests (`tests/e2e/flows/{feature}.spec.ts`)
-- **Manual test docs**: Create documentation (`docs/manual-tests/{feature}.md`)
+1. Get git SHAs for the phase's commits
+2. Dispatch code-reviewer subagent with:
+   - What was implemented (phase summary)
+   - Plan/requirements (from feature description)
+   - Base and head SHAs
+3. Present review results to user
+4. Fix Critical/Important issues before proceeding to next phase
+5. User approves → proceed to next phase
 
-**6b. Create E2E Tests**
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 Phase {N} Review
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{Review results}
 
-```typescript
-// tests/e2e/{feature}.spec.ts
-import { test, expect } from '@playwright/test';
-
-test.describe('{Feature Name}', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/{feature-path}', { waitUntil: 'networkidle' });
-  });
-
-  test('should display {main element}', async ({ page }) => {
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  });
-
-  // Add tests for key user interactions
-});
+Proceed to Phase {N+1}? (Waiting for review feedback)
 ```
 
-**6c. Create Flow Tests (if applicable)**
+### Step 7: E2E Tests (Feature Level)
 
-For features with multi-step user journeys:
-```typescript
-// tests/e2e/flows/{feature}.spec.ts
-test.describe('{Feature} Flow', () => {
-  test('should complete {journey name}', async ({ page }) => {
-    // Step 1: Start
-    // Step 2: Action
-    // Step 3: Verify result
-  });
-});
-```
+After all phases complete, create E2E tests if applicable:
 
-**6d. Run E2E Tests**
-
-```bash
-bunx playwright test tests/e2e/{feature}.spec.ts
-```
-
-**6e. Commit E2E Tests**
+1. Identify E2E test needs based on feature (new pages, user flows)
+2. Create test files following project's E2E test patterns
+3. Run E2E tests
+4. Commit E2E tests separately
 
 ```bash
 git add tests/e2e/
-git commit -m "test(e2e): Add E2E tests for {feature-name}
+git commit -m "test(e2e): add E2E tests for {feature-name}
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 ```
 
-### Step 7: Handle Completion
+### Step 8: Feature Completion
 
-After processing all tickets and E2E tests:
+After all tickets and E2E tests:
+
+**Invoke**: `superpowers:finishing-a-development-branch`
+
+This presents 4 options:
+1. Merge back to base branch locally
+2. Push and create a Pull Request
+3. Keep the branch as-is
+4. Discard this work
+
+The skill handles verification, merge, PR creation, and worktree cleanup.
+
+### Step 9: Display Summary
 
 **If all done**:
 ```
-🎉 Feature '{name}' fully implemented!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 FEATURE COMPLETE: {name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📊 Summary:
+📊 Implementation Summary:
   - Tickets completed: {count}
-  - Commits made: {count}
-  - Files changed: {count}
+  - Total commits: {count}
+  - Files created: {count}
+  - Files modified: {count}
 
-📋 Commits:
+📋 Commit Log:
   {hash} - {message}
   {hash} - {message}
   ...
 
 🧪 Tests:
-  - Unit/Integration tests: Added per ticket
-  - E2E tests: tests/e2e/{feature}.spec.ts
+  - Unit/Integration tests: Added per ticket (TDD)
+  - E2E tests: {test file path}
 
 ✅ All tests passing
 ```
@@ -428,14 +319,12 @@ After processing all tickets and E2E tests:
 ⚠️ Feature '{name}' partially implemented
 
 Completed: {count} tickets
-Skipped (blocked): {count} tickets
+Skipped (stuck): {count} tickets
 
 Skipped tickets:
-  #{id} - {title} (blocked by #{blocker-ids})
+  #{id} - {title} (reason: {failure description})
 
-These tickets have unmet dependencies.
-Either the blocking tickets need to be completed manually,
-or there may be a circular dependency issue.
+These tickets are left in-progress for manual review.
 ```
 
 ## Interruption Handling
@@ -446,87 +335,74 @@ If interrupted (user cancels, error occurs):
 2. Progress is preserved (completed tickets stay done)
 3. Resume by running `/tt-implement-feature {name}` again
    - Will skip completed tickets
-   - Will resume from next pending ticket
+   - Will resume in-progress tickets
+   - Will continue from next pending ticket
 
-## Safety Checks
-
-Before making changes:
-- Verify we're on a feature branch (warn if on main)
-- Check for uncommitted changes (warn if dirty)
-- Confirm with user before starting if there are concerns
+## Dispatch Details
 
 ```
-⚠️ Safety Check:
-- Currently on branch: main (consider creating feature branch)
-- Uncommitted changes: 3 files
+Task tool (subagent_type: general-purpose):
+  prompt: |
+    Implement ticket #{id} for feature {name} by following /tt-work-ticket.
 
-Proceed anyway? (y/n)
+    Read the ticket yourself — do not expect it in this prompt. Your context
+    is discarded when you return, which is the point: the read costs nothing
+    beyond your own run.
+
+    After EACH implementation step, call
+    mcp__ticketrack__updateImplementationStep(#{id}, stepId, "done")
+    immediately — not batched at the end. Step status is the audit trail and
+    is what makes an interrupted run resumable from disk rather than context.
+
+    You are one of up to 3 agents working this machine right now. Every test
+    command you run must name what it runs — the path of the test the ticket
+    touched, one spec, one target. No pathless runner, no watch mode, no
+    workspace-wide script, no full E2E suite. The project's CLAUDE.md has the
+    commands. If you believe you need the whole suite, say so in your result
+    line instead of running it.
+
+    Return ONLY the one-line result described below. Nothing else.
 ```
 
-## Output Format
+**Say the scoping rule in the prompt; do not assume it is inherited.** The
+subagent reads `/tt-work-ticket`, which carries the rule — but it also reads the
+ticket, the feature, and whatever the codebase suggests, and a rule stated once
+three files away loses to a habit. It costs five lines here and prevents the
+failure mode this whole cap exists for.
 
-### During Implementation
+**Pass the ticket number, not the ticket.** Pasting the description in means the
+orchestrator read it first — the exact cost this avoids.
 
-```
-🚀 Implementing Feature: {name}
+### What comes back
 
-📋 Tickets to implement: {count}
-   ✅ Already done: {count}
-   📋 To do: {count}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎫 Implementing Ticket #45: Database Schema - Reviews Table
-Progress: 1/6 (17%)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{Implementation details}
-
-✅ Ticket #45 complete
-   Commit: abc123
-   Files: {path-to-changed-file} (+45)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎫 Implementing Ticket #46: Backend API - Review Service
-Progress: 2/6 (33%)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{... continues for each ticket ...}
-```
-
-### Final Summary
+The saving is entirely in what does *not* return. The final message is the
+summary alone — no transcript, no ticket body, no diff:
 
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎉 FEATURE COMPLETE: {name}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 Implementation Summary:
-  - Tickets completed: 6
-  - Total commits: 6
-  - Files created: 8
-  - Files modified: 4
-  - Tests added: 12
-
-📋 Commit Log:
-  abc123 - Database Schema - Reviews Table
-  def456 - Backend API - Review Service
-  ghi789 - Backend API - Review Routes
-  jkl012 - Frontend - Review Components
-  mno345 - Frontend - Product Reviews Page
-  pqr678 - Testing - Review Feature Tests
-
-🧪 All tests passing ✅
-
-🚀 Next Steps:
-  - Review changes: git log --oneline -6
-  - Push to remote: git push
-  - Create PR: gh pr create
+✅ #279 done — commit f17be24, 11 tests passing
+⚠️  #279 incomplete after 7 attempts — {blocker}, left in-progress
 ```
 
-## Error Handling
+A chatty subagent turns a 1,500-token saving into a 1,500-token cost. That one
+line is also all the phase banner and commit log need.
 
-- **Feature not found**: "Feature '{name}' not found."
-- **No tickets**: "Feature has no tickets. Run /tt-create-tickets first."
-- **Build failure**: Attempt fix, report if unable
-- **Test failure**: Attempt fix, pause if unable after 2 attempts
-- **Circular dependency**: Report the cycle and ask for guidance
+### Rules
+
+- Max 3 parallel agents; one ticket each, never two in the same files. 3 is a
+  machine budget, not a target — see "Why 3 and not 10" above.
+- Wait for all agents in a phase before the review checkpoint.
+- Failures follow the protocol above; **never stop the run**.
+- Each subagent brackets its own work session, so tokens land on the right
+  ticket. Unverified: whether token attribution can distinguish a subagent —
+  if per-ticket tokens start vanishing, that is the cause (see #257).
+
+## Key Differences from Old tt-implement-feature
+
+| Old | New |
+|-----|-----|
+| Sequential only | Phase-based with parallel dispatch |
+| No isolation | Git worktree at feature start |
+| No code review | Review checkpoint after each phase |
+| No merge/PR flow | Branch finishing at completion |
+| Mentions TDD, doesn't enforce | Delegates to tt-work-ticket which enforces TDD |
+| No E2E tests | E2E tests at feature completion |

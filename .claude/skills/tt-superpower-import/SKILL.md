@@ -176,7 +176,7 @@ For each task in the plan:
 **5a. Create ticket:**
 ```yaml
 mcp__ticketrack__createTicket:
-  featureName: <feature-name>
+  feature: <feature-name>
   title: "Task N - <task title>"
   type: task
   labels: [<inferred from file paths>]

@@ -80,7 +80,7 @@ mcp__ticketrack__getTicket:
 **If feature name provided:**
 ```yaml
 mcp__ticketrack__listTickets:
-  featureName: <feature-name>
+  feature: <feature-name>
 ```
 
 Collect all ticket IDs for processing.

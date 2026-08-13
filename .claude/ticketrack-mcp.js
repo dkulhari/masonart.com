@@ -929,7 +929,7 @@ var require_command = __commonJS({
   "../../node_modules/.pnpm/commander@9.5.0/node_modules/commander/lib/command.js"(exports) {
     var EventEmitter4 = __require("events").EventEmitter;
     var childProcess = __require("child_process");
-    var path2 = __require("path");
+    var path4 = __require("path");
     var fs3 = __require("fs");
     var process3 = __require("process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
@@ -1757,9 +1757,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path2.resolve(baseDir, baseName);
+          const localBin = path4.resolve(baseDir, baseName);
           if (fs3.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path2.extname(baseName))) return void 0;
+          if (sourceExt.includes(path4.extname(baseName))) return void 0;
           const foundExt = sourceExt.find((ext) => fs3.existsSync(`${localBin}${ext}`));
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1775,19 +1775,19 @@ Expecting one of '${allowedValues.join("', '")}'`);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path2.resolve(path2.dirname(resolvedScriptPath), executableDir);
+          executableDir = path4.resolve(path4.dirname(resolvedScriptPath), executableDir);
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path2.basename(this._scriptPath, path2.extname(this._scriptPath));
+            const legacyName = path4.basename(this._scriptPath, path4.extname(this._scriptPath));
             if (legacyName !== this._name) {
               localFile = findFile(executableDir, `${legacyName}-${subcommand._name}`);
             }
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path2.extname(executableFile));
+        launchWithNode = sourceExt.includes(path4.extname(executableFile));
         let proc;
         if (process3.platform !== "win32") {
           if (launchWithNode) {
@@ -2563,7 +2563,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path2.basename(filename, path2.extname(filename));
+        this._name = path4.basename(filename, path4.extname(filename));
         return this;
       }
       /**
@@ -2577,9 +2577,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {string|Command}
        */
-      executableDir(path3) {
-        if (path3 === void 0) return this._executableDir;
-        this._executableDir = path3;
+      executableDir(path5) {
+        if (path5 === void 0) return this._executableDir;
+        this._executableDir = path5;
         return this;
       }
       /**
@@ -3252,8 +3252,8 @@ function getErrorMap() {
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path2, errorMaps, issueData } = params;
-  const fullPath = [...path2, ...issueData.path || []];
+  const { data, path: path4, errorMaps, issueData } = params;
+  const fullPath = [...path4, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -3369,11 +3369,11 @@ var errorUtil;
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path2, key) {
+  constructor(parent, value, path4, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path2;
+    this._path = path4;
     this._key = key;
   }
   get path() {
@@ -7675,7 +7675,7 @@ var Protocol = class {
    * Do not use this method to emit notifications! Use notification() instead.
    */
   request(request, resultSchema, options) {
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve4, reject) => {
       var _a, _b, _c;
       if (!this._transport) {
         reject(new Error("Not connected"));
@@ -7708,7 +7708,7 @@ var Protocol = class {
         }
         try {
           const result = resultSchema.parse(response.result);
-          resolve2(result);
+          resolve4(result);
         } catch (error) {
           reject(error);
         }
@@ -8010,12 +8010,12 @@ var StdioServerTransport = class {
     (_a = this.onclose) === null || _a === void 0 ? void 0 : _a.call(this);
   }
   send(message) {
-    return new Promise((resolve2) => {
+    return new Promise((resolve4) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve2();
+        resolve4();
       } else {
-        this._stdout.once("drain", resolve2);
+        this._stdout.once("drain", resolve4);
       }
     });
   }
@@ -8239,8 +8239,11 @@ function summariseSessionCost(prompts) {
 }
 
 // ../shared/dist/utils.js
-import { promises as fs } from "fs";
-import * as path from "path";
+import { promises as fs, readFileSync as readFileSync2, unlinkSync as unlinkSync2 } from "fs";
+import { AsyncLocalStorage } from "async_hooks";
+import { createHash, randomBytes as randomBytes2, randomUUID } from "crypto";
+import { hostname } from "os";
+import * as path3 from "path";
 
 // ../../node_modules/.pnpm/js-yaml@4.1.0/node_modules/js-yaml/dist/js-yaml.mjs
 function isNothing(subject) {
@@ -10868,30 +10871,578 @@ function validateTicketProperties(properties) {
   };
 }
 
+// ../shared/dist/ticket-index.js
+import { readFileSync, readdirSync, statSync, renameSync, writeFileSync, unlinkSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import * as path2 from "node:path";
+
+// ../shared/dist/layout.js
+import path from "path";
+var TICKETS_DIR = "tickets";
+function ticketRelPath(filename) {
+  return path.join(TICKETS_DIR, filename);
+}
+function isTicketFilename(name) {
+  return name.startsWith("ticket-") && name.endsWith(".yaml");
+}
+
+// ../shared/dist/ticket-index.js
+var INDEX_FILENAME = ".index.json";
+var SNAPSHOT_VERSION = 2;
+var sameFile = (a, b) => a.size === b.size && a.mtimeMs === b.mtimeMs && a.ino === b.ino;
+var memos = /* @__PURE__ */ new Map();
+function snapshotStamp(file) {
+  try {
+    const st = statSync(file);
+    return `${st.size}:${st.mtimeMs}:${st.ino}`;
+  } catch {
+    return null;
+  }
+}
+var TicketIndex = class {
+  dataDir;
+  snapshotPath;
+  memoKey;
+  constructor(dataDir) {
+    this.dataDir = dataDir;
+    this.snapshotPath = path2.join(dataDir, INDEX_FILENAME);
+    this.memoKey = path2.resolve(dataDir);
+  }
+  /**
+   * Every ticket in the corpus, optionally narrowed to one status.
+   *
+   * The returned tickets are the index's own objects, shared between callers
+   * and reused across reads: treat them as read-only. Callers that mutate a
+   * ticket must take an owned copy — `TrackerFileSystem.readTicket` does.
+   */
+  async readAll(status) {
+    return (await this.readAllEntries(status)).map((e) => e.ticket);
+  }
+  /**
+   * As `readAll`, but pairs each ticket with its path relative to the data
+   * dir, for callers that report on file locations. Sorted by path so output
+   * built from it is stable across runs, matching `findTickets`.
+   */
+  async readAllEntries(status) {
+    const entries = this.revalidate();
+    const out = [];
+    for (const entry of entries.values()) {
+      if (status && entry.ticket.status !== status)
+        continue;
+      out.push({ path: entry.path, ticket: entry.ticket });
+    }
+    return out.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  }
+  /**
+   * One ticket by its path relative to the data dir, or null if it is gone.
+   * Shares the same read-only contract as `readAll`.
+   */
+  async readOne(relPath) {
+    const entries = this.revalidate();
+    const entry = entries.get(relPath);
+    return entry ? entry.ticket : null;
+  }
+  /**
+   * A single ticket from the cache, without sweeping the corpus, or null.
+   *
+   * Deliberately narrower than `readAll`: it stats one file and compares one
+   * fingerprint, which is the same staleness guarantee applied to the only
+   * file the caller asked about. It never populates the cache and never falls
+   * back to parsing, so a single-ticket read can only get faster — sweeping
+   * 327 files to answer a question about one of them would be a regression.
+   */
+  peek(relPath) {
+    const memo = memos.get(this.memoKey);
+    if (!memo)
+      return null;
+    const cached = memo.entries.get(relPath);
+    if (!cached)
+      return null;
+    try {
+      const st = statSync(path2.join(this.dataDir, relPath));
+      if (!sameFile({ path: relPath, size: st.size, mtimeMs: st.mtimeMs, ino: st.ino }, cached)) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+    return cached.ticket;
+  }
+  /** The path of a ticket file by number, relative to the data dir. */
+  async findPath(ticketNumber) {
+    const entries = this.revalidate();
+    for (const entry of entries.values()) {
+      if (entry.ticket?.ticket_number === ticketNumber)
+        return entry.path;
+    }
+    return null;
+  }
+  /**
+   * Brings the in-memory index in line with what is on disk right now, and
+   * returns it. This is the whole correctness story, so it runs on every read.
+   */
+  revalidate() {
+    const memo = this.loadMemo();
+    const stamps = this.sweep();
+    const next = /* @__PURE__ */ new Map();
+    let changed = false;
+    for (const stamp of stamps) {
+      const cached = memo.entries.get(stamp.path);
+      if (cached && sameFile(stamp, cached)) {
+        next.set(stamp.path, cached);
+        continue;
+      }
+      const parsed = this.parse(stamp);
+      if (parsed) {
+        next.set(stamp.path, parsed);
+        changed = true;
+      }
+    }
+    if (next.size !== memo.entries.size)
+      changed = true;
+    memo.entries = next;
+    if (changed)
+      this.persist(memo);
+    return next;
+  }
+  /**
+   * Enumerates every ticket file and stats it. Deliberately reads the ticket
+   * files themselves and never the feature rollups: the rollups are derived
+   * too, and in the live corpus several disagree with the tickets on disk
+   * (#338). The files are the truth.
+   */
+  sweep() {
+    const stamps = [];
+    let files;
+    try {
+      files = readdirSync(path2.join(this.dataDir, TICKETS_DIR), { withFileTypes: true });
+    } catch {
+      return stamps;
+    }
+    for (const file of files) {
+      if (file.isDirectory())
+        continue;
+      if (!isTicketFilename(file.name))
+        continue;
+      const rel = ticketRelPath(file.name);
+      try {
+        const st = statSync(path2.join(this.dataDir, rel));
+        stamps.push({ path: rel, size: st.size, mtimeMs: st.mtimeMs, ino: st.ino });
+      } catch {
+      }
+    }
+    return stamps;
+  }
+  /** Reads and parses one ticket file. Returns null if it is unreadable. */
+  parse(stamp) {
+    try {
+      const raw = readFileSync(path2.join(this.dataDir, stamp.path), "utf-8");
+      const ticket = load(raw);
+      if (!ticket || typeof ticket !== "object")
+        return null;
+      if (!ticket.last_updated)
+        ticket.last_updated = ticket.created;
+      return { path: stamp.path, size: stamp.size, mtimeMs: stamp.mtimeMs, ino: stamp.ino, ticket };
+    } catch {
+      return null;
+    }
+  }
+  /** Loads the memo, re-reading the snapshot if it changed underneath us. */
+  loadMemo() {
+    let memo = memos.get(this.memoKey);
+    const stamp = snapshotStamp(this.snapshotPath);
+    if (memo && memo.snapshotStamp === stamp)
+      return memo;
+    memo = { entries: this.readSnapshot(), snapshotStamp: stamp };
+    memos.set(this.memoKey, memo);
+    return memo;
+  }
+  /** Reads the snapshot. Any problem at all means "start from nothing". */
+  readSnapshot() {
+    const entries = /* @__PURE__ */ new Map();
+    try {
+      const snap = JSON.parse(readFileSync(this.snapshotPath, "utf-8"));
+      if (!snap || snap.version !== SNAPSHOT_VERSION || !Array.isArray(snap.entries))
+        return entries;
+      for (const entry of snap.entries) {
+        if (!entry || typeof entry.path !== "string" || !entry.ticket)
+          continue;
+        entries.set(entry.path, entry);
+      }
+    } catch {
+    }
+    return entries;
+  }
+  /**
+   * Writes the snapshot, atomically, and never fatally.
+   *
+   * tmp-then-rename so a concurrent reader cannot see a half-written snapshot,
+   * with the temp name matching the pattern TrackerFileSystem already sweeps.
+   * No fsync: this is a rebuildable cache, and paying for durability on
+   * something we would happily delete is the wrong trade.
+   *
+   * Failure is swallowed by design — a read-only or full data dir must still
+   * serve correct reads, just without the speedup.
+   */
+  persist(memo) {
+    const snapshot = { version: SNAPSHOT_VERSION, entries: [...memo.entries.values()] };
+    const tmp = path2.join(this.dataDir, `.${INDEX_FILENAME}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+    try {
+      writeFileSync(tmp, JSON.stringify(snapshot), "utf-8");
+      renameSync(tmp, this.snapshotPath);
+      memo.snapshotStamp = snapshotStamp(this.snapshotPath);
+    } catch {
+      try {
+        unlinkSync(tmp);
+      } catch {
+      }
+      memo.snapshotStamp = snapshotStamp(this.snapshotPath);
+    }
+  }
+};
+
 // ../shared/dist/utils.js
 var SILENT_LOGGER = () => {
 };
+async function writeFileAtomic(requestedTarget, content, dataDir) {
+  const target = await resolveWriteTarget(requestedTarget, dataDir);
+  const dir = path3.dirname(target);
+  const tmpPath = path3.join(dir, `.${path3.basename(target)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
+  let handle;
+  try {
+    handle = await fs.open(tmpPath, "wx", 438);
+    await handle.writeFile(content, "utf-8");
+    const existingMode = await fs.stat(target).then((stats) => stats.mode, () => void 0);
+    if (existingMode !== void 0) {
+      await handle.chmod(existingMode);
+    }
+    await handle.sync();
+    await handle.close();
+    handle = void 0;
+    await fs.rename(tmpPath, target);
+    const dirHandle = await fs.open(dir, "r").catch(() => null);
+    if (dirHandle) {
+      await dirHandle.sync().catch(() => {
+      });
+      await dirHandle.close().catch(() => {
+      });
+    }
+  } catch (error) {
+    if (handle) {
+      await handle.close().catch(() => {
+      });
+    }
+    await fs.unlink(tmpPath).catch(() => {
+    });
+    throw error;
+  }
+}
+var TEMP_FILE_PATTERN = /^\..+\.\d+\.[0-9a-f]{12}\.tmp$/;
+var TEMP_SWEEP_AGE_MS = 6e4;
+var MAX_SYMLINK_HOPS = 16;
+async function resolveWriteTarget(target, dataDir) {
+  let resolved = target;
+  for (let hop = 0; hop < MAX_SYMLINK_HOPS; hop++) {
+    let stats;
+    try {
+      stats = await fs.lstat(resolved);
+    } catch {
+      break;
+    }
+    if (!stats.isSymbolicLink())
+      break;
+    const linked = await fs.readlink(resolved);
+    resolved = path3.resolve(path3.dirname(resolved), linked);
+  }
+  await assertInsideDataDir(resolved, dataDir);
+  return resolved;
+}
+var realDataDirs = /* @__PURE__ */ new Map();
+async function assertInsideDataDir(resolved, dataDir) {
+  let realRoot = realDataDirs.get(dataDir);
+  if (realRoot === void 0) {
+    realRoot = await fs.realpath(dataDir).catch(() => path3.resolve(dataDir));
+    realDataDirs.set(dataDir, realRoot);
+  }
+  const realParent = await fs.realpath(path3.dirname(resolved)).catch(() => path3.resolve(path3.dirname(resolved)));
+  const finalPath = path3.join(realParent, path3.basename(resolved));
+  if (finalPath !== realRoot && !finalPath.startsWith(realRoot + path3.sep)) {
+    throw new Error(`Refusing to write to ${finalPath}: it resolves outside the tracker data directory ${realRoot}. A symlink in the store points out of it.`);
+  }
+}
+var LOCK_FILENAME = ".tracker-write.lock";
+var LOCK_STAGE_SUFFIX = ".stage-";
+var LOCK_STALE_MS = 1e4;
+var LOCK_REFRESH_MS = 2e3;
+var LOCK_ACQUIRE_TIMEOUT_MS = 3e4;
+var LOCK_POLL_MIN_MS = 2;
+var LOCK_POLL_MAX_MS = 25;
+var inProcessLocks = /* @__PURE__ */ new Map();
+function delay(ms) {
+  return new Promise((resolve4) => setTimeout(resolve4, ms));
+}
+async function withInProcessLock(key, fn) {
+  const previous = inProcessLocks.get(key) ?? Promise.resolve();
+  const mine = previous.catch(() => {
+  }).then(fn);
+  const queued = mine.then(() => {
+  }, () => {
+  });
+  inProcessLocks.set(key, queued);
+  try {
+    return await mine;
+  } finally {
+    if (inProcessLocks.get(key) === queued) {
+      inProcessLocks.delete(key);
+    }
+  }
+}
+async function staleLockContent(lockPath) {
+  let stats;
+  try {
+    stats = await fs.stat(lockPath);
+  } catch {
+    return null;
+  }
+  const raw = await fs.readFile(lockPath, "utf-8").catch(() => null);
+  if (raw === null)
+    return null;
+  if (Date.now() - stats.mtimeMs > LOCK_STALE_MS)
+    return raw;
+  try {
+    const owner = JSON.parse(raw);
+    if (owner.host === lockHostname() && typeof owner.pid === "number" && owner.pid !== process.pid && !isProcessAlive(owner.pid)) {
+      return raw;
+    }
+  } catch {
+  }
+  return null;
+}
+function breakerPathFor(lockPath, raw) {
+  const fingerprint = createHash("sha256").update(raw).digest("hex").slice(0, 16);
+  return `${lockPath}.break-${fingerprint}`;
+}
+async function breakStaleLock(lockPath, raw) {
+  const breakerPath = breakerPathFor(lockPath, raw);
+  try {
+    const handle = await fs.open(breakerPath, "wx", 420);
+    await handle.close();
+  } catch (error) {
+    if (error?.code !== "EEXIST")
+      return;
+    const stats = await fs.stat(breakerPath).catch(() => null);
+    if (stats && Date.now() - stats.mtimeMs > LOCK_STALE_MS) {
+      await fs.unlink(breakerPath).catch(() => {
+      });
+    }
+    return;
+  }
+  try {
+    if (await staleLockContent(lockPath) === raw) {
+      await fs.unlink(lockPath).catch(() => {
+      });
+    }
+  } finally {
+    await fs.unlink(breakerPath).catch(() => {
+    });
+  }
+}
+async function releaseLock(lockPath, body) {
+  const raw = await fs.readFile(lockPath, "utf-8").catch(() => null);
+  if (raw === body) {
+    await fs.unlink(lockPath).catch(() => {
+    });
+  }
+}
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+var cachedHostname;
+function lockHostname() {
+  if (cachedHostname === void 0) {
+    try {
+      cachedHostname = hostname();
+    } catch {
+      cachedHostname = "";
+    }
+  }
+  return cachedHostname;
+}
+var heldLocks = /* @__PURE__ */ new Map();
+var lockCleanupInstalled = false;
+function releaseHeldLocksSync() {
+  for (const [lockPath, body] of heldLocks) {
+    try {
+      if (readFileSync2(lockPath, "utf-8") === body) {
+        unlinkSync2(lockPath);
+      }
+    } catch {
+    }
+  }
+  heldLocks.clear();
+}
+function installLockCleanup() {
+  if (lockCleanupInstalled)
+    return;
+  lockCleanupInstalled = true;
+  process.once("exit", releaseHeldLocksSync);
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.once(signal, () => {
+      releaseHeldLocksSync();
+      if (process.listenerCount(signal) === 0) {
+        process.kill(process.pid, signal);
+      }
+    });
+  }
+}
+async function withFileLock(dataDir, fn) {
+  const lockPath = path3.join(dataDir, LOCK_FILENAME);
+  const deadline = Date.now() + LOCK_ACQUIRE_TIMEOUT_MS;
+  let poll = LOCK_POLL_MIN_MS;
+  let body = "";
+  installLockCleanup();
+  for (; ; ) {
+    if (Date.now() > deadline) {
+      throw new Error(`Timed out after ${LOCK_ACQUIRE_TIMEOUT_MS}ms waiting for the tracker write lock at ${lockPath}. Another process is holding it. Remove the file if you are certain nothing is writing.`);
+    }
+    body = JSON.stringify({
+      token: randomUUID(),
+      pid: process.pid,
+      host: lockHostname(),
+      acquired: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    const staging = `${lockPath}${LOCK_STAGE_SUFFIX}${randomUUID()}`;
+    let claimed = false;
+    try {
+      await fs.writeFile(staging, body, { flag: "wx", mode: 420 });
+      heldLocks.set(lockPath, body);
+      try {
+        await fs.link(staging, lockPath);
+        claimed = true;
+      } catch (error) {
+        if (error?.code !== "EEXIST")
+          throw error;
+        heldLocks.delete(lockPath);
+      }
+    } finally {
+      await fs.unlink(staging).catch(() => {
+      });
+    }
+    if (claimed) {
+      if (await fs.readFile(lockPath, "utf-8").catch(() => null) === body)
+        break;
+      heldLocks.delete(lockPath);
+      await delay(jitter(poll));
+      poll = Math.min(LOCK_POLL_MAX_MS, poll * 2);
+      continue;
+    }
+    const stale = await staleLockContent(lockPath);
+    if (stale !== null) {
+      await breakStaleLock(lockPath, stale);
+    }
+    await delay(jitter(poll));
+    poll = Math.min(LOCK_POLL_MAX_MS, poll * 2);
+  }
+  const refresh = setInterval(() => {
+    const now = /* @__PURE__ */ new Date();
+    fs.utimes(lockPath, now, now).catch(() => {
+    });
+  }, LOCK_REFRESH_MS);
+  refresh.unref?.();
+  try {
+    return await fn();
+  } finally {
+    clearInterval(refresh);
+    heldLocks.delete(lockPath);
+    await releaseLock(lockPath, body);
+  }
+}
+function jitter(ms) {
+  return ms + Math.floor(Math.random() * ms);
+}
+var heldByContext = new AsyncLocalStorage();
+async function withReentrantWriteLock(key, fn) {
+  const held = heldByContext.getStore();
+  if (held?.has(key))
+    return fn();
+  const nested = new Set(held ?? []);
+  nested.add(key);
+  return withInProcessLock(key, () => withFileLock(key, () => heldByContext.run(nested, fn)));
+}
 var TrackerFileSystem = class {
   dataDir;
   initialized = false;
   logger;
+  index;
   constructor(dataDir, options = {}) {
     this.dataDir = dataDir;
     this.logger = options.logger ?? SILENT_LOGGER;
+    this.index = new TicketIndex(dataDir);
   }
   resolvePath(...paths) {
-    return path.join(this.dataDir, ...paths);
+    return path3.join(this.dataDir, ...paths);
   }
   async ensureInitialized() {
     if (this.initialized)
       return;
     await fs.mkdir(this.dataDir, { recursive: true });
-    const requiredDirs = ["todo", "in-progress", "done", "features"];
+    const requiredDirs = ["tickets", "features"];
     for (const dir of requiredDirs) {
       await this.ensureDir(dir);
     }
     await this.ensureStatusFiles();
+    await this.sweepStaleTempFiles();
     this.initialized = true;
+  }
+  /**
+   * Removes temp files a crashed write left behind.
+   *
+   * Not merely tidiness. A stranded temp under `<status>/feature-X/` makes
+   * TicketOperations.cleanupOrphanDir count a leftover and refuse to remove an
+   * emptied feature directory, and one at the data-dir root shows up in
+   * `git status` since the store is tracked.
+   *
+   * The age floor is load-bearing: a temp younger than it may belong to a write
+   * happening right now in another process, and deleting that would turn a
+   * cosmetic problem into a lost write. Failures are swallowed — a sweep that
+   * cannot run must not stop the store from initialising.
+   */
+  async sweepStaleTempFiles() {
+    const cutoff = Date.now() - TEMP_SWEEP_AGE_MS;
+    const sweep = async (dirPath, depth) => {
+      let entries;
+      try {
+        entries = await fs.readdir(dirPath, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const full = path3.join(dirPath, entry.name);
+        if (entry.isDirectory()) {
+          if (depth > 0)
+            await sweep(full, depth - 1);
+          continue;
+        }
+        const disposable = TEMP_FILE_PATTERN.test(entry.name) || entry.name.startsWith(`${LOCK_FILENAME}.`) && entry.name !== LOCK_FILENAME;
+        if (!disposable)
+          continue;
+        try {
+          const stats = await fs.stat(full);
+          if (stats.mtimeMs < cutoff)
+            await fs.unlink(full);
+        } catch {
+        }
+      }
+    };
+    try {
+      await sweep(this.dataDir, 2);
+    } catch {
+    }
   }
   async ensureStatusFiles() {
     const statusFiles = [
@@ -10914,7 +11465,7 @@ var TrackerFileSystem = class {
           blocked_tickets: []
         };
         const yamlContent = dump(defaultContent, { lineWidth: -1 });
-        await fs.writeFile(this.resolvePath(file.name), yamlContent, "utf-8");
+        await writeFileAtomic(this.resolvePath(file.name), yamlContent, this.dataDir);
         this.logger(`\u{1F4DD} Created ${file.name}`);
       }
     }
@@ -10926,7 +11477,7 @@ var TrackerFileSystem = class {
         low_priority_tickets: []
       };
       const yamlContent = dump(priorityContent, { lineWidth: -1 });
-      await fs.writeFile(this.resolvePath("PRIORITY.yaml"), yamlContent, "utf-8");
+      await writeFileAtomic(this.resolvePath("PRIORITY.yaml"), yamlContent, this.dataDir);
       this.logger("\u{1F4DD} Created PRIORITY.yaml");
     }
     if (!await this.existsWithoutInit("DEPENDENCIES.yaml")) {
@@ -10935,7 +11486,7 @@ var TrackerFileSystem = class {
         dependencies: {}
       };
       const yamlContent = dump(depsContent, { lineWidth: -1 });
-      await fs.writeFile(this.resolvePath("DEPENDENCIES.yaml"), yamlContent, "utf-8");
+      await writeFileAtomic(this.resolvePath("DEPENDENCIES.yaml"), yamlContent, this.dataDir);
       this.logger("\u{1F4DD} Created DEPENDENCIES.yaml");
     }
   }
@@ -10949,7 +11500,27 @@ var TrackerFileSystem = class {
   }
   async writeFile(filePath, content) {
     await this.ensureInitialized();
-    await fs.writeFile(this.resolvePath(filePath), content, "utf-8");
+    await writeFileAtomic(this.resolvePath(filePath), content, this.dataDir);
+  }
+  /**
+   * Runs `fn` with exclusive write access to this dataDir, across processes.
+   *
+   * Reentrant since #338: a nested call re-enters instead of waiting
+   * LOCK_ACQUIRE_TIMEOUT_MS on itself. Reentrancy is scoped to the async
+   * context that holds the lock, so a SIBLING operation in the same process
+   * still queues — see `withReentrantWriteLock`.
+   *
+   * Public because the read-modify-writes that need it do not all live in this
+   * class: `TicketOperations.createTicket` and `updateFeatureWorkSessionSummary`
+   * rewrite `features/<name>.yaml` from outside it.
+   *
+   * Everything it wraps reaches the disk through readFile/writeFile, which
+   * never take the lock themselves — writeFile gets its atomicity from rename.
+   */
+  async withWriteLock(fn) {
+    await this.ensureInitialized();
+    const key = path3.resolve(this.dataDir);
+    return withReentrantWriteLock(key, fn);
   }
   async existsWithoutInit(filePath) {
     try {
@@ -10963,7 +11534,27 @@ var TrackerFileSystem = class {
     await this.ensureInitialized();
     return this.existsWithoutInit(filePath);
   }
+  /**
+   * Every ticket in the corpus, served from the derived index (#334).
+   *
+   * The tickets are the index's own objects and are shared between callers —
+   * treat them as read-only. Anything that mutates a ticket before writing it
+   * back must go through `readTicket`, which hands out an owned copy.
+   */
+  async readAllTickets(status) {
+    await this.ensureInitialized();
+    return this.index.readAll(status);
+  }
+  /** As `readAllTickets`, but pairs each ticket with its path. Read-only. */
+  async readAllTicketEntries(status) {
+    await this.ensureInitialized();
+    return this.index.readAllEntries(status);
+  }
   async readTicket(ticketPath) {
+    await this.ensureInitialized();
+    const cached = this.index.peek(ticketPath);
+    if (cached)
+      return structuredClone(cached);
     const content = await this.readFile(ticketPath);
     const ticket = load(content);
     if (!ticket.last_updated) {
@@ -11031,7 +11622,7 @@ var TrackerFileSystem = class {
     return ticket;
   }
   async readFeature(featurePath) {
-    const readmePath = path.join(featurePath, "README.md");
+    const readmePath = path3.join(featurePath, "README.md");
     const content = await this.readFile(readmePath);
     const match = content.match(/^---\n([\s\S]*?)\n---/);
     if (!match) {
@@ -11063,7 +11654,7 @@ var TrackerFileSystem = class {
   async highestTicketNumber() {
     let highest = 0;
     for (const ticketPath of await this.findTickets()) {
-      const match = path.basename(ticketPath).match(/^ticket-(\d+)-/);
+      const match = path3.basename(ticketPath).match(/^ticket-(\d+)-/);
       if (!match)
         continue;
       const parsed = parseInt(match[1], 10);
@@ -11114,30 +11705,26 @@ var TrackerFileSystem = class {
     const yamlContent = dump(counterData, { lineWidth: -1 });
     await this.writeFile("COUNTER.yaml", yamlContent);
   }
+  /**
+   * Reserves and returns the next ticket number.
+   *
+   * The lock spans the whole read-modify-write, not just setCounter (#333).
+   * Locking only the write would still let two callers read 332 and both
+   * compute 333 — the duplicate is decided in the gap, so the gap is what has
+   * to be closed.
+   */
   async incrementCounter() {
-    const current = await this.getCounter();
-    const next = current + 1;
-    await this.setCounter(next);
-    return next;
+    return this.withWriteLock(async () => {
+      const current = await this.getCounter();
+      const next = current + 1;
+      await this.setCounter(next);
+      return next;
+    });
   }
   async findTickets(status) {
-    const dirs = status ? [status] : ["todo", "in-progress", "done"];
-    const tickets = [];
-    for (const dir of dirs) {
-      const dirPath = this.resolvePath(dir);
-      if (!await this.exists(dir))
-        continue;
-      const features = await fs.readdir(dirPath);
-      for (const feature of features) {
-        if (!feature.startsWith("feature-"))
-          continue;
-        const featurePath = path.join(dir, feature);
-        const files = await fs.readdir(this.resolvePath(featurePath));
-        const ticketFiles = files.filter((f) => f.startsWith("ticket-") && f.endsWith(".yaml"));
-        tickets.push(...ticketFiles.map((f) => path.join(dir, feature, f)));
-      }
-    }
-    return tickets.sort();
+    await this.ensureInitialized();
+    const entries = await this.index.readAllEntries(status);
+    return entries.map((e) => e.path);
   }
   formatTicketNumber(num) {
     return num.toString().padStart(4, "0");
@@ -11145,59 +11732,32 @@ var TrackerFileSystem = class {
   async moveFile(from, to) {
     const fromPath = this.resolvePath(from);
     const toPath = this.resolvePath(to);
-    await this.ensureDir(path.dirname(to));
+    await this.ensureDir(path3.dirname(to));
     await fs.rename(fromPath, toPath);
-    const attachDir = path.join(path.dirname(from), "attachments");
-    if (await this.exists(attachDir)) {
-      const newAttachDir = path.join(path.dirname(to), "attachments");
-      await fs.rename(this.resolvePath(attachDir), this.resolvePath(newAttachDir));
-    }
   }
-  async moveTicket(ticketPath, fromStatus, toStatus) {
-    const filename = path.basename(ticketPath);
-    const featureName = path.basename(path.dirname(ticketPath));
-    const fromFullPath = this.resolvePath(fromStatus, featureName, filename);
-    const toDir = this.resolvePath(toStatus, featureName);
-    const toFullPath = path.join(toDir, filename);
-    await this.ensureDir(path.join(toStatus, featureName));
-    await fs.rename(fromFullPath, toFullPath);
-    const attachmentFromDir = this.resolvePath(fromStatus, featureName, "attachments");
-    const attachmentToDir = this.resolvePath(toStatus, featureName, "attachments");
-    if (await this.exists(path.join(fromStatus, featureName, "attachments"))) {
-      await this.ensureDir(path.join(toStatus, featureName, "attachments"));
-      const attachmentFiles = await fs.readdir(attachmentFromDir);
-      for (const file of attachmentFiles) {
-        await fs.rename(path.join(attachmentFromDir, file), path.join(attachmentToDir, file));
-      }
-    }
-    return path.join(toStatus, featureName, filename);
+  /**
+   * Status is a field, so changing it moves nothing (#335). Kept for its
+   * callers and for the return contract; the rename plumbing is gone.
+   */
+  async moveTicket(ticketPath, _fromStatus, _toStatus) {
+    return ticketPath;
   }
   async findTicketsByFeature(feature, status) {
-    const dirs = status ? [status] : ["todo", "in-progress", "done"];
-    const tickets = [];
-    for (const dir of dirs) {
-      const featurePath = path.join(dir, feature);
-      if (!await this.exists(featurePath))
-        continue;
-      const files = await fs.readdir(this.resolvePath(featurePath));
-      const ticketFiles = files.filter((f) => f.startsWith("ticket-") && f.endsWith(".yaml"));
-      tickets.push(...ticketFiles.map((f) => path.join(dir, feature, f)));
-    }
-    return tickets.sort();
+    await this.ensureInitialized();
+    const entries = await this.index.readAllEntries(status);
+    return entries.filter((e) => e.ticket.feature === feature).map((e) => e.path);
   }
   async readdir(dirPath) {
     return fs.readdir(this.resolvePath(dirPath));
   }
   async updateDependencies() {
-    const tickets = await this.findTickets();
+    const entries = await this.readAllTicketEntries();
     const featureMap = /* @__PURE__ */ new Map();
     const ticketLookup = /* @__PURE__ */ new Map();
-    for (const ticketPath of tickets) {
-      const ticket = await this.readTicket(ticketPath);
+    for (const { ticket } of entries) {
       ticketLookup.set(ticket.ticket_number, ticket.title);
     }
-    for (const ticketPath of tickets) {
-      const ticket = await this.readTicket(ticketPath);
+    for (const { ticket } of entries) {
       if (ticket.blocks && ticket.blocks.length > 0 || ticket.blocked_by && ticket.blocked_by.length > 0) {
         if (!featureMap.has(ticket.feature)) {
           featureMap.set(ticket.feature, []);
@@ -11230,28 +11790,22 @@ var TrackerFileSystem = class {
     await this.writeFile("DEPENDENCIES.yaml", yamlContent);
   }
   /**
-   * Finds the path to a ticket YAML file by ticket number, searching all status directories.
+   * Finds the path to a ticket YAML file by ticket number, searching `tickets/`.
    * @param ticketNumber - The ticket number to search for
    * @returns The relative path to the ticket YAML file, or null if not found
    */
   async findTicketFile(ticketNumber) {
-    const statusDirs = ["todo", "in-progress", "done"];
-    for (const statusDir of statusDirs) {
-      const dirPath = this.resolvePath(statusDir);
-      if (!await this.exists(statusDir))
-        continue;
-      const features = await fs.readdir(dirPath);
-      for (const feature of features) {
-        if (!feature.startsWith("feature-"))
-          continue;
-        const featurePath = path.join(statusDir, feature);
-        const files = await fs.readdir(this.resolvePath(featurePath));
-        for (const file of files) {
-          if (file.startsWith(`ticket-${ticketNumber.toString().padStart(4, "0")}-`)) {
-            return path.join(featurePath, file);
-          }
-        }
-      }
+    await this.ensureInitialized();
+    const indexed = await this.index.findPath(ticketNumber);
+    if (indexed)
+      return indexed;
+    const prefix = `ticket-${ticketNumber.toString().padStart(4, "0")}-`;
+    if (!await this.exists(TICKETS_DIR))
+      return null;
+    const files = await fs.readdir(this.resolvePath(TICKETS_DIR));
+    for (const file of files) {
+      if (file.startsWith(prefix))
+        return ticketRelPath(file);
     }
     return null;
   }
@@ -11261,7 +11815,7 @@ var TrackerFileSystem = class {
    * @returns The feature data
    */
   async readFeatureYaml(featureName) {
-    const featurePath = path.join("features", `${featureName}.yaml`);
+    const featurePath = path3.join("features", `${featureName}.yaml`);
     const content = await this.readFile(featurePath);
     return load(content);
   }
@@ -11271,7 +11825,7 @@ var TrackerFileSystem = class {
    * @param feature - Feature data
    */
   async writeFeatureYaml(featureName, feature) {
-    const featurePath = path.join("features", `${featureName}.yaml`);
+    const featurePath = path3.join("features", `${featureName}.yaml`);
     const content = dump(feature, { lineWidth: -1, noRefs: true });
     await this.writeFile(featurePath, content);
   }
@@ -11403,49 +11957,126 @@ var TrackerFileSystem = class {
     await this.writeTicket(ticketPath, ticket);
     return ticket;
   }
+  /**
+   * Moves one ticket between the buckets in `features/<name>.yaml`.
+   *
+   * The whole read-modify-write is inside the write lock (#338). Without it the
+   * gap between the read and the write is a lost bucket entry: a concurrent
+   * create, another status change, or a work-session rollup writes the same
+   * file, and last-writer-wins reverts whichever moved first. `writeFileAtomic`
+   * does not help — it makes the loss clean rather than corrupt. The visible
+   * result is `total_tickets` and `completion_percentage` disagreeing with the
+   * tickets on disk, which is what `listFeatures` and the kanban UI display.
+   */
   async updateCentralizedFeatureTracking(ticketNumber, ticketTitle, featureName, fromStatus, toStatus) {
     try {
       const cleanFeatureName = featureName.startsWith("feature-") ? featureName.substring(8) : featureName;
-      const centralizedFeaturePath = path.join("features", `${cleanFeatureName}.yaml`);
-      if (!await this.exists(centralizedFeaturePath)) {
-        return false;
-      }
-      const featureContent = await this.readFile(centralizedFeaturePath);
-      const feature = load(featureContent);
-      if (!feature.tickets) {
-        feature.tickets = {
-          todo: {},
-          in_progress: {},
-          done: {}
+      const centralizedFeaturePath = path3.join("features", `${cleanFeatureName}.yaml`);
+      return await this.withWriteLock(async () => {
+        if (!await this.exists(centralizedFeaturePath)) {
+          return false;
+        }
+        const featureContent = await this.readFile(centralizedFeaturePath);
+        const feature = load(featureContent);
+        if (!feature.tickets) {
+          feature.tickets = {
+            todo: {},
+            in_progress: {},
+            done: {}
+          };
+        }
+        const statusMap = {
+          "todo": "todo",
+          "in-progress": "in_progress",
+          "done": "done"
         };
-      }
-      const statusMap = {
-        "todo": "todo",
-        "in-progress": "in_progress",
-        "done": "done"
-      };
-      const fromKey = statusMap[fromStatus];
-      const toKey = statusMap[toStatus];
-      if (feature.tickets[fromKey]) {
-        delete feature.tickets[fromKey][ticketNumber];
-      }
-      if (!feature.tickets[toKey]) {
-        feature.tickets[toKey] = {};
-      }
-      feature.tickets[toKey][ticketNumber] = ticketTitle;
-      const updatedFeature = updateFeatureStatistics(feature);
-      const updatedFeatureYaml = dump(updatedFeature, {
-        lineWidth: -1,
-        noRefs: true,
-        quotingType: '"',
-        forceQuotes: false
+        const fromKey = statusMap[fromStatus];
+        const toKey = statusMap[toStatus];
+        if (feature.tickets[fromKey]) {
+          delete feature.tickets[fromKey][ticketNumber];
+        }
+        if (!feature.tickets[toKey]) {
+          feature.tickets[toKey] = {};
+        }
+        feature.tickets[toKey][ticketNumber] = ticketTitle;
+        const updatedFeature = updateFeatureStatistics(feature);
+        await this.stampFeatureActivity(updatedFeature, cleanFeatureName, toStatus);
+        const updatedFeatureYaml = dump(updatedFeature, {
+          lineWidth: -1,
+          noRefs: true,
+          quotingType: '"',
+          forceQuotes: false
+        });
+        await this.writeFile(centralizedFeaturePath, updatedFeatureYaml);
+        return true;
       });
-      await this.writeFile(centralizedFeaturePath, updatedFeatureYaml);
-      return true;
     } catch (error) {
       console.error("Failed to update centralized feature tracking:", error);
       return false;
     }
+  }
+  /**
+   * Stamps the activity timestamps on a feature being rewritten (#322).
+   *
+   * Mutates in place, and NEVER throws: the caller's next act is to write the
+   * bucket reassignment, and losing that because a timestamp could not be worked
+   * out would trade a real correctness bug for a cosmetic one.
+   *
+   * `completed` is the interesting one. The obvious implementation stamps
+   * `now`, which is wrong — `now` is when the last bucket move was processed,
+   * which for any imported or backfilled feature is nothing like when the work
+   * finished. It reads instead from the done tickets themselves, taking the
+   * latest, and falls back to `now` only when no done ticket carries a date at
+   * all (legacy tickets predate Ticket.completed).
+   */
+  async stampFeatureActivity(feature, cleanFeatureName, toStatus) {
+    try {
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      feature.last_activity = now;
+      if (toStatus !== "todo" && !feature.started) {
+        feature.started = now;
+      }
+      if (feature.is_completed) {
+        feature.completed = await this.latestTicketCompletion(feature, cleanFeatureName) ?? now;
+      } else {
+        delete feature.completed;
+      }
+    } catch (error) {
+      console.error("Failed to stamp feature activity timestamps:", error);
+    }
+  }
+  /**
+   * The latest `completed` among the feature's done tickets, or null if none
+   * carries one.
+   *
+   * Trusts the feature's own `done` bucket for membership rather than each
+   * ticket's own `status` field, and that is what makes the answer correct at
+   * the moment it is called: `updateCentralizedFeatureTracking` rewrites that
+   * bucket, via `stampFeatureActivity`, in the same locked region where
+   * `updateTicketStatus` has ALREADY written the closing ticket's `completed`
+   * field to `tickets/` (#335 — tickets are flat, filed by number, with no
+   * per-status relocation to be mid-flight). So by the time this runs, the
+   * bucket and the ticket file it reads agree; there is no race to guard
+   * against here, only a read of state that is already settled.
+   */
+  async latestTicketCompletion(feature, cleanFeatureName) {
+    const doneNumbers = new Set(Object.keys(feature.tickets?.done ?? {}).map(Number));
+    if (doneNumbers.size === 0)
+      return null;
+    const ticketPaths = await this.findTicketsByFeature(cleanFeatureName);
+    let latest = null;
+    for (const ticketPath of ticketPaths) {
+      try {
+        const ticket = await this.readTicket(ticketPath);
+        if (!doneNumbers.has(ticket.ticket_number) || !ticket.completed)
+          continue;
+        if (latest === null || ticket.completed > latest) {
+          latest = ticket.completed;
+        }
+      } catch {
+      }
+    }
+    return latest;
   }
 };
 function formatTicketNumber(num) {
@@ -11527,16 +12158,16 @@ function updateFeatureStatistics(feature) {
 var QUARANTINE_THRESHOLD_MINUTES = 8 * 60;
 
 // ../shared/dist/prompt-store.js
-import { join as join2 } from "path";
+import { join as join3 } from "path";
 import { promises as fs2 } from "fs";
 function promptSidecarPath(dataDir, ticketNumber) {
-  return join2(dataDir, ".prompts", `ticket-${String(ticketNumber).padStart(4, "0")}.jsonl`);
+  return join3(dataDir, ".prompts", `ticket-${String(ticketNumber).padStart(4, "0")}.jsonl`);
 }
 async function readTicketPrompts(dataDir, ticketNumber) {
-  const path2 = promptSidecarPath(dataDir, ticketNumber);
+  const path4 = promptSidecarPath(dataDir, ticketNumber);
   let raw;
   try {
-    raw = await fs2.readFile(path2, "utf-8");
+    raw = await fs2.readFile(path4, "utf-8");
   } catch {
     return [];
   }
@@ -11556,14 +12187,14 @@ async function writeSessionPrompts(dataDir, ticketNumber, sessionStart, prompts)
   const existing = await readTicketPrompts(dataDir, ticketNumber);
   const others = existing.filter((p) => p.session_start !== sessionStart);
   const merged = [...others, ...prompts.map((p) => ({ ...p, session_start: sessionStart }))];
-  const path2 = promptSidecarPath(dataDir, ticketNumber);
-  await fs2.mkdir(join2(dataDir, ".prompts"), { recursive: true });
+  const path4 = promptSidecarPath(dataDir, ticketNumber);
+  await fs2.mkdir(join3(dataDir, ".prompts"), { recursive: true });
   if (merged.length === 0) {
-    await fs2.rm(path2, { force: true });
+    await fs2.rm(path4, { force: true });
     return;
   }
   const body = merged.map((p) => JSON.stringify(p)).join("\n") + "\n";
-  await fs2.writeFile(path2, body, "utf-8");
+  await fs2.writeFile(path4, body, "utf-8");
 }
 
 // ../shared/dist/activity.js
@@ -11772,21 +12403,21 @@ function buildActivity(tickets, query, nowIso = (/* @__PURE__ */ new Date()).toI
 }
 
 // ../shared/dist/logger.js
-import { writeFileSync, existsSync, appendFileSync } from "fs";
-import { join as join3 } from "path";
+import { writeFileSync as writeFileSync2, existsSync, appendFileSync } from "fs";
+import { join as join4 } from "path";
 var TrackerLogger = class _TrackerLogger {
   scriptCallLogPath;
   verboseLogPath;
   constructor(dataPath = "plan/tracker-data") {
-    this.scriptCallLogPath = join3(dataPath, "scriptcall.log");
-    this.verboseLogPath = join3(dataPath, "verbose.log");
+    this.scriptCallLogPath = join4(dataPath, "scriptcall.log");
+    this.verboseLogPath = join4(dataPath, "verbose.log");
   }
   getCurrentTimestamp() {
     return (/* @__PURE__ */ new Date()).toISOString();
   }
   ensureLogFileExists(filePath) {
     if (!existsSync(filePath)) {
-      writeFileSync(filePath, `# Tracker Script Log
+      writeFileSync2(filePath, `# Tracker Script Log
 # Created: ${this.getCurrentTimestamp()}
 
 `);
@@ -11882,107 +12513,7 @@ var FeatureNotFoundError = class extends ScriptError {
   }
 };
 
-// ../shared/dist/status-reports.js
-var STATUSES = ["todo", "in-progress", "done"];
-var PRIORITY_ORDER = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3
-};
-var UNKNOWN_PRIORITY_RANK = 999;
-async function regenerateStatusReports(fs3) {
-  const messages = [];
-  const globalTicketLookup = /* @__PURE__ */ new Map();
-  for (const status of STATUSES) {
-    for (const ticketPath of await fs3.findTickets(status)) {
-      const ticket = await fs3.readTicket(ticketPath);
-      globalTicketLookup.set(ticket.ticket_number, ticket.title);
-    }
-  }
-  for (const status of STATUSES) {
-    const ticketPaths = await fs3.findTickets(status);
-    const ticketData = [];
-    for (const ticketPath of ticketPaths) {
-      ticketData.push({ ticket: await fs3.readTicket(ticketPath), path: ticketPath });
-    }
-    ticketData.sort((a, b) => {
-      const prioDiff = (PRIORITY_ORDER[a.ticket.priority] ?? UNKNOWN_PRIORITY_RANK) - (PRIORITY_ORDER[b.ticket.priority] ?? UNKNOWN_PRIORITY_RANK);
-      if (prioDiff !== 0)
-        return prioDiff;
-      return a.ticket.ticket_number - b.ticket.ticket_number;
-    });
-    const summary = { critical: 0, high: 0, medium: 0, low: 0 };
-    ticketData.forEach(({ ticket }) => {
-      const priority = ticket.priority;
-      summary[priority]++;
-    });
-    const priorities = {};
-    const featureMap = /* @__PURE__ */ new Map();
-    ticketData.forEach(({ ticket }) => {
-      const priority = ticket.priority;
-      if (!featureMap.has(priority)) {
-        featureMap.set(priority, /* @__PURE__ */ new Map());
-      }
-      const priorityMap = featureMap.get(priority);
-      if (!priorityMap.has(ticket.feature)) {
-        priorityMap.set(ticket.feature, []);
-      }
-      priorityMap.get(ticket.feature).push({
-        ticket_number: ticket.ticket_number,
-        title: ticket.title,
-        assignee: ticket.assignee,
-        blocked_by: (ticket.blocked_by || []).map((b) => ({
-          ticket_number: b.ticket,
-          title: globalTicketLookup.get(b.ticket) || `Ticket #${b.ticket}`
-        }))
-      });
-    });
-    featureMap.forEach((priorityMap, priority) => {
-      if (priorityMap.size > 0) {
-        priorities[priority] = [];
-        priorityMap.forEach((tickets, feature) => {
-          priorities[priority].push({ feature, tickets });
-        });
-      }
-    });
-    const blockedTickets = [];
-    ticketData.forEach(({ ticket }) => {
-      if (ticket.blocked_by && ticket.blocked_by.length > 0) {
-        blockedTickets.push({
-          ticket_number: ticket.ticket_number,
-          title: ticket.title,
-          blocked_by: ticket.blocked_by.map((blocker) => ({
-            ticket_number: blocker.ticket,
-            title: globalTicketLookup.get(blocker.ticket) || `Ticket #${blocker.ticket}`
-          })),
-          description: ticket.blocked_by.map((b) => b.description).join(", ")
-        });
-      }
-    });
-    const statusReport = {
-      status,
-      last_updated: (/* @__PURE__ */ new Date()).toISOString(),
-      total_tickets: ticketData.length,
-      summary,
-      priorities,
-      blocked_tickets: blockedTickets
-    };
-    await fs3.writeFile(`STATUS-${status.toUpperCase()}.yaml`, dump(statusReport, { lineWidth: -1 }));
-    messages.push(`\u2705 Updated STATUS-${status.toUpperCase()}.yaml (${ticketData.length} tickets)`);
-  }
-  return messages;
-}
-async function regenerateAllReports(fs3) {
-  const messages = await regenerateStatusReports(fs3);
-  await fs3.updateDependencies();
-  messages.push("\u2705 Updated DEPENDENCIES.yaml");
-  return messages;
-}
-
 // ../shared/dist/ticket-operations.js
-import { symlink, readdir, lstat, unlink, rmdir } from "fs/promises";
-import { join as join4, dirname as dirname2 } from "path";
 var TicketFinder = class {
   fs;
   constructor(dataDir) {
@@ -12005,11 +12536,11 @@ var TicketFinder = class {
    * @throws TicketNotFoundError if ticket not found
    */
   async requireTicketFile(ticketNumber) {
-    const path2 = await this.findTicketFile(ticketNumber);
-    if (!path2) {
+    const path4 = await this.findTicketFile(ticketNumber);
+    if (!path4) {
       throw new TicketNotFoundError(ticketNumber);
     }
-    return path2;
+    return path4;
   }
   /**
    * Finds and reads a ticket by number
@@ -12019,9 +12550,9 @@ var TicketFinder = class {
    * @throws TicketNotFoundError if ticket not found
    */
   async findAndReadTicket(ticketNumber) {
-    const path2 = await this.requireTicketFile(ticketNumber);
-    const ticket = await this.fs.readTicket(path2);
-    return { ticket, path: path2 };
+    const path4 = await this.requireTicketFile(ticketNumber);
+    const ticket = await this.fs.readTicket(path4);
+    return { ticket, path: path4 };
   }
   /**
    * Checks if a ticket exists
@@ -12030,18 +12561,16 @@ var TicketFinder = class {
    * @returns Promise<boolean> True if ticket exists
    */
   async ticketExists(ticketNumber) {
-    const path2 = await this.findTicketFile(ticketNumber);
-    return path2 !== null;
+    const path4 = await this.findTicketFile(ticketNumber);
+    return path4 !== null;
   }
 };
 var TicketOperations = class {
   fs;
   finder;
-  dataDir;
   constructor(dataDir) {
     this.fs = new TrackerFileSystem(dataDir);
     this.finder = new TicketFinder(dataDir);
-    this.dataDir = dataDir;
   }
   /**
    * Creates a ticket, reproducing every side effect create-ticket.ts performs.
@@ -12053,15 +12582,24 @@ var TicketOperations = class {
    * Side effects, all of them:
    *   - COUNTER.yaml increment
    *   - centralised feature registration + updateFeatureStatistics rollup
-   *   - todo/feature-<name>/ directory creation
-   *   - feature.yaml soft link (falling back to a copy when symlink fails)
-   *   - the ticket file itself, named ticket-<padded>-<slug>.yaml
-   *   - STATUS-*.yaml and DEPENDENCIES.yaml regeneration
+   *   - the ticket file itself, in tickets/, named ticket-<padded>-<slug>.yaml
    *
-   * Note the one behaviour that looks like an omission but is not: a feature
-   * with no centralised features/<name>.yaml is NOT an error. The ticket is
-   * written into todo/feature-<name>/ with no link. create-ticket.ts allows
-   * this, so this does too.
+   * STATUS-*.yaml and DEPENDENCIES.yaml regeneration used to be on that list.
+   * #336 removed it: they are a derived export, refreshed on request by
+   * update-all-yaml or the syncDependencies tool, not a write-path side effect.
+   *
+   * There used to be two more: a todo/feature-<name>/ directory created for the
+   * ticket, and a feature.yaml soft link into it. #335 flattens storage to
+   * tickets/, where status lives only in the `status:` field, so there is no
+   * per-status directory left to create or link.
+   *
+   * ONE DELIBERATE DIVERGENCE from the original script (#337): a feature with
+   * no centralised features/<name>.yaml is now an error. It used to be written
+   * into todo/feature-<name>/ with no link, which is how nine orphaned feature
+   * directories accumulated — their tickets invisible to listFeatures and
+   * counted by nothing. #332 closed the `undefined` case; this closes the
+   * general one. checkIntegrity() in integrity.ts reports the drift that
+   * predates the check.
    */
   async createTicket(input) {
     const messages = [];
@@ -12071,7 +12609,29 @@ var TicketOperations = class {
     if (!validation.isValid) {
       throw new ValidationError(validation.errors.join(", "));
     }
-    const ticketNumber = await this.fs.incrementCounter();
+    if (typeof input.feature !== "string" || input.feature.trim() === "") {
+      throw new ValidationError("Feature name is required and must be a non-empty string");
+    }
+    if (/[/\\]/.test(input.feature)) {
+      throw new ValidationError(`Feature name must not contain a path separator, got: ${input.feature}`);
+    }
+    const centralizedFeaturePath = `features/${input.feature}.yaml`;
+    if (!await this.fs.exists(centralizedFeaturePath)) {
+      throw new ValidationError(`Unknown feature "${input.feature}": no ${centralizedFeaturePath} exists. Create the feature first (create-feature --name ${input.feature}), or use an existing name. Run check-integrity to list the features that exist.`);
+    }
+    return this.fs.withWriteLock(async () => {
+      const ticketNumber = await this.fs.incrementCounter();
+      return this.registerAndWriteTicket(input, ticketNumber, type2, priority, messages);
+    });
+  }
+  /**
+   * The rest of `createTicket`, running inside the write lock.
+   *
+   * Split out only so the locked region reads as one block; it has no other
+   * caller and no meaning outside `createTicket`.
+   */
+  async registerAndWriteTicket(input, ticketNumber, type2, priority, messages) {
+    const centralizedFeaturePath = `features/${input.feature}.yaml`;
     const paddedNumber = formatTicketNumber(ticketNumber);
     const slug = createTicketSlug(input.title);
     const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -12100,11 +12660,9 @@ var TicketOperations = class {
       attachments: [],
       ai_context: void 0
     };
-    const centralizedFeaturePath = `features/${input.feature}.yaml`;
-    let feature = null;
     try {
       if (await this.fs.exists(centralizedFeaturePath)) {
-        feature = load(await this.fs.readFile(centralizedFeaturePath));
+        const feature = load(await this.fs.readFile(centralizedFeaturePath));
         if (!feature.tickets) {
           feature.tickets = { todo: {}, in_progress: {}, done: {} };
         }
@@ -12121,40 +12679,13 @@ var TicketOperations = class {
     } catch (err) {
       messages.push(`\u26A0\uFE0F  Could not update centralized feature: ${err}`);
     }
-    const featureDir = `todo/feature-${input.feature}`;
-    await this.fs.ensureDir(featureDir);
-    if (feature) {
-      const softLinkPath = `${featureDir}/feature.yaml`;
-      const relativePath = `../../features/${input.feature}.yaml`;
-      try {
-        if (!await this.fs.exists(softLinkPath)) {
-          await symlink(relativePath, join4(this.dataDir, softLinkPath));
-          messages.push(`\u{1F517} Created soft link: ${softLinkPath}`);
-        }
-      } catch (err) {
-        messages.push(`\u26A0\uFE0F  Could not create soft link: ${err}`);
-        try {
-          await this.fs.writeFile(softLinkPath, await this.fs.readFile(centralizedFeaturePath));
-          messages.push(`\u{1F4C4} Copied feature file as fallback: ${softLinkPath}`);
-        } catch (copyErr) {
-          messages.push(`\u26A0\uFE0F  Could not copy feature file: ${copyErr}`);
-        }
-      }
-    }
     const filename = `ticket-${paddedNumber}-${slug}.yaml`;
-    const path2 = `${featureDir}/${filename}`;
-    await this.fs.writeTicket(path2, ticket);
+    const path4 = ticketRelPath(filename);
+    await this.fs.ensureDir(TICKETS_DIR);
+    await this.fs.writeTicket(path4, ticket);
     messages.push(`\u2705 Created ticket #${ticketNumber}: ${input.title}`);
-    messages.push(`\u{1F4C1} Location: ${path2}`);
-    if (input.regenerateReports !== false) {
-      try {
-        await regenerateAllReports(this.fs);
-        messages.push("\u{1F4CA} Updated status reports");
-      } catch (err) {
-        messages.push(`\u26A0\uFE0F  Warning: Could not update status reports: ${err}`);
-      }
-    }
-    return { ticket, path: path2, messages };
+    messages.push(`\u{1F4C1} Location: ${path4}`);
+    return { ticket, path: path4, messages };
   }
   /**
    * Updates the last_updated timestamp on a ticket
@@ -12192,8 +12723,8 @@ var TicketOperations = class {
    * equivalent — update-ticket.ts accepts only type and priority. They are kept
    * for API callers and applied after, with an explicit last_updated bump.
    */
-  async updateTicket(ticketNumber, updates, options = {}) {
-    const path2 = await this.finder.requireTicketFile(ticketNumber);
+  async updateTicket(ticketNumber, updates) {
+    const path4 = await this.finder.requireTicketFile(ticketNumber);
     const validation = validateTicketProperties({
       ...updates.type && { type: updates.type },
       ...updates.priority && { priority: updates.priority }
@@ -12201,7 +12732,7 @@ var TicketOperations = class {
     if (!validation.isValid) {
       throw new ValidationError(validation.errors.join(", "));
     }
-    const original = await this.fs.readTicket(path2);
+    const original = await this.fs.readTicket(path4);
     const changes = [];
     if (updates.type && updates.type !== original.type) {
       changes.push(`type: ${original.type} \u2192 ${updates.type}`);
@@ -12211,7 +12742,7 @@ var TicketOperations = class {
     }
     let ticket = original;
     if (updates.type || updates.priority) {
-      ticket = await this.fs.updateTicketProperties(path2, {
+      ticket = await this.fs.updateTicketProperties(path4, {
         ...updates.type && { type: updates.type },
         ...updates.priority && { priority: updates.priority }
       });
@@ -12225,18 +12756,10 @@ var TicketOperations = class {
         ...updates.description !== void 0 && { description: updates.description },
         ...updates.labels !== void 0 && { labels: updates.labels }
       });
-      await this.fs.writeTicket(path2, ticket);
+      await this.fs.writeTicket(path4, ticket);
     }
     const messages = [];
-    if (options.regenerateReports !== false && changes.length > 0) {
-      try {
-        await regenerateAllReports(this.fs);
-        messages.push("\u{1F4CA} Updated status reports");
-      } catch (err) {
-        messages.push(`\u26A0\uFE0F  Warning: Could not update status reports: ${err}`);
-      }
-    }
-    return { ticket, path: path2, changes, messages };
+    return { ticket, path: path4, changes, messages };
   }
   /**
    * Updates one implementation step's status.
@@ -12248,8 +12771,8 @@ var TicketOperations = class {
    * first step.
    */
   async updateImplementationStep(ticketNumber, stepId, status) {
-    const path2 = await this.finder.requireTicketFile(ticketNumber);
-    const ticket = await this.fs.updateImplementationStep(path2, stepId, status);
+    const path4 = await this.finder.requireTicketFile(ticketNumber);
+    const ticket = await this.fs.updateImplementationStep(path4, stepId, status);
     const step = ticket.implementation_steps.find((s) => s.id === stepId);
     const messages = [
       `\u2705 Updated step ${stepId} to '${status}' on ticket #${ticketNumber}: ${ticket.title}`,
@@ -12258,12 +12781,12 @@ var TicketOperations = class {
     if (ticket.current_step !== void 0) {
       messages.push(`\u27A1\uFE0F  Current step: ${ticket.current_step}`);
     }
-    return { ticket, path: path2, messages };
+    return { ticket, path: path4, messages };
   }
   /** Moves the current-step pointer without changing any step's status. */
   async setCurrentStep(ticketNumber, stepId) {
-    const path2 = await this.finder.requireTicketFile(ticketNumber);
-    return { ticket: await this.fs.setCurrentStep(path2, stepId), path: path2 };
+    const path4 = await this.finder.requireTicketFile(ticketNumber);
+    return { ticket: await this.fs.setCurrentStep(path4, stepId), path: path4 };
   }
   /**
    * Ticks or unticks a checklist item by index.
@@ -12272,13 +12795,13 @@ var TicketOperations = class {
    * rather than silently doing nothing — matching TrackerFileSystem.
    */
   async updateChecklist(ticketNumber, index, checked) {
-    const path2 = await this.finder.requireTicketFile(ticketNumber);
-    const ticket = await this.fs.updateChecklist(path2, index, checked);
+    const path4 = await this.finder.requireTicketFile(ticketNumber);
+    const ticket = await this.fs.updateChecklist(path4, index, checked);
     const item = ticket.checklist[index];
     const checkedCount = ticket.checklist.filter((c) => c.checked).length;
     return {
       ticket,
-      path: path2,
+      path: path4,
       messages: [
         `\u2705 Updated checklist item on ticket #${ticketNumber}: ${ticket.title}`,
         `${checked ? "\u2611\uFE0F" : "\u2610"} ${item.text}`,
@@ -12294,8 +12817,8 @@ var TicketOperations = class {
    * verification, not a history.
    */
   async recordVerification(ticketNumber, verification) {
-    const path2 = await this.finder.requireTicketFile(ticketNumber);
-    const ticket = await this.fs.setVerification(path2, verification);
+    const path4 = await this.finder.requireTicketFile(ticketNumber);
+    const ticket = await this.fs.setVerification(path4, verification);
     const messages = [`\u2705 Recorded verification on ticket #${ticketNumber}: ${ticket.title}`];
     if (ticket.verification?.tests_passed !== void 0) {
       messages.push(`\u{1F9EA} Tests: ${ticket.verification.tests_passed ? "PASSED" : "FAILED"}`);
@@ -12304,153 +12827,50 @@ var TicketOperations = class {
       messages.push(`\u{1F528} Build: ${ticket.verification.build_passed ? "PASSED" : "FAILED"}`);
     }
     messages.push(`\u{1F552} Verified at: ${ticket.verification?.verified_at}`);
-    return { ticket, path: path2, messages };
+    return { ticket, path: path4, messages };
   }
   /**
-   * Moves a ticket to a different status, with the side effects move-ticket.ts
-   * produces today.
+   * Moves a ticket to a different status.
    *
-   * The work is delegated to TrackerFileSystem.updateTicketStatus, which is where
-   * two easily-missed side effects live:
+   * Status is a field, not a path (#335): this is a normal write to the
+   * ticket's existing location, and there is no rename, no per-status
+   * directory, and no feature.yaml link to maintain — #287's directory
+   * housekeeping (and the 23 orphaned directories it was fixing) cannot recur
+   * because there is no longer a per-status directory to orphan.
+   *
+   * The work is delegated to TrackerFileSystem.updateTicketStatus, which is
+   * where two easily-missed side effects live:
    *   - it appends a 'system' comment recording the transition
    *   - it reassigns the ticket between the centralised feature's todo /
    *     in_progress / done buckets
-   * Reimplementing the status change by hand — as the previous version of this
+   * Reimplementing the status change by hand — as an earlier version of this
    * method did — silently dropped both. The characterisation suite pins them.
    *
-   * Directory housekeeping is handled here (#287), replacing two helpers in
-   * move-ticket.ts that #268 proved were inert in every layout this system
-   * produces:
-   *   - cleanupEmptyFeatureDirectory was handed join(...absolutePath.split('/')),
-   *     which drops the leading slash and yields a relative path; readdirSync
-   *     threw and the bare catch swallowed it.
-   *   - updateFeatureLinks searched <status>/<name>/ while directories are
-   *     actually named <status>/feature-<name>/, so it matched nothing — yet
-   *     still returned true, which is why the script reported success it had
-   *     never achieved.
-   * 23 orphaned directories accumulated in plan/tracker-data as a result.
+   * Unlike a hand-rolled reimplementation, a no-op move THROWS rather than
+   * returning quietly — matching the script, which exits non-zero with
+   * "already in X status".
    *
-   * Unlike the previous implementation, a no-op move THROWS rather than returning
-   * quietly — matching the script, which exits non-zero with "already in X status".
-   *
-   * STATUS-* regeneration (#293) is the third side effect, added last and missing
-   * the longest. A move is the only operation that changes which bucket a ticket
-   * belongs to, yet it was the only write path that never rebuilt the buckets —
-   * createTicket and updateTicket both did. The result was an index that
-   * disagreed with the filesystem: a ticket living in done/ while
-   * STATUS-IN-PROGRESS.yaml still listed it. Neither the pre-refactor script nor
-   * this method ever regenerated, so the drift is as old as the rollups.
+   * STATUS-* regeneration is not a side effect here (#336): the rollups are an
+   * export, not an index, and reads come from the ticket index (#334), which
+   * revalidates against the filesystem and so cannot drift from it.
    */
-  async moveTicket(ticketNumber, newStatus, options = {}) {
-    const { ticket, path: path2 } = await this.finder.findAndReadTicket(ticketNumber);
+  async moveTicket(ticketNumber, newStatus) {
+    const { ticket, path: path4 } = await this.finder.findAndReadTicket(ticketNumber);
     const oldStatus = ticket.status;
     if (oldStatus === newStatus) {
       throw new ValidationError(`Ticket #${ticketNumber} is already in ${newStatus} status`);
     }
-    const updatedTicket = await this.fs.updateTicketStatus(path2, newStatus);
-    const newPath = await this.fs.moveTicket(path2, oldStatus, newStatus);
-    await this.fs.writeTicket(newPath, updatedTicket);
+    const updatedTicket = await this.fs.updateTicketStatus(path4, newStatus);
     const messages = [
       `\u2705 Moved ticket to ${newStatus} status`,
-      `\u{1F4C1} New location: ${newPath}`
+      `\u{1F4C1} Location: ${path4}`
     ];
-    const featureDirName = dirname2(path2).split("/").pop();
-    if (await this.ensureFeatureLink(newStatus, featureDirName)) {
-      messages.push(`\u{1F517} Created feature link: ${newStatus}/${featureDirName}/feature.yaml`);
-    }
-    if (await this.removeEmptyFeatureDir(oldStatus, featureDirName)) {
-      messages.push(`\u{1F9F9} Cleaned up empty feature directory: ${oldStatus}/${featureDirName}`);
-    }
     if (newStatus === "in-progress" && updatedTicket.started) {
       messages.push(`\u23F0 Started: ${updatedTicket.started}`);
     } else if (newStatus === "done" && updatedTicket.completed) {
       messages.push(`\u2705 Completed: ${updatedTicket.completed}`);
     }
-    if (options.regenerateReports !== false) {
-      try {
-        await regenerateAllReports(this.fs);
-        messages.push("\u{1F4CA} Updated status reports");
-      } catch (err) {
-        messages.push(`\u26A0\uFE0F  Warning: Could not update status reports: ${err}`);
-      }
-    }
-    return { ticket: updatedTicket, newPath, messages };
-  }
-  /**
-   * Removes a feature directory that no longer holds any tickets.
-   *
-   * DELIBERATELY CONSERVATIVE. Removing a directory is destructive and
-   * irreversible, so it only happens when everything left behind is provably
-   * disposable — meaning a `feature.yaml` that is a SYMLINK, whose target is the
-   * real file in features/.
-   *
-   * It refuses when:
-   *   - any ticket-*.yaml remains (obviously)
-   *   - feature.yaml is a regular file — the legacy layout keeps the only copy
-   *     of the feature there, and deleting it would destroy data
-   *   - anything else is present — README.md and CLAUDE.md both appear in real
-   *     orphaned directories, and whatever they are, they are not this
-   *     routine's to delete
-   *
-   * A cleanup routine that loses data is worse than one that leaves clutter.
-   *
-   * @returns true when the directory was removed.
-   */
-  async removeEmptyFeatureDir(status, featureDirName) {
-    const relDir = `${status}/${featureDirName}`;
-    const absDir = join4(this.dataDir, relDir);
-    let entries;
-    try {
-      entries = await readdir(absDir);
-    } catch {
-      return false;
-    }
-    if (entries.some((e) => e.startsWith("ticket-") && e.endsWith(".yaml")))
-      return false;
-    const leftovers = entries.filter((e) => e !== "feature.yaml");
-    if (leftovers.length > 0)
-      return false;
-    if (entries.includes("feature.yaml")) {
-      const linkPath = join4(absDir, "feature.yaml");
-      try {
-        if (!(await lstat(linkPath)).isSymbolicLink())
-          return false;
-        await unlink(linkPath);
-      } catch {
-        return false;
-      }
-    }
-    try {
-      await rmdir(absDir);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  /**
-   * Ensures a status directory can resolve its feature, by linking feature.yaml
-   * into features/.
-   *
-   * Only acts when the directory exists, has no feature.yaml already, and the
-   * centralised file is actually there to point at.
-   *
-   * @returns true when a link was created.
-   */
-  async ensureFeatureLink(status, featureDirName) {
-    const featureName = featureDirName.startsWith("feature-") ? featureDirName.slice("feature-".length) : featureDirName;
-    const relDir = `${status}/${featureDirName}`;
-    if (!await this.fs.exists(relDir))
-      return false;
-    if (await this.fs.exists(`${relDir}/feature.yaml`))
-      return false;
-    if (!await this.fs.exists(`features/${featureName}.yaml`))
-      return false;
-    try {
-      await symlink(join4("..", "..", "features", `${featureName}.yaml`), join4(this.dataDir, relDir, "feature.yaml"));
-      return true;
-    } catch {
-      return false;
-    }
+    return { ticket: updatedTicket, newPath: path4, messages };
   }
   /**
    * Adds a comment to a ticket.
@@ -12490,7 +12910,7 @@ var TicketOperations = class {
     if (!text || text.trim().length === 0) {
       throw new ValidationError("Comment text cannot be empty");
     }
-    const { ticket, path: path2 } = await this.finder.findAndReadTicket(ticketNumber);
+    const { ticket, path: path4 } = await this.finder.findAndReadTicket(ticketNumber);
     const comment = {
       author: author.trim(),
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -12500,15 +12920,15 @@ var TicketOperations = class {
       ...ticket,
       comments: [...ticket.comments ?? [], comment]
     });
-    await this.fs.writeTicket(path2, updatedTicket);
+    await this.fs.writeTicket(path4, updatedTicket);
     const messages = [
       `\u2705 Added comment to ticket #${ticketNumber}: ${updatedTicket.title}`,
       `\u{1F4AC} Author: ${comment.author}`,
       `\u{1F4DD} Comment: ${comment.text}`,
-      `\u{1F4C1} File: ${path2}`,
+      `\u{1F4C1} File: ${path4}`,
       `\u{1F4CA} Total comments on this ticket: ${updatedTicket.comments.length}`
     ];
-    return { ticket: updatedTicket, path: path2, messages };
+    return { ticket: updatedTicket, path: path4, messages };
   }
   /**
    * Performs bulk operations on multiple tickets
@@ -12597,8 +13017,677 @@ function createTicketOperations(dataDir) {
   return new TicketOperations(dataDir);
 }
 
-// ../shared/dist/work-session-operations.js
+// ../shared/dist/integrity.js
+import { readdir, readFile, lstat, stat } from "fs/promises";
 import { join as join5 } from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
+
+// ../shared/dist/yaml-compare.js
+var ISO_INSTANT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
+function canonicalScalar(value) {
+  if (value instanceof Date)
+    return JSON.stringify(value.toISOString());
+  if (typeof value === "string" && ISO_INSTANT.test(value)) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime()))
+      return JSON.stringify(parsed.toISOString());
+  }
+  return JSON.stringify(value);
+}
+function flattenScalars(value, prefix = "", out = /* @__PURE__ */ new Map()) {
+  if (value instanceof Date || value === null || typeof value !== "object") {
+    out.set(prefix, canonicalScalar(value));
+    return out;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0)
+      out.set(prefix, "[]");
+    value.forEach((v, i2) => flattenScalars(v, `${prefix}[${i2}]`, out));
+    return out;
+  }
+  const keys = Object.keys(value);
+  if (keys.length === 0)
+    out.set(prefix, "{}");
+  for (const k of keys) {
+    flattenScalars(value[k], prefix ? `${prefix}.${k}` : k, out);
+  }
+  return out;
+}
+var DERIVED_FIELDS = /* @__PURE__ */ new Set([
+  "total_tickets",
+  "completion_percentage",
+  "is_completed",
+  "work_session_summary"
+]);
+function rollupTicketNumber(key) {
+  const parts = key.split(".");
+  if (parts[0] !== "tickets")
+    return null;
+  return parts.length >= 3 ? parts[2] : null;
+}
+function rollupTicketNumbers(scalars) {
+  const numbers = /* @__PURE__ */ new Set();
+  for (const key of scalars.keys()) {
+    const number = rollupTicketNumber(key);
+    if (number !== null)
+      numbers.add(number);
+  }
+  return numbers;
+}
+function uniqueFeatureContent(copy, central, centralLabel) {
+  const copyScalars = flattenScalars(copy ?? {});
+  const centralScalars = flattenScalars(central ?? {});
+  const centralTickets = rollupTicketNumbers(centralScalars);
+  const unique = [];
+  for (const [key, value] of copyScalars) {
+    const head = key.split(".")[0].replace(/\[\d+\]$/, "");
+    if (DERIVED_FIELDS.has(head))
+      continue;
+    if (head === "tickets") {
+      const number = rollupTicketNumber(key);
+      if (number === null || centralTickets.has(number))
+        continue;
+      unique.push(`${key}=${value} (absent from ${centralLabel})`);
+      continue;
+    }
+    if (!centralScalars.has(key)) {
+      unique.push(`${key}=${value} (absent from ${centralLabel})`);
+    } else if (centralScalars.get(key) !== value) {
+      unique.push(`${key}: copy=${value} central=${centralScalars.get(key)}`);
+    }
+  }
+  return unique;
+}
+
+// ../shared/dist/integrity.js
+var execFileAsync = promisify(execFile);
+var STATUS_DIRS = ["todo", "in-progress", "done"];
+var FEATURE_LINK = "feature.yaml";
+var SAMPLE_LIMIT = 10;
+var BUCKET_BY_STATUS = {
+  todo: "todo",
+  "in-progress": "in_progress",
+  done: "done"
+};
+var KIND_ORDER = [
+  "unreadable-ticket",
+  "unreadable-feature-file",
+  "feature-directory-without-feature-file",
+  "name-collision",
+  "feature-copy-holds-unique-content",
+  "feature-link-target-missing",
+  "feature-link-dangling",
+  "feature-link-is-copy",
+  "ticket-feature-mismatch",
+  "ticket-status-mismatch",
+  "feature-rollup-mismatch",
+  "feature-file-without-tickets",
+  "stray-non-ticket-file",
+  "uncommitted-tracker-data"
+];
+var SEVERITY_BY_KIND = {
+  "unreadable-ticket": "error",
+  "unreadable-feature-file": "error",
+  "feature-directory-without-feature-file": "error",
+  // Two tickets that would land on one path in a flat `tickets/`. One would
+  // overwrite the other, so this is unconditionally fatal to a flatten.
+  "name-collision": "error",
+  // The per-status copy is the only record of something. Deleting it — which is
+  // what the flatten does to every feature link — loses that content.
+  "feature-copy-holds-unique-content": "error",
+  // A dangling link over a feature with NO central file: the last mention of
+  // that feature anywhere on disk.
+  "feature-link-target-missing": "error",
+  "feature-link-dangling": "error",
+  // Severity is decided per issue: a copy that already disagrees with the
+  // central file is an error, one that still matches is a warning about what
+  // will happen next.
+  "feature-link-is-copy": "warning",
+  "ticket-feature-mismatch": "error",
+  "ticket-status-mismatch": "error",
+  "feature-rollup-mismatch": "error",
+  // A feature registered but not yet ticketed is the normal state for the
+  // minutes between create-feature and the first create-ticket. Worth naming,
+  // not worth failing a build over.
+  "feature-file-without-tickets": "warning",
+  // The flatten moves tickets and drops the feature link; anything else keeps
+  // the directory alive afterwards. Survivable, but a surprise if unannounced.
+  "stray-non-ticket-file": "warning",
+  // Untracked ticket files are the one part of a migration git cannot roll
+  // back. A warning, because committing is the caller's call — `--strict` is
+  // how a caller says "refuse on this".
+  "uncommitted-tracker-data": "warning"
+};
+var INTEGRITY_ISSUE_KINDS = Object.keys(SEVERITY_BY_KIND);
+async function safeReaddir(dir) {
+  try {
+    return await readdir(dir);
+  } catch {
+    return [];
+  }
+}
+async function exists(target) {
+  try {
+    await stat(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function inspectFeatureLink(dataDir, status, entry, feature, add) {
+  const relPath = `${status}/${entry}/feature.yaml`;
+  const fullPath = join5(dataDir, relPath);
+  let info;
+  try {
+    info = await lstat(fullPath);
+  } catch {
+    return;
+  }
+  const centralPath = `features/${feature}.yaml`;
+  const centralFull = join5(dataDir, centralPath);
+  if (info.isSymbolicLink()) {
+    try {
+      await stat(fullPath);
+      return;
+    } catch {
+    }
+    let centralExists = true;
+    try {
+      await stat(centralFull);
+    } catch {
+      centralExists = false;
+    }
+    add(centralExists ? {
+      kind: "feature-link-dangling",
+      feature,
+      path: relPath,
+      message: `${relPath} is a symlink whose target does not exist`
+    } : {
+      kind: "feature-link-target-missing",
+      feature,
+      path: relPath,
+      message: `${relPath} is a dangling symlink AND ${centralPath} is absent \u2014 this feature has no surviving definition anywhere`
+    });
+    return;
+  }
+  if (!info.isFile())
+    return;
+  let copyRaw;
+  let centralRaw;
+  try {
+    [copyRaw, centralRaw] = await Promise.all([
+      readFile(fullPath, "utf8"),
+      readFile(centralFull, "utf8")
+    ]);
+  } catch {
+    add({
+      kind: "feature-copy-holds-unique-content",
+      feature,
+      path: relPath,
+      message: `${relPath} is a regular-file copy and ${centralPath} cannot be read \u2014 whatever this copy holds is the only record of it`
+    });
+    return;
+  }
+  let unique = [];
+  if (copyRaw !== centralRaw) {
+    try {
+      unique = uniqueFeatureContent(load(copyRaw), load(centralRaw), centralPath);
+    } catch (err) {
+      add({
+        kind: "feature-copy-holds-unique-content",
+        feature,
+        path: relPath,
+        message: `${relPath} is a regular-file copy that cannot be compared with ${centralPath}: ${err instanceof Error ? err.message : String(err)}`
+      });
+      return;
+    }
+  }
+  if (unique.length > 0) {
+    add({
+      kind: "feature-copy-holds-unique-content",
+      feature,
+      path: relPath,
+      message: `${relPath} is a regular-file copy holding content absent from ${centralPath}: ${unique.join("; ")}. Deleting it loses that content \u2014 reconcile into the central file first.`
+    });
+    return;
+  }
+  add({
+    kind: "feature-link-is-copy",
+    feature,
+    path: relPath,
+    message: `${relPath} is a copy, not a symlink \u2014 it will silently diverge from ${centralPath}`
+  });
+}
+async function uncommittedPaths(dataDir) {
+  try {
+    const { stdout: prefixOut } = await execFileAsync("git", ["rev-parse", "--show-prefix"], {
+      cwd: dataDir
+    });
+    const prefix = prefixOut.trim();
+    const { stdout } = await execFileAsync("git", ["status", "--porcelain", "-z", "--untracked-files=all", "--", "."], { cwd: dataDir, maxBuffer: 64 * 1024 * 1024 });
+    const paths = [];
+    const records = stdout.split("\0");
+    for (let i2 = 0; i2 < records.length; i2++) {
+      const record = records[i2];
+      if (!record)
+        continue;
+      const status = record.slice(0, 2);
+      const repoRelative = record.slice(3);
+      paths.push(prefix && repoRelative.startsWith(prefix) ? repoRelative.slice(prefix.length) : repoRelative);
+      if (status[0] === "R" || status[0] === "C")
+        i2++;
+    }
+    return paths.sort();
+  } catch {
+    return [];
+  }
+}
+async function checkIntegrity(dataDir) {
+  const issues = [];
+  const add = (issue) => {
+    issues.push({ ...issue, severity: issue.severity ?? SEVERITY_BY_KIND[issue.kind] });
+  };
+  const featureFiles = (await safeReaddir(join5(dataDir, "features"))).filter((f) => f.endsWith(".yaml")).sort();
+  const registeredFeatures = new Set(featureFiles.map((f) => f.replace(/\.yaml$/, "")));
+  const referencedFeatures = /* @__PURE__ */ new Set();
+  const diskBuckets = /* @__PURE__ */ new Map();
+  let ticketCount = 0;
+  let featureDirCount = 0;
+  const bucketsFor = (name) => {
+    let buckets = diskBuckets.get(name);
+    if (!buckets) {
+      buckets = { todo: /* @__PURE__ */ new Set(), in_progress: /* @__PURE__ */ new Set(), done: /* @__PURE__ */ new Set() };
+      diskBuckets.set(name, buckets);
+    }
+    return buckets;
+  };
+  const legacyDirs = (await Promise.all(STATUS_DIRS.map(async (d) => await exists(join5(dataDir, d)) ? d : null))).filter((d) => d !== null);
+  if (legacyDirs.length > 0) {
+    const claimedBasenames = /* @__PURE__ */ new Map();
+    for (const existing of await safeReaddir(join5(dataDir, TICKETS_DIR))) {
+      if (isTicketFilename(existing)) {
+        claimedBasenames.set(existing, `${TICKETS_DIR}/${existing}`);
+      }
+    }
+    for (const status of legacyDirs) {
+      const statusPath = join5(dataDir, status);
+      for (const entry of (await safeReaddir(statusPath)).sort()) {
+        if (!entry.startsWith("feature-"))
+          continue;
+        const dirFeature = entry.slice("feature-".length);
+        const dirPath = join5(statusPath, entry);
+        const dirContents = (await safeReaddir(dirPath)).sort();
+        const ticketFiles = dirContents.filter(isTicketFilename);
+        if (ticketFiles.length === 0)
+          continue;
+        featureDirCount++;
+        referencedFeatures.add(dirFeature);
+        await inspectFeatureLink(dataDir, status, entry, dirFeature, add);
+        for (const stray of dirContents) {
+          if (isTicketFilename(stray) || stray === FEATURE_LINK)
+            continue;
+          add({
+            kind: "stray-non-ticket-file",
+            feature: dirFeature,
+            path: `${status}/${entry}/${stray}`,
+            message: `${status}/${entry}/${stray} is neither a ticket nor the feature link \u2014 it would keep ${status}/${entry}/ alive after a flatten`
+          });
+        }
+        for (const file of ticketFiles) {
+          const relPath = `${status}/${entry}/${file}`;
+          const claimant = claimedBasenames.get(file);
+          if (claimant) {
+            add({
+              kind: "name-collision",
+              feature: dirFeature,
+              path: relPath,
+              message: `${relPath} and ${claimant} share a basename \u2014 both want ${TICKETS_DIR}/${file}, and one would overwrite the other`
+            });
+          } else {
+            claimedBasenames.set(file, relPath);
+          }
+          let ticket;
+          try {
+            ticket = load(await readFile(join5(dirPath, file), "utf8"));
+          } catch (err) {
+            add({
+              kind: "unreadable-ticket",
+              path: relPath,
+              feature: dirFeature,
+              message: `Cannot parse ${relPath}: ${err instanceof Error ? err.message : String(err)}`
+            });
+            continue;
+          }
+          if (!ticket || typeof ticket !== "object") {
+            add({
+              kind: "unreadable-ticket",
+              path: relPath,
+              feature: dirFeature,
+              message: `${relPath} does not contain a ticket mapping`
+            });
+            continue;
+          }
+          ticketCount++;
+          const ticketNumber = typeof ticket.ticket_number === "number" ? ticket.ticket_number : void 0;
+          if (ticketNumber !== void 0) {
+            bucketsFor(dirFeature)[BUCKET_BY_STATUS[status]].add(ticketNumber);
+          }
+          if (typeof ticket.feature === "string" && ticket.feature !== "") {
+            referencedFeatures.add(ticket.feature);
+            if (ticket.feature !== dirFeature) {
+              add({
+                kind: "ticket-feature-mismatch",
+                path: relPath,
+                feature: dirFeature,
+                ticket: ticketNumber,
+                message: `${relPath} declares feature "${ticket.feature}" but sits in the "${dirFeature}" directory`
+              });
+            }
+          } else {
+            add({
+              kind: "ticket-feature-mismatch",
+              path: relPath,
+              feature: dirFeature,
+              ticket: ticketNumber,
+              message: `${relPath} has no feature field; its directory says "${dirFeature}"`
+            });
+          }
+          if (ticket.status !== status) {
+            add({
+              kind: "ticket-status-mismatch",
+              path: relPath,
+              feature: dirFeature,
+              ticket: ticketNumber,
+              message: `${relPath} records status "${ticket.status}" but sits in the "${status}" directory`
+            });
+          }
+        }
+      }
+    }
+  }
+  for (const file of (await safeReaddir(join5(dataDir, TICKETS_DIR))).sort()) {
+    if (!isTicketFilename(file))
+      continue;
+    const relPath = `${TICKETS_DIR}/${file}`;
+    let ticket;
+    try {
+      ticket = load(await readFile(join5(dataDir, TICKETS_DIR, file), "utf8"));
+    } catch (err) {
+      add({
+        kind: "unreadable-ticket",
+        path: relPath,
+        message: `Cannot parse ${relPath}: ${err instanceof Error ? err.message : String(err)}`
+      });
+      continue;
+    }
+    if (!ticket || typeof ticket !== "object") {
+      add({
+        kind: "unreadable-ticket",
+        path: relPath,
+        message: `${relPath} does not contain a ticket mapping`
+      });
+      continue;
+    }
+    ticketCount++;
+    const ticketNumber = typeof ticket.ticket_number === "number" ? ticket.ticket_number : void 0;
+    const bucket = BUCKET_BY_STATUS[ticket.status];
+    if (bucket === void 0) {
+      add({
+        kind: "ticket-status-mismatch",
+        path: relPath,
+        ticket: ticketNumber,
+        message: `${relPath} records status "${ticket.status}", which is not one of todo/in-progress/done`
+      });
+    }
+    if (typeof ticket.feature === "string" && ticket.feature !== "") {
+      referencedFeatures.add(ticket.feature);
+      if (ticketNumber !== void 0 && bucket !== void 0) {
+        bucketsFor(ticket.feature)[bucket].add(ticketNumber);
+      }
+    } else {
+      add({
+        kind: "ticket-feature-mismatch",
+        path: relPath,
+        ticket: ticketNumber,
+        message: `${relPath} has no feature field`
+      });
+    }
+  }
+  for (const name of [...referencedFeatures].sort()) {
+    if (registeredFeatures.has(name))
+      continue;
+    add({
+      kind: "feature-directory-without-feature-file",
+      feature: name,
+      message: `Feature "${name}" has tickets but no features/${name}.yaml \u2014 its tickets are invisible to listFeatures and counted by no rollup`
+    });
+  }
+  for (const name of [...registeredFeatures].sort()) {
+    if (referencedFeatures.has(name))
+      continue;
+    add({
+      kind: "feature-file-without-tickets",
+      feature: name,
+      message: `Feature "${name}" is registered in features/${name}.yaml but has no tickets`
+    });
+  }
+  for (const name of [...registeredFeatures].sort()) {
+    const relPath = `features/${name}.yaml`;
+    let featureFile;
+    try {
+      featureFile = load(await readFile(join5(dataDir, relPath), "utf8"));
+    } catch (err) {
+      add({
+        kind: "unreadable-feature-file",
+        feature: name,
+        path: relPath,
+        message: `Cannot parse ${relPath}: ${err instanceof Error ? err.message : String(err)}`
+      });
+      continue;
+    }
+    if (!featureFile || typeof featureFile !== "object") {
+      add({
+        kind: "unreadable-feature-file",
+        feature: name,
+        path: relPath,
+        message: `${relPath} does not contain a feature mapping`
+      });
+      continue;
+    }
+    const onDisk = diskBuckets.get(name);
+    if (!onDisk)
+      continue;
+    const declared = featureFile.tickets ?? {};
+    const drifts = [];
+    for (const bucket of ["todo", "in_progress", "done"]) {
+      const declaredNumbers = new Set(Object.keys(declared[bucket] ?? {}).map((k) => Number(k)).filter((n) => Number.isFinite(n)));
+      const missing = [...onDisk[bucket]].filter((n) => !declaredNumbers.has(n)).sort((a, b) => a - b);
+      const extra = [...declaredNumbers].filter((n) => !onDisk[bucket].has(n)).sort((a, b) => a - b);
+      if (missing.length > 0) {
+        drifts.push(`${bucket} missing ${missing.map((n) => `#${n}`).join(", ")}`);
+      }
+      if (extra.length > 0) {
+        drifts.push(`${bucket} lists ${extra.map((n) => `#${n}`).join(", ")} which are not on disk`);
+      }
+    }
+    if (drifts.length > 0) {
+      add({
+        kind: "feature-rollup-mismatch",
+        feature: name,
+        path: relPath,
+        message: `${relPath} rollup disagrees with the tickets on disk \u2014 ${drifts.join("; ")}`
+      });
+    }
+  }
+  const dirty = await uncommittedPaths(dataDir);
+  if (dirty.length > 0) {
+    const sample = dirty.slice(0, SAMPLE_LIMIT);
+    const rest = dirty.length - sample.length;
+    add({
+      kind: "uncommitted-tracker-data",
+      message: `${dirty.length} path(s) under the data dir are modified or untracked: ` + sample.join(", ") + (rest > 0 ? `, and ${rest} more` : "") + `. Untracked ticket files are the one part of a migration git cannot roll back \u2014 commit before applying one.`
+    });
+  }
+  issues.sort((a, b) => {
+    const byKind = KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind);
+    if (byKind !== 0)
+      return byKind;
+    const byFeature = (a.feature ?? "").localeCompare(b.feature ?? "");
+    if (byFeature !== 0)
+      return byFeature;
+    const byTicket = (a.ticket ?? 0) - (b.ticket ?? 0);
+    if (byTicket !== 0)
+      return byTicket;
+    return (a.path ?? "").localeCompare(b.path ?? "");
+  });
+  const errors = issues.filter((i2) => i2.severity === "error").length;
+  const warnings = issues.length - errors;
+  const report = {
+    clean: issues.length === 0,
+    issues,
+    errors,
+    warnings,
+    counts: {
+      features: featureFiles.length,
+      featureDirectories: featureDirCount,
+      tickets: ticketCount
+    },
+    messages: []
+  };
+  report.messages = formatIntegrityReport(report);
+  return report;
+}
+function formatIntegrityReport(report) {
+  const { counts } = report;
+  const scanned = `\u{1F50D} Checked ${counts.features} feature file(s), ${counts.featureDirectories} feature directory(ies), ${counts.tickets} ticket(s)`;
+  if (report.clean) {
+    return [scanned, "\u2705 Integrity check passed \u2014 no issues found"];
+  }
+  const lines = [scanned, ""];
+  let lastKind = null;
+  for (const issue of report.issues) {
+    if (issue.kind !== lastKind) {
+      if (lastKind !== null)
+        lines.push("");
+      lines.push(`${issue.kind}:`);
+      lastKind = issue.kind;
+    }
+    lines.push(`  ${issue.severity === "error" ? "\u274C" : "\u26A0\uFE0F "} ${issue.message}`);
+  }
+  lines.push("");
+  lines.push(`Found ${report.issues.length} issue(s): ${report.errors} error(s), ${report.warnings} warning(s)`);
+  return lines;
+}
+
+// ../shared/dist/status-reports.js
+var STATUSES = ["todo", "in-progress", "done"];
+var PRIORITY_ORDER = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3
+};
+var UNKNOWN_PRIORITY_RANK = 999;
+async function regenerateStatusReports(fs3) {
+  const messages = [];
+  const allEntries = await fs3.readAllTicketEntries();
+  const globalTicketLookup = /* @__PURE__ */ new Map();
+  const byStatus = /* @__PURE__ */ new Map();
+  for (const status of STATUSES)
+    byStatus.set(status, []);
+  const unbucketed = [];
+  for (const { ticket, path: ticketPath } of allEntries) {
+    globalTicketLookup.set(ticket.ticket_number, ticket.title);
+    const bucket = ticket.status;
+    const list = byStatus.get(bucket);
+    if (list) {
+      list.push({ ticket, path: ticketPath });
+    } else {
+      unbucketed.push({ ticket, path: ticketPath });
+    }
+  }
+  if (unbucketed.length > 0) {
+    messages.push(`\u26A0\uFE0F  ${unbucketed.length} ticket(s) have a status matching none of todo/in-progress/done and are excluded from every report: ` + unbucketed.map(({ ticket }) => `#${ticket.ticket_number} (status: ${JSON.stringify(ticket.status)})`).join(", "));
+  }
+  for (const status of STATUSES) {
+    const ticketData = byStatus.get(status);
+    ticketData.sort((a, b) => {
+      const prioDiff = (PRIORITY_ORDER[a.ticket.priority] ?? UNKNOWN_PRIORITY_RANK) - (PRIORITY_ORDER[b.ticket.priority] ?? UNKNOWN_PRIORITY_RANK);
+      if (prioDiff !== 0)
+        return prioDiff;
+      return a.ticket.ticket_number - b.ticket.ticket_number;
+    });
+    const summary = { critical: 0, high: 0, medium: 0, low: 0 };
+    ticketData.forEach(({ ticket }) => {
+      const priority = ticket.priority;
+      summary[priority]++;
+    });
+    const priorities = {};
+    const featureMap = /* @__PURE__ */ new Map();
+    ticketData.forEach(({ ticket }) => {
+      const priority = ticket.priority;
+      if (!featureMap.has(priority)) {
+        featureMap.set(priority, /* @__PURE__ */ new Map());
+      }
+      const priorityMap = featureMap.get(priority);
+      if (!priorityMap.has(ticket.feature)) {
+        priorityMap.set(ticket.feature, []);
+      }
+      priorityMap.get(ticket.feature).push({
+        ticket_number: ticket.ticket_number,
+        title: ticket.title,
+        assignee: ticket.assignee,
+        blocked_by: (ticket.blocked_by || []).map((b) => ({
+          ticket_number: b.ticket,
+          title: globalTicketLookup.get(b.ticket) || `Ticket #${b.ticket}`
+        }))
+      });
+    });
+    featureMap.forEach((priorityMap, priority) => {
+      if (priorityMap.size > 0) {
+        priorities[priority] = [];
+        priorityMap.forEach((tickets, feature) => {
+          priorities[priority].push({ feature, tickets });
+        });
+      }
+    });
+    const blockedTickets = [];
+    ticketData.forEach(({ ticket }) => {
+      if (ticket.blocked_by && ticket.blocked_by.length > 0) {
+        blockedTickets.push({
+          ticket_number: ticket.ticket_number,
+          title: ticket.title,
+          blocked_by: ticket.blocked_by.map((blocker) => ({
+            ticket_number: blocker.ticket,
+            title: globalTicketLookup.get(blocker.ticket) || `Ticket #${blocker.ticket}`
+          })),
+          description: ticket.blocked_by.map((b) => b.description).join(", ")
+        });
+      }
+    });
+    const statusReport = {
+      status,
+      last_updated: (/* @__PURE__ */ new Date()).toISOString(),
+      total_tickets: ticketData.length,
+      summary,
+      priorities,
+      blocked_tickets: blockedTickets
+    };
+    await fs3.writeFile(`STATUS-${status.toUpperCase()}.yaml`, dump(statusReport, { lineWidth: -1 }));
+    messages.push(`\u2705 Updated STATUS-${status.toUpperCase()}.yaml (${ticketData.length} tickets)`);
+  }
+  return messages;
+}
+async function regenerateAllReports(fs3) {
+  const messages = await regenerateStatusReports(fs3);
+  await fs3.updateDependencies();
+  messages.push("\u2705 Updated DEPENDENCIES.yaml");
+  return messages;
+}
+
+// ../shared/dist/work-session-operations.js
+import { join as join6 } from "path";
 import { promises as fsp, createReadStream } from "fs";
 import { createInterface } from "readline";
 import { homedir } from "os";
@@ -12649,47 +13738,38 @@ async function updateFeatureWorkSessionSummary(featureName, dataPath) {
   const messages = [];
   const warnings = [];
   const trackerFs = new TrackerFileSystem(dataPath);
-  const statusDirs = ["todo", "in-progress", "done"];
-  const allWorkSessions = [];
-  for (const statusDir of statusDirs) {
-    const featurePath = join5(statusDir, `feature-${featureName}`);
-    try {
-      for (const file of await trackerFs.readdir(featurePath)) {
-        if (file.startsWith("ticket-") && file.endsWith(".yaml")) {
-          const ticket = await trackerFs.readTicket(join5(featurePath, file));
-          if (ticket.work_sessions) {
-            allWorkSessions.push(...ticket.work_sessions);
-          }
-        }
+  await trackerFs.withWriteLock(async () => {
+    const allWorkSessions = [];
+    for (const relPath of await trackerFs.findTicketsByFeature(featureName)) {
+      const ticket = await trackerFs.readTicket(relPath);
+      if (ticket.work_sessions) {
+        allWorkSessions.push(...ticket.work_sessions);
       }
-    } catch {
     }
-  }
-  const featureYamlPath = await findFeatureYamlPath(trackerFs, featureName);
-  if (!featureYamlPath) {
-    warnings.push(`Could not find feature.yaml for feature ${featureName}`);
-    return { messages, warnings };
-  }
-  try {
-    const feature = load(await trackerFs.readFile(featureYamlPath));
-    feature.work_session_summary = updateWorkSessionSummary(allWorkSessions);
-    await trackerFs.writeFile(featureYamlPath, dump(feature, { lineWidth: -1 }));
-    messages.push(`\u{1F4CA} Updated feature ${featureName} work session summary`);
-  } catch (e) {
-    warnings.push(`Could not update feature ${featureName} work session summary: ${e}`);
-  }
+    const featureYamlPath = await findFeatureYamlPath(trackerFs, featureName);
+    if (!featureYamlPath) {
+      warnings.push(`Could not find feature.yaml for feature ${featureName}`);
+      return;
+    }
+    try {
+      const feature = load(await trackerFs.readFile(featureYamlPath));
+      feature.work_session_summary = updateWorkSessionSummary(allWorkSessions);
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      feature.last_activity = now;
+      if (!feature.started) {
+        feature.started = now;
+      }
+      await trackerFs.writeFile(featureYamlPath, dump(feature, { lineWidth: -1 }));
+      messages.push(`\u{1F4CA} Updated feature ${featureName} work session summary`);
+    } catch (e) {
+      warnings.push(`Could not update feature ${featureName} work session summary: ${e}`);
+    }
+  });
   return { messages, warnings };
 }
 async function findFeatureYamlPath(trackerFs, featureName) {
-  for (const statusDir of ["todo", "in-progress", "done"]) {
-    const yamlPath = join5(statusDir, `feature-${featureName}`, "feature.yaml");
-    try {
-      await trackerFs.readFile(yamlPath);
-      return yamlPath;
-    } catch {
-    }
-  }
-  return null;
+  const yamlPath = join6("features", `${featureName}.yaml`);
+  return await trackerFs.exists(yamlPath) ? yamlPath : null;
 }
 function formatWorkSessionSummary(summary, label) {
   const lines = [
@@ -12708,10 +13788,10 @@ function formatWorkSessionSummary(summary, label) {
   return lines;
 }
 function projectTranscriptDir(claudePath, projectDir) {
-  const projectsRoot = join5(claudePath, "projects");
+  const projectsRoot = join6(claudePath, "projects");
   if (!projectDir)
     return projectsRoot;
-  return join5(projectsRoot, projectDir.replace(/\//g, "-"));
+  return join6(projectsRoot, projectDir.replace(/\//g, "-"));
 }
 function belongsToProject(message, projectDir) {
   if (!projectDir)
@@ -12736,7 +13816,7 @@ async function findJSONLFiles(projectPath) {
   async function scanDir(dir) {
     try {
       for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
-        const fullPath = join5(dir, entry.name);
+        const fullPath = join6(dir, entry.name);
         if (entry.isDirectory()) {
           await scanDir(fullPath);
         } else if (entry.name.endsWith(".jsonl")) {
@@ -13047,29 +14127,27 @@ async function logWorkSession(options) {
 }
 
 // ../shared/dist/feature-operations.js
-import { symlink as symlink2 } from "fs/promises";
-import { join as join6 } from "path";
-var STATUS_DIRS = ["todo", "in-progress", "done"];
 var FeatureOperations = class {
   fs;
-  dataDir;
   constructor(dataDir) {
     this.fs = new TrackerFileSystem(dataDir);
-    this.dataDir = dataDir;
   }
   featurePath(name) {
     return `features/${name}.yaml`;
   }
   async requireFeature(name) {
-    const path2 = this.featurePath(name);
-    if (!await this.fs.exists(path2)) {
+    const path4 = this.featurePath(name);
+    if (!await this.fs.exists(path4)) {
       throw new FeatureNotFoundError(name);
     }
-    return load(await this.fs.readFile(path2));
+    return load(await this.fs.readFile(path4));
   }
   /**
-   * Creates a feature: the centralised file, the todo directory, and the soft
-   * link between them.
+   * Creates a feature: just the centralised file.
+   *
+   * Before #335 this also created a todo/feature-<name>/ directory and a soft
+   * link back to the centralised file. Flat storage has no per-status
+   * directory for a fresh feature to seed, so there is nothing left to link.
    *
    * Note create-feature.ts is the one write script that does NOT record a
    * scriptcall.log entry — it predates the logScriptExecution wrapper the others
@@ -13108,23 +14186,8 @@ ${input.description}
     const centralizedPath = this.featurePath(input.name);
     const featureYaml = dump(feature, { lineWidth: -1 });
     await this.fs.writeFile(centralizedPath, featureYaml);
-    const featureDir = `todo/feature-${input.name}`;
-    await this.fs.ensureDir(featureDir);
-    const softLinkPath = `${featureDir}/feature.yaml`;
-    try {
-      await symlink2(join6("..", "..", "features", `${input.name}.yaml`), join6(this.dataDir, softLinkPath));
-      messages.push(`\u2705 Created feature: ${input.name}`);
-      messages.push(`\u{1F4C1} Centralized file: ${centralizedPath}`);
-      messages.push(`\u{1F4C1} Feature directory: ${featureDir}`);
-      messages.push(`\u{1F517} Soft link: ${softLinkPath}`);
-    } catch (linkError) {
-      messages.push(`\u26A0\uFE0F  Soft link creation failed, copying file instead: ${linkError}`);
-      await this.fs.writeFile(softLinkPath, featureYaml);
-      messages.push(`\u2705 Created feature: ${input.name}`);
-      messages.push(`\u{1F4C1} Centralized file: ${centralizedPath}`);
-      messages.push(`\u{1F4C1} Feature directory: ${featureDir}`);
-      messages.push(`\u{1F4C4} Copied feature file to: ${softLinkPath}`);
-    }
+    messages.push(`\u2705 Created feature: ${input.name}`);
+    messages.push(`\u{1F4C1} Centralized file: ${centralizedPath}`);
     return { feature, messages, changes: [] };
   }
   /**
@@ -13196,31 +14259,7 @@ ${input.description}
     for (const change of changes) {
       messages.push(`   \u2022 ${change}`);
     }
-    await this.ensureSoftLinks(name);
     return { feature, messages, changes };
-  }
-  /**
-   * Re-points feature.yaml soft links in any status directory that already has
-   * a feature directory.
-   *
-   * Only touches directories that exist; it does not create them. Note this is
-   * NOT the broken updateFeatureLinks from move-ticket.ts — that one searched
-   * <status>/<name>/ instead of <status>/feature-<name>/ and matched nothing
-   * (#287). This uses the correct prefix.
-   */
-  async ensureSoftLinks(name) {
-    for (const status of STATUS_DIRS) {
-      const featureDir = `${status}/feature-${name}`;
-      if (!await this.fs.exists(featureDir))
-        continue;
-      const softLinkPath = `${featureDir}/feature.yaml`;
-      if (await this.fs.exists(softLinkPath))
-        continue;
-      try {
-        await symlink2(join6("..", "..", "features", `${name}.yaml`), join6(this.dataDir, softLinkPath));
-      } catch {
-      }
-    }
   }
   /**
    * Records the design approach. approved_at is stamped only when approved.
@@ -13404,8 +14443,8 @@ function dateComparator(a, b) {
   const dateB = b instanceof Date ? b : new Date(b);
   return dateA.getTime() - dateB.getTime();
 }
-function getNestedValue(obj, path2) {
-  const keys = path2.split(".");
+function getNestedValue(obj, path4) {
+  const keys = path4.split(".");
   let value = obj;
   for (const key of keys) {
     if (value == null)
@@ -13511,8 +14550,8 @@ function formatCSV(data, columns) {
 function formatJSON(data, pretty = true) {
   return pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
 }
-function getNestedValue2(obj, path2) {
-  const keys = path2.split(".");
+function getNestedValue2(obj, path4) {
+  const keys = path4.split(".");
   let value = obj;
   for (const key of keys) {
     if (value == null)
@@ -13777,11 +14816,7 @@ function formatCompact(tickets, includeStatus) {
 async function listTickets(dataDir, options = {}) {
   validateListOptions(options);
   const fs3 = new TrackerFileSystem(dataDir);
-  const paths = await fs3.findTickets(options.status);
-  const tickets = [];
-  for (const path2 of paths) {
-    tickets.push(await fs3.readTicket(path2));
-  }
+  const tickets = await fs3.readAllTickets(options.status);
   let filtered = applyFilters(tickets, options);
   const sortFields = (options.sort ?? ["number"]).map(mapSortField);
   filtered = sortTicketsBy(filtered, sortFields, options.reverse);
@@ -13927,10 +14962,10 @@ async function showTicket(dataDir, ticketNumber, options = {}) {
   const commentProjection = options.comments ?? "all";
   const want = (section) => requested === null || requested.has(section);
   const fs3 = new TrackerFileSystem(dataDir);
-  const path2 = await fs3.findTicketFile(ticketNumber);
-  if (!path2)
+  const path4 = await fs3.findTicketFile(ticketNumber);
+  if (!path4)
     throw new TicketNotFoundError(ticketNumber);
-  const t = await fs3.readTicket(path2);
+  const t = await fs3.readTicket(path4);
   const chunks = [];
   const add = (section, build) => {
     const lines = [];
@@ -14074,7 +15109,7 @@ async function showTicket(dataDir, ticketNumber, options = {}) {
   if (want("meta"))
     add("meta", (lines) => {
       lines.push(`
-\u{1F4C2} File: ${path2}`);
+\u{1F4C2} File: ${path4}`);
     });
   let trailer = "";
   if (requested !== null) {
@@ -14134,8 +15169,8 @@ async function listWorkSessions(dataDir, options = {}) {
   const fs3 = new TrackerFileSystem(dataDir);
   const paths = await fs3.findTickets();
   const rows = [];
-  for (const path2 of paths) {
-    const ticket = await fs3.readTicket(path2);
+  for (const path4 of paths) {
+    const ticket = await fs3.readTicket(path4);
     if (options.ticketNumber && ticket.ticket_number !== options.ticketNumber)
       continue;
     for (const session of ticket.work_sessions ?? []) {
@@ -14183,10 +15218,10 @@ async function listActiveSessions(dataDir, options = {}) {
   const staleThreshold = options.staleThreshold ?? 24;
   const fs3 = new TrackerFileSystem(dataDir);
   const rows = [];
-  for (const path2 of await fs3.findTickets()) {
+  for (const path4 of await fs3.findTickets()) {
     let ticket;
     try {
-      ticket = await fs3.readTicket(path2);
+      ticket = await fs3.readTicket(path4);
     } catch {
       continue;
     }
@@ -14246,14 +15281,14 @@ var DependencyOperations = class {
    * needs the target's feature and title, so with no target there is nothing to
    * write. Neither is an error.
    */
-  async addDependencies(input, options = {}) {
+  async addDependencies(input) {
     const dependsOn = input.dependsOn ?? [];
     const blocks = input.blocks ?? [];
     if (dependsOn.length === 0 && blocks.length === 0) {
       throw new ValidationError("Must specify at least one dependency: dependsOn (--depends-on) or blocks (--blocks)");
     }
-    const path2 = await this.finder.requireTicketFile(input.ticketNumber);
-    const ticket = await this.fs.readTicket(path2);
+    const path4 = await this.finder.requireTicketFile(input.ticketNumber);
+    const ticket = await this.fs.readTicket(path4);
     if (dependsOn.length > 0) {
       if (!ticket.blocked_by) {
         ticket.blocked_by = [];
@@ -14280,7 +15315,7 @@ var DependencyOperations = class {
         }
       }
     }
-    await this.fs.writeTicket(path2, ticket);
+    await this.fs.writeTicket(path4, ticket);
     const messages = [`\u2705 Updated dependencies for ticket #${input.ticketNumber}`];
     if (ticket.blocked_by && ticket.blocked_by.length > 0) {
       messages.push(`\u{1F4E5} Blocked by: ${ticket.blocked_by.map((b) => `#${b.ticket}`).join(", ")}`);
@@ -14288,18 +15323,17 @@ var DependencyOperations = class {
     if (ticket.blocks && ticket.blocks.length > 0) {
       messages.push(`\u{1F4E4} Blocks: ${ticket.blocks.map((b) => `#${b.ticket}`).join(", ")}`);
     }
-    messages.push(...await this.regenerate(options));
     return { messages };
   }
   /** Removes blocked_by / blocks entries, deleting the field when it empties. */
-  async removeDependencies(input, options = {}) {
+  async removeDependencies(input) {
     const dependsOn = input.dependsOn ?? [];
     const blocks = input.blocks ?? [];
     if (dependsOn.length === 0 && blocks.length === 0) {
       throw new ValidationError("Must specify at least one dependency to remove: dependsOn (--depends-on) or blocks (--blocks)");
     }
-    const path2 = await this.finder.requireTicketFile(input.ticketNumber);
-    const ticket = await this.fs.readTicket(path2);
+    const path4 = await this.finder.requireTicketFile(input.ticketNumber);
+    const ticket = await this.fs.readTicket(path4);
     if (dependsOn.length > 0 && ticket.blocked_by) {
       ticket.blocked_by = ticket.blocked_by.filter((dep) => !dependsOn.includes(dep.ticket));
       if (ticket.blocked_by.length === 0) {
@@ -14312,7 +15346,7 @@ var DependencyOperations = class {
         delete ticket.blocks;
       }
     }
-    await this.fs.writeTicket(path2, ticket);
+    await this.fs.writeTicket(path4, ticket);
     const messages = [`\u2705 Removed dependencies from ticket #${input.ticketNumber}`];
     if (ticket.blocked_by && ticket.blocked_by.length > 0) {
       messages.push(`\u{1F4E5} Still blocked by: ${ticket.blocked_by.map((b) => `#${b.ticket}`).join(", ")}`);
@@ -14320,7 +15354,6 @@ var DependencyOperations = class {
     if (ticket.blocks && ticket.blocks.length > 0) {
       messages.push(`\u{1F4E4} Still blocks: ${ticket.blocks.map((b) => `#${b.ticket}`).join(", ")}`);
     }
-    messages.push(...await this.regenerate(options));
     return { messages };
   }
   /**
@@ -14329,10 +15362,10 @@ var DependencyOperations = class {
    * The single-ticket rendering is verbatim from the script, indentation included.
    * The whole-graph case is the divergence documented at the top of this file.
    */
-  async listDependencies(ticketNumber, options = {}) {
+  async listDependencies(ticketNumber) {
     if (ticketNumber) {
-      const path2 = await this.finder.requireTicketFile(ticketNumber);
-      const ticket = await this.fs.readTicket(path2);
+      const path4 = await this.finder.requireTicketFile(ticketNumber);
+      const ticket = await this.fs.readTicket(path4);
       const messages2 = [
         `\u{1F517} Dependencies for Ticket #${ticketNumber}: ${ticket.title}`,
         `   Feature: ${ticket.feature}`,
@@ -14357,7 +15390,6 @@ var DependencyOperations = class {
       return { messages: messages2 };
     }
     const messages = [];
-    messages.push(...await this.regenerate(options));
     const tickets = await this.readAllTickets();
     const withDeps = tickets.filter((t) => t.blocked_by && t.blocked_by.length > 0 || t.blocks && t.blocks.length > 0);
     if (withDeps.length === 0) {
@@ -14441,26 +15473,15 @@ var DependencyOperations = class {
   }
   /** The blocked_by / blocks entry shape: number plus the target's feature and title. */
   async describeTicket(ticketNumber) {
-    const path2 = await this.finder.findTicketFile(ticketNumber);
-    if (!path2)
+    const path4 = await this.finder.findTicketFile(ticketNumber);
+    if (!path4)
       return null;
-    const ticket = await this.fs.readTicket(path2);
+    const ticket = await this.fs.readTicket(path4);
     return { ticket: ticketNumber, feature: ticket.feature, description: ticket.title };
   }
   async readAllTickets() {
     const paths = await this.fs.findTickets();
-    return Promise.all(paths.map((path2) => this.fs.readTicket(path2)));
-  }
-  /** Report regeneration never fails the operation — the edge is already on disk. */
-  async regenerate(options) {
-    if (options.regenerateReports === false)
-      return [];
-    try {
-      await regenerateAllReports(this.fs);
-      return ["\u{1F4CA} Updated status reports"];
-    } catch (err) {
-      return [`\u26A0\uFE0F  Warning: Could not update status reports: ${err}`];
-    }
+    return Promise.all(paths.map((path4) => this.fs.readTicket(path4)));
   }
 };
 function createDependencyOperations(dataDir) {
@@ -14547,14 +15568,14 @@ function humanLabel(key) {
 async function runAnalyticsReport(dataDir, options) {
   const fs3 = new TrackerFileSystem(dataDir);
   const paths = await fs3.findTickets();
-  const tickets = await Promise.all(paths.map((path2) => fs3.readTicket(path2)));
+  const tickets = await Promise.all(paths.map((path4) => fs3.readTicket(path4)));
   const report = buildAnalyticsReport(options.reportType, tickets, options.filters ?? {});
   return { messages: [formatAnalyticsReport(report, options.format ?? "summary")] };
 }
 
 // src/config/config.ts
-import { existsSync as existsSync2, readFileSync } from "fs";
-import { resolve } from "path";
+import { existsSync as existsSync2, readFileSync as readFileSync3 } from "fs";
+import { resolve as resolve3 } from "path";
 
 // src/config/schema.ts
 var LogLevelSchema = external_exports.enum(["debug", "info", "warn", "error"]);
@@ -14829,8 +15850,8 @@ var typeConverters = {
     return value.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
   }
 };
-function setNestedProperty(obj, path2, value) {
-  const keys = path2.split(".");
+function setNestedProperty(obj, path4, value) {
+  const keys = path4.split(".");
   let current = obj;
   for (let i2 = 0; i2 < keys.length - 1; i2++) {
     const key = keys[i2];
@@ -14842,14 +15863,14 @@ function setNestedProperty(obj, path2, value) {
   const lastKey = keys[keys.length - 1];
   current[lastKey] = value;
 }
-function convertValue(path2, value) {
-  if (path2.includes("port") || path2.includes("timeout") || path2.includes("threshold") || path2.includes("maxFiles") || path2.includes("maxRequestsPerMinute") || path2.includes("maxFileWatchers")) {
+function convertValue(path4, value) {
+  if (path4.includes("port") || path4.includes("timeout") || path4.includes("threshold") || path4.includes("maxFiles") || path4.includes("maxRequestsPerMinute") || path4.includes("maxFileWatchers")) {
     return typeConverters.number(value);
   }
-  if (path2.includes("healthCheck") || path2.includes("metricsEnabled") || path2.includes("enableAuth") || path2.includes("rateLimitEnabled")) {
+  if (path4.includes("healthCheck") || path4.includes("metricsEnabled") || path4.includes("enableAuth") || path4.includes("rateLimitEnabled")) {
     return typeConverters.boolean(value);
   }
-  if (path2.includes("allowedOrigins")) {
+  if (path4.includes("allowedOrigins")) {
     return typeConverters.array(value);
   }
   return typeConverters.string(value);
@@ -14897,11 +15918,11 @@ var CONFIG_FILE_LOCATIONS = [
 ].filter(Boolean);
 function loadFromFile(filePath) {
   try {
-    const resolvedPath = resolve(filePath);
+    const resolvedPath = resolve3(filePath);
     if (!existsSync2(resolvedPath)) {
       return {};
     }
-    const content = readFileSync(resolvedPath, "utf-8");
+    const content = readFileSync3(resolvedPath, "utf-8");
     const parsed = JSON.parse(content);
     console.error(`\u2705 Loaded configuration from: ${resolvedPath}`);
     return parsed;
@@ -15063,7 +16084,7 @@ function getConfigManager() {
 }
 
 // src/monitoring/health.ts
-import { existsSync as existsSync3, statSync } from "fs";
+import { existsSync as existsSync3, statSync as statSync2 } from "fs";
 var HealthManager = class {
   config = getConfigManager();
   startTime = Date.now();
@@ -15079,7 +16100,7 @@ var HealthManager = class {
     const dataCheckStart = Date.now();
     try {
       if (existsSync3(trackerConfig2.dataDir)) {
-        const stats = statSync(trackerConfig2.dataDir);
+        const stats = statSync2(trackerConfig2.dataDir);
         if (stats.isDirectory()) {
           checks.dataDirectory = {
             status: "pass",
@@ -15236,7 +16257,7 @@ var HealthManager = class {
 };
 
 // src/monitoring/logger.ts
-import { writeFileSync as writeFileSync2, existsSync as existsSync4, mkdirSync, readdirSync, unlinkSync, statSync as statSync2 } from "fs";
+import { writeFileSync as writeFileSync3, existsSync as existsSync4, mkdirSync, readdirSync as readdirSync2, unlinkSync as unlinkSync3, statSync as statSync3 } from "fs";
 import { join as join7 } from "path";
 var Logger = class _Logger {
   constructor(component) {
@@ -15269,16 +16290,16 @@ var Logger = class _Logger {
   cleanupOldLogFiles() {
     if (!this.logConfig.fileDir) return;
     try {
-      const files = readdirSync(this.logConfig.fileDir).filter((file) => file.endsWith(".log")).map((file) => ({
+      const files = readdirSync2(this.logConfig.fileDir).filter((file) => file.endsWith(".log")).map((file) => ({
         name: file,
         path: join7(this.logConfig.fileDir, file),
-        mtime: statSync2(join7(this.logConfig.fileDir, file)).mtime
+        mtime: statSync3(join7(this.logConfig.fileDir, file)).mtime
       })).sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
       if (files.length > this.logConfig.maxFiles) {
         const filesToDelete = files.slice(this.logConfig.maxFiles);
         filesToDelete.forEach((file) => {
           try {
-            unlinkSync(file.path);
+            unlinkSync3(file.path);
           } catch (error) {
             console.error(`Failed to delete old log file ${file.name}:`, error);
           }
@@ -15337,7 +16358,7 @@ Stack: ${entry.error.stack}`;
       try {
         const logFilePath = this.getLogFilePath();
         const logLine = formattedEntry + "\n";
-        writeFileSync2(logFilePath, logLine, { flag: "a" });
+        writeFileSync3(logFilePath, logLine, { flag: "a" });
       } catch (error) {
         console.error("Failed to write to log file:", error);
       }
@@ -15627,7 +16648,7 @@ var ProcessManager = class extends EventEmitter {
 
 // src/monitoring/exit-recorder.ts
 import { appendFileSync as appendFileSync2, mkdirSync as mkdirSync2 } from "fs";
-import { dirname as dirname3, join as join8 } from "path";
+import { dirname as dirname2, join as join8 } from "path";
 var EXIT_LOG_FILENAME = ".mcp-exits.jsonl";
 var ExitRecorder = class {
   logPath;
@@ -15658,7 +16679,7 @@ var ExitRecorder = class {
       ...detail
     };
     try {
-      mkdirSync2(dirname3(this.logPath), { recursive: true });
+      mkdirSync2(dirname2(this.logPath), { recursive: true });
       appendFileSync2(this.logPath, JSON.stringify(entry) + "\n");
     } catch (error) {
       this.writeFailures += 1;
@@ -16200,9 +17221,9 @@ function formatActivitySummary(result) {
 
 // src/index.ts
 var bundleVersion = {
-  version: true ? "feature-mcp-local-runtime-e25edee-dirty" : "dev",
-  gitCommit: true ? "e25edee" : "unknown",
-  buildTime: true ? "2026-08-04T19:38:42Z" : "unknown"
+  version: true ? "1.0.0" : "dev",
+  gitCommit: true ? "eca4c71" : "unknown",
+  buildTime: true ? "2026-08-13T15:55:23Z" : "unknown"
 };
 async function reportVersionSkew() {
   const trackerUrl = process.env.TRACKER_API_URL;
@@ -16234,37 +17255,57 @@ exitRecorder.install();
 var serverLogger = logger.child("server");
 var TicketEventEmitter = class extends EventEmitter3 {
   watchers = /* @__PURE__ */ new Map();
+  // Single TrackerFileSystem, reused across events, so status reads hit the
+  // corpus's fingerprint cache instead of reparsing every ticket on every
+  // event (mirrors the #335 API watcher's file-watcher.ts).
+  fs = new TrackerFileSystem(trackerConfig.dataDir);
   startWatching() {
     try {
-      const watchPaths = ["todo", "in-progress", "done"];
-      watchPaths.forEach((status) => {
-        const watchPath = join9(trackerConfig.dataDir, status);
-        try {
-          const watcher = watch(watchPath, { recursive: true }, (eventType, filename) => {
-            if (filename?.endsWith(".yaml")) {
-              this.emit("ticketChange", {
-                type: eventType,
-                filename,
-                status,
-                timestamp: (/* @__PURE__ */ new Date()).toISOString()
-              });
-              serverLogger.debug("Ticket file change detected", {
-                eventType,
-                filename,
-                status
-              });
-            }
-          });
-          this.watchers.set(status, watcher);
-          serverLogger.debug("Started watching directory", { watchPath });
-        } catch (error) {
-          serverLogger.error(`Failed to watch ${watchPath}`, error);
-        }
-      });
+      const watchPath = join9(trackerConfig.dataDir, TICKETS_DIR);
+      try {
+        const watcher = watch(watchPath, { recursive: false }, (eventType, filename) => {
+          if (!filename || !isTicketFilename(filename)) return;
+          void this.handleTicketFileEvent(eventType, filename);
+        });
+        this.watchers.set(TICKETS_DIR, watcher);
+        serverLogger.debug("Started watching directory", { watchPath });
+      } catch (error) {
+        serverLogger.error(`Failed to watch ${watchPath}`, error);
+      }
       serverLogger.info("File watching system started");
     } catch (error) {
       serverLogger.error("Failed to start file watching", error);
     }
+  }
+  /**
+   * Status lives in the ticket body now, not the watch path (#335), so each
+   * event needs a read. A delete leaves no body to read, and both chokidar
+   * (API side) and this raw `fs.watch` can fire mid atomic-write — both are
+   * legitimate events, so a read failure here means `status` stays absent
+   * rather than the event being thrown away.
+   */
+  async handleTicketFileEvent(eventType, filename) {
+    let status;
+    let feature;
+    try {
+      const ticket = await this.fs.readTicket(ticketRelPath(filename));
+      status = ticket.status;
+      feature = ticket.feature;
+    } catch {
+    }
+    this.emit("ticketChange", {
+      type: eventType,
+      filename,
+      status,
+      feature,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    serverLogger.debug("Ticket file change detected", {
+      eventType,
+      filename,
+      status,
+      feature
+    });
   }
   stopWatching() {
     this.watchers.forEach((watcher) => watcher.close());
@@ -16431,6 +17472,20 @@ server.setRequestHandler(ListToolsSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {}
+        }
+      },
+      {
+        name: "checkIntegrity",
+        description: "Report referential inconsistencies in the tracker store: feature directories with no features/<name>.yaml, registered features with no tickets, and tickets whose feature or status disagrees with the directory holding them. Read-only \u2014 it never repairs.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            json: {
+              type: "boolean",
+              default: false,
+              description: "Return the structured report as JSON instead of the text summary"
+            }
+          }
         }
       },
       {
@@ -17421,6 +18476,27 @@ server.setRequestHandler(CallToolSchema, async (request) => {
           ]
         };
       }
+      case "checkIntegrity": {
+        const { json: json2 = false } = args;
+        const output = await executeOperation(
+          "check-integrity",
+          { "data-dir": trackerConfig.dataDir, json: json2 },
+          async () => {
+            const report = await checkIntegrity(trackerConfig.dataDir);
+            return {
+              messages: json2 ? [JSON.stringify({ ...report, messages: void 0 }, null, 2)] : report.messages
+            };
+          }
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: output || "\u2705 Integrity check produced no output"
+            }
+          ]
+        };
+      }
       case "listTickets": {
         const {
           status,
@@ -17655,8 +18731,7 @@ server.setRequestHandler(CallToolSchema, async (request) => {
               description,
               type: type2,
               priority,
-              labels: Array.isArray(labels) ? labels : [],
-              regenerateReports: false
+              labels: Array.isArray(labels) ? labels : []
             });
             logScriptExecution(
               "create-ticket",
@@ -17684,13 +18759,6 @@ server.setRequestHandler(CallToolSchema, async (request) => {
             results.successful.push({ id, result: `Created ticket: ${title}` });
           } catch (error) {
             results.failed.push({ id: ticket.id, error: error instanceof Error ? error.message : String(error) });
-          }
-        }
-        if (results.successful.length > 0) {
-          try {
-            await regenerateAllReports(trackerFs);
-          } catch (error) {
-            serverLogger.error("Failed to regenerate reports after bulk create", error);
           }
         }
         results.summary = `Bulk create completed: ${results.successful.length} successful, ${results.failed.length} failed`;
@@ -17725,22 +18793,11 @@ server.setRequestHandler(CallToolSchema, async (request) => {
             await executeOperation(
               "move-ticket",
               { ticket: ticketNumber, status: newStatus, "data-dir": trackerConfig.dataDir },
-              // One regeneration for the whole batch below, not one per ticket:
-              // each rebuild re-scans every ticket in the store.
-              () => createTicketOperations(trackerConfig.dataDir).moveTicket(ticketNumber, newStatus, {
-                regenerateReports: false
-              })
+              () => createTicketOperations(trackerConfig.dataDir).moveTicket(ticketNumber, newStatus)
             );
             results.successful.push({ id, result: `Updated ticket #${ticketNumber} to ${newStatus}` });
           } catch (error) {
             results.failed.push({ id: update.id, error: error instanceof Error ? error.message : String(error) });
-          }
-        }
-        if (results.successful.length > 0) {
-          try {
-            await regenerateAllReports(new TrackerFileSystem(trackerConfig.dataDir));
-          } catch (error) {
-            serverLogger.error("Failed to regenerate reports after bulk status update", error);
           }
         }
         results.summary = `Bulk status update completed: ${results.successful.length} successful, ${results.failed.length} failed`;
@@ -17986,16 +19043,13 @@ server.setRequestHandler(CallToolSchema, async (request) => {
           case "start":
             ticketEvents.startWatching();
             const handleTicketChange = (event) => {
-              const { type: type2, filename, status, timestamp: timestamp2 } = event;
+              const { type: type2, filename, status, feature, timestamp: timestamp2 } = event;
               let shouldNotify = true;
               if (filters.status && !filters.status.includes(status)) {
                 shouldNotify = false;
               }
-              if (filters.features && filename) {
-                const hasMatchingFeature = filters.features.some(
-                  (feature) => filename.includes(feature)
-                );
-                if (!hasMatchingFeature) shouldNotify = false;
+              if (filters.features && !(feature !== void 0 && filters.features.includes(feature))) {
+                shouldNotify = false;
               }
               if (shouldNotify) {
                 console.error(`\u{1F514} Ticket change detected: ${filename} (${type2}) at ${timestamp2}`);

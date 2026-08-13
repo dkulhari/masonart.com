@@ -57,6 +57,30 @@ $ARGUMENTS: [--max-iterations=30] [--max-tickets=20]
 
 **Example**: `/tt-fix-tests` or `/tt-fix-tests --max-iterations=50`
 
+## Test Entry Point (check this before the loop starts)
+
+This skill is written around `./scripts/run-tests.sh` — the entry point
+convention documented in `/tt-work-ticket` ("The project test entry point").
+Every `./scripts/run-tests.sh` below assumes it.
+
+**Before the first iteration, confirm it exists.**
+
+```bash
+test -x ./scripts/run-tests.sh && echo present || echo absent
+```
+
+If absent, substitute the project's own commands from its `CLAUDE.md` for every
+invocation below, keeping the two properties this loop depends on:
+
+- **a failure cap** — the loop's `--max-failures=N` is what stops it grinding
+  through an entire red suite on every iteration. If the runner has no
+  equivalent flag, run one target at a time instead.
+- **a file filter** — needed to re-run a single failing test after a fix.
+
+Do not run `./scripts/run-tests.sh` unchecked. A missing script produces a shell
+error that reads like a test failure, and this loop will happily open a bug
+ticket for it and start "fixing" a test that never ran.
+
 ## Core Loop
 
 ```
