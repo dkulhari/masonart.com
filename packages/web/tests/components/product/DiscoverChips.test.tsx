@@ -217,6 +217,15 @@ describe('crop depth per orientation', () => {
     expect(chipArtScale(undefined)).toBe(chipArtScale('square'))
     expect(chipArtScale('hexagonal')).toBe(chipArtScale('square'))
   })
+
+  it('crops a set of 2/3 like the wide thing it is, not like a square', () => {
+    // digital-cosmos and paper-layers are two panels with a wall gutter, so the
+    // pair measures 1.6:1 and 2.1:1 respectively. Falling through to the square
+    // ratio left a white arc waiting for whichever of them a collection picked
+    // as its representative. #545.
+    expect(chipArtScale('set-of-2-3')).toBeGreaterThan(chipArtScale('square'))
+    expect(chipArtScale('set-of-2-3')).toBeLessThan(chipArtScale('panoramic'))
+  })
 })
 
 describe('the rail itself', () => {

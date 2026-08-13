@@ -44,3 +44,6 @@ export * from './constants/styles';
 // schema modules above: this barrel lists modules, so adding one to
 // './constants/index.ts' alone leaves it unreachable through `@chobii/shared`.
 export * from './constants/shipping';
+// The rule that decides what a measured proportion is called. The seed, the
+// admin upload path and the storefront all have to agree on it (#545).
+export * from './constants/orientation';

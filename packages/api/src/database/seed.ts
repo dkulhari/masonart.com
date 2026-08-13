@@ -51,6 +51,11 @@ import {
 //
 //   >= 1.8 panoramic | >= 1.15 landscape | >= 0.87 square | else portrait
 //
+// Those breakpoints are no longer typed out anywhere but here: they live in
+// `orientationFromRatio` in @chobii/shared, which the admin write path now
+// checks every upload against, so a photograph and a column can no longer
+// disagree without somebody saying so out loud.
+//
 // plus `set-of-2-3` for the two photographs that show two panels with wall
 // between them (`digital-cosmos`, `paper-layers`) — panel count, not
 // proportion, which is exactly what that facet value is for. It has no size
@@ -162,7 +167,11 @@ const sampleProducts: NewProduct[] = [
     colors: ["blue", "purple", "black"],
     rooms: ["living-room", "bedroom", "office"],
     tags: ["bestseller", "cosmic", "celestial"],
-    orientation: "square",
+    // 0.51 — the piece is shot hanging on a near-white wall, and the wall was
+    // inside the box the first time this was measured (1.04, filed square).
+    // measureArtBox learned to peel a wall off in #594; this is the column
+    // catching up with the better measurement.
+    orientation: "portrait",
     images: [
       {
         id: "img-1",
@@ -1110,7 +1119,9 @@ const sampleProducts: NewProduct[] = [
     colors: ["colorful", "black", "white"],
     rooms: ["office", "kids-room", "living-room"],
     tags: ["creative", "inspiration", "maker"],
-    orientation: "square",
+    // 0.78 — portrait, but only just. Same wall-trim correction as
+    // cosmic-harmony: 0.87 is the boundary, and this sits under it.
+    orientation: "portrait",
     images: [
       {
         id: "img-quo-2",

@@ -24,9 +24,17 @@
  * falls back to drawing the square unframed, which is today's behaviour.
  *
  * Idempotent: images that already carry a box are skipped unless --force.
+ *
+ * ## It also audits `orientation`
+ *
+ * Every box it holds is a second opinion on the column beside it, so it reports
+ * any product whose declared orientation its own artwork contradicts (#545) —
+ * reports, never rewrites, because changing that column also changes which size
+ * ladder the product sells and that belongs to the seed. `--dry-run` runs the
+ * audit without writing anything.
  */
 
-import type { ProductImage } from "@chobii/shared";
+import { orientationContradictingArt, type ProductImage } from "@chobii/shared";
 import { eq } from "drizzle-orm";
 import { db, closeDatabase } from "./index";
 import { products } from "./schema";
@@ -54,7 +62,12 @@ async function fetchImage(url: string): Promise<Buffer | null> {
 
 async function main(): Promise<void> {
   const rows = await db
-    .select({ id: products.id, slug: products.slug, images: products.images })
+    .select({
+      id: products.id,
+      slug: products.slug,
+      orientation: products.orientation,
+      images: products.images,
+    })
     .from(products);
 
   let scanned = 0;
@@ -62,6 +75,7 @@ async function main(): Promise<void> {
   let skipped = 0;
   let failed = 0;
   let touched = 0;
+  const contradictions: string[] = [];
 
   for (const row of rows) {
     const images = (row.images ?? []) as ProductImage[];
@@ -100,6 +114,30 @@ async function main(): Promise<void> {
       next.push({ ...image, artBox });
     }
 
+    /*
+     * AUDIT: does the column still describe the picture? (#545)
+     *
+     * Free here and nowhere else — this loop is the only place that holds a
+     * measured box and a declared orientation for every product at once. The
+     * admin write path refuses to CREATE a disagreement, but nothing re-checks
+     * the rows that already exist, and the measurement itself improves over
+     * time: cosmic-harmony read 1.04 until measureArtBox learned to peel a
+     * photographed wall off the edges, then 0.51. Reporting is the whole job —
+     * rewriting the column would also have to rebuild that product's size
+     * ladder, which is `bun run seed`, not this.
+     */
+    const artwork = next.find((image) => image.type === "main");
+    const contradiction = orientationContradictingArt(
+      row.orientation,
+      artwork?.artBox
+    );
+    if (contradiction) {
+      const ratio = (artwork!.artBox!.w / artwork!.artBox!.h).toFixed(2);
+      contradictions.push(
+        `${row.slug}: declares ${row.orientation}, measures ${contradiction} (${ratio}:1)`
+      );
+    }
+
     if (!changed) continue;
     touched++;
 
@@ -126,6 +164,21 @@ async function main(): Promise<void> {
     `\n${dryRun ? "[dry run] " : ""}products touched ${touched}/${rows.length} | ` +
       `images scanned ${scanned}, measured ${measured}, skipped ${skipped}, failed ${failed}`
   );
+
+  if (contradictions.length > 0) {
+    console.warn(
+      `\n! ${contradictions.length} product(s) declare an orientation their own ` +
+        `artwork contradicts. The storefront crops from that column, so each of ` +
+        `these renders a wrong window into its own picture:`
+    );
+    for (const line of contradictions) console.warn(`  ! ${line}`);
+    console.warn(
+      `\n  Fix the value in seed.ts and re-run \`bun run seed\`, which rebuilds ` +
+        `the size ladder along with it.`
+    );
+  } else {
+    console.log("\nEvery orientation agrees with its artwork.");
+  }
 }
 
 main()

@@ -36,7 +36,12 @@ import {
 import { purgeProductResponseCache } from "../../lib/redis";
 import { unitsSoldSql } from "../../lib/product-sales";
 import { buildProductMedia } from "../../lib/product-media";
-import { ADMIN_IMAGE_MIME_TYPES, MAX_ADMIN_IMAGE_MB } from "@chobii/shared";
+import {
+  ADMIN_IMAGE_MIME_TYPES,
+  MAX_ADMIN_IMAGE_MB,
+  orientationContradictingArt,
+  type ProportionOrientation,
+} from "@chobii/shared";
 
 // ============================================================================
 // Constants
@@ -90,12 +95,60 @@ const productImageSchema = z
         h: z.number().min(0).max(1),
       })
       .optional(),
+    /**
+     * Where the artwork sits on its mat, measured at upload time.
+     *
+     * Declared here because zod strips what it does not know: the upload
+     * endpoint returns this and the admin posts the same object straight back,
+     * so leaving it out silently discarded the one measurement the storefront
+     * cannot retake — the stored image is 1500x1500 for a 3:1 panorama and a
+     * perfect square alike. #545.
+     */
+    artBox: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+        w: z.number().min(0).max(1),
+        h: z.number().min(0).max(1),
+      })
+      .optional(),
     originalKey: z.string(),
   })
   .refine((img) => img.width === img.height, {
     message: "Product images must be square (width must equal height)",
     path: ["width"],
   });
+
+/**
+ * The orientation the artwork measures, when it contradicts the one declared.
+ *
+ * Only the matted `main` image is a witness. A room mockup or a texture shot is
+ * cropped to fill its square by a human-chosen window, so its box says nothing
+ * about the proportion of the piece — `buildProductMedia` does not even measure
+ * one.
+ *
+ * Returns undefined for "no objection", which covers the cases that matter as
+ * much as the catch: no artwork, no measurement (the box is dropped for
+ * full-bleed sources), or an orientation counting panels rather than shape.
+ */
+function orientationAgainstArtwork(
+  orientation: string | null | undefined,
+  images: readonly ProductImage[] | null | undefined
+): ProportionOrientation | undefined {
+  const artwork = images?.find((image) => image.type === "main");
+  return orientationContradictingArt(orientation, artwork?.artBox);
+}
+
+/** The 400 an admin gets back, naming both sides so the disagreement is legible. */
+const orientationConflict = (declared: string, measured: string) => ({
+  error:
+    `The artwork measures ${measured}, but this product declares ` +
+    `${declared}. The storefront crops from the column, so a wrong value ` +
+    `renders a wrong window into the picture. Send ` +
+    `orientationOverride: true to store it anyway.`,
+  declared,
+  measured,
+});
 
 /**
  * Query parameters for admin product listing
@@ -142,6 +195,10 @@ const createProductSchema = z.object({
     "landscape",
     "panoramic",
     "round",
+    // On the `orientation` postgres enum and in ORIENTATION_OPTIONS since #535,
+    // but missing here — which left the two diptychs in the catalogue
+    // (digital-cosmos, paper-layers) un-editable through the admin API.
+    "set-of-2-3",
   ]),
   artistId: z.string().uuid().optional().nullable(),
   images: z.array(productImageSchema).optional(),
@@ -162,6 +219,16 @@ const createProductSchema = z.object({
   popularOrder: z.number().int().optional().nullable(),
   isAiGenerated: z.boolean().optional().default(false),
   aiGenerationId: z.string().uuid().optional().nullable(),
+  /**
+   * Write this orientation even though the artwork measures something else.
+   *
+   * Not a column — it decides one request. The measurement is a heuristic over
+   * a photograph (it trims a wall; it can meet a piece composed as a small mark
+   * on white), so an admin who genuinely knows better must not be wedged. It
+   * being explicit is the whole value: the catalogue drifted because
+   * contradicting the picture took no decision at all. #545.
+   */
+  orientationOverride: z.boolean().optional(),
 });
 
 /**
@@ -461,6 +528,18 @@ adminProductsApp.post(
         return c.json({ error: "Slug already exists" }, 409);
       }
 
+      // The column and the picture have to agree, or the storefront crops the
+      // wrong window. #545.
+      if (!input.orientationOverride) {
+        const measured = orientationAgainstArtwork(
+          input.orientation,
+          input.images as ProductImage[] | undefined
+        );
+        if (measured) {
+          return c.json(orientationConflict(input.orientation, measured), 400);
+        }
+      }
+
       // Create product
       const insertedProducts = await db
         .insert(products)
@@ -533,7 +612,16 @@ adminProductsApp.patch(
     try {
       // Check if product exists
       const existing = await db
-        .select({ id: products.id, slug: products.slug, sku: products.sku })
+        .select({
+          id: products.id,
+          slug: products.slug,
+          sku: products.sku,
+          // Both sides of the #545 check. A payload may carry a new
+          // orientation, new artwork, or neither — the stored row supplies
+          // whichever half is missing.
+          orientation: products.orientation,
+          images: products.images,
+        })
         .from(products)
         .where(eq(products.id, id))
         .limit(1);
@@ -570,6 +658,30 @@ adminProductsApp.patch(
 
         if (slugConflict.length > 0) {
           return c.json({ error: "Slug already exists" }, 409);
+        }
+      }
+
+      /*
+       * Check the column against the picture, but only when this write touches
+       * one of them.
+       *
+       * A row that is already wrong stays writable — renaming a product is not
+       * the moment to demand its data be fixed, and refusing every edit until
+       * it is would make the 27 rows #545 found unmaintainable. What cannot
+       * happen is a write that CREATES the disagreement, in either direction:
+       * a new orientation over the old artwork, or new artwork under the old
+       * orientation. The catalogue drifted through the second one.
+       */
+      const touchesOrientation =
+        input.orientation !== undefined || input.images !== undefined;
+
+      if (touchesOrientation && !input.orientationOverride) {
+        const orientation = input.orientation ?? existingProduct.orientation;
+        const images = (input.images ??
+          existingProduct.images) as ProductImage[] | null;
+        const measured = orientationAgainstArtwork(orientation, images);
+        if (measured) {
+          return c.json(orientationConflict(orientation, measured), 400);
         }
       }
 

@@ -58,6 +58,18 @@ const NARROW_SIDE_RATIO: Record<string, number> = {
   landscape: 0.75,
   panoramic: 0.34,
   round: 1,
+  /**
+   * A set of 2/3 is panels, not a proportion — but the CHIP does not care what
+   * the facet means, only how wide the picture is. Both diptychs in the
+   * catalogue are two panels with a wall gutter between them, and measured as
+   * one rectangle they come back 1.6:1 (digital-cosmos) and 2.1:1
+   * (paper-layers); 0.55 is the shallower of those, so neither shows mat.
+   *
+   * Without a key here they fell through to the square ratio and cropped far
+   * too little. Unreachable while the representative ranking sorts diptychs
+   * last, which is exactly why it needed writing down rather than leaving. #545.
+   */
+  'set-of-2-3': 0.55,
 }
 
 /** Mirrors MAT_ART_INSET in @chobii/shared — artwork fraction of the longest side. */
