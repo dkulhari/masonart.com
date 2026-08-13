@@ -38,6 +38,9 @@ test-results/
 .env.development.local
 .env.test.local
 .env.production.local
+# Timestamped backups — same secrets as .env, and nothing stops another one
+# being written.
+.env.bak-*
 
 # IDE
 .idea/
