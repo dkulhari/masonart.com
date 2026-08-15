@@ -22,6 +22,11 @@
  * (`items-per-view="2"`), 8px apart. One index drives both, so the words and
  * the photographs advance in lockstep.
  *
+ * Lockstep only means anything if the two tracks hold the SAME reviews in the
+ * same order, which is why a review with no photograph is not quoted here at
+ * all — see `buildReviewsRail`. Loox gets that for free (theirs is a photo
+ * review widget); ours filters for it.
+ *
  * That distinction is the whole design. Interleaving the two kinds into one
  * scrolling rail — what shipped — puts the quote card off-screen every other
  * step and turns a two-part composition into a photo strip with captions in it.
@@ -99,8 +104,18 @@ import { cn } from '~/lib/utils'
  */
 export const MIN_REVIEWS_FOR_HOME_STRIP = 10
 
-/** How many reviews the band asks for. One screenful of stepping, no more. */
-const RAIL_SIZE = 12
+/**
+ * How many reviews the band asks the feed for.
+ *
+ * Deeper than it can show, because only reviews carrying a photograph are
+ * quotable here — see `buildReviewsRail`. Asking for exactly MAX_SLIDES gets a
+ * band a fraction of that size: the seeded catalogue has media on five reviews
+ * in twelve.
+ */
+export const FEED_PAGE_SIZE = 24
+
+/** How many slides the band steps through. One screenful of stepping, no more. */
+export const MAX_SLIDES = 12
 
 /** Loox `max-characters="180"`. A quote card is a pull quote, not the review. */
 export const MAX_BODY_CHARACTERS = 180
@@ -152,47 +167,49 @@ const BADGE_INK = 'text-[#685c53]'
 // ============================================================================
 
 export interface HomeReviewsRail {
-  /** Every review, in feed order. One quote card each. */
+  /** The quoted reviews, in feed order. One quote card each. */
   quotes: ReviewFeedItem[]
-  /** The first attachment of every review that has one. One tile each. */
+  /** The same reviews, same order — their cover attachment. One tile each. */
   tiles: { key: string; review: ReviewFeedItem; media: ReviewMediaItem }[]
-  /** Steps the index may take — the longer of the two tracks. */
+  /** Steps the index may take. Both tracks are this long. */
   pageCount: number
 }
 
 /**
- * Split a page of the feed into the band's two tracks.
+ * Build the band's two tracks out of a page of the feed.
  *
- * Not an interleave. Every review is quotable, so the left track is simply the
- * feed; only some carry photographs, so the right track is the subset that
- * does. The two are stepped by one index and clamped independently — see
- * `tileIndex` — because ours, unlike theirs, is not guaranteed a photograph on
- * every review.
+ * ONE list, rendered twice. Position `i` of the quote track and position `i` of
+ * the media track are the same review, so the photograph beside a set of words
+ * belongs to the person who wrote them — which is the entire composition.
+ *
+ * That means a review with no photograph cannot appear: it is dropped from both
+ * tracks rather than quoted beside a stranger's picture. Keeping every review
+ * in the left track and only the photographed ones in the right made two lists
+ * of different lengths whose indices meant different reviews, and the strip then
+ * had to be clamped at `tiles - 2` — with five photographs among twelve reviews
+ * it froze on step three and the words carried on without it.
+ *
+ * Loox does not have this problem: their widget is a photo-review widget, so
+ * every slide has a picture by construction. Ours filters to reach the same
+ * guarantee.
  *
  * A review contributes at most one tile. Their strip shows one frame per
  * customer, and a single enthusiastic reviewer with six photos would otherwise
  * take the whole band.
  */
 export function buildReviewsRail(reviews: ReviewFeedItem[]): HomeReviewsRail {
-  const quotes = reviews
-  const tiles = reviews.flatMap((review) => {
-    const cover = review.media?.[0]
-    return cover ? [{ key: `${review.id}-media`, review, media: cover }] : []
-  })
+  const slides = reviews
+    .flatMap((review) => {
+      const cover = review.media?.[0]
+      return cover ? [{ key: `${review.id}-media`, review, media: cover }] : []
+    })
+    .slice(0, MAX_SLIDES)
 
-  return { quotes, tiles, pageCount: Math.max(quotes.length, tiles.length) }
-}
-
-/**
- * Where the media strip sits when the quote track is at `index`.
- *
- * Lockstep until the strip runs out, then held at its last full pair. Stepping
- * past that would walk empty space into the right-hand half of the band while
- * the left half still has cards to show.
- */
-export function tileIndex(index: number, tileCount: number): number {
-  const furthest = Math.max(0, tileCount - TILES_PER_VIEW)
-  return Math.min(index, furthest)
+  return {
+    quotes: slides.map((slide) => slide.review),
+    tiles: slides,
+    pageCount: slides.length,
+  }
 }
 
 /**
@@ -637,7 +654,7 @@ export function CustomerReviewsStrip({
   if (
     averageRating === null ||
     reviewCount < MIN_REVIEWS_FOR_HOME_STRIP ||
-    reviews.length === 0
+    quotes.length === 0
   ) {
     return null
   }
@@ -774,11 +791,11 @@ export function CustomerReviewsStrip({
               // on the desktop grid, one on a phone, where two would be 177px
               // of photograph each.
               className="flex h-[240px] w-full gap-2 transition-transform duration-500 ease-out [--step:calc(100%+8px)] sm:h-[320px] lg:h-full lg:[--step:calc(50%+4px)] motion-reduce:transition-none"
+              // The SAME index as the quote track, unclamped. Both tracks hold
+              // the same reviews in the same order, so tile `index` is the
+              // photograph belonging to the words on the plate.
               style={{
-                transform: `translateX(calc(var(--step) * -1 * ${tileIndex(
-                  index,
-                  tiles.length
-                )}))`,
+                transform: `translateX(calc(var(--step) * -1 * ${index}))`,
               }}
             >
               {tiles.map(({ key, review, media }) => (
@@ -789,6 +806,27 @@ export function CustomerReviewsStrip({
                   <HomeReviewMediaTile review={review} media={media} />
                 </div>
               ))}
+
+              {/* Two tiles are visible at a time, so on the last index the
+                  right-hand slot would be a gap. Theirs loops; repeating the
+                  first tile at the tail is what a loop looks like from the
+                  final step, and it costs one already-decoded image.
+
+                  Hidden from assistive tech and untabbable — it is the same
+                  photograph announced a second time. */}
+              {pageCount > 1 && tiles[0] ? (
+                <div
+                  key="tail-clone"
+                  data-testid="home-review-media-clone"
+                  aria-hidden="true"
+                  className="h-full shrink-0 basis-full lg:basis-[calc((100%-8px)/2)]"
+                >
+                  <HomeReviewMediaTile
+                    review={tiles[0].review}
+                    media={tiles[0].media}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -889,7 +927,7 @@ export function CustomerReviewsSection() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: feed } = useReviewFeed(1, RAIL_SIZE)
+  const { data: feed } = useReviewFeed(1, FEED_PAGE_SIZE)
 
   return (
     <CustomerReviewsStrip

@@ -269,6 +269,43 @@ test.describe('the home Customer Reviews strip', () => {
     expect(await page.getByTestId('home-review-card').count()).toBeGreaterThan(0)
   })
 
+  test('the photograph advances with the quote, every step', async ({
+    page,
+  }) => {
+    // The band shipped with two tracks of different lengths — every review
+    // quoted, only the photographed ones tiled — so the strip paired quotes
+    // with strangers' pictures and froze once it ran out of them. Both tracks
+    // now hold the same reviews, so the tile at the index is the quoted one.
+    const band = page.getByTestId('home-reviews')
+    await expect(band).toBeVisible()
+
+    const next = band.getByRole('button', { name: 'Next review' })
+    const track = page.getByTestId('home-reviews-media-track')
+
+    for (let step = 1; step <= 3; step++) {
+      await next.click()
+
+      const offset = await track.evaluate(
+        (node) =>
+          Number(/\* -1 \* (\d+)/.exec((node as HTMLElement).style.transform)?.[1])
+      )
+      expect(offset).toBe(step)
+
+      // The quoted name and the name on the leading tile are the same person.
+      const author = await page
+        .getByTestId('home-review-card')
+        .nth(step)
+        .getByTestId('home-review-author')
+        .innerText()
+      const label = await page
+        .getByTestId('home-review-media')
+        .nth(step)
+        .getAttribute('aria-label')
+
+      expect(label).toContain(author.trim())
+    }
+  })
+
   test('View All leads to the reviews destination', async ({ page }) => {
     await page
       .getByTestId('home-reviews')

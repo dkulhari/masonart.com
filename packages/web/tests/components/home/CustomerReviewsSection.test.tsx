@@ -7,11 +7,14 @@
  *
  * Five things here are load-bearing:
  *
- *   1. TWO TRACKS, ONE INDEX. The band is a fixed blush plate that quote cards
- *      translate through, beside a strip of media tiles two-at-a-time. Both
- *      move off one integer. The first implementation interleaved cards and
- *      tiles into a single scroll-snap rail, which is a different band; these
- *      tests exist so that cannot come back.
+ *   1. TWO TRACKS, ONE INDEX, ONE LIST. The band is a fixed blush plate that
+ *      quote cards translate through, beside a strip of media tiles
+ *      two-at-a-time. Both move off one integer OVER THE SAME REVIEWS, so the
+ *      photograph beside a quote belongs to the person quoted. Two earlier
+ *      shapes are pinned out by these tests: a single scroll-snap rail that
+ *      interleaved cards and tiles, and two tracks of different lengths — every
+ *      review quoted, only some tiled — which paired quotes with strangers'
+ *      photographs and froze the strip once the shorter track ran out.
  *
  *   2. SUPPRESSION. The whole section returns null below ten approved reviews,
  *      and when `averageRating` is null however many there are. Not a
@@ -50,9 +53,10 @@ import {
   MAX_BODY_CHARACTERS,
   AUTOPLAY_DELAY_MS,
   TILES_PER_VIEW,
+  FEED_PAGE_SIZE,
+  MAX_SLIDES,
   buildReviewsRail,
   bulletWindow,
-  tileIndex,
   truncateBody,
   formatAuthorName,
 } from '~/components/home/CustomerReviewsSection'
@@ -144,6 +148,16 @@ function makeReviews(count: number): ReviewFeedItem[] {
       author: { id: `user-${i + 1}`, name: `Reviewer ${i + 1}` },
     })
   )
+}
+
+/**
+ * Hang a photograph on one review.
+ *
+ * The band only quotes reviews that carry media — a medialess fixture is
+ * suppressed, not rendered — so a card-level test has to give its subject one.
+ */
+function withMedia(review: ReviewFeedItem): ReviewFeedItem {
+  return { ...review, media: [makeMedia({ id: `m-${review.id}` })] }
 }
 
 /** `count` reviews, every one of them carrying a photograph. */
@@ -254,6 +268,20 @@ describe('the suppression rule', () => {
     )
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('renders nothing when not one review on the page carries media', () => {
+    // The band is a photograph beside the words of the person who took it.
+    // With no photographs there is no band — a plate of quotes next to an
+    // empty column is a broken layout, not a reduced one.
+    const { container } = render(
+      <CustomerReviewsStrip
+        averageRating={4.8}
+        reviewCount={4000}
+        reviews={makeReviews(12)}
+      />
+    )
+    expect(container).toBeEmptyDOMElement()
+  })
 })
 
 // ============================================================================
@@ -262,7 +290,7 @@ describe('the suppression rule', () => {
 
 describe('the score band', () => {
   it('prints the catalogue aggregate, never their hardcoded number', () => {
-    renderStrip(makeReviews(12), 4.7)
+    renderStrip(makeReviewsWithMedia(12), 4.7)
 
     const score = screen.getByTestId('home-reviews-score')
     expect(score).toHaveTextContent('4.7')
@@ -274,21 +302,21 @@ describe('the score band', () => {
   })
 
   it('keeps their "Score x.x/ 5.0" phrasing beside the real number', () => {
-    renderStrip(makeReviews(12), 4.5)
+    renderStrip(makeReviewsWithMedia(12), 4.5)
     expect(screen.getByTestId('home-reviews-score')).toHaveTextContent(
       'Score 4.5/ 5.0'
     )
   })
 
   it('heads the band the way the reference does', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
     expect(
       screen.getByRole('heading', { name: 'Customer Reviews' })
     ).toBeInTheDocument()
   })
 
   it('puts View All at the far end of the header row', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     const link = screen.getByRole('link', { name: /view all/i })
     expect(link).toHaveAttribute('href', '/reviews')
@@ -303,9 +331,11 @@ describe('the score band', () => {
 // ============================================================================
 
 describe('buildReviewsRail', () => {
-  it('quotes every review and tiles only the ones with photographs', () => {
-    // NOT an interleave. The two tracks are different lengths on purpose:
-    // every customer can be quoted, only some sent a photo.
+  it('quotes ONLY the reviews that carry media, so the two tracks pair up', () => {
+    // The whole point of the band: the photograph beside a quote belongs to
+    // the person being quoted. A medialess review in the left track puts a
+    // stranger's photo next to their words and, once the shorter track runs
+    // out, freezes the strip while the quotes carry on.
     const reviews = [
       makeReview({ id: 'a', media: [makeMedia({ id: 'm-a' })] }),
       makeReview({ id: 'b' }),
@@ -314,8 +344,9 @@ describe('buildReviewsRail', () => {
 
     const rail = buildReviewsRail(reviews)
 
-    expect(rail.quotes.map((r) => r.id)).toEqual(['a', 'b', 'c'])
+    expect(rail.quotes.map((r) => r.id)).toEqual(['a', 'c'])
     expect(rail.tiles.map((t) => t.review.id)).toEqual(['a', 'c'])
+    expect(rail.pageCount).toBe(2)
   })
 
   it('takes one tile per review, however many photos they sent', () => {
@@ -332,27 +363,22 @@ describe('buildReviewsRail', () => {
     expect(rail.tiles[0].media.id).toBe('m-1')
   })
 
-  it('pages over the longer of the two tracks', () => {
-    const rail = buildReviewsRail(makeReviews(7))
+  it('pages over one track, because there is only one length now', () => {
+    const rail = buildReviewsRail(makeReviewsWithMedia(7))
     expect(rail.pageCount).toBe(7)
-  })
-})
-
-describe('tileIndex', () => {
-  it('keeps the strip in lockstep with the quotes', () => {
-    expect(tileIndex(0, 10)).toBe(0)
-    expect(tileIndex(3, 10)).toBe(3)
+    expect(rail.quotes).toHaveLength(7)
+    expect(rail.tiles).toHaveLength(7)
   })
 
-  it('holds at the last full pair rather than stepping into empty space', () => {
-    // Five tiles, two visible: the furthest honest position is 3.
-    expect(tileIndex(4, 5)).toBe(3)
-    expect(tileIndex(9, 5)).toBe(3)
+  it('renders nothing at all when no review carries media', () => {
+    const rail = buildReviewsRail(makeReviews(12))
+    expect(rail.quotes).toHaveLength(0)
+    expect(rail.pageCount).toBe(0)
   })
 
-  it('never goes negative when there is nothing to show', () => {
-    expect(tileIndex(2, 0)).toBe(0)
-    expect(tileIndex(2, 1)).toBe(0)
+  it('caps the band rather than paginating the whole catalogue', () => {
+    const rail = buildReviewsRail(makeReviewsWithMedia(MAX_SLIDES + 6))
+    expect(rail.pageCount).toBe(MAX_SLIDES)
   })
 
   it('shows two tiles at a time, as the widget is configured to', () => {
@@ -365,19 +391,48 @@ describe('tileIndex', () => {
 // ============================================================================
 
 describe('the two tracks', () => {
-  it('renders one quote card per review and one tile per photo', () => {
+  it('renders a quote card and a tile for each media review, and skips the rest', () => {
     const reviews = [
       ...makeReviewsWithMedia(4),
       ...makeReviews(8).map((r) => ({ ...r, id: `text-${r.id}` })),
     ]
     renderStrip(reviews)
 
-    expect(screen.getAllByTestId('home-review-card')).toHaveLength(12)
-    expect(screen.getAllByTestId('home-review-media')).toHaveLength(4)
+    expect(screen.getAllByTestId('home-review-card')).toHaveLength(4)
+    // Four real tiles plus the trailing clone that fills the second visible
+    // slot on the last step — see `home-review-media-clone`.
+    expect(screen.getAllByTestId('home-review-media')).toHaveLength(5)
+    expect(screen.getAllByTestId('home-review-media-clone')).toHaveLength(1)
+  })
+
+  it('pairs each quote with that reviewer’s own photograph', () => {
+    const reviews = [
+      makeReview({
+        id: 'a',
+        author: { id: 'u-a', name: 'Ada Lovelace' },
+        media: [makeMedia({ id: 'm-a' })],
+      }),
+      makeReview({ id: 'b', author: { id: 'u-b', name: 'No Photo' } }),
+      makeReview({
+        id: 'c',
+        author: { id: 'u-c', name: 'Grace Hopper' },
+        media: [makeMedia({ id: 'm-c' })],
+      }),
+    ]
+    renderStrip(reviews)
+
+    const cards = screen.getAllByTestId('home-review-card')
+    const tiles = screen.getAllByTestId('home-review-media')
+
+    expect(cards[0]).toHaveTextContent('Ada L.')
+    expect(tiles[0].getAttribute('aria-label')).toContain('Ada L.')
+    expect(cards[1]).toHaveTextContent('Grace H.')
+    expect(tiles[1].getAttribute('aria-label')).toContain('Grace H.')
+    expect(screen.queryByText(/No P\./)).toBeNull()
   })
 
   it('steps the quote track one whole plate at a time', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     const track = screen.getByTestId('home-reviews-quote-track')
     expect(track).toHaveStyle({ transform: 'translateX(calc(0 * -100%))' })
@@ -397,24 +452,43 @@ describe('the two tracks', () => {
     })
   })
 
-  it('holds the strip still once it runs out of tiles', () => {
-    // Twelve quotes, three photos: the strip parks at 1 and the words carry on.
-    const reviews = makeReviews(12).map((review, i) =>
-      i < 3 ? { ...review, media: [makeMedia({ id: `m-${i}` })] } : review
-    )
+  it('never freezes the strip while the words carry on', () => {
+    // THE REGRESSION. The band used to quote every review and tile only the
+    // ones with photographs, then clamp the strip at `tiles - 2`: with five
+    // photos among twelve reviews the media stopped dead on step three and
+    // the quotes kept going. One track, one index, every step.
+    const reviews = [
+      ...makeReviewsWithMedia(5),
+      ...makeReviews(7).map((r) => ({ ...r, id: `text-${r.id}` })),
+    ]
     renderStrip(reviews)
 
     const next = screen.getByRole('button', { name: /next review/i })
-    fireEvent.click(next)
-    fireEvent.click(next)
-    fireEvent.click(next)
+    for (const step of [1, 2, 3, 4]) {
+      fireEvent.click(next)
+      expect(screen.getByTestId('home-reviews-quote-track')).toHaveStyle({
+        transform: `translateX(calc(${step} * -100%))`,
+      })
+      expect(screen.getByTestId('home-reviews-media-track')).toHaveStyle({
+        transform: `translateX(calc(var(--step) * -1 * ${step}))`,
+      })
+    }
+  })
 
-    expect(screen.getByTestId('home-reviews-quote-track')).toHaveStyle({
-      transform: 'translateX(calc(3 * -100%))',
-    })
-    expect(screen.getByTestId('home-reviews-media-track')).toHaveStyle({
-      transform: 'translateX(calc(var(--step) * -1 * 1))',
-    })
+  it('keeps a clone of the first tile at the tail, so the last step is not half empty', () => {
+    // Two tiles are visible at a time, so the final index would otherwise
+    // park a photograph beside a gap.
+    renderStrip(makeReviewsWithMedia(4))
+
+    const tiles = screen.getAllByTestId('home-review-media')
+    expect(tiles).toHaveLength(5)
+    expect(tiles[4].getAttribute('aria-label')).toEqual(
+      tiles[0].getAttribute('aria-label')
+    )
+    // The clone is a duplicate, so it is not announced twice.
+    expect(
+      screen.getByTestId('home-review-media-clone').getAttribute('aria-hidden')
+    ).toBe('true')
   })
 
   it('is a grid of plate and strip, not one scrolling rail', () => {
@@ -429,7 +503,7 @@ describe('the two tracks', () => {
   })
 
   it('paints the blush on the plate, which never moves', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     const plate = screen.getByTestId('home-reviews-plate')
     // Measured `rgb(246 239 236)` — the widget's own, not the old #f6ebe6.
@@ -439,7 +513,7 @@ describe('the two tracks', () => {
   })
 
   it('hides the cards parked off-plate from assistive tech', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     const cards = screen.getAllByTestId('home-review-card')
     expect(cards[0]).not.toHaveAttribute('aria-hidden')
@@ -453,7 +527,7 @@ describe('the two tracks', () => {
 
 describe('a quote card', () => {
   it('hangs the quote glyph off the plate corner', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     // Measured at -8,-8 against the plate — it overlaps the corner rather
     // than sitting inside the padding, which means it must live OUTSIDE the
@@ -470,7 +544,7 @@ describe('a quote card', () => {
   })
 
   it('draws the stars in the widget orange, not the page amber', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
     expect(screen.getAllByTestId('home-review-stars')[0].innerHTML).toContain(
       '#ff8d00'
     )
@@ -480,14 +554,14 @@ describe('a quote card', () => {
     // `auto 1fr auto`. With three auto rows a short review pushes the name
     // into the middle of the plate, and since the band steps between reviews
     // of different lengths the name then jumps on every advance.
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
     expect(screen.getAllByTestId('home-review-card')[0].className).toContain(
       'grid-rows-[auto_1fr_auto]'
     )
   })
 
   it('sets the card stars at the reference 24px, not the 20px default', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
     const star = screen
       .getAllByTestId('home-review-stars')[0]
       .querySelector('span[aria-hidden="true"]') as HTMLElement | null
@@ -498,7 +572,10 @@ describe('a quote card', () => {
   it('draws an empty star as a hollow outline in the same hue, never grey', () => {
     // A cool-grey unfilled star is the loudest wrong note on an otherwise
     // entirely warm band, and it is what the shared StarRating renders.
-    renderStrip([makeReview({ rating: 3 }), ...makeReviews(11)])
+    renderStrip([
+      withMedia(makeReview({ id: 'subject', rating: 3 })),
+      ...makeReviewsWithMedia(11),
+    ])
 
     const row = screen.getAllByTestId('home-review-stars')[0]
     const slots = row.querySelectorAll('span[aria-hidden="true"]')
@@ -510,7 +587,7 @@ describe('a quote card', () => {
   })
 
   it('half-fills a fractional aggregate rather than rounding it', () => {
-    renderStrip(makeReviews(12), 4.5)
+    renderStrip(makeReviewsWithMedia(12), 4.5)
 
     const solid = screen
       .getByTestId('home-reviews-score')
@@ -521,13 +598,19 @@ describe('a quote card', () => {
 
   it('leaves a short review alone', () => {
     const short = 'Beautiful print, arrived early.'
-    renderStrip([makeReview({ content: short }), ...makeReviews(11)])
+    renderStrip([
+      withMedia(makeReview({ id: 'subject', content: short })),
+      ...makeReviewsWithMedia(11),
+    ])
     expect(screen.getAllByTestId('home-review-body')[0]).toHaveTextContent(short)
   })
 
   it('cuts a long review to the widget cap', () => {
     const long = `${'word '.repeat(80)}end`
-    renderStrip([makeReview({ content: long }), ...makeReviews(11)])
+    renderStrip([
+      withMedia(makeReview({ id: 'subject', content: long })),
+      ...makeReviewsWithMedia(11),
+    ])
 
     const body = screen.getAllByTestId('home-review-body')[0].textContent ?? ''
     expect(body.length).toBeLessThanOrEqual(MAX_BODY_CHARACTERS + 1)
@@ -536,8 +619,14 @@ describe('a quote card', () => {
 
   it('signs off bottom-right with the verified check', () => {
     renderStrip([
-      makeReview({ author: { id: 'u', name: 'Daniel Norris' }, verified: true }),
-      ...makeReviews(11),
+      withMedia(
+        makeReview({
+          id: 'subject',
+          author: { id: 'u', name: 'Daniel Norris' },
+          verified: true,
+        })
+      ),
+      ...makeReviewsWithMedia(11),
     ])
 
     const author = screen.getAllByTestId('home-review-author')[0]
@@ -547,7 +636,10 @@ describe('a quote card', () => {
   })
 
   it('drops the check when the purchase was not verified', () => {
-    renderStrip([makeReview({ verified: false }), ...makeReviews(11)])
+    renderStrip([
+      withMedia(makeReview({ id: 'subject', verified: false })),
+      ...makeReviewsWithMedia(11),
+    ])
     // The other eleven fixtures ARE verified — scope to the card in question.
     const first = screen.getAllByTestId('home-review-card')[0]
     expect(
@@ -556,7 +648,10 @@ describe('a quote card', () => {
   })
 
   it('survives a review whose author was deleted', () => {
-    renderStrip([makeReview({ author: null }), ...makeReviews(11)])
+    renderStrip([
+      withMedia(makeReview({ id: 'subject', author: null })),
+      ...makeReviewsWithMedia(11),
+    ])
     expect(screen.getAllByTestId('home-review-author')[0]).toHaveTextContent(
       'Verified customer'
     )
@@ -606,8 +701,10 @@ describe('a media tile', () => {
   })
 
   it('costs a poster frame and nothing else for a clip', () => {
-    const reviews = makeReviews(12).map((review, i) =>
-      i === 0
+    // On the SECOND review, not the first: the first tile is also cloned onto
+    // the tail of the strip, and one clip asserted twice is a confusing test.
+    const reviews = makeReviewsWithMedia(12).map((review, i) =>
+      i === 1
         ? {
             ...review,
             media: [
@@ -653,7 +750,7 @@ describe('a media tile', () => {
 
 describe('the arrows', () => {
   it('steps forward and back', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
     const track = screen.getByTestId('home-reviews-quote-track')
 
     fireEvent.click(screen.getByRole('button', { name: /next review/i }))
@@ -664,7 +761,7 @@ describe('the arrows', () => {
   })
 
   it('wraps at both ends, the way theirs loops', () => {
-    renderStrip(makeReviews(3))
+    renderStrip(makeReviewsWithMedia(3))
     const track = screen.getByTestId('home-reviews-quote-track')
 
     fireEvent.click(screen.getByRole('button', { name: /previous review/i }))
@@ -707,7 +804,7 @@ describe('bulletWindow', () => {
 
 describe('the bullets', () => {
   it('marks the active one and jumps on click', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     const dots = screen.getAllByTestId('home-reviews-dot')
     expect(dots).toHaveLength(5)
@@ -720,7 +817,7 @@ describe('the bullets', () => {
   })
 
   it('sits under the band, left-aligned like theirs', () => {
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
     // Measured 64px in from the content edge, not centred.
     const dots = screen.getByTestId('home-reviews-dots')
     expect(dots.className).toContain('lg:pl-16')
@@ -736,7 +833,7 @@ describe('autoplay', () => {
   it('advances one step every five seconds', () => {
     vi.useFakeTimers()
     stubReducedMotion(false)
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     act(() => {
       vi.advanceTimersByTime(AUTOPLAY_DELAY_MS)
@@ -750,7 +847,7 @@ describe('autoplay', () => {
   it('wraps back to the first quote at the end', () => {
     vi.useFakeTimers()
     stubReducedMotion(false)
-    renderStrip(makeReviews(2))
+    renderStrip(makeReviewsWithMedia(2))
 
     act(() => {
       vi.advanceTimersByTime(AUTOPLAY_DELAY_MS * 2)
@@ -764,7 +861,7 @@ describe('autoplay', () => {
   it('never starts under prefers-reduced-motion', () => {
     vi.useFakeTimers()
     stubReducedMotion(true)
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     act(() => {
       vi.advanceTimersByTime(AUTOPLAY_DELAY_MS * 3)
@@ -778,7 +875,7 @@ describe('autoplay', () => {
   it('stops while the pointer is over the band', () => {
     vi.useFakeTimers()
     stubReducedMotion(false)
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     const region = screen.getByTestId('home-reviews-carousel')
     fireEvent.mouseEnter(region)
@@ -801,7 +898,7 @@ describe('autoplay', () => {
   it('stops while the keyboard is inside the band', () => {
     vi.useFakeTimers()
     stubReducedMotion(false)
-    renderStrip(makeReviews(12))
+    renderStrip(makeReviewsWithMedia(12))
 
     // focusin/focusout, so arrows and bullets count as "inside" too.
     fireEvent.focusIn(screen.getByRole('button', { name: /next review/i }))
@@ -826,7 +923,7 @@ describe('autoplay', () => {
     stubReducedMotion(false)
     const clearInterval = vi.spyOn(window, 'clearInterval')
 
-    const { unmount } = renderStrip(makeReviews(12))
+    const { unmount } = renderStrip(makeReviewsWithMedia(12))
     unmount()
 
     expect(clearInterval).toHaveBeenCalled()
@@ -865,7 +962,10 @@ describe('CustomerReviewsSection', () => {
     renderConnected()
 
     expect(await screen.findByTestId('home-reviews')).toBeInTheDocument()
-    expect(useReviewFeed).toHaveBeenCalledWith(1, 12)
+    // Deeper than the band can show: only reviews with media are quoted, so a
+    // page of exactly MAX_SLIDES would leave the band a fraction of that.
+    expect(useReviewFeed).toHaveBeenCalledWith(1, FEED_PAGE_SIZE)
+    expect(FEED_PAGE_SIZE).toBeGreaterThan(MAX_SLIDES)
   })
 
   it('stays silent when the catalogue is below the threshold', async () => {
