@@ -99,13 +99,11 @@ async function fetchProductStats(): Promise<ProductStats> {
   })
 
   if (!response.ok) {
-    // Return default stats if endpoint doesn't exist yet
-    return {
-      totalProducts: 0,
-      activeProducts: 0,
-      lowStockProducts: 0,
-      outOfStockProducts: 0,
-    }
+    // Throws, like fetchOrderStats beside it. The zero-filled fallback that
+    // used to live here (#602) meant a dead endpoint rendered as a catalogue
+    // of zero products and zero low-stock alarms — a reading an operator
+    // cannot tell apart from a healthy empty shop.
+    throw new Error('Failed to fetch product stats')
   }
 
   return response.json()
@@ -156,6 +154,15 @@ function AdminDashboard() {
       setProductStats(products)
       setRecentOrders(recent)
       setLastRefresh(new Date())
+
+      // One dead call must not blank the whole screen, but it must not pass
+      // unmentioned either — the tiles it feeds render a placeholder, and this
+      // says why (#602).
+      if (!products) {
+        setError(
+          'Could not load product statistics. Product figures are unavailable — the rest of the dashboard is current.'
+        )
+      }
     } catch (err) {
       setError('Failed to load dashboard data. Please try again.')
     } finally {
@@ -208,7 +215,10 @@ function AdminDashboard() {
 
       {/* Error State */}
       {error && (
-        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <div
+          role="alert"
+          className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
+        >
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <p className="text-sm">{error}</p>
           <button
@@ -308,7 +318,9 @@ function AdminDashboard() {
             {/* Products */}
             <StatsCard
               title="Active Products"
-              value={productStats?.activeProducts || 0}
+              // An em dash, not a zero: the stats call can fail, and "0 active
+              // products" is a claim this tile is in no position to make (#602).
+              value={productStats ? productStats.activeProducts : '—'}
               icon={Package}
               compact
               href="/admin/products"

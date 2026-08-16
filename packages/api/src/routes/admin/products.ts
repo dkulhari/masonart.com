@@ -462,6 +462,87 @@ adminProductsApp.get(
 );
 
 // ============================================================================
+// GET /api/admin/products/stats - Catalogue Statistics (Admin)
+// ============================================================================
+
+/**
+ * Must stay ABOVE `GET /:id` (#602).
+ *
+ * Hono matches in registration order. Registered below the parameterised
+ * route, `/stats` is swallowed by `/:id` with `id="stats"`, which answers 400
+ * "Invalid product ID format" — the exact shape of the original bug, where the
+ * dashboard turned that 400 into four confident zeros.
+ *
+ * Stock thresholds are NOT a constant. `product_variants.low_stock_threshold`
+ * already exists per variant (default 5), because a 12x16 print and a
+ * gallery-size canvas do not run out at the same number. A hard-coded
+ * threshold here would silently override what a merchandiser set on the row.
+ *
+ * Scope of each counter, since the four are deliberately not the same
+ * population:
+ *
+ * - `totalProducts`  every product row, drafts and archived included — the
+ *                    size of the catalogue as stored.
+ * - `activeProducts` `status = 'active'`: what a customer can currently reach.
+ * - `lowStockProducts` / `outOfStockProducts` are restocking alarms, so they
+ *   cover ACTIVE products only. A draft nobody can buy yet, or an archived
+ *   product deliberately retired, is not work waiting for an operator.
+ *
+ * A product is low when any *active* variant still has stock but has fallen to
+ * or below its own threshold; out of stock when no active variant has stock
+ * left at all (which includes a product carrying no sellable variant — it
+ * cannot be bought, whatever the catalogue says). The two are mutually
+ * exclusive by construction: "low" requires stock > 0.
+ */
+adminProductsApp.get("/stats", async (c) => {
+  try {
+    /** Correlated: does this product have any variant a customer can buy? */
+    const hasSellableStock = sql`EXISTS (
+      SELECT 1 FROM ${productVariants}
+      WHERE ${productVariants.productId} = ${products.id}
+        AND ${productVariants.isActive} = true
+        AND ${productVariants.stockQuantity} > 0
+    )`;
+
+    /** Correlated: any sellable variant at or below its own threshold. */
+    const hasLowStock = sql`EXISTS (
+      SELECT 1 FROM ${productVariants}
+      WHERE ${productVariants.productId} = ${products.id}
+        AND ${productVariants.isActive} = true
+        AND ${productVariants.stockQuantity} > 0
+        AND ${productVariants.stockQuantity} <= ${productVariants.lowStockThreshold}
+    )`;
+
+    const [totals] = await db
+      .select({
+        totalProducts: sql<number>`count(*)::int`,
+        activeProducts: sql<number>`count(*) FILTER (WHERE ${products.status} = 'active')::int`,
+      })
+      .from(products);
+
+    const [stock] = await db
+      .select({
+        lowStockProducts: sql<number>`count(*) FILTER (WHERE ${hasLowStock})::int`,
+        outOfStockProducts: sql<number>`count(*) FILTER (WHERE NOT ${hasSellableStock})::int`,
+      })
+      .from(products)
+      .where(eq(products.status, "active"));
+
+    return c.json({
+      totalProducts: totals?.totalProducts ?? 0,
+      activeProducts: totals?.activeProducts ?? 0,
+      lowStockProducts: stock?.lowStockProducts ?? 0,
+      outOfStockProducts: stock?.outOfStockProducts ?? 0,
+    });
+  } catch (error) {
+    // Deliberately an error, never a zero — see the ticket. A dashboard tile
+    // reading "0 low stock" because the query died is worse than a blank one.
+    console.error("Failed to fetch product stats:", error);
+    return c.json({ error: "Failed to fetch product stats" }, 500);
+  }
+});
+
+// ============================================================================
 // GET /api/admin/products/:id - Get Product by ID (Admin)
 // ============================================================================
 
