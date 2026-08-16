@@ -27,6 +27,7 @@ import {
   MessageSquare,
   RotateCcw,
   ShieldCheck,
+  ClipboardCheck,
   Store,
   Percent,
   Gift,
@@ -102,6 +103,16 @@ const NAV_ITEMS: NavItem[] = [
     label: 'AI Moderation',
     href: '/admin/ai-moderation',
     icon: ShieldCheck,
+  },
+  {
+    // Customer photo submissions waiting on a human (#605). The queue and its
+    // API shipped without a door: typing the URL was the only way in, so
+    // submissions piled up unseen. Operational, so it sits with Reviews and
+    // AI Moderation rather than under Settings — and stays out of
+    // CONTENT_MANAGER_ALLOWED_PREFIXES, matching requireAdmin on the API.
+    label: 'Approvals',
+    href: '/admin/approvals',
+    icon: ClipboardCheck,
   },
   {
     label: 'Returns',

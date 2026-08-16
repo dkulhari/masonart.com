@@ -60,6 +60,25 @@ describe('AdminSidebar return path', () => {
   })
 })
 
+describe('AdminSidebar photo approvals entry (#605)', () => {
+  it('links admins to the photo approvals queue', () => {
+    render(<AdminSidebar user={admin} collapsed={false} />)
+
+    expect(screen.getByRole('link', { name: /approvals/i })).toHaveAttribute(
+      'href',
+      '/admin/approvals'
+    )
+  })
+
+  it('hides approvals from content managers', () => {
+    // /api/admin/approvals is requireAdmin — a visible link would be a 403
+    // waiting to happen.
+    render(<AdminSidebar user={contentManager} collapsed={false} />)
+
+    expect(screen.queryByRole('link', { name: /approvals/i })).toBeNull()
+  })
+})
+
 describe('MobileAdminHeader', () => {
   it('titles the staff area for what a content manager can reach', () => {
     render(<MobileAdminHeader role="content-manager" />)
