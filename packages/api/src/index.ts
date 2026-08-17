@@ -37,7 +37,10 @@ import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { adminReviewsApp } from "./routes/admin/reviews";
 import { adminShippingApp } from "./routes/admin/shipping";
 import { adminShippingConfigApp } from "./routes/admin/shipping-config";
-import { adminShipmentsApp } from "./routes/admin/shipments";
+import {
+  adminShipmentsApp,
+  adminOrderShipmentsApp,
+} from "./routes/admin/shipments";
 import { adminReturnsApp } from "./routes/admin/returns";
 import { adminNotificationsApp } from "./routes/admin/notifications";
 import { adminApprovalsApp } from "./routes/admin/approvals";
@@ -247,7 +250,12 @@ app.route("/api/admin/shipping-config", adminShippingConfigApp);
 
 // Admin Shipments API - shipment management
 app.route("/api/admin/shipments", adminShipmentsApp);
-app.route("/api/admin", adminShipmentsApp);
+// POST /api/admin/orders/:orderId/ship only. Mounting the whole shipments
+// router here instead also mounted its `GET /:id`, and `GET /api/admin/:id`
+// answered every single-segment admin list route registered below it with
+// `400 Invalid shipment ID` — the vendor directory and the production queue
+// were both dead. See the comment on adminOrderShipmentsApp.
+app.route("/api/admin", adminOrderShipmentsApp);
 
 // Admin Returns API - return request management
 app.route("/api/admin/returns", adminReturnsApp);

@@ -93,6 +93,25 @@ const adminShipmentsApp = new Hono<{ Variables: AuthVariables }>();
 adminShipmentsApp.use("*", requireAuth);
 adminShipmentsApp.use("*", requireAdmin);
 
+/**
+ * The one order-scoped route, in its own router.
+ *
+ * `POST /api/admin/orders/:orderId/ship` hangs off `/api/admin`, not off
+ * `/api/admin/shipments`, so it cannot live on the router above: mounting THAT
+ * one at `/api/admin` also mounts its `GET /:id`, and `GET /api/admin/:id`
+ * swallows every single-segment admin list route registered after it —
+ * `/api/admin/vendors` and `/api/admin/production` both answered
+ * `400 Invalid shipment ID` until this was split out.
+ *
+ * A one-route router is the price of a prefix that is a parent of the whole
+ * admin tree. Keep it that way: nothing with a bare `/:id` may be mounted at
+ * `/api/admin`.
+ */
+const adminOrderShipmentsApp = new Hono<{ Variables: AuthVariables }>();
+
+adminOrderShipmentsApp.use("*", requireAuth);
+adminOrderShipmentsApp.use("*", requireAdmin);
+
 // ============================================================================
 // GET /api/admin/shipments - List All Shipments
 // ============================================================================
@@ -311,7 +330,7 @@ adminShipmentsApp.get("/:id", async (c) => {
 // POST /api/admin/orders/:orderId/ship - Create Shipment for Order
 // ============================================================================
 
-adminShipmentsApp.post(
+adminOrderShipmentsApp.post(
   "/orders/:orderId/ship",
   zValidator("json", createShipmentSchema),
   async (c) => {
@@ -612,6 +631,7 @@ adminShipmentsApp.post("/:id/mark-delivered", async (c) => {
 // Export the router and schemas
 export {
   adminShipmentsApp,
+  adminOrderShipmentsApp,
   listShipmentsSchema,
   createShipmentSchema,
   updateShipmentSchema,

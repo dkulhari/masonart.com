@@ -17,7 +17,18 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, asc, sql, ilike, or, gte, lte } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  sql,
+  ilike,
+  or,
+  gte,
+  lte,
+  inArray,
+} from "drizzle-orm";
 
 import { db } from "../../database";
 import {
@@ -313,7 +324,12 @@ adminOrdersApp.get(
             email: users.email,
           })
           .from(users)
-          .where(sql`${users.id} = ANY(${userIds})`);
+          // `sql\`${users.id} = ANY(${userIds})\`` bound the array as one
+          // parameter per element, so Postgres answered "op ANY/ALL (array)
+          // requires array on right side" and the whole admin order list 500ed
+          // the moment a single order had a userId. `inArray` builds the IN
+          // list Drizzle knows how to parameterise.
+          .where(inArray(users.id, userIds));
 
         userMap = userList.reduce(
           (acc, user) => {
@@ -344,6 +360,9 @@ adminOrdersApp.get(
         hasPreviousPage: page > 1,
       });
     } catch (error) {
+      // Logged, not only returned: a silent catch here is why the broken
+      // `ANY()` bind above sat unnoticed behind a generic 500.
+      console.error("[Orders] Failed to list orders:", error);
       return c.json({ error: "Failed to fetch orders" }, 500);
     }
   }
