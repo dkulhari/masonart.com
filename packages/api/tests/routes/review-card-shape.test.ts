@@ -30,8 +30,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
-import { PgDialect } from 'drizzle-orm/pg-core'
-import type { SQL } from 'drizzle-orm'
+import { createSelectQueue } from '../helpers/select-queue'
 import '../setup'
 
 const { selectMock, getCachedMock, setCachedMock, deletePatternMock } = vi.hoisted(
@@ -163,65 +162,12 @@ function mediaRow(reviewId: string, overrides: Record<string, unknown> = {}) {
 // Mocked db.select — records the fragments each handler builds
 // ============================================================================
 
-const dialect = new PgDialect()
-
-interface RecordedSelect {
-  fields: unknown
-  ops: Array<{ method: string; args: unknown[] }>
-}
-
-let selects: RecordedSelect[] = []
-
-/** Render a recorded drizzle fragment down to `{ sql, params }`. */
-function render(fragment: unknown): { sql: string; params: unknown[] } {
-  const { sql, params } = dialect.sqlToQuery(fragment as SQL)
-  return { sql, params: params as unknown[] }
-}
-
-/** The arguments a recorded select passed to `method`, or undefined. */
-function argsFor(select: RecordedSelect, method: string): unknown[] | undefined {
-  return select.ops.find((op) => op.method === method)?.args
-}
-
-/** Every join a recorded select made, rendered down to SQL. */
-function joinSql(select: RecordedSelect): string[] {
-  return select.ops
-    .filter((op) => op.method === 'leftJoin' || op.method === 'innerJoin')
-    .map((op) => render(op.args[1]).sql)
-}
-
-/** Queue one result array per `db.select()` call, in call order. */
-function queueSelects(...results: unknown[][]) {
-  let call = 0
-  selectMock.mockImplementation((fields: unknown) => {
-    const rows = results[call++] ?? []
-    const record: RecordedSelect = { fields, ops: [] }
-    selects.push(record)
-
-    const chain: Record<string, unknown> = {}
-    for (const method of [
-      'from',
-      'where',
-      'groupBy',
-      'orderBy',
-      'limit',
-      'offset',
-      'leftJoin',
-      'innerJoin',
-    ]) {
-      chain[method] = (...args: unknown[]) => {
-        record.ops.push({ method, args })
-        return chain
-      }
-    }
-    chain.then = (resolve: (v: unknown) => void) => resolve(rows)
-    return chain
-  })
-}
+const { selects, queueSelects, render, argsFor, joinSql, reset } =
+  createSelectQueue(selectMock)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  selects = []
+  reset()
   getCachedMock.mockResolvedValue(null)
   setCachedMock.mockResolvedValue(undefined)
   deletePatternMock.mockResolvedValue(undefined)
