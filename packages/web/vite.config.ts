@@ -25,7 +25,39 @@ export default defineConfig({
      * Add machine names here as they come up; localhost and IP literals are
      * always permitted and need no entry.
      */
-    allowedHosts: ['macmini', 'macmini.local'],
+    allowedHosts: [
+      'macmini',
+      'macmini.local',
+      'tailmacmini',
+      'tailmacmini.local',
+      'dkmacmini',
+      'dkmacmini.local',
+    ],
+    /**
+     * Browser API calls go same-origin and are proxied here to the API on
+     * :3000.
+     *
+     * Without this, `getApiUrl()` falls back to the literal
+     * "http://localhost:3000" in the browser (packages/web has no .env, so
+     * `import.meta.env.VITE_API_URL` is undefined). On this machine that
+     * happens to work; from any other machine — LAN or Tailscale — localhost
+     * is the CLIENT's own box, every product/facet/review request fails, and
+     * the page renders "No products found" with no visible error.
+     *
+     * Paired with the `define` below, which forces the client bundle's
+     * VITE_API_URL to "" so the base URL is empty and requests are relative.
+     * SSR is untouched: it reads process.env, not import.meta.env.
+     */
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
+  // Client-only: see the proxy comment above. SSR keeps process.env.VITE_API_URL.
+  define: {
+    'import.meta.env.VITE_API_URL': '""',
   },
   plugins: [
     tsConfigPaths(),
