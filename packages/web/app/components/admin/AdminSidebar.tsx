@@ -290,15 +290,15 @@ export function AdminSidebar({
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           {!isCollapsed && (
             <a href="/admin" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-medium text-white">
                 M
               </div>
-              <span className="text-lg font-bold text-foreground">chobii.art</span>
+              <span className="text-lg font-medium text-foreground">chobii.art</span>
             </a>
           )}
           {isCollapsed && (
             <a href="/admin" className="flex w-full items-center justify-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-medium text-white">
                 M
               </div>
             </a>
@@ -492,7 +492,7 @@ export function MobileAdminHeader({ role }: { role?: string }) {
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 pl-16 md:hidden">
-      <span className="text-lg font-bold text-foreground">{title}</span>
+      <span className="text-lg font-medium text-foreground">{title}</span>
       {/* The only way out of /admin on a phone — the bare text link was a
           20px-tall tap target, well under the 44px minimum (#362). */}
       <a

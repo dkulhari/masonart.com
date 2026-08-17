@@ -682,7 +682,7 @@ export function OrderDetail({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold text-foreground">
+            <h2 className="text-2xl font-medium text-foreground">
               Order {order.orderNumber}
             </h2>
             <button

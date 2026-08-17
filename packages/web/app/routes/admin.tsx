@@ -177,7 +177,7 @@ function UnauthorizedScreen() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
           <ShieldAlert className="h-8 w-8 text-red-600" />
         </div>
-        <h1 className="mt-6 text-2xl font-bold text-foreground">Access Denied</h1>
+        <h1 className="mt-6 text-2xl font-medium text-foreground">Access Denied</h1>
         <p className="mt-2 text-muted-foreground">
           You don&apos;t have permission to access the admin panel. Please contact
           your administrator if you believe this is a mistake.

@@ -201,7 +201,7 @@ function AdminDashboard() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Dashboard</h1>
+          <h1 className="text-2xl font-medium text-foreground sm:text-3xl">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Welcome back! Here&apos;s an overview of your store.
           </p>

@@ -160,7 +160,7 @@ function NewProductPage() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+          <h1 className="text-2xl font-medium text-foreground sm:text-3xl">
             New Product
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

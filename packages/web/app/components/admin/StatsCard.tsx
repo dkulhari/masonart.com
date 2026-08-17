@@ -178,7 +178,7 @@ export function StatsCard({
           ) : (
             <p
               className={cn(
-                'mt-1 font-bold text-foreground',
+                'mt-1 font-medium text-foreground',
                 compact ? 'text-xl' : 'text-2xl sm:text-3xl'
               )}
             >

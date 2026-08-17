@@ -445,7 +445,7 @@ function EditProductPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+            <h1 className="text-2xl font-medium text-foreground sm:text-3xl">
               {isLoading ? 'Loading...' : product?.title || 'Edit Product'}
             </h1>
             {product && (

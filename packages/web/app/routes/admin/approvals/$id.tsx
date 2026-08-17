@@ -595,7 +595,7 @@ function AdminApprovalDetailPage() {
               <ArrowLeft className="h-5 w-5" />
             </a>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-medium text-gray-900">
                 Approval Details
               </h1>
               {approval?.order && (

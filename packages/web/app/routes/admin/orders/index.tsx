@@ -439,7 +439,7 @@ function AdminOrdersPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Orders</h1>
+          <h1 className="text-2xl font-medium text-foreground sm:text-3xl">Orders</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage customer orders ({pagination.total} total)
           </p>
@@ -609,7 +609,7 @@ function StatCard({ label, value, subtext, variant = 'default' }: StatCardProps)
   return (
     <div className={cn('rounded-xl border bg-card p-4', variants[variant])}>
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-2xl font-bold', textVariants[variant])}>{value}</p>
+      <p className={cn('mt-1 text-2xl font-medium', textVariants[variant])}>{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
     </div>
   )

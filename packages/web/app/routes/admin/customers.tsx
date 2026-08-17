@@ -532,7 +532,7 @@ function AdminCustomersPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+          <h1 className="flex items-center gap-2 text-2xl font-medium text-foreground">
             <Users className="h-6 w-6" />
             Customers
           </h1>
