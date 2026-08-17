@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# Refuse a commit that does not typecheck.
+#
+# packages/web sat at 22 type errors for months (#626), and the cost was not
+# the errors themselves — it was that every ticket's verification became
+# ambiguous. "Did I break this, or was it already broken?" has to be answered
+# by diffing against a baseline nobody maintains, so in practice it is not
+# answered at all. Two of those 22 turned out to be live defects: a dead filter
+# control and six navigations that error-boundary to a blank page.
+#
+# CI has run this since the beginning (.github/workflows/test.yml, the `lint`
+# job). This hook is the local half, so the answer arrives in seconds rather
+# than after a push.
+#
+# Skip it with `git commit --no-verify` when you mean to. There is deliberately
+# no second escape hatch: an env var nobody remembers setting is how a gate
+# becomes decoration.
+
+set -euo pipefail
+
+# Nothing TypeScript staged, nothing to check. Keeps doc and config commits
+# instant.
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(ts|tsx)$'; then
+  exit 0
+fi
+
+echo "pre-commit: typechecking…"
+
+# Turbo caches this, so an unchanged tree is a cache hit rather than a compile.
+#
+# One caveat worth knowing: packages/web is `composite: true`, and a stale
+# .tsbuildinfo can under-report — #626 found ~130 errors hiding behind one
+# until an edit invalidated it. CI runs this cold on a fresh checkout, which is
+# the backstop for that case.
+if ! bun run typecheck; then
+  echo
+  echo "pre-commit: typecheck failed — commit refused."
+  echo "            Fix the errors above, or use --no-verify if you mean it."
+  exit 1
+fi
