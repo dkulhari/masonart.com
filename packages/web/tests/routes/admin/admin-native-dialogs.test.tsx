@@ -22,6 +22,7 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripCommentsAndStrings } from '../../utils/source-guards'
 
 const ADMIN_TREES = [
   join(process.cwd(), 'app/routes/admin'),
@@ -34,21 +35,6 @@ const ADMIN_TREES = [
  * out so `props.confirm(` — a caller's own callback — is not swept up either.
  */
 const NATIVE_DIALOG = /(?<![\w$.])(?:window\.)?(?:alert|prompt|confirm)\s*\(/
-
-/**
- * Comments and string literals stripped before matching, so prose about the
- * ban is not itself a violation. Deliberately not a parser: a regex that eats
- * `/* *\/`, `//` and quoted runs is enough to tell an explanation from a call,
- * and the fixtures below prove the cases that matter.
- */
-export function stripCommentsAndStrings(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
-    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
-}
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

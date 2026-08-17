@@ -24,6 +24,19 @@ const EXEMPT = [
   // is where the --brand-* scale still lives.
   `components${sep}admin${sep}`,
   `routes${sep}admin`,
+  /*
+   * The vendor portal (#621), same category and for the same reason: a
+   * supplier-facing operations tool, built to follow the admin screens, that
+   * no customer ever sees. It was neither exempt nor storefront, so it failed
+   * this suite from the day it landed (#627).
+   *
+   * One thing the exemption does NOT make true: `font-bold` renders as
+   * synthesised faux-bold everywhere, because weight 700 is never loaded at
+   * all. That is a rendering defect rather than a palette preference, and it
+   * is now unguarded across all three exempt trees — worth its own ticket, not
+   * worth pretending this list fixed it.
+   */
+  `routes${sep}vendor`,
   // Our differentiator surface. The analysis calls for keeping it and
   // restyling rather than folding it into the monochrome system.
   `components${sep}ai-generator${sep}`,

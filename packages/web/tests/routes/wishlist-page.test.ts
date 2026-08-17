@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripCommentsAndStrings } from '../utils/source-guards'
 
 const routePath = join(process.cwd(), 'app/routes/wishlist.tsx')
 const src = readFileSync(routePath, 'utf8')
@@ -26,11 +27,30 @@ describe('the wishlist route', () => {
     ).toBe(false)
   })
 
+  /*
+   * Read against code, not prose (#627). `_authed` is not the only way to lock
+   * a page out — a `beforeLoad` redirect would do the same damage — but the
+   * route explains where its session comes from in a comment, and that comment
+   * says the word. A guard that cannot tell the two apart makes documenting
+   * the rule impossible, and gets deleted rather than fixed.
+   */
   it('has no auth guard of its own either', () => {
-    // `_authed` is not the only way to lock a page out; a beforeLoad redirect
-    // would do the same damage.
-    expect(src).not.toContain('beforeLoad')
-    expect(src).not.toContain('/auth/login')
+    const code = stripCommentsAndStrings(src)
+
+    expect(code).not.toContain('beforeLoad')
+    expect(code).not.toContain('/auth/login')
+  })
+
+  it('would still catch a real guard', () => {
+    const withGuard = stripCommentsAndStrings(
+      "export const Route = createFileRoute('/wishlist')({ beforeLoad: () => {} })"
+    )
+    const withProse = stripCommentsAndStrings(
+      '// session comes from the root route beforeLoad\nconst x = 1'
+    )
+
+    expect(withGuard).toContain('beforeLoad')
+    expect(withProse).not.toContain('beforeLoad')
   })
 
   it('delegates its contents to the tested component', () => {
