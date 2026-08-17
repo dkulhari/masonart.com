@@ -18,6 +18,7 @@ import { z } from "zod";
 import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import {
   giftCards,
@@ -191,6 +192,20 @@ adminGiftCardsApp.post("/", zValidator("json", issueSchema), async (c) => {
       description: `Issued by admin: ${input.reason}`,
     });
 
+    // Deliberately built from `toPublic`, never from the issue result: the
+    // plaintext code exists once, in the response below, and an audit row is
+    // readable by every admin for the length of the retention window.
+    await recordAudit(c, {
+      action: "gift_card.issued",
+      entityType: "gift_card",
+      entityId: card.id,
+      summary: `Issued a gift card of ${input.amountPaise / 100} to ${
+        input.recipientEmail ?? "no recipient"
+      }: ${input.reason}`,
+      after: toPublic(card),
+      metadata: { reason: input.reason, amountPaise: input.amountPaise },
+    });
+
     return c.json({
       giftCard: toPublic(card),
       // Shown once. Not stored, not recoverable, not resendable.
@@ -214,6 +229,17 @@ adminGiftCardsApp.post("/:id/disable", async (c) => {
     return c.json({ error: "Gift card not found or already disabled" }, 404);
   }
 
+  await recordAudit(c, {
+    action: "gift_card.disabled",
+    entityType: "gift_card",
+    entityId: updated.id,
+    summary: `Disabled gift card ending ${updated.codeLast4} holding ${
+      updated.balancePaise / 100
+    }`,
+    before: { disabledAt: null },
+    after: { disabledAt: updated.disabledAt },
+  });
+
   return c.json({ giftCard: toPublic(updated) });
 });
 
@@ -225,6 +251,17 @@ adminGiftCardsApp.post("/:id/enable", async (c) => {
     .returning();
 
   if (!updated) return c.json({ error: "Gift card not found" }, 404);
+
+  // Re-enabling is re-issuing tender: the balance becomes spendable again.
+  await recordAudit(c, {
+    action: "gift_card.enabled",
+    entityType: "gift_card",
+    entityId: updated.id,
+    summary: `Re-enabled gift card ending ${updated.codeLast4} holding ${
+      updated.balancePaise / 100
+    }`,
+    after: { disabledAt: null },
+  });
 
   return c.json({ giftCard: toPublic(updated) });
 });
@@ -277,9 +314,29 @@ adminGiftCardsApp.post(
         return updated!;
       });
 
+      await recordAudit(c, {
+        action: "gift_card.adjusted",
+        entityType: "gift_card",
+        entityId: id,
+        summary: `Adjusted gift card ending ${result.codeLast4} by ${
+          amountPaise / 100
+        }: ${reason}`,
+        after: { balancePaise: result.balancePaise },
+        metadata: { amountPaise, reason },
+      });
+
       return c.json({ giftCard: toPublic(result) });
     } catch (error) {
       if (error instanceof GiftCardError) {
+        await recordAudit(c, {
+          action: "gift_card.adjusted",
+          entityType: "gift_card",
+          entityId: id,
+          outcome: "failure",
+          summary: `Refused adjustment of ${amountPaise / 100}: ${error.message}`,
+          metadata: { amountPaise, reason },
+        });
+
         return c.json({ error: error.message }, 400);
       }
       console.error("Error adjusting gift card:", error);

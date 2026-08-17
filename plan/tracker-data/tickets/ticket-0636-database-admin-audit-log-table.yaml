@@ -13,17 +13,38 @@ description: |-
 feature: admin-audit-log
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T07:20:13.641Z'
-last_updated: '2026-08-17T07:20:13.641Z'
+last_updated: '2026-08-17T07:26:48.664Z'
 time_spent_minutes: 0
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T07:24:11.165Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T07:26:42.519Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T07:26:48.664Z'
+    text: |-
+      Done — commit 3188f068. 10/10 passing (`cd packages/api && bunx vitest run tests/database/audit-log-schema.test.ts`), turbo typecheck green.
+
+      Shipped `schema/audit-log.ts` (table + 2 enums + 6 indexes + relations) and hand-written migration `0021_admin_audit_log.sql`, applied to the dev DB on 5440.
+
+      Two notes for later tickets:
+      1. **`drizzle-kit generate` is unusable here** — it goes interactive asking whether `frame_category` is a new enum or a rename of `frame_type` (pre-existing drift from the frames work). Migrations 0014-0020 are all hand-written for the same reason; 0021 follows, with the `_journal.json` entry appended by hand (idx 21, tag `0021_admin_audit_log`).
+      2. **Trigger verified live**, not just asserted in a schema test:
+         - `UPDATE` → `ERROR: admin_audit_log is append-only: UPDATE is not permitted`
+         - `DELETE` → `ERROR: admin_audit_log is append-only: DELETE requires the retention job`
+         - `BEGIN; SET LOCAL chobii.audit_purge='on'; DELETE ...` → `DELETE 1`
+
+      The FK is `admin_audit_log_actor_user_id_user_id_fk` → `public.user(id)` (the better-auth table is singular), ON DELETE set null.
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -66,3 +87,5 @@ implementation_steps:
     command: 'git add packages/api/src/database packages/api/tests/database/audit-log-schema.test.ts && git commit -m "feat(api): append-only admin_audit_log table with immutability trigger"'
     status: pending
 current_step: 1
+started: '2026-08-17T07:24:11.165Z'
+completed: '2026-08-17T07:26:42.519Z'

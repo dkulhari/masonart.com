@@ -11,18 +11,24 @@ description: |-
 feature: admin-audit-log
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T07:20:13.837Z'
-last_updated: '2026-08-17T07:20:13.837Z'
+last_updated: '2026-08-17T07:33:45.675Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
   - logging
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T07:29:53.508Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T07:33:45.675Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -59,3 +65,5 @@ implementation_steps:
     command: 'git add packages/api/src/middleware/request-context.ts packages/api/src/lib/logger.ts packages/api/src/index.ts packages/api/tests/middleware/request-context.test.ts && git commit -m "feat(api): request id correlation and log redaction"'
     status: pending
 current_step: 1
+started: '2026-08-17T07:29:53.508Z'
+completed: '2026-08-17T07:33:45.675Z'

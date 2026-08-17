@@ -1,0 +1,44 @@
+ticket_number: 649
+title: Bug - the actor FK and the immutability trigger contradict each other
+description: |-
+  ## Bug
+  `admin_audit_log.actor_user_id` is `ON DELETE SET NULL`, which Postgres implements as an `UPDATE` on the audit row. The immutability trigger from #636 refuses every `UPDATE`. Net effect: **deleting any user who has ever appeared in the audit log fails**, with a confusing error that names the user delete but reports the audit trigger.
+
+  Found by `tests/routes/admin/gift-cards.test.ts` teardown (`afterAll` deletes its test admin):
+
+  ```
+  Error: Failed query: delete from "user" where "user"."id" = $1
+  Caused by: PostgresError: admin_audit_log is append-only: UPDATE is not permitted
+  where: SQL statement "UPDATE ONLY "public"."admin_audit_log" SET "actor_user_id" = NULL ..."
+  ```
+
+  Same failure in `tests/routes/admin/customers.test.ts`.
+
+  ## Fix
+  Drop the FK; keep `actor_user_id` as plain text. An append-only ledger must not carry a constraint whose whole job is to rewrite it. The actor is already snapshotted (`actor_email`, `actor_role`), so a dangling id is the intended state after a user is deleted — history should record who acted even when the account is gone. Reads use a LEFT JOIN, which they would have needed anyway for the SET NULL case.
+
+  The rejected alternative was teaching the trigger to permit an UPDATE that only nulls `actor_user_id`: it re-opens the UPDATE path on an append-only table to save a constraint we do not want.
+
+  ## Steps
+  - Migration 0022 drops `admin_audit_log_actor_user_id_user_id_fk`
+  - `schema/audit-log.ts`: drop `.references()`, keep the relation for query convenience
+  - Update the schema-shape test (no FK) and add a live-DB test: insert a row, delete the user, row survives with its actor id and email intact
+feature: admin-audit-log
+type: bug
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:43:42.152Z'
+last_updated: '2026-08-17T07:43:42.152Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - bug
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

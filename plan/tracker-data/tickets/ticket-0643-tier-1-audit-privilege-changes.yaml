@@ -13,18 +13,21 @@ description: |-
 feature: admin-audit-log
 type: task
 priority: high
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T07:21:02.368Z'
-last_updated: '2026-08-17T07:21:02.368Z'
+last_updated: '2026-08-17T07:41:34.846Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
   - privilege
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T07:41:34.846Z'
+    text: Status changed from 'todo' to 'in-progress'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -64,3 +67,4 @@ implementation_steps:
     command: 'git add packages/api/src/routes/admin packages/api/tests/routes/admin/privilege-audit.test.ts && git commit -m "feat(api): audit privilege changes and gift card tender"'
     status: pending
 current_step: 1
+started: '2026-08-17T07:41:34.846Z'

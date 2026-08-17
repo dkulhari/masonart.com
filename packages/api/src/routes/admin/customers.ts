@@ -34,6 +34,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { users } from "../../database/schema/users";
 import {
   requireAuth,
@@ -372,6 +373,16 @@ adminCustomersApp.put(
     }
 
     if (target.role === "super-admin") {
+      await recordAudit(c, {
+        action: "user.role_changed",
+        entityType: "user",
+        entityId: id,
+        outcome: "failure",
+        summary: `Refused: cannot change the role of a super-admin account`,
+        before: { role: target.role },
+        after: { role },
+      });
+
       return c.json(
         {
           error: "Forbidden",
@@ -384,6 +395,16 @@ adminCustomersApp.put(
 
     const currentUser = c.get("user");
     if (currentUser && currentUser.id === target.id) {
+      await recordAudit(c, {
+        action: "user.role_changed",
+        entityType: "user",
+        entityId: id,
+        outcome: "failure",
+        summary: "Refused: an admin cannot change their own role",
+        before: { role: target.role },
+        after: { role },
+      });
+
       return c.json(
         {
           error: "Forbidden",
@@ -395,6 +416,17 @@ adminCustomersApp.put(
     }
 
     if (target.role === "trade") {
+      await recordAudit(c, {
+        action: "user.role_changed",
+        entityType: "user",
+        entityId: id,
+        outcome: "failure",
+        summary:
+          "Refused: trade accounts are managed through the trade application workflow",
+        before: { role: target.role },
+        after: { role },
+      });
+
       return c.json(
         {
           error: "Forbidden",
@@ -407,6 +439,17 @@ adminCustomersApp.put(
     }
 
     await db.update(users).set({ role }).where(eq(users.id, id));
+
+    // The gap this closes: until now the only trace of a promotion to admin was
+    // the promoted account itself.
+    await recordAudit(c, {
+      action: "user.role_changed",
+      entityType: "user",
+      entityId: id,
+      summary: `Changed role of ${id}: ${target.role} → ${role}`,
+      before: { role: target.role },
+      after: { role },
+    });
 
     return c.json({ success: true, id, role });
   }

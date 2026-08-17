@@ -70,6 +70,7 @@ export const AUDIT_ACTIONS = [
   'gift_card.issued',
   'gift_card.disabled',
   'gift_card.enabled',
+  'gift_card.adjusted',
   'wallet.adjusted',
   'vendor.payable_settled',
 
@@ -136,6 +137,7 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'gift_card.issued': 'money',
   'gift_card.disabled': 'money',
   'gift_card.enabled': 'money',
+  'gift_card.adjusted': 'money',
   'wallet.adjusted': 'money',
   'vendor.payable_settled': 'money',
 
