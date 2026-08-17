@@ -43,125 +43,21 @@ import {
   afterAll,
 } from "vitest";
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { eq, like } from "drizzle-orm";
+import {
+  buildCachePurgeApp,
+  cachePurgeSessionFor,
+} from "../../helpers/cache-purge-harness";
 import "../../setup";
 
 // ============================================================================
 // An in-memory Redis
 // ============================================================================
 
-const { redisStore, redisCalls, resetFakeRedis, FakeRedis } = vi.hoisted(() => {
-  const store = new Map<string, string>();
-  const calls = { keys: 0, scan: 0, del: 0 };
-
-  /** Redis glob semantics, as much of them as cache prefixes use. */
-  function toRegExp(pattern: string): RegExp {
-    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`^${escaped.replace(/\*/g, ".*").replace(/\?/g, ".")}$`);
-  }
-
-  class FakeRedis {
-    status = "ready";
-
-    constructor(_url?: string, _options?: unknown) {}
-
-    on(): this {
-      return this;
-    }
-
-    async connect(): Promise<void> {
-      this.status = "ready";
-    }
-
-    async quit(): Promise<string> {
-      return "OK";
-    }
-
-    async get(key: string): Promise<string | null> {
-      return store.get(key) ?? null;
-    }
-
-    async setex(key: string, _ttl: number, value: string): Promise<string> {
-      store.set(key, value);
-      return "OK";
-    }
-
-    async del(...keys: string[]): Promise<number> {
-      calls.del += 1;
-      let removed = 0;
-      for (const key of keys) {
-        if (store.delete(key)) removed += 1;
-      }
-      return removed;
-    }
-
-    /**
-     * Implemented so a KEYS-based purge would still pass every behavioural
-     * assertion below — which is the point. The blocking-command regression is
-     * caught by the call counter, not by a missing method.
-     */
-    async keys(pattern: string): Promise<string[]> {
-      calls.keys += 1;
-      const match = toRegExp(pattern);
-      return [...store.keys()].filter((key) => match.test(key));
-    }
-
-    /**
-     * Pages three keys at a time regardless of COUNT — real Redis treats COUNT
-     * as a hint too, and a small page forces the caller's cursor loop to run
-     * more than once.
-     *
-     * The cursor is the last key handed out, resolved against the sorted
-     * keyspace, rather than an index into it. That reproduces the guarantee
-     * the caller depends on: keys deleted mid-iteration (which is exactly what
-     * a purge does) must not shift the keys after them out of the walk. An
-     * index-based cursor would skip one key per deletion and the purge would
-     * appear to leak.
-     */
-    async scan(
-      cursor: string | number,
-      ...args: unknown[]
-    ): Promise<[string, string[]]> {
-      calls.scan += 1;
-
-      let pattern = "*";
-      for (let i = 0; i < args.length - 1; i += 1) {
-        if (String(args[i]).toUpperCase() === "MATCH") {
-          pattern = String(args[i + 1]);
-        }
-      }
-
-      const all = [...store.keys()].sort();
-      const from =
-        String(cursor) === "0"
-          ? 0
-          : all.findIndex((key) => key > String(cursor));
-      if (from < 0 || from >= all.length) return ["0", []];
-
-      const page = all.slice(from, from + 3);
-      const done = from + page.length >= all.length;
-      const match = toRegExp(pattern);
-
-      return [
-        done ? "0" : String(page[page.length - 1]),
-        page.filter((key) => match.test(key)),
-      ];
-    }
-  }
-
-  return {
-    redisStore: store,
-    redisCalls: calls,
-    FakeRedis,
-    resetFakeRedis: () => {
-      store.clear();
-      calls.keys = 0;
-      calls.scan = 0;
-      calls.del = 0;
-    },
-  };
-});
+const { redisStore, redisCalls, resetFakeRedis, FakeRedis } = await vi.hoisted(
+  async () =>
+    (await import("../../helpers/cache-purge-harness")).createFakeRedis()
+);
 
 vi.mock("ioredis", () => ({ default: FakeRedis, Redis: FakeRedis }));
 
@@ -227,42 +123,23 @@ function survivingProductKeys(): string[] {
   return productCacheKeys().filter((key) => redisStore.has(key));
 }
 
+const CALLER = {
+  id: CALLER_ID,
+  name: "Promo Cache Purge Test Caller",
+  email: "promo-cache-purge-test-caller@example.com",
+  sessionId: "promo-cache-purge-test-session",
+  sessionToken: "promo-cache-purge-test-token",
+};
+
 function sessionFor(role: string) {
-  const now = new Date();
-  return {
-    user: {
-      id: CALLER_ID,
-      name: "Promo Cache Purge Test Caller",
-      email: "promo-cache-purge-test-caller@example.com",
-      emailVerified: true,
-      image: null,
-      createdAt: now,
-      updatedAt: now,
-      role,
-      status: "active",
-    },
-    session: {
-      id: "promo-cache-purge-test-session",
-      token: "promo-cache-purge-test-token",
-      userId: CALLER_ID,
-      expiresAt: new Date(now.getTime() + 86_400_000),
-      createdAt: now,
-      updatedAt: now,
-    },
-  };
+  return cachePurgeSessionFor(CALLER, role);
 }
 
 async function buildApp(): Promise<Hono> {
   const { adminPromotionsApp } = await import(
     "../../../src/routes/admin/promotions"
   );
-  const app = new Hono();
-  app.route("/api/admin/promotions", adminPromotionsApp);
-  app.onError((err, c) => {
-    if (err instanceof HTTPException) return err.getResponse();
-    return c.json({ error: err.message }, 500);
-  });
-  return app;
+  return buildCachePurgeApp("/api/admin/promotions", adminPromotionsApp);
 }
 
 function promotionBody(overrides: Record<string, unknown> = {}) {
