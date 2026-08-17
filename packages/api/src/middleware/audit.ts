@@ -59,6 +59,20 @@ export function auditRequests(action: AuditAction = "admin.request") {
       if (!c.get("audited")) {
         const status = c.res?.status ?? 500;
 
+        // An unauthenticated rejection is not somebody doing something. It has
+        // no actor, no entity and no action, and any bot probing /api/admin/*
+        // can produce them without limit — measured on the live table before
+        // this rule existed, 863 anonymous 401s against 15 real rows, all kept
+        // for the full 400-day window.
+        //
+        // A 403 is the opposite and is kept: authenticated, identified, and
+        // told no. So is anything with an actor, and so is a 500 — a crash is
+        // not nobody doing nothing. The 401s remain in the request log, where
+        // volume is cheap and retention is short.
+        if (status === 401 && !c.get("user")) {
+          return;
+        }
+
         // Awaited rather than fired and forgotten: recordAudit never throws, so
         // the only cost is one insert of latency, and in exchange the row is
         // durable before the response is finished — which is what makes an

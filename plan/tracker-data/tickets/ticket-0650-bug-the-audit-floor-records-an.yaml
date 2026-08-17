@@ -1,0 +1,47 @@
+ticket_number: 650
+title: Bug - the audit floor records anonymous 401s, flooding the table
+description: |-
+  ## Bug
+  Found during workflow testing, from the live table rather than a test:
+
+  ```
+   status | anon | count
+  --------+------+-------
+   401    | t    |   863
+   201    | f    |    12
+   200    | f    |     3
+  ```
+
+  863 of 878 floor rows are unauthenticated 401s. They carry no actor, no entity and no action — an unauthenticated caller cannot have *done* anything — and they are kept for the full 400-day retention window, so the signal (a named actor doing something) is buried under a ratio of 50:1 before the feature is a day old. Any bot probing `/api/admin/*` can grow the table without limit.
+
+  ## Fix
+  In `middleware/audit.ts`, skip the floor row when the response is 401 AND the context carries no user. Keep:
+  - **403** — authenticated and refused, which is the single most interesting floor row there is
+  - anything with an actor, at any status
+  - every handler-written `recordAudit` row, which is unaffected
+
+  The rejection is still visible: `requestContext()` logs every request with its status, so a 401 flood shows up in the logs, where volume is cheap and retention is short. The audit log answers "who did what", and nobody did anything here.
+
+  ## Steps
+  - Failing test in `tests/middleware/audit.test.ts`: anonymous 401 writes nothing; authenticated 403 still writes; anonymous 500 still writes
+  - Implement the skip
+  - Purge the accumulated noise rows through the guarded transaction
+feature: admin-audit-log
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T08:15:28.671Z'
+last_updated: '2026-08-17T08:15:28.671Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - bug
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -52,6 +52,10 @@ function adminApp() {
   app.post('/api/admin/blow-up', () => {
     throw new Error('kaboom');
   });
+
+  // Rejected before any auth middleware set a user — what a bot probing
+  // /api/admin/* looks like.
+  app.post('/api/anon/admin-ish', (c) => c.json({ error: 'Unauthorized' }, 401));
   app.post('/api/vendor/jobs/:id/accept', (c) => c.json({ ok: true }));
 
   // A cooperating handler: writes its own precise row.
@@ -131,6 +135,40 @@ describe('auditRequests', () => {
 
     expect(insert).toHaveBeenCalledTimes(1);
     expect(row()).toMatchObject({ action: 'return.approved', entityType: 'return' });
+  });
+
+  it('ignores an anonymous 401 — nobody did anything, and bots would flood the table', async () => {
+    // Measured on the live table before this rule existed: 863 anonymous 401
+    // rows against 15 real ones. The rejection is still in the request log,
+    // where volume is cheap and retention is short.
+    const app = new Hono();
+    app.use('/api/admin/*', auditRequests());
+    app.post('/api/admin/probe', (c) => c.json({ error: 'Unauthorized' }, 401));
+
+    await app.request('/api/admin/probe', { method: 'POST' });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it('still records a 403, which is the interesting refusal', async () => {
+    // Authenticated and told no: exactly what an access review looks for.
+    await adminApp().request('/api/admin/customers/u2/role', { method: 'PUT' });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(row()).toMatchObject({ outcome: 'failure', actorUserId: 'u1' });
+  });
+
+  it('still records an anonymous 500 — a crash is not nobody doing nothing', async () => {
+    const app = new Hono();
+    app.use('/api/admin/*', auditRequests());
+    app.post('/api/admin/crash', () => {
+      throw new Error('kaboom');
+    });
+    app.onError((_err, c) => c.json({ error: 'Internal' }, 500));
+
+    await app.request('/api/admin/crash', { method: 'POST' });
+
+    expect(insert).toHaveBeenCalledTimes(1);
   });
 
   it('never fails the request when the audit insert dies', async () => {
