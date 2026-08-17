@@ -333,6 +333,26 @@ describe('invite refusals', () => {
     expect(render(cleanup?.where).params).toContain(NEW_USER_ID)
   })
 
+  it('reports why the INVITE failed even when the cleanup delete also fails', async () => {
+    // The compensating delete runs outside the transaction. If it throws, the
+    // caller must still be told the real cause — an unrelated cleanup error
+    // masking a UNIQUE violation turns a clear 422 into an opaque 500, and the
+    // admin then has no idea the email is already linked to another vendor.
+    queueRows({
+      'select:vendors': [[{ id: VENDOR_ID }]],
+      'select:user': [[]],
+      'update:user': [[{ id: NEW_USER_ID, email: 'shop@printworks.test', role: 'vendor' }]],
+    })
+    const uniqueViolation = Object.assign(new Error('duplicate key value'), { code: '23505' })
+    failNext.set('insert:vendor_users', uniqueViolation)
+    failNext.set('delete:user', new Error('cleanup delete exploded'))
+
+    const res = await invite()
+
+    expect(res.status).toBe(422)
+    expect((await res.json()).error).toMatch(/already linked to a vendor/i)
+  })
+
   it('does NOT silently convert an existing customer account', async () => {
     queueRows({
       'select:vendors': [[{ id: VENDOR_ID }]],

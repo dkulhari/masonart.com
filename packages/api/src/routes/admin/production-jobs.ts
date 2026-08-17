@@ -91,10 +91,19 @@ import {
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-/** decimal(10,2) as a string, the shape the whole vendor stack passes money in. */
+/**
+ * decimal(10,2) as a string, the shape the whole vendor stack passes money in.
+ *
+ * Non-negative, matching vendor-rates (amount >= 0) and settlements
+ * (amount > 0). This is the only field that takes a free-form amount from an
+ * admin, and it feeds the payables sum directly: a negative override would
+ * quietly reduce what we owe a vendor, which is a credit note — something this
+ * system deliberately does not model. Money leaves via settlements or not at
+ * all.
+ */
 const decimalString = z
   .string()
-  .regex(/^-?\d{1,8}(\.\d{1,2})?$/, "Expected a decimal amount like '1234.56'");
+  .regex(/^\d{1,8}(\.\d{1,2})?$/, "Expected a non-negative decimal amount like '1234.56'");
 
 // ============================================================================
 // Validation

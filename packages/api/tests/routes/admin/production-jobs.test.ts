@@ -714,6 +714,21 @@ describe('PATCH /api/admin/production/:jobId', () => {
     expect(written.amountActual).toBe('90.00')
   })
 
+  it('refuses a negative amountActual and writes nothing', async () => {
+    // The override feeds the payables sum directly, so a negative would quietly
+    // reduce what we owe a vendor — a credit note, which this system
+    // deliberately does not model. Money leaves via settlements or not at all.
+    // vendor-rates requires amount >= 0 and settlements require amount > 0;
+    // this field was the one gap.
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ amountActual: '-50.00' }, 'PATCH')
+    )
+
+    expect(res.status).toBe(400)
+    expect(updates(productionJobs)).toHaveLength(0)
+  })
+
   it('accepts the date fields and a status, with no transition guard', async () => {
     queueRows({
       'update:production_jobs': [[jobRow({ status: 'sent', sentAt: new Date('2026-08-01T00:00:00Z') })]],

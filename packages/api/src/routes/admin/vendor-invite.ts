@@ -58,6 +58,7 @@ import {
   type AuthVariables,
 } from "../../middleware/auth";
 import { isUniqueViolation } from "../../lib/pg-errors";
+import { logger } from "../../lib/logger";
 
 // ============================================================================
 // Validation
@@ -229,7 +230,20 @@ const adminVendorInviteRoute = adminVendorInviteApp.post(
         // Compensating delete: the transaction rolled back, but the account
         // Better Auth wrote is outside it. Leaving it behind would leave a
         // login that can do nothing.
-        await db.delete(users).where(eq(users.id, newUserId));
+        //
+        // Swallowed deliberately. If the cleanup itself fails, the caller must
+        // still be told why the INVITE failed — an unrelated delete error
+        // masking a UNIQUE violation turns a clear 422 ("already linked to a
+        // vendor") into an opaque 500. The orphan account is the lesser
+        // problem and is recoverable; a misreported cause is not.
+        try {
+          await db.delete(users).where(eq(users.id, newUserId));
+        } catch (cleanupError) {
+          logger.error(
+            { err: cleanupError, userId: newUserId, vendorId: id },
+            "vendor invite rollback left an orphan account"
+          );
+        }
 
         if (isUniqueViolation(error)) {
           return c.json(
