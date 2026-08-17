@@ -48,3 +48,6 @@ export * from "./promotions";
 
 // Gift cards, their ledger, and what each card paid on an order
 export * from "./gift-cards";
+
+// Vendors, contacts, capabilities and rate cards
+export * from "./vendors";
