@@ -43,6 +43,7 @@ import { adminNotificationsApp } from "./routes/admin/notifications";
 import { adminApprovalsApp } from "./routes/admin/approvals";
 import { adminModerationApp } from "./routes/admin/ai-moderation";
 import { adminVendorsApp } from "./routes/admin/vendors";
+import { adminVendorRatesApp } from "./routes/admin/vendor-rates";
 import { adminProductionApp } from "./routes/admin/production-jobs";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
@@ -261,6 +262,10 @@ app.route("/api/admin/ai-moderation", adminModerationApp);
 // Admin-only, unlike the catalogue routers above: the list carries what we owe
 // each vendor and the detail view carries what we buy at.
 app.route("/api/admin/vendors", adminVendorsApp);
+
+// Admin Vendor Rate Cards - effective-dated bands, mounted on the same prefix.
+// Hono merges routes additively, so this composes with adminVendorsApp above.
+app.route("/api/admin/vendors", adminVendorRatesApp);
 
 // Admin Production API - job queue, assignment pricing and QC reviews.
 // Admin-only: assignment writes what we will owe the vendor.
