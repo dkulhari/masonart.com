@@ -43,6 +43,7 @@ import { adminNotificationsApp } from "./routes/admin/notifications";
 import { adminApprovalsApp } from "./routes/admin/approvals";
 import { adminModerationApp } from "./routes/admin/ai-moderation";
 import { adminVendorsApp } from "./routes/admin/vendors";
+import { adminProductionApp } from "./routes/admin/production-jobs";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
 import { shipmentsApp } from "./routes/shipments";
@@ -260,6 +261,10 @@ app.route("/api/admin/ai-moderation", adminModerationApp);
 // Admin-only, unlike the catalogue routers above: the list carries what we owe
 // each vendor and the detail view carries what we buy at.
 app.route("/api/admin/vendors", adminVendorsApp);
+
+// Admin Production API - job queue, assignment pricing and QC reviews.
+// Admin-only: assignment writes what we will owe the vendor.
+app.route("/api/admin/production", adminProductionApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)
