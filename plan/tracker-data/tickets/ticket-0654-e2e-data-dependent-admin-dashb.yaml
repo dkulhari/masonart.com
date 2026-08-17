@@ -1,0 +1,33 @@
+ticket_number: 654
+title: E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
+description: |-
+  ## Finding
+  Workflow testing 2026-08-17: `tests/e2e/admin-dashboard.spec.ts` fails **3 of 85**, all in `Empty Orders State` (`:730`, `:736`, `:742`). They assert the dashboard's empty-orders message, description and cart icon — on a database that has orders, so the panel correctly renders orders instead.
+
+  Reproduced identically on a pre-work server against the same database, so this is environment coupling rather than a regression: the tests can only pass on a freshly reset database and silently "pass" nothing everywhere else.
+
+  ## Fix
+  Either drive the empty state from a component test (where the empty payload can be handed in directly), or make the E2E scope its own data. A test whose outcome depends on whether someone else ran the seed is worse than no test — it fails for reasons unrelated to the code under review, which trains everyone to ignore it.
+
+  ## Also seen in the same sweep
+  - `tests/e2e/gift-cards.spec.ts` "paying entirely with a gift card" failed once and passed on retry — the known guest-cart/checkout race.
+  - `tests/e2e/wishlist-staging.admin.spec.ts` "a staged order reaches the storefront intact" fails on both current and pre-work servers; needs its own investigation.
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T08:55:30.144Z'
+last_updated: '2026-08-17T08:55:30.144Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

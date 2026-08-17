@@ -1,0 +1,40 @@
+ticket_number: 652
+title: E2E stale - admin-products still expects native confirm() and an old edit flow
+description: |-
+  ## Finding
+  Workflow testing 2026-08-17: `tests/e2e/admin-products.spec.ts` fails **6 of 99** against current main.
+
+  ```
+  :998  Edit Product Page > should update product on submit
+  :1031 Edit Product Page > should show success message after update
+  :1097 Delete/Archive Product > should show confirmation dialog before delete
+  :1137 Delete/Archive Product > should delete/archive product on confirmation
+  :1167 Delete/Archive Product > should redirect to products list after delete
+  :1868 Product Image Management > should have Add Image button for images
+  ```
+
+  The three Delete/Archive tests date from before `2411e0df` replaced 15 blocking native dialogs with the shared `ConfirmDialog`; they drive a `confirm()` that no longer exists.
+
+  **Verified not caused by the audit instrumentation**: the same three edit/image tests fail with `routes/admin/products.ts` reverted to `485fa949` on an otherwise-current server.
+
+  ## Fix
+  Drive the delete flow through `ConfirmDialog` (see `tests/components/admin/confirm-dialog-fields.test.tsx` for the shape), and re-derive the edit-submit and Add-Image assertions from what the current screen renders.
+feature: qa-e2e-testing
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T08:55:30.076Z'
+last_updated: '2026-08-17T08:55:30.076Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -29,19 +29,23 @@ description: |-
 feature: admin-audit-log
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T08:15:28.671Z'
-last_updated: '2026-08-17T08:15:28.671Z'
+last_updated: '2026-08-17T08:16:29.621Z'
 time_spent_minutes: 0
 labels:
   - backend
   - bug
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T08:16:29.621Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-17T08:16:29.621Z'

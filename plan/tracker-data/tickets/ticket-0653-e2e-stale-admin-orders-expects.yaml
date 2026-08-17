@@ -1,0 +1,29 @@
+ticket_number: 653
+title: E2E stale - admin-orders expects the Export button that was deliberately removed
+description: |-
+  ## Finding
+  Workflow testing 2026-08-17: `tests/e2e/admin-orders.spec.ts` fails **1 of 127** — `should display Export button`.
+
+  `f72c9b81` dropped that button on purpose: it only opened an `alert()`. The spec was not updated, so the suite now fails for doing the right thing.
+
+  ## Fix
+  Delete the assertion. If order export is still wanted as a feature, it needs its own ticket and its own test — not a resurrected button that does nothing.
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T08:55:30.109Z'
+last_updated: '2026-08-17T08:55:30.109Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

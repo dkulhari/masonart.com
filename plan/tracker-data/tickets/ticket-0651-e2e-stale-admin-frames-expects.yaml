@@ -1,0 +1,34 @@
+ticket_number: 651
+title: E2E stale - admin-frames expects size buttons, the poster page now uses a select
+description: |-
+  ## Finding
+  Workflow testing 2026-08-17: `tests/e2e/admin-frames.spec.ts` fails **4/4** against current main. Not a product bug — the spec is stale.
+
+  `selectFrameOnFirstProduct()` (line ~104) waits for `getByRole('button', { name: /\d+\s*×\s*\d+/ })`. The poster detail page rebuilt against the mesonart reference (`2f29ee65`) replaced the size buttons with a `<select>`; the screenshot shows `16"H x 12"W/ 41H x 30W CM` in a dropdown. The frame selector below it never appears because the size is never chosen, so all four tests time out.
+
+  Confirmed against a server running pre-2f29ee65 code, where the same spec passes 4/4 — so frame repricing itself is fine and only the selector interaction moved.
+
+  ## Fix
+  Replace the size-button click with `selectOption` on the size `<select>`, then keep the rest of the flow. While in there, assert the option count is non-zero first: a select that renders empty would otherwise make these tests pass vacuously.
+
+  ## Scope
+  4 tests: repriced frame quoted and charged, price edit visible immediately, archive/unarchive round trip, last active frame refused.
+feature: qa-e2e-testing
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T08:55:30.034Z'
+last_updated: '2026-08-17T08:55:30.034Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

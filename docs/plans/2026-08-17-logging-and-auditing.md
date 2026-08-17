@@ -306,6 +306,68 @@ Daily: `SET LOCAL chobii.audit_purge = 'on'` then delete rows older than
 
 Every test command is scoped to a path. No pathless runner — the box is shared.
 
+## Part 5b — Delivered (2026-08-17)
+
+Implemented on `main`, 17 tickets, one commit each. Two defects were found by the work's
+own tests and fixed rather than filed and left:
+
+| Ticket | What shipped |
+|---|---|
+| #635 | Shared action registry (43 actions), category map, query + entry schemas |
+| #636 | `admin_audit_log` table, 6 indexes, migration 0021, immutability trigger |
+| #637 | Redactor + changed-keys delta |
+| #638 | `recordAudit` — never throws, tx-aware, claims the request |
+| #639 | Request id correlation, pino redaction, 500 bodies carry the id |
+| #640 | Middleware floor over admin + vendor mutations |
+| #641–#643 | Tier 1: returns money paths, order status/cancel/refund, role changes + gift cards |
+| #644 | Tier 2: products, frames, promotions, collections, shipping and wallet config |
+| #645 | Read API — filters, keyset paging, entity timeline, admin-only |
+| #646 | `/admin/audit-log` viewer with before/after drawer |
+| #647 | Retention purge behind the guard, `AUDIT_RETENTION_DAYS` |
+| #648 | E2E (9 tests) + OPERATIONS.md §3b |
+| #649 | **Fixed:** the actor FK was `ON DELETE SET NULL`, which Postgres implements as an UPDATE — the trigger refused it, so deleting any user who had acted failed. FK dropped; the snapshot columns are what carry the actor now. |
+| #650 | **Fixed:** the floor recorded anonymous 401s — 863 of 878 rows on the live table before the rule was added. 401-without-actor is now skipped; 403 and anything with an actor are kept. |
+
+Evidence, not assertion:
+
+- Trigger verified against the dev database — `UPDATE` refused, unguarded `DELETE` refused,
+  guarded `DELETE` removed the row.
+- Retention `DELETE` verified live — a 500-day-old row removed, today's kept.
+- After a full E2E sweep the table held 432 rows across all five categories with named
+  actors, readable summaries and both outcomes present.
+
+## Part 5c — Workflow test of recently completed features
+
+Run against a private API (`:3010`) and web (`:4321`) pair on this branch, with every
+failure diffed against a pre-work baseline before being called a regression.
+
+| Suite | Result |
+|---|---|
+| `packages/shared` unit | **972 / 972** |
+| `packages/web` unit | **3312 / 3312** |
+| `packages/api` unit | **4946 passed, 24 failed** — all 24 reproduce identically at `485fa949` |
+| E2E `audit-log` (new) | **9 / 9** |
+| E2E `admin-vendor-lifecycle` | **13 / 13** — the whole vendor feature, incl. both refusals |
+| E2E `admin-approvals` | **26 / 26** |
+| E2E `collections.admin` | **11 / 11** |
+| E2E `wishlist-collection-edit.admin` | **7 / 7** |
+| E2E `gift-cards` | 9 / 10, the failure passes on retry — the known checkout race |
+| E2E `admin-orders` | 126 / 127 — stale: expects the Export button `f72c9b81` removed |
+| E2E `admin-products` | 93 / 99 — stale: native `confirm()` before `2411e0df` |
+| E2E `admin-frames` | 0 / 4 — stale: size buttons became a `<select>` in `2f29ee65` |
+| E2E `admin-dashboard` | 82 / 85 — empty-order-state tests cannot pass on a seeded DB |
+| E2E `wishlist-staging.admin` | 5 / 6 — fails on the pre-work server too |
+
+One genuine regression was introduced and fixed during the sweep: the product write path's
+second insert (the audit row) displaced the `product-orientation-guard` suite's
+last-insert recorder. `recordAudit` is now stubbed there, since what lands in the audit
+table is asserted in `catalogue-audit.test.ts`.
+
+The stale-spec findings are filed against `qa-e2e-testing` (#651–#654). Worth saying
+plainly: **the E2E suite has drifted behind the UI changes of the last week** — the frames
+suite tests nothing at all today, and four suites fail for reasons that have nothing to do
+with whatever change is being reviewed.
+
 ## Part 6 — Risks
 
 | Risk | Mitigation |

@@ -1,7 +1,7 @@
 name: qa-e2e-testing
 title: Qa E2e Testing
 priority: medium
-created: '2026-08-13T21:32:56.927Z'
+created: "2026-08-13T21:32:56.927Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -14,16 +14,20 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "651": E2E stale - admin-frames expects size buttons, the poster page now uses a select
+    "652": E2E stale - admin-products still expects native confirm() and an old edit flow
+    "653": E2E stale - admin-orders expects the Export button that was deliberately removed
+    "654": E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
   in_progress: {}
   done:
-    '184': 'Bug: admin-approvals status transition tests timeout with networkidle'
-    '185': 'Bug: admin-reviews bulk actions beforeEach times out waiting for stats card'
-    '186': 'Bug: Replace networkidle with domcontentloaded in all admin E2E tests'
-total_tickets: 3
-completion_percentage: 100
-is_completed: true
+    "184": "Bug: admin-approvals status transition tests timeout with networkidle"
+    "185": "Bug: admin-reviews bulk actions beforeEach times out waiting for stats card"
+    "186": "Bug: Replace networkidle with domcontentloaded in all admin E2E tests"
+total_tickets: 7
+completion_percentage: 43
+is_completed: false

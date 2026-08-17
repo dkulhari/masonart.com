@@ -78,8 +78,7 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
-    "650": Bug - the audit floor records anonymous 401s, flooding the table
+  todo: {}
   in_progress: {}
   done:
     "635": Contract - shared audit action registry and zod schemas
@@ -97,9 +96,10 @@ tickets:
     "647": Ops - retention purge worker behind the immutability guard
     "648": E2E and runbook - an admin action appears in the viewer
     "649": Bug - the actor FK and the immutability trigger contradict each other
+    "650": Bug - the audit floor records anonymous 401s, flooding the table
 total_tickets: 16
-completion_percentage: 94
-is_completed: false
+completion_percentage: 100
+is_completed: true
 plan:
   phases:
     - name: Contract
@@ -138,6 +138,6 @@ plan:
         - 647
         - 648
   generated_at: "2026-08-17T07:21:59.707Z"
-last_activity: "2026-08-17T08:02:37.051Z"
+last_activity: "2026-08-17T08:16:29.642Z"
 started: "2026-08-17T07:22:12.112Z"
-completed: "2026-08-17T08:02:37.033Z"
+completed: "2026-08-17T08:16:29.621Z"
