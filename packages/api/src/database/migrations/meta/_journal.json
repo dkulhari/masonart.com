@@ -148,6 +148,13 @@
       "when": 1786406700000,
       "tag": "0020_production_job_fk_restrict",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786406760000,
+      "tag": "0021_admin_audit_log",
+      "breakpoints": true
     }
   ]
 }

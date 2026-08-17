@@ -57,3 +57,6 @@ export * from "./production-jobs";
 
 // Which vendor a vendor-role user belongs to (exactly one)
 export * from "./vendor-users";
+
+// Append-only trail of admin and vendor actions: who did what, to what, when
+export * from "./audit-log";
