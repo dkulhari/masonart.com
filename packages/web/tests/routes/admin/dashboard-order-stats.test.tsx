@@ -14,59 +14,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, waitFor } from '@testing-library/react'
 
-vi.mock('@tanstack/react-router', () => ({
-  createFileRoute: () => (config: unknown) => config,
-  Link: ({ children, ...props }: { children: React.ReactNode; to?: string }) => (
-    <a href={props.to}>{children}</a>
-  ),
-}))
+import { mockDashboardFetch as mockFetch } from '../../helpers/admin-dashboard-fetch'
+
+vi.mock('@tanstack/react-router', async () =>
+  (await import('../../helpers/router-mock')).tanstackRouterMock()
+)
 
 import AdminDashboard from '~/routes/admin/index'
-
-const ORDER_STATS = {
-  byStatus: { pending: 2, delivered: 3 },
-  byPaymentStatus: { paid: 4 },
-  totalRevenue: '10000.00',
-  todayOrders: 1,
-  monthRevenue: '5000.00',
-}
-
-const PRODUCT_STATS = {
-  totalProducts: 42,
-  activeProducts: 36,
-  lowStockProducts: 4,
-  outOfStockProducts: 2,
-}
-
-type RouteAnswer = { ok: boolean; body: unknown }
-
-/** Route `fetch` by URL so the orders call can die while the rest answer. */
-function mockFetch(answers: {
-  orderStats?: RouteAnswer
-  productStats?: RouteAnswer
-  orders?: RouteAnswer
-}) {
-  const respond = (answer: RouteAnswer) =>
-    Promise.resolve({
-      ok: answer.ok,
-      status: answer.ok ? 200 : 500,
-      json: () => Promise.resolve(answer.body),
-    } as Response)
-
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.includes('/api/admin/products/stats')) {
-        return respond(answers.productStats ?? { ok: true, body: PRODUCT_STATS })
-      }
-      if (url.includes('/api/admin/orders/stats')) {
-        return respond(answers.orderStats ?? { ok: true, body: ORDER_STATS })
-      }
-      return respond(answers.orders ?? { ok: true, body: { items: [] } })
-    })
-  )
-}
 
 /** The card wrapper for a tile, found from its title text. */
 function tileFor(title: string): HTMLElement {
