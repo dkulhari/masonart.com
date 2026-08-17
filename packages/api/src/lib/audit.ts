@@ -10,6 +10,18 @@
  * Design: docs/plans/2026-08-17-logging-and-auditing.md §3.3
  */
 
+import type { Context } from "hono";
+import {
+  AUDIT_ACTION_CATEGORY,
+  type AuditAction,
+  type AuditOutcome,
+} from "@chobii/shared";
+import { db } from "../database";
+import { adminAuditLog } from "../database/schema/audit-log";
+import { getClientIp } from "../middleware/rate-limit";
+import { logger } from "./logger";
+import { alertCritical } from "./alerts";
+
 /** What replaces a secret. Kept as a value so tests and readers agree. */
 export const AUDIT_REDACTED = "[redacted]";
 
@@ -132,4 +144,121 @@ export function diffRecords(
     before: redactAuditPayload(beforeDelta) as Record<string, unknown>,
     after: redactAuditPayload(afterDelta) as Record<string, unknown>,
   };
+}
+
+// ============================================================================
+// Writing a row
+// ============================================================================
+
+/**
+ * What a handler describes. The category is deliberately absent: it is derived
+ * from the action, so two callers cannot file the same action two ways.
+ */
+export interface AuditEntryInput {
+  action: AuditAction;
+  entityType?: string | null;
+  entityId?: string | null;
+  /** One human line for the viewer's list column. */
+  summary?: string | null;
+  before?: unknown;
+  after?: unknown;
+  /** Merged over the automatically captured route metadata. */
+  metadata?: Record<string, unknown>;
+  /** Defaults to success. A refusal is evidence — record it, don't drop it. */
+  outcome?: AuditOutcome;
+}
+
+/**
+ * The subset of a Hono context this module reads. Declared structurally so a
+ * caller inside a queue or a script can hand over a stub instead of faking a
+ * whole request.
+ */
+type AuditContext = Pick<Context, "get" | "set" | "req">;
+
+/** The insert surface shared by `db` and a drizzle transaction handle. */
+type AuditWriter = { insert: typeof db.insert };
+
+/**
+ * Record one audited action.
+ *
+ * ## Never throws
+ *
+ * A refund that already moved money must not be rolled back because an INSERT
+ * into the audit table deadlocked. Failures are logged with the request id and
+ * escalated through `alertCritical` — a silently-dropped audit row is worse than
+ * a loud one, because the gap is invisible at exactly the moment it matters.
+ *
+ * ## Claims the request
+ *
+ * Sets `audited` on the context. `middleware/audit.ts` reads that flag and skips
+ * its own coarse `admin.request` row, so one action produces one row.
+ *
+ * ## Atomicity is opt-in
+ *
+ * Pass `tx` when the audit belongs to the same transaction as the business
+ * write — a gift-card ledger entry, say — and the two commit or fail together.
+ * Omit it and the audit is written independently, which is what you want when
+ * the business write has already committed.
+ */
+export async function recordAudit(
+  c: AuditContext,
+  entry: AuditEntryInput,
+  tx?: AuditWriter
+): Promise<void> {
+  // Set before the write: if the insert fails we still do not want the
+  // middleware writing a misleading `admin.request` row in its place.
+  c.set("audited" as never, true as never);
+
+  const user = c.get("user" as never) as
+    | { id?: string; email?: string; role?: string }
+    | null
+    | undefined;
+  const requestId = (c.get("requestId" as never) as string | undefined) ?? null;
+
+  try {
+    const writer = tx ?? db;
+
+    await writer.insert(adminAuditLog).values({
+      actorUserId: user?.id ?? null,
+      actorEmail: user?.email ?? null,
+      actorRole: user?.role ?? null,
+      action: entry.action,
+      category: AUDIT_ACTION_CATEGORY[entry.action],
+      outcome: entry.outcome ?? "success",
+      summary: entry.summary ?? null,
+      entityType: entry.entityType ?? null,
+      entityId: entry.entityId ?? null,
+      before: (redactAuditPayload(entry.before ?? null) ?? null) as never,
+      after: (redactAuditPayload(entry.after ?? null) ?? null) as never,
+      metadata: redactAuditPayload({
+        method: c.req.method,
+        path: c.req.path,
+        ...(entry.metadata ?? {}),
+      }) as never,
+      requestId,
+      ipAddress: getClientIp(c as Context),
+      userAgent: c.req.header("user-agent") ?? null,
+    });
+  } catch (error) {
+    // Loud, but not fatal. The business action already happened.
+    logger.error(
+      {
+        err: error,
+        requestId,
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        actorUserId: user?.id ?? null,
+      },
+      "audit write failed"
+    );
+
+    alertCritical(
+      "Audit write failed",
+      `Could not record ${entry.action} on ${entry.entityType ?? "unknown"} ${
+        entry.entityId ?? ""
+      }. The action itself succeeded; the trail did not.`,
+      { action: entry.action, requestId: requestId ?? "unknown" }
+    );
+  }
 }
