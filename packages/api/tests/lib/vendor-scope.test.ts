@@ -19,6 +19,9 @@ describe('vendor-scope module contract', () => {
     'getVendorPayableTotal',
     'getVendorJobItems',
     'getVendorJobReviews',
+    // The one mutation. Enrolled here for the same reason as the reads: an
+    // unscoped write is worse than an unscoped read, not exempt from the rule.
+    'updateVendorJob',
   ] as const
 
   it('exports every vendor-facing query', () => {

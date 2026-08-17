@@ -160,6 +160,55 @@ export async function getVendorJobItems(vendorId: string | null | undefined, job
     .where(eq(productionJobItems.jobId, jobId))
 }
 
+/**
+ * The ONE write a vendor gets, and the only mutation this module will ever
+ * expose. Scoped exactly like the reads, twice over:
+ *
+ * 1. The row is loaded through `getVendorJob` FIRST, so a job belonging to
+ *    another vendor is NOT FOUND before an UPDATE is ever built. Updating by id
+ *    and checking ownership afterwards gives the same answer on the happy path
+ *    and the wrong one whenever the check is wrong.
+ * 2. `vendorId` is in the UPDATE's own WHERE as well, so even a bug that skipped
+ *    the pre-read could not touch another vendor's row.
+ *
+ * The patch is a WHITELIST, not a spread: `status`, `sentAt` and `receivedAt`
+ * are copied field by field. Amounts are what we owe, priced from the rate card
+ * at assignment — a vendor may not price their own job, so no amount can arrive
+ * here even if a caller puts one in the object.
+ *
+ * Returns the re-read row (the same customer-free column list as every other
+ * read), never the raw `.returning()` row, which would carry `orderId`.
+ */
+export type VendorSettableStatus = 'sent' | 'received'
+
+export async function updateVendorJob(
+  vendorId: string | null | undefined,
+  jobId?: string,
+  patch: {
+    status?: VendorSettableStatus
+    sentAt?: Date | null
+    receivedAt?: Date | null
+  } = {}
+) {
+  assertVendorId(vendorId)
+
+  const existing = await getVendorJob(vendorId, jobId)
+  if (!existing || !jobId) return null
+
+  const fields: Record<string, unknown> = {}
+  if (patch.status !== undefined) fields.status = patch.status
+  if (patch.sentAt !== undefined) fields.sentAt = patch.sentAt
+  if (patch.receivedAt !== undefined) fields.receivedAt = patch.receivedAt
+  if (Object.keys(fields).length === 0) return existing
+
+  await db
+    .update(productionJobs)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+
+  return getVendorJob(vendorId, jobId)
+}
+
 /** QC history for a job the caller owns. */
 export async function getVendorJobReviews(vendorId: string | null | undefined, jobId?: string) {
   assertVendorId(vendorId)

@@ -47,6 +47,7 @@ import { adminVendorRatesApp } from "./routes/admin/vendor-rates";
 import { adminVendorPayablesApp } from "./routes/admin/vendor-payables";
 import { adminVendorInviteApp } from "./routes/admin/vendor-invite";
 import { adminProductionApp } from "./routes/admin/production-jobs";
+import { vendorApp } from "./routes/vendor";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
 import { shipmentsApp } from "./routes/shipments";
@@ -278,6 +279,10 @@ app.route("/api/admin/vendors", adminVendorInviteApp);
 // Admin Production API - job queue, assignment pricing and QC reviews.
 // Admin-only: assignment writes what we will owe the vendor.
 app.route("/api/admin/production", adminProductionApp);
+
+// Vendor Portal API - a supplier's own jobs, rates and payments. Every read is
+// row-scoped in lib/vendor-scope, not by role: this tree carries no admin grant.
+app.route("/api/vendor", vendorApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)
