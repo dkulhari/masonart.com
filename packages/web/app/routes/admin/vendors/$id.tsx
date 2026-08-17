@@ -48,6 +48,7 @@ import {
   type VendorStatus,
 } from './index'
 import { VendorForm, type VendorFormValues, type vendorPayload } from './VendorForm'
+import { VendorPayablesSection } from './$id.payables'
 
 export const Route = createFileRoute('/admin/vendors/$id')({
   head: () => ({
@@ -147,9 +148,10 @@ async function callApi<T>(path: string, init?: RequestInit): Promise<T> {
  * A destructive control that asks first, inline.
  *
  * The pattern is `ReviewMediaStrip`'s, and the reason is the one documented
- * there: a native `confirm()` blocks the automation harness, so a path guarded
- * by one can never be covered end to end. Nothing in this file uses `confirm`
- * or `alert`.
+ * there: a native browser dialog blocks the automation harness, so a path
+ * guarded by one can never be covered end to end. No file under
+ * `routes/admin/vendors/` opens one — the audit grep over this directory is
+ * expected to return nothing at all, prose included.
  */
 export function InlineConfirm({
   label,
@@ -1012,6 +1014,8 @@ function VendorDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const [tab, setTab] = useState<'details' | 'payables'>('details')
+
   const [rates, setRates] = useState<AdminVendorRate[]>([])
   const [ratesError, setRatesError] = useState<string | null>(null)
   const [includeExpired, setIncludeExpired] = useState(false)
@@ -1112,6 +1116,37 @@ function VendorDetailPage() {
         <DetailSkeleton />
       ) : (
         <>
+          {/* Two tabs, not two routes: payables is a view of this vendor, and
+              splitting it into a child route would make `$id` a layout that
+              every one of these sections then hangs off an Outlet from. */}
+          <nav
+            data-testid="vendor-detail-tabs"
+            className="flex gap-1 border-b border-border"
+            aria-label="Vendor sections"
+          >
+            {(['details', 'payables'] as const).map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-current={tab === name ? 'page' : undefined}
+                data-testid={`vendor-tab-${name}`}
+                onClick={() => setTab(name)}
+                className={cn(
+                  '-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize',
+                  tab === name
+                    ? 'border-brand-600 text-brand-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {name}
+              </button>
+            ))}
+          </nav>
+
+          {tab === 'payables' && <VendorPayablesSection vendorId={id} />}
+
+          {tab === 'details' && (
+        <>
           <Section
             title="Details"
             description="Who they are and whether they may be assigned work."
@@ -1147,6 +1182,8 @@ function VendorDetailPage() {
             loadError={ratesError}
             onRetry={() => void loadRates()}
           />
+        </>
+          )}
         </>
       )}
     </div>
