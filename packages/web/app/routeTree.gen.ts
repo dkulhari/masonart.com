@@ -63,6 +63,8 @@ import { Route as AdminGiftCardsIndexRouteImport } from './routes/admin/gift-car
 import { Route as AdminGiftCardsIdRouteImport } from './routes/admin/gift-cards/$id'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
+import { Route as AdminProductionIdRouteImport } from './routes/admin/production/$id'
+import { Route as AdminProductionIndexRouteImport } from './routes/admin/production/index'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
@@ -346,6 +348,16 @@ const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminProductionIdRoute = AdminProductionIdRouteImport.update({
+  id: '/production/$id',
+  path: '/production/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProductionIndexRoute = AdminProductionIndexRouteImport.update({
+  id: '/production/',
+  path: '/production/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -464,6 +476,8 @@ export interface FileRoutesByFullPath {
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/production/$id': typeof AdminProductionIdRoute
+  '/admin/production/': typeof AdminProductionIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/admin/promotions/': typeof AdminPromotionsIndexRoute
   '/admin/vendors/': typeof AdminVendorsIndexRoute
@@ -529,6 +543,8 @@ export interface FileRoutesByTo {
   '/admin/frames': typeof AdminFramesIndexRoute
   '/admin/gift-cards': typeof AdminGiftCardsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
+  '/admin/production/$id': typeof AdminProductionIdRoute
+  '/admin/production': typeof AdminProductionIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
   '/admin/promotions': typeof AdminPromotionsIndexRoute
   '/admin/vendors': typeof AdminVendorsIndexRoute
@@ -597,6 +613,8 @@ export interface FileRoutesById {
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/production/$id': typeof AdminProductionIdRoute
+  '/admin/production/': typeof AdminProductionIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/admin/promotions/': typeof AdminPromotionsIndexRoute
   '/admin/vendors/': typeof AdminVendorsIndexRoute
@@ -665,6 +683,8 @@ export interface FileRouteTypes {
     | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
+    | '/admin/production/$id'
+    | '/admin/production/'
     | '/admin/products/'
     | '/admin/promotions/'
     | '/admin/vendors/'
@@ -730,6 +750,8 @@ export interface FileRouteTypes {
     | '/admin/frames'
     | '/admin/gift-cards'
     | '/admin/orders'
+    | '/admin/production/$id'
+    | '/admin/production'
     | '/admin/products'
     | '/admin/promotions'
     | '/admin/vendors'
@@ -797,6 +819,8 @@ export interface FileRouteTypes {
     | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
+    | '/admin/production/$id'
+    | '/admin/production/'
     | '/admin/products/'
     | '/admin/promotions/'
     | '/admin/vendors/'
@@ -1218,6 +1242,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/production/$id': {
+      id: '/admin/production/$id'
+      path: '/production/$id'
+      fullPath: '/admin/production/$id'
+      preLoaderRoute: typeof AdminProductionIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/production/': {
+      id: '/admin/production/'
+      path: '/production'
+      fullPath: '/admin/production/'
+      preLoaderRoute: typeof AdminProductionIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/products/': {
       id: '/admin/products/'
       path: '/products'
@@ -1349,6 +1387,8 @@ interface AdminRouteChildren {
   AdminFramesIndexRoute: typeof AdminFramesIndexRoute
   AdminGiftCardsIndexRoute: typeof AdminGiftCardsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
+  AdminProductionIdRoute: typeof AdminProductionIdRoute
+  AdminProductionIndexRoute: typeof AdminProductionIndexRoute
   AdminProductsIndexRoute: typeof AdminProductsIndexRoute
   AdminPromotionsIndexRoute: typeof AdminPromotionsIndexRoute
   AdminVendorsIndexRoute: typeof AdminVendorsIndexRoute
@@ -1378,6 +1418,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFramesIndexRoute: AdminFramesIndexRoute,
   AdminGiftCardsIndexRoute: AdminGiftCardsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
+  AdminProductionIdRoute: AdminProductionIdRoute,
+  AdminProductionIndexRoute: AdminProductionIndexRoute,
   AdminProductsIndexRoute: AdminProductsIndexRoute,
   AdminPromotionsIndexRoute: AdminPromotionsIndexRoute,
   AdminVendorsIndexRoute: AdminVendorsIndexRoute,

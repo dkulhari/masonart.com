@@ -26,6 +26,7 @@ import {
   type ShippingDetails,
 } from '~/components/admin/OrderDetail'
 import type { OrderStatus } from '~/components/admin/OrdersTable'
+import { OrderProductionPanel } from '~/routes/admin/production/OrderProductionPanel'
 
 // ============================================================================
 // Route Configuration
@@ -280,14 +281,28 @@ function AdminOrderDetailPage() {
       {isLoading ? (
         <OrderDetailSkeleton />
       ) : order ? (
-        <OrderDetail
-          order={order}
-          onUpdateStatus={handleUpdateStatus}
-          onUpdateShipping={handleUpdateShipping}
-          onUpdateNotes={handleUpdateNotes}
-          onInitiateRefund={handleInitiateRefund}
-          isUpdating={isUpdating}
-        />
+        <>
+          <OrderDetail
+            order={order}
+            onUpdateStatus={handleUpdateStatus}
+            onUpdateShipping={handleUpdateShipping}
+            onUpdateNotes={handleUpdateNotes}
+            onInitiateRefund={handleInitiateRefund}
+            isUpdating={isUpdating}
+          />
+          {/*
+            Which of this order's items are actually being made — and, the part
+            that only exists here, which of them are on NO production job at
+            all (#620). An order item with no job is invisible work: the
+            production queue lists jobs, so it cannot show a line that never
+            became one.
+
+            Mounted below OrderDetail rather than inside it so the panel owns
+            its own fetch, skeleton and error state, and a failed queue read
+            cannot take the order itself down with it.
+          */}
+          <OrderProductionPanel orderId={order.id} orderItems={order.items} />
+        </>
       ) : (
         <div className="rounded-xl border border-border bg-card p-12 text-center">
           <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />

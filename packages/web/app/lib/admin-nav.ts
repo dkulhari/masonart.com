@@ -74,6 +74,29 @@ export const ADMIN_VENDORS_SEARCH = {
 } as const
 
 /**
+ * Rows per page for the production queue.
+ *
+ * Matches `DEFAULT_PAGE_SIZE` in `routes/admin/production-jobs.ts` on the API
+ * side, for the same reason `VENDOR_PAGE_SIZE` does: the constant below and the
+ * route's own zod default read from one place and cannot drift apart.
+ */
+export const PRODUCTION_PAGE_SIZE = 20
+
+/**
+ * Default search params for /admin/production.
+ *
+ * Same contract as ADMIN_VENDORS_SEARCH. Also deliberately NOT added to
+ * CONTENT_MANAGER_ALLOWED_PREFIXES — a production job carries what we pay a
+ * supplier, and `routes/admin/production-jobs.ts` gates the API with
+ * `requireAdmin`. `tests/lib/admin-nav-vendor-role.test.ts` asserts the refusal
+ * from the other side.
+ */
+export const ADMIN_PRODUCTION_SEARCH = {
+  page: 1,
+  pageSize: PRODUCTION_PAGE_SIZE,
+} as const
+
+/**
  * Label for the staff area entry point, by role. null = not staff, show nothing.
  *
  * Content managers only get the catalog sections, so calling their entry

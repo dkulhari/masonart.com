@@ -34,6 +34,7 @@ import {
   Truck,
   Frame,
   Factory,
+  Hammer,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -133,6 +134,21 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Vendors',
     href: '/admin/vendors',
     icon: Factory,
+  },
+  {
+    // The production queue (#620) — what has been sent out to be made, and
+    // what came back. It sits directly under Vendors because the two are read
+    // together: a job names a vendor and a vendor's open-job count is a link
+    // into this queue.
+    //
+    // Edited in the same commit as `admin-nav.ts`, always — route access and
+    // visible navigation come from that one module, and #603 exists because
+    // the pairing was bypassed. `/admin/production` stays OUT of
+    // CONTENT_MANAGER_ALLOWED_PREFIXES: a job carries what we pay a supplier,
+    // matching requireAdmin on the API.
+    label: 'Production',
+    href: '/admin/production',
+    icon: Hammer,
   },
   {
     label: 'AI Generations',
