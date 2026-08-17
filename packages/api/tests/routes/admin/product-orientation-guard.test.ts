@@ -41,6 +41,21 @@ vi.mock('../../../src/lib/redis', () => ({
   CacheKeys: { PRODUCT: 'products:', PRODUCT_LIST: 'products:list:' },
 }));
 
+/**
+ * The write path also records an audit row, through the same mocked `db`. The
+ * recorders below keep only the LAST insert and the LAST update, so an
+ * unmocked `recordAudit` replaces the product write these tests are reading —
+ * every assertion about `insertedValues` then describes the audit row instead.
+ *
+ * Stubbed rather than accommodated: what lands in the audit table is asserted
+ * in tests/routes/admin/catalogue-audit.test.ts, and teaching this suite to
+ * distinguish two inserts would only couple it to that.
+ */
+vi.mock('../../../src/lib/audit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/audit')>()),
+  recordAudit: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { adminProductsApp } from '../../../src/routes/admin/products';
 
 const app = new Hono();
