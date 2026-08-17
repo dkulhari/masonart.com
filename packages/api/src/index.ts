@@ -47,6 +47,7 @@ import { adminReturnsApp } from "./routes/admin/returns";
 import { adminNotificationsApp } from "./routes/admin/notifications";
 import { adminApprovalsApp } from "./routes/admin/approvals";
 import { adminModerationApp } from "./routes/admin/ai-moderation";
+import { adminAuditLogApp } from "./routes/admin/audit-log";
 import { adminVendorsApp } from "./routes/admin/vendors";
 import { adminVendorRatesApp } from "./routes/admin/vendor-rates";
 import { adminVendorPayablesApp } from "./routes/admin/vendor-payables";
@@ -280,6 +281,10 @@ app.route("/api/admin/approvals", adminApprovalsApp);
 
 // Admin AI Moderation API - AI generation review queue
 app.route("/api/admin/ai-moderation", adminModerationApp);
+
+// Admin Audit Log API - who did what, to what, when. Admin-only, unlike the
+// catalogue routers: rows carry customer emails and every domain's actions.
+app.route("/api/admin/audit-log", adminAuditLogApp);
 
 // Admin Vendors API - vendor directory, contacts and capabilities.
 // Admin-only, unlike the catalogue routers above: the list carries what we owe
