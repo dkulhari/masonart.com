@@ -31,6 +31,7 @@
 
 import { startGiftCardDeliveryScheduler } from "./services/gift-card-delivery";
 import { startDeadlineChecker } from "./services/approval-deadline";
+import { startAuditRetentionWorker } from "./queues/audit-retention";
 import { logger } from "./lib/logger";
 
 export interface BackgroundWorkers {
@@ -47,7 +48,7 @@ export interface BackgroundWorkers {
 export function startBackgroundWorkers(): BackgroundWorkers {
   if (process.env.DISABLE_BACKGROUND_WORKERS === "true") {
     logger.info(
-      "Background workers disabled by DISABLE_BACKGROUND_WORKERS — gift card delivery and approval deadlines will not run in this process",
+      "Background workers disabled by DISABLE_BACKGROUND_WORKERS — gift card delivery, approval deadlines and audit retention will not run in this process",
     );
     return { stop: () => {} };
   }
@@ -59,7 +60,14 @@ export function startBackgroundWorkers(): BackgroundWorkers {
 
   const deadlineChecker = startDeadlineChecker();
 
-  logger.info("Background workers started: gift card delivery, approval deadlines");
+  // Retention on the audit log. Safe to run in every instance for the same
+  // reason as the sweeps above: deleting rows that are already gone is a no-op,
+  // and the delete is bounded by age rather than by count.
+  const auditRetention = startAuditRetentionWorker();
+
+  logger.info(
+    "Background workers started: gift card delivery, approval deadlines, audit retention",
+  );
 
   let stopped = false;
 
@@ -72,6 +80,7 @@ export function startBackgroundWorkers(): BackgroundWorkers {
 
       clearInterval(giftCardDelivery);
       deadlineChecker.stop();
+      auditRetention.stop();
       logger.info("Background workers stopped");
     },
   };
