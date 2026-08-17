@@ -78,7 +78,7 @@ export interface OptionalAuthVariables {
 /**
  * Create a standardized 401 Unauthorized error
  */
-function createUnauthorizedError(message = "Unauthorized"): HTTPException {
+export function createUnauthorizedError(message = "Unauthorized"): HTTPException {
   return new HTTPException(401, {
     message,
     res: new Response(
@@ -98,7 +98,7 @@ function createUnauthorizedError(message = "Unauthorized"): HTTPException {
 /**
  * Create a standardized 403 Forbidden error
  */
-function createForbiddenError(message = "Forbidden"): HTTPException {
+export function createForbiddenError(message = "Forbidden"): HTTPException {
   return new HTTPException(403, {
     message,
     res: new Response(
