@@ -44,6 +44,8 @@ import { adminApprovalsApp } from "./routes/admin/approvals";
 import { adminModerationApp } from "./routes/admin/ai-moderation";
 import { adminVendorsApp } from "./routes/admin/vendors";
 import { adminVendorRatesApp } from "./routes/admin/vendor-rates";
+import { adminVendorPayablesApp } from "./routes/admin/vendor-payables";
+import { adminVendorInviteApp } from "./routes/admin/vendor-invite";
 import { adminProductionApp } from "./routes/admin/production-jobs";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
@@ -266,6 +268,12 @@ app.route("/api/admin/vendors", adminVendorsApp);
 // Admin Vendor Rate Cards - effective-dated bands, mounted on the same prefix.
 // Hono merges routes additively, so this composes with adminVendorsApp above.
 app.route("/api/admin/vendors", adminVendorRatesApp);
+
+// Payables, settlements and the vendor account invite. Separate routers on the
+// same prefix — Hono merges them additively, and keeping them apart keeps the
+// money paths reviewable on their own.
+app.route("/api/admin/vendors", adminVendorPayablesApp);
+app.route("/api/admin/vendors", adminVendorInviteApp);
 
 // Admin Production API - job queue, assignment pricing and QC reviews.
 // Admin-only: assignment writes what we will owe the vendor.
