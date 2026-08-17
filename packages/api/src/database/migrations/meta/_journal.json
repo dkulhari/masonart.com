@@ -141,6 +141,13 @@
       "when": 1786406640000,
       "tag": "0019_vendor_management_phase_1",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786406700000,
+      "tag": "0020_production_job_fk_restrict",
+      "breakpoints": true
     }
   ]
 }

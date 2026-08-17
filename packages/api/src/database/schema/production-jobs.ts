@@ -66,8 +66,15 @@ export const productionJobs = pgTable(
   'production_jobs',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    /**
+     * restrict, not cascade: a job carries amountExpected, amountActual and
+     * settlementId, so it is a financial record. Cascading it away with the
+     * order would destroy the proof that we owe — or have already paid — a
+     * vendor for work they actually did. Deleting an order with production
+     * against it should be blocked and dealt with deliberately.
+     */
     orderId: uuid('order_id')
-      .references(() => orders.id, { onDelete: 'cascade' })
+      .references(() => orders.id, { onDelete: 'restrict' })
       .notNull(),
     stage: productionJobStageEnum('stage').notNull(),
     vendorId: uuid('vendor_id').references(() => vendors.id, { onDelete: 'restrict' }),
@@ -116,8 +123,14 @@ export const productionJobItems = pgTable(
     jobId: uuid('job_id')
       .references(() => productionJobs.id, { onDelete: 'cascade' })
       .notNull(),
+    /**
+     * restrict for the same reason as production_jobs.orderId: this row is the
+     * record of WHAT the billed work was for. Losing it leaves a job with an
+     * amount and no explanation. jobId above stays cascade — a join row really
+     * is meaningless without its job — but the order item side is history.
+     */
     orderItemId: uuid('order_item_id')
-      .references(() => orderItems.id, { onDelete: 'cascade' })
+      .references(() => orderItems.id, { onDelete: 'restrict' })
       .notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
