@@ -40,6 +40,7 @@ import { z } from "zod";
 import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { shippingConfig } from "../../database/schema/shipping";
 import { users } from "../../database/schema/users";
 import {
@@ -233,6 +234,23 @@ adminShippingConfigApp.put(
           )} is already scheduled for ${scheduled.effectiveFrom.toISOString()} and will replace this value then. It has been left in place.`
         );
       }
+
+      // One money rule that every storefront surface prints, effective-dated.
+      // The warnings go in too: "nobody said this would make every order free"
+      // is answerable only if the warning shown at the time is on the record.
+      await recordAudit(c, {
+        action: "shipping_config.updated",
+        entityType: "shipping_config",
+        entityId: KEY,
+        summary: `Free shipping threshold set to ${value}, effective ${startsAt.toISOString()}`,
+        after: {
+          key: KEY,
+          valueInt: row?.valueInt ?? value,
+          effectiveFrom: startsAt,
+          description: row?.description ?? description ?? null,
+        },
+        metadata: { warnings, pendingCount: pending.length },
+      });
 
       return c.json({
         message: "Free shipping threshold updated",

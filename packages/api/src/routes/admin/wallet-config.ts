@@ -15,6 +15,7 @@ import { z } from "zod";
 import { eq, sql, and, desc, gte, lte } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import {
   walletPricingConfig,
   walletTransactions,
@@ -175,6 +176,22 @@ adminWalletConfigApp.put(
 
       // Invalidate cache
       await deleteCached(`wallet-config:${key}`);
+
+      await recordAudit(c, {
+        action: "wallet_config.updated",
+        entityType: "wallet_config",
+        entityId: key,
+        summary: `Wallet config ${key} set to ${valueInt} (${formatConfigValue(
+          key,
+          valueInt
+        )})`,
+        after: {
+          key,
+          valueInt,
+          effectiveFrom: newConfig?.effectiveFrom ?? null,
+          effectiveTo: newConfig?.effectiveTo ?? null,
+        },
+      });
 
       return c.json({
         message: "Config updated successfully",

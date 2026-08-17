@@ -21,6 +21,7 @@ import { z } from "zod";
 import { eq, and, desc, asc, sql, ilike, or } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit, diffRecords } from "../../lib/audit";
 import {
   products,
   productVariants,
@@ -657,6 +658,15 @@ adminProductsApp.post(
 
       await purgeProductResponseCache();
 
+      await recordAudit(c, {
+        action: "product.created",
+        entityType: "product",
+        entityId: newProduct.id,
+        summary: `Created product ${newProduct.slug} at ${newProduct.basePrice}`,
+        // No `before`: on a create there was nothing there to record.
+        after: newProduct as unknown as Record<string, unknown>,
+      });
+
       return c.json(
         {
           message: "Product created successfully",
@@ -691,18 +701,17 @@ adminProductsApp.patch(
     }
 
     try {
-      // Check if product exists
+      // The whole row, not a projection.
+      //
+      // It used to select five columns: id, slug, sku and both sides of the
+      // #545 orientation check (a payload may carry a new orientation, new
+      // artwork, or neither — the stored row supplies whichever half is
+      // missing). The audit delta needs the pre-image of whatever this write
+      // touches, and "whatever" is not enumerable at compile time — a price
+      // edit whose `before` is unavailable is the exact question the trail
+      // exists to answer.
       const existing = await db
-        .select({
-          id: products.id,
-          slug: products.slug,
-          sku: products.sku,
-          // Both sides of the #545 check. A payload may carry a new
-          // orientation, new artwork, or neither — the stored row supplies
-          // whichever half is missing.
-          orientation: products.orientation,
-          images: products.images,
-        })
+        .select()
         .from(products)
         .where(eq(products.id, id))
         .limit(1);
@@ -816,6 +825,24 @@ adminProductsApp.patch(
       // for free.
       await purgeProductResponseCache();
 
+      // Only the keys this write touched, and only those that actually moved.
+      // A whole-row snapshot would bury the one changed field under forty that
+      // did not, forever, in a table nobody may prune by hand.
+      const delta = diffRecords(
+        existingProduct as Record<string, unknown>,
+        (updatedProduct ?? {}) as Record<string, unknown>,
+        Object.keys(updateData).filter((key) => key !== "updatedAt")
+      );
+
+      await recordAudit(c, {
+        action: "product.updated",
+        entityType: "product",
+        entityId: id,
+        summary: `Edited product ${existingProduct.slug} (${Object.keys(delta.after ?? {}).join(", ") || "no change"})`,
+        before: delta.before,
+        after: delta.after,
+      });
+
       return c.json({
         message: "Product updated successfully",
         product: updatedProduct,
@@ -843,7 +870,7 @@ adminProductsApp.delete("/:id", async (c) => {
   try {
     // Check if product exists
     const existing = await db
-      .select({ id: products.id, slug: products.slug })
+      .select({ id: products.id, slug: products.slug, status: products.status })
       .from(products)
       .where(eq(products.id, id))
       .limit(1);
@@ -862,6 +889,15 @@ adminProductsApp.delete("/:id", async (c) => {
       .where(eq(products.id, id));
 
     await purgeProductResponseCache();
+
+    await recordAudit(c, {
+      action: "product.deleted",
+      entityType: "product",
+      entityId: id,
+      summary: `Archived product ${existing[0]?.slug ?? id}`,
+      before: { status: existing[0]?.status ?? null },
+      after: { status: "archived" },
+    });
 
     return c.json({
       message: "Product archived successfully",

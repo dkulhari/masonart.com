@@ -30,6 +30,7 @@ import {
 } from "@chobii/shared";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import {
   collections,
   collectionProducts,
@@ -410,6 +411,17 @@ adminCollectionsApp.delete("/:id", async (c) => {
     if (!row) return c.json({ error: "Collection not found" }, 404);
 
     await bustCollectionCache(row.slug);
+
+    // A hard delete that cascades its membership rows: this is the only
+    // remaining record that the collection, and what was curated into it,
+    // ever existed.
+    await recordAudit(c, {
+      action: "collection.deleted",
+      entityType: "collection",
+      entityId: row.id,
+      summary: `Deleted collection '${row.slug}' and its membership rows`,
+      before: row as unknown as Record<string, unknown>,
+    });
 
     return c.json({ success: true, id: row.id });
   } catch (error) {

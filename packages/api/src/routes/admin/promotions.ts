@@ -45,6 +45,7 @@ import {
 } from "@chobii/shared";
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { products } from "../../database/schema/products";
 import {
   promotionExclusions,
@@ -414,6 +415,15 @@ adminPromotionsApp.post("/:id/enable", async (c) => {
 
   await invalidatePricingCaches();
 
+  await recordAudit(c, {
+    action: "promotion.enabled",
+    entityType: "promotion",
+    entityId: row.id,
+    summary: `Enabled promotion '${row.name}'`,
+    before: { isEnabled: false },
+    after: { isEnabled: true },
+  });
+
   const membership = await loadMembership([row.id]);
   return c.json(
     serialize(row, membership.get(row.id) ?? EMPTY_MEMBERSHIP, new Date())
@@ -430,6 +440,15 @@ adminPromotionsApp.post("/:id/disable", async (c) => {
   }
 
   await invalidatePricingCaches();
+
+  await recordAudit(c, {
+    action: "promotion.disabled",
+    entityType: "promotion",
+    entityId: row.id,
+    summary: `Disabled promotion '${row.name}'`,
+    before: { isEnabled: true },
+    after: { isEnabled: false },
+  });
 
   const membership = await loadMembership([row.id]);
   return c.json(
@@ -457,6 +476,15 @@ adminPromotionsApp.delete("/:id", async (c) => {
       404
     );
   }
+
+  // A hard delete, unlike products and frames, and the membership rows go with
+  // it — so this row is the only remaining evidence the promotion existed.
+  await recordAudit(c, {
+    action: "promotion.deleted",
+    entityType: "promotion",
+    entityId: deleted.id,
+    summary: `Deleted promotion ${deleted.id} and its membership rows`,
+  });
 
   await invalidatePricingCaches();
 

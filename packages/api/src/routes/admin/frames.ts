@@ -35,6 +35,7 @@ import {
 } from "@chobii/shared";
 
 import { db } from "../../database";
+import { recordAudit, diffRecords } from "../../lib/audit";
 import { frames } from "../../database/schema/products";
 import {
   requireAuth,
@@ -218,6 +219,14 @@ adminFramesApp.post(
 
       await purgeFramesCache();
 
+      await recordAudit(c, {
+        action: "frame.created",
+        entityType: "frame",
+        entityId: row!.id,
+        summary: `Created frame '${row!.name}' (${row!.type}) at +${row!.priceAddition}`,
+        after: row as unknown as Record<string, unknown>,
+      });
+
       return c.json({ frame: row }, 201);
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -273,6 +282,21 @@ adminFramesApp.patch(
       if (!row) return c.json({ error: "Frame not found" }, 404);
 
       await purgeFramesCache();
+
+      // `patch` already holds exactly the keys this request supplied, so the
+      // delta is the intersection of "asked for" and "actually moved". The
+      // pre-image is not read: the frame price feeds every product page, and a
+      // second SELECT on a hot admin write to enrich a log is a poor trade.
+      await recordAudit(c, {
+        action: "frame.updated",
+        entityType: "frame",
+        entityId: id,
+        summary: `Edited frame '${row.name}' (${Object.keys(patch)
+          .filter((key) => key !== "updatedAt")
+          .join(", ")})`,
+        after: diffRecords(null, row as unknown as Record<string, unknown>, undefined).after,
+        metadata: { changedKeys: Object.keys(patch).filter((k) => k !== "updatedAt") },
+      });
 
       return c.json({ frame: row });
     } catch (error) {
@@ -358,6 +382,15 @@ adminFramesApp.delete("/:id", async (c) => {
       .where(eq(frames.id, id));
 
     await purgeFramesCache();
+
+    await recordAudit(c, {
+      action: "frame.archived",
+      entityType: "frame",
+      entityId: id,
+      summary: `Archived frame '${existing.name}'`,
+      before: { isActive: true },
+      after: { isActive: false },
+    });
 
     return c.json({ message: `Frame '${existing.name}' archived` });
   } catch (error) {

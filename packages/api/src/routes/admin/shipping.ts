@@ -17,6 +17,7 @@ import { z } from "zod";
 import { eq, asc, desc, sql } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { shippingOptions } from "../../database/schema/shipping";
 import {
   requireAuth,
@@ -333,6 +334,15 @@ adminShippingApp.delete("/options/:id", async (c) => {
     // Invalidate cache
     await deleteCachedPattern(`${SHIPPING_CACHE_PREFIX}options:*`);
     await deleteCached(`${SHIPPING_CACHE_PREFIX}option:${optionId}`);
+
+    await recordAudit(c, {
+      action: "shipping_option.deleted",
+      entityType: "shipping_option",
+      entityId: optionId,
+      summary: `Deactivated shipping option ${deactivatedOption?.name ?? optionId}`,
+      before: { isActive: true },
+      after: { isActive: false },
+    });
 
     return c.json({
       message: "Shipping option deactivated successfully",
