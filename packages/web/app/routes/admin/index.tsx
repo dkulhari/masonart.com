@@ -157,10 +157,16 @@ function AdminDashboard() {
 
       // One dead call must not blank the whole screen, but it must not pass
       // unmentioned either — the tiles it feeds render a placeholder, and this
-      // says why (#602).
-      if (!products) {
+      // says why (#602, #606). Each half is named separately so an operator can
+      // see which figures are missing.
+      const missing = [
+        !orders && 'order',
+        !products && 'product',
+      ].filter(Boolean) as string[]
+
+      if (missing.length > 0) {
         setError(
-          'Could not load product statistics. Product figures are unavailable — the rest of the dashboard is current.'
+          `Could not load ${missing.join(' or ')} statistics. Those figures are unavailable — the rest of the dashboard is current.`
         )
       }
     } catch (err) {
@@ -248,7 +254,8 @@ function AdminDashboard() {
               icon={IndianRupee}
               variant="success"
               description="All time paid orders"
-              href="/admin/analytics"
+              // No href: this pointed at /admin/analytics, which does not
+              // exist (#603). It gets one back when the analytics screen ships.
             />
 
             {/* Month Revenue */}
@@ -333,7 +340,9 @@ function AdminDashboard() {
               icon={Sparkles}
               variant="purple"
               compact
-              href="/admin/ai-generations"
+              // /admin/ai-generations was the screen's old name; it is
+              // /admin/ai-moderation now and the tile 404'd until #603.
+              href="/admin/ai-moderation"
             />
           </>
         )}

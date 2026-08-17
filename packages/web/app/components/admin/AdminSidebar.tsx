@@ -14,15 +14,11 @@ import {
   Package,
   ShoppingCart,
   Users,
-  Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
   Menu,
   X,
-  Sparkles,
-  BarChart3,
-  Tags,
   ImageIcon,
   MessageSquare,
   RotateCcw,
@@ -45,7 +41,7 @@ import { isAdminNavItemVisible, staffAreaLabel } from '~/lib/admin-nav'
 // Types
 // ============================================================================
 
-interface NavItem {
+export interface NavItem {
   label: string
   href: string
   icon: typeof LayoutDashboard
@@ -70,7 +66,12 @@ interface AdminSidebarProps {
 // Navigation Configuration
 // ============================================================================
 
-const NAV_ITEMS: NavItem[] = [
+/**
+ * Exported so `tests/components/admin/AdminSidebar.test.tsx` can compare every
+ * href against the generated route tree — four of these pointed at routes that
+ * did not exist and nothing noticed (#603).
+ */
+export const NAV_ITEMS: NavItem[] = [
   {
     label: 'Dashboard',
     href: '/admin',
@@ -150,20 +151,16 @@ const NAV_ITEMS: NavItem[] = [
     href: '/admin/production',
     icon: Hammer,
   },
-  {
-    label: 'AI Generations',
-    href: '/admin/ai-generations',
-    icon: Sparkles,
-  },
+  // `AI Generations` -> /admin/ai-generations was dropped rather than repointed
+  // (#603): the screen it meant is /admin/ai-moderation, already listed above,
+  // so repointing would have left two entries for one screen.
+  //
+  // `Analytics` -> /admin/analytics was dropped too — no route, no API, and the
+  // analytics-dashboard feature has not started. It comes back with the screen.
   {
     label: 'Customers',
     href: '/admin/customers',
     icon: Users,
-  },
-  {
-    label: 'Analytics',
-    href: '/admin/analytics',
-    icon: BarChart3,
   },
   {
     // The free-shipping threshold (#570). It belongs in the primary list
@@ -175,29 +172,23 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
-const SECONDARY_NAV_ITEMS: NavItem[] = [
+export const SECONDARY_NAV_ITEMS: NavItem[] = [
   {
     label: 'Collections',
     href: '/admin/collections',
     icon: ImageIcon,
   },
   {
-    label: 'Categories',
-    href: '/admin/categories',
-    icon: Tags,
-  },
-  {
     // Here rather than in the primary list: a frame is a catalogue axis like a
-    // collection or a category, not an operational surface like Orders.
+    // collection, not an operational surface like Orders.
     label: 'Frames',
     href: '/admin/frames',
     icon: Frame,
   },
-  {
-    label: 'Settings',
-    href: '/admin/settings',
-    icon: Settings,
-  },
+  // `Categories` -> /admin/categories and `Settings` -> /admin/settings both
+  // 404'd and were removed (#603). Categories does not come back without a
+  // categories model: product taxonomy here is collections, and `category`
+  // exists only as `frameCategoryEnum` on frames.
 ]
 
 // ============================================================================
@@ -360,7 +351,7 @@ export function AdminSidebar({
           <div className="space-y-1">
             {!isCollapsed && (
               <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Settings
+                Catalog
               </p>
             )}
             {visibleSecondaryNavItems.map((item) => (

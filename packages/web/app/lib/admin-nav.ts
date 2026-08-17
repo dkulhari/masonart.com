@@ -13,7 +13,9 @@
 export const CONTENT_MANAGER_ALLOWED_PREFIXES = [
   '/admin/products',
   '/admin/collections',
-  '/admin/categories',
+  // `/admin/categories` was listed here until #603. There is no such route, no
+  // such API and no categories table — product taxonomy is collections — so the
+  // prefix only ever granted access to a 404.
   /**
    * `/api/admin/frames` is gated with `requireContentManager`, same as
    * collections. Leaving the path out here would let the endpoint serve a role

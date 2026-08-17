@@ -8,6 +8,8 @@
  * MobileAdminHeader is the only chrome on screen.
  */
 
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
@@ -19,7 +21,12 @@ vi.mock('~/lib/auth-client', () => ({
   signOut: vi.fn(),
 }))
 
-import { AdminSidebar, MobileAdminHeader } from '~/components/admin/AdminSidebar'
+import {
+  AdminSidebar,
+  MobileAdminHeader,
+  NAV_ITEMS,
+  SECONDARY_NAV_ITEMS,
+} from '~/components/admin/AdminSidebar'
 
 const contentManager = {
   name: 'Cara Manager',
@@ -76,6 +83,63 @@ describe('AdminSidebar photo approvals entry (#605)', () => {
     render(<AdminSidebar user={contentManager} collapsed={false} />)
 
     expect(screen.queryByRole('link', { name: /approvals/i })).toBeNull()
+  })
+})
+
+/**
+ * Nav-to-route drift (#603)
+ *
+ * Four nav items pointed at routes that were never generated — `AI
+ * Generations` (the screen was renamed to ai-moderation), `Analytics`,
+ * `Categories` (a concept the schema does not have) and `Settings`. Nothing
+ * caught it because nothing compares the nav to the route tree, so the drift
+ * only showed up as a 404 for whoever clicked first.
+ *
+ * The route tree is read as text rather than imported: importing
+ * routeTree.gen.ts pulls in every route module (and their loaders) for what is
+ * a question about a list of strings.
+ */
+const APP_DIR = resolve(__dirname, '../../../app')
+
+function generatedRoutePaths(): Set<string> {
+  const source = readFileSync(resolve(APP_DIR, 'routeTree.gen.ts'), 'utf8')
+  // The `to` paths — what an href has to match — live in FileRoutesByTo.
+  const block = source.match(/export interface FileRoutesByTo \{([\s\S]*?)\n\}/)
+  if (!block) throw new Error('FileRoutesByTo not found in routeTree.gen.ts')
+  return new Set(Array.from(block[1].matchAll(/^\s*'([^']+)':/gm), (m) => m[1]))
+}
+
+/** An href is only as resolvable as its path — drop search and hash. */
+function pathOf(href: string): string {
+  return href.split(/[?#]/)[0]
+}
+
+describe('admin nav points at routes that exist (#603)', () => {
+  const routePaths = generatedRoutePaths()
+
+  it.each([...NAV_ITEMS, ...SECONDARY_NAV_ITEMS].map((i) => [i.label, i.href]))(
+    'resolves %s -> %s',
+    (_label, href) => {
+      expect(routePaths.has(pathOf(href))).toBe(true)
+    }
+  )
+
+  it('lists each admin screen once', () => {
+    const hrefs = [...NAV_ITEMS, ...SECONDARY_NAV_ITEMS].map((i) => i.href)
+    expect(hrefs).toHaveLength(new Set(hrefs).size)
+  })
+
+  it('sends every dashboard tile somewhere that exists', () => {
+    // The stale links were in two places: removing them from the sidebar alone
+    // left the dashboard quick-action tiles pointing at the same 404s.
+    const dashboard = readFileSync(resolve(APP_DIR, 'routes/admin/index.tsx'), 'utf8')
+    const hrefs = Array.from(
+      dashboard.matchAll(/href=["'](\/[^"'{]*)["']/g),
+      (m) => pathOf(m[1])
+    )
+
+    expect(hrefs.length).toBeGreaterThan(0)
+    expect(hrefs.filter((href) => !routePaths.has(href))).toEqual([])
   })
 })
 
