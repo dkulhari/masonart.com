@@ -273,19 +273,37 @@ describe('the table', () => {
     expect(props.onToggle).toHaveBeenCalledWith(rows[1], true)
   })
 
-  it('confirms before deleting', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  /*
+   * Confirmation moved into the page in #625. It used to be `window.confirm`,
+   * which blocks the event loop and freezes any harness driving this table —
+   * so the tripwire here is a native confirm that THROWS rather than a spy
+   * that answers, because a spy would let the screen quietly go back to it.
+   */
+  it('confirms before deleting, without a native dialog', async () => {
+    vi.stubGlobal('confirm', () => {
+      throw new Error('native confirm() called — blocks the E2E harness (#625)')
+    })
     const props = renderTable()
 
     fireEvent.click(screen.getByRole('button', { name: /delete Independence Sale/i }))
-    expect(confirmSpy).toHaveBeenCalled()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/Independence Sale/)).toBeInTheDocument()
     expect(props.onDelete).not.toHaveBeenCalled()
 
-    confirmSpy.mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: /delete Independence Sale/i }))
-    expect(props.onDelete).toHaveBeenCalledWith(rows[0])
+    fireEvent.click(within(dialog).getByRole('button', { name: /^cancel$/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(props.onDelete).not.toHaveBeenCalled()
 
-    confirmSpy.mockRestore()
+    fireEvent.click(screen.getByRole('button', { name: /delete Independence Sale/i }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: /delete promotion/i,
+      })
+    )
+
+    await waitFor(() => expect(props.onDelete).toHaveBeenCalledWith(rows[0]))
+    vi.unstubAllGlobals()
   })
 
   it('opens the editor', () => {

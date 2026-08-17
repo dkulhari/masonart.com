@@ -28,6 +28,7 @@ import {
 import { getApiUrl } from '~/lib/utils'
 import { cn } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 export const Route = createFileRoute('/admin/collections/')({
   head: () => ({
@@ -55,6 +56,7 @@ interface AdminCollection {
 }
 
 function AdminCollectionsPage() {
+  const { confirmAction, dialog } = useConfirmDialog()
   const [collections, setCollections] = useState<AdminCollection[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -161,13 +163,16 @@ function AdminCollectionsPage() {
        * collection's curation goes with it — cheap to recreate, not cheap to
        * re-curate.
        */
-      const confirmed = window.confirm(
-        `Delete “${collection.title}”? ${
+      const confirmed = await confirmAction({
+        title: `Delete “${collection.title}”?`,
+        body: `${
           collection.kind === 'manual'
             ? 'Its hand-picked product list will be deleted too. '
             : ''
-        }This cannot be undone.`
-      )
+        }This cannot be undone.`,
+        confirmLabel: 'Delete collection',
+        destructive: true,
+      })
       if (!confirmed) return
 
       setIsSaving(true)
@@ -184,7 +189,7 @@ function AdminCollectionsPage() {
         setIsSaving(false)
       }
     },
-    [load]
+    [load, confirmAction]
   )
 
   const inRail = collections.filter((c) => c.showInDiscover)
@@ -365,6 +370,9 @@ function AdminCollectionsPage() {
           </table>
         </div>
       )}
+
+      {/* Delete asks here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

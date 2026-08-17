@@ -35,6 +35,7 @@ import {
 import { cn } from '~/lib/utils'
 import { getApiUrl } from '~/lib/utils'
 import { StatsCard, StatsCardGrid, StatsCardSkeleton } from '~/components/admin/StatsCard'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 // ============================================================================
 // Route Configuration
@@ -266,9 +267,11 @@ interface ReviewMediaStripProps {
 /**
  * A review's attachments, at every processing status.
  *
- * Deletion is two-step and entirely inline. `window.confirm` is off limits
- * here: a native dialog blocks the browser automation harness outright, and
- * this action is destructive enough that it genuinely needs a confirm step.
+ * Deletion is two-step and entirely inline. Native dialogs are off limits
+ * here: they block the browser automation harness outright, and this action is
+ * destructive enough that it genuinely needs a confirm step. The rest of this
+ * screen took three more tries to learn that — the delete and bulk handlers
+ * above called the native one until #625 moved them onto `useConfirmDialog`.
  */
 export function ReviewMediaStrip({
   reviewId,
@@ -443,6 +446,7 @@ export function ReviewMediaStrip({
 function AdminReviewsPage() {
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
+  const { confirmAction, dialog } = useConfirmDialog()
 
   const [reviews, setReviews] = useState<AdminReview[]>([])
   const [stats, setStats] = useState<ReviewStats | null>(null)
@@ -554,9 +558,14 @@ function AdminReviewsPage() {
 
   // Handle delete
   const handleDelete = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to permanently delete this review?')) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: 'Delete this review?',
+      body: 'The review and its media are removed permanently. This cannot be undone.',
+      confirmLabel: 'Delete review',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await deleteReview(reviewId)
@@ -592,9 +601,13 @@ function AdminReviewsPage() {
   const handleBulkApprove = async () => {
     if (selectedReviews.size === 0) return
 
-    if (!confirm(`Are you sure you want to approve ${selectedReviews.size} reviews?`)) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: `Approve ${selectedReviews.size} reviews?`,
+      body: 'They become publicly visible on their product pages.',
+      confirmLabel: 'Approve reviews',
+    })
+
+    if (!confirmed) return
 
     try {
       await Promise.all(
@@ -613,9 +626,14 @@ function AdminReviewsPage() {
   const handleBulkReject = async () => {
     if (selectedReviews.size === 0) return
 
-    if (!confirm(`Are you sure you want to reject ${selectedReviews.size} reviews?`)) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: `Reject ${selectedReviews.size} reviews?`,
+      body: 'They stay hidden from the product pages.',
+      confirmLabel: 'Reject reviews',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await Promise.all(
@@ -896,6 +914,9 @@ function AdminReviewsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete and both bulk actions ask here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

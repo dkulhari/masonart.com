@@ -27,6 +27,7 @@ import {
   type ProductFormData,
   type ProductVariant,
 } from '~/components/admin/ProductForm'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 // ============================================================================
 // Route Configuration
@@ -257,6 +258,7 @@ async function archiveProduct(id: string): Promise<void> {
 function EditProductPage() {
   const navigate = useNavigate()
   const { id } = Route.useParams()
+  const { confirmAction, dialog } = useConfirmDialog()
 
   const [product, setProduct] = useState<ProductWithVariants | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -348,13 +350,14 @@ function EditProductPage() {
   const handleArchive = async () => {
     if (!product) return
 
-    if (
-      !confirm(
-        `Are you sure you want to archive "${product.title}"? This will hide the product from the store.`
-      )
-    ) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: 'Archive this product?',
+      body: `"${product.title}" is hidden from the store. Existing orders keep it.`,
+      confirmLabel: 'Archive product',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await archiveProduct(id)
@@ -513,6 +516,9 @@ function EditProductPage() {
           isEditing
         />
       )}
+
+      {/* Archive asks here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

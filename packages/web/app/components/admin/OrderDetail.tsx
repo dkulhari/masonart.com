@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
 import type { OrderStatus, PaymentStatus } from './OrdersTable'
+import { useConfirmDialog } from './useConfirm'
 
 // ============================================================================
 // Types
@@ -632,6 +633,7 @@ export function OrderDetail({
   onInitiateRefund,
   isUpdating = false,
 }: OrderDetailProps) {
+  const { promptForValues, dialog } = useConfirmDialog()
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [showShippingModal, setShowShippingModal] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -739,10 +741,31 @@ export function OrderDetail({
         {canRefund && onInitiateRefund && (
           <button
             type="button"
-            onClick={() => {
-              if (confirm('Are you sure you want to initiate a refund for this order?')) {
-                onInitiateRefund(undefined, 'Admin initiated refund')
-              }
+            onClick={async () => {
+              /*
+               * The reason is collected rather than hardcoded (#625). This
+               * button used to send the literal string "Admin initiated
+               * refund" for every refund on the platform, which tells whoever
+               * reads the refund log nothing at all — and the native confirm
+               * it sat behind had nowhere to type a real one.
+               */
+              const values = await promptForValues({
+                title: 'Initiate refund',
+                body: `Order ${order.orderNumber} — ${formatPrice(Number(order.total))}.`,
+                confirmLabel: 'Initiate refund',
+                destructive: true,
+                fields: [
+                  {
+                    name: 'reason',
+                    label: 'Refund reason',
+                    type: 'textarea',
+                    required: true,
+                    placeholder: 'Why is this being refunded?',
+                  },
+                ],
+              })
+
+              if (values?.reason) onInitiateRefund(undefined, values.reason)
             }}
             disabled={isUpdating}
             className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
@@ -1031,6 +1054,9 @@ export function OrderDetail({
           isUpdating={isUpdating}
         />
       )}
+
+      {/* Refund asks here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

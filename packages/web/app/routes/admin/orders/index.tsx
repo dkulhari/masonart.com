@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
 import { OrdersTable, OrdersTableSkeleton, type AdminOrder, type OrderStatus } from '~/components/admin/OrdersTable'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 // ============================================================================
 // Route Configuration
@@ -94,6 +95,40 @@ interface OrderStats {
   totalRevenue: string
   todayOrders: number
   monthRevenue: string
+}
+
+/**
+ * The eleven statuses the API accepts, in lifecycle order — the same list the
+ * route's `validateSearch` enum carries. They live at module scope because the
+ * status dialog offers them as a select (#625); before that they existed only
+ * inside the handler, as a list to check typed input against.
+ */
+const ORDER_STATUSES: OrderStatus[] = [
+  'pending',
+  'pending_payment',
+  'confirmed',
+  'processing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+  'cancelled',
+  'refund_requested',
+  'refunded',
+  'failed',
+]
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  pending_payment: 'Pending payment',
+  confirmed: 'Confirmed',
+  processing: 'Processing',
+  shipped: 'Shipped',
+  out_for_delivery: 'Out for delivery',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  refund_requested: 'Refund requested',
+  refunded: 'Refunded',
+  failed: 'Failed',
 }
 
 // ============================================================================
@@ -205,6 +240,7 @@ async function initiateRefund(orderId: string, reason: string): Promise<void> {
 function AdminOrdersPage() {
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
+  const { confirmAction, promptForValues, dialog } = useConfirmDialog()
 
   const [orders, setOrders] = useState<AdminOrder[]>([])
   const [stats, setStats] = useState<OrderStats | null>(null)
@@ -291,34 +327,38 @@ function AdminOrdersPage() {
     })
   }
 
-  // Status update handler
+  /*
+   * Status update (#625).
+   *
+   * This used to be a native prompt asking the operator to TYPE a status, then
+   * string-matched against the enum below — so "shiped" was a silent no-op with
+   * an error banner and no hint about the spelling. A select of the eleven
+   * valid values cannot be mistyped, and the validation branch that existed to
+   * catch typos is gone with the typos.
+   */
   const handleUpdateStatus = async (order: AdminOrder) => {
-    const newStatus = prompt(
-      'Enter new status (pending, confirmed, processing, shipped, delivered, cancelled):'
-    )
-    if (!newStatus) return
+    const values = await promptForValues({
+      title: 'Update order status',
+      body: `Order ${order.orderNumber} is currently ${ORDER_STATUS_LABELS[order.status] ?? order.status}.`,
+      confirmLabel: 'Update status',
+      fields: [
+        {
+          name: 'status',
+          label: 'New status',
+          type: 'select',
+          defaultValue: order.status,
+          options: ORDER_STATUSES.map((status) => ({
+            value: status,
+            label: ORDER_STATUS_LABELS[status] ?? status,
+          })),
+        },
+      ],
+    })
 
-    const validStatuses: OrderStatus[] = [
-      'pending',
-      'pending_payment',
-      'confirmed',
-      'processing',
-      'shipped',
-      'out_for_delivery',
-      'delivered',
-      'cancelled',
-      'refund_requested',
-      'refunded',
-      'failed',
-    ]
-
-    if (!validStatuses.includes(newStatus as OrderStatus)) {
-      setError('Invalid status. Please enter a valid status.')
-      return
-    }
+    if (!values) return
 
     try {
-      await updateOrderStatus(order.id, newStatus as OrderStatus)
+      await updateOrderStatus(order.id, values.status as OrderStatus)
       loadOrders()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update order status.')
@@ -327,9 +367,15 @@ function AdminOrdersPage() {
 
   // Cancel handler
   const handleCancelOrder = async (order: AdminOrder) => {
-    if (!confirm(`Are you sure you want to cancel order ${order.orderNumber}?`)) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: 'Cancel this order?',
+      body: `Order ${order.orderNumber} will be cancelled. This cannot be undone.`,
+      confirmLabel: 'Cancel order',
+      cancelLabel: 'Keep order',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await updateOrderStatus(order.id, 'cancelled', 'Cancelled by admin')
@@ -339,9 +385,30 @@ function AdminOrdersPage() {
     }
   }
 
-  // Refund handler
+  /*
+   * Refund (#625). The reason is `required`, so the dialog cannot submit an
+   * empty one — a refund with no recorded reason is an audit hole, and the
+   * native prompt this replaced returned `''` for an empty submit.
+   */
   const handleRefundOrder = async (order: AdminOrder) => {
-    const reason = prompt('Enter refund reason:')
+    const values = await promptForValues({
+      title: 'Initiate refund',
+      body: `Order ${order.orderNumber} — ${formatCurrency(order.total)}.`,
+      confirmLabel: 'Initiate refund',
+      destructive: true,
+      fields: [
+        {
+          name: 'reason',
+          label: 'Refund reason',
+          type: 'textarea',
+          required: true,
+          placeholder: 'Why is this being refunded?',
+        },
+      ],
+    })
+
+    // `required` on the field means the dialog cannot resolve without it.
+    const reason = values?.reason
     if (!reason) return
 
     try {
@@ -500,6 +567,9 @@ function AdminOrdersPage() {
           </div>
         </div>
       )}
+
+      {/* Status / cancel / refund all ask here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

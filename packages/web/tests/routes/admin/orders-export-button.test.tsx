@@ -18,8 +18,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, waitFor } from '@testing-library/react'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 
 const SEARCH = {
   page: 1,
@@ -100,29 +98,10 @@ describe('/admin/orders header controls', () => {
   })
 })
 
-/**
- * The screen-level assertion above only covers one route. This one covers the
- * class of defect: a native `alert()` anywhere under the admin tree is a
- * harness-freezing hazard regardless of which screen reintroduces it.
+/*
+ * The `alert(`-only source guard that used to live here moved to
+ * `admin-native-dialogs.test.tsx` in #625, where it covers `prompt` and
+ * `confirm` too and reads across `app/components/admin` as well. Nothing was
+ * dropped in the move — this file keeps the screen-level assertions, which are
+ * about the Export button rather than about native dialogs generally.
  */
-describe('admin routes and native dialogs', () => {
-  const ADMIN_ROUTES = join(process.cwd(), 'app/routes/admin')
-
-  const walk = (dir: string): string[] =>
-    readdirSync(dir).flatMap((entry) => {
-      const full = join(dir, entry)
-      if (statSync(full).isDirectory()) return walk(full)
-      return full.endsWith('.tsx') || full.endsWith('.ts') ? [full] : []
-    })
-
-  // `setAlert(` and friends are fine; a bare or `window.`-qualified call is not.
-  const ALERT_CALL = /(?<![\w$])(?:window\.)?alert\s*\(/
-
-  it('calls alert() from no admin route', () => {
-    const offenders = walk(ADMIN_ROUTES).filter((file) =>
-      ALERT_CALL.test(readFileSync(file, 'utf8'))
-    )
-
-    expect(offenders).toEqual([])
-  })
-})

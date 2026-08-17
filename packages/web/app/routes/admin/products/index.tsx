@@ -21,6 +21,7 @@ import {
 import { cn } from '~/lib/utils'
 import { getApiUrl } from '~/lib/utils'
 import { ProductsTable, ProductsTableSkeleton, type AdminProduct } from '~/components/admin/ProductsTable'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 // ============================================================================
 // Route Configuration
@@ -121,6 +122,7 @@ async function archiveProduct(id: string): Promise<void> {
 function AdminProductsPage() {
   const navigate = useNavigate()
   const searchParams = Route.useSearch()
+  const { confirmAction, dialog } = useConfirmDialog()
 
   const [products, setProducts] = useState<AdminProduct[]>([])
   const [pagination, setPagination] = useState({
@@ -201,9 +203,14 @@ function AdminProductsPage() {
 
   // Archive handler
   const handleArchiveProduct = async (product: AdminProduct) => {
-    if (!confirm(`Are you sure you want to archive "${product.title}"?`)) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: 'Archive this product?',
+      body: `"${product.title}" is hidden from the storefront. Existing orders keep it.`,
+      confirmLabel: 'Archive product',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await archiveProduct(product.id)
@@ -215,13 +222,14 @@ function AdminProductsPage() {
 
   // Delete handler (same as archive for soft delete)
   const handleDeleteProduct = async (product: AdminProduct) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${product.title}"? This action will archive the product.`
-      )
-    ) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: 'Delete this product?',
+      body: `"${product.title}" is archived rather than erased — it stays on past orders.`,
+      confirmLabel: 'Delete product',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await archiveProduct(product.id)
@@ -233,13 +241,14 @@ function AdminProductsPage() {
 
   // Bulk archive
   const handleBulkArchive = async (selectedProducts: AdminProduct[]) => {
-    if (
-      !confirm(
-        `Are you sure you want to archive ${selectedProducts.length} products?`
-      )
-    ) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: `Archive ${selectedProducts.length} products?`,
+      body: 'All of them are hidden from the storefront.',
+      confirmLabel: 'Archive products',
+      destructive: true,
+    })
+
+    if (!confirmed) return
 
     try {
       await Promise.all(selectedProducts.map((p) => archiveProduct(p.id)))
@@ -342,6 +351,9 @@ function AdminProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Archive, delete and bulk archive ask here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

@@ -227,6 +227,13 @@ function ActionMenu({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        /*
+         * Named, because an icon-only trigger is unreachable by name to a
+         * screen reader and to anything driving this table (#625).
+         */
+        aria-label={`Order actions for ${order.orderNumber}`}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
         className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
       >
         <MoreHorizontal className="h-4 w-4" />

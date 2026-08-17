@@ -36,6 +36,7 @@ import {
   StatsCardGrid,
   StatsCardSkeleton,
 } from "~/components/admin/StatsCard";
+import { useConfirmDialog } from "~/components/admin/useConfirm";
 
 // ============================================================================
 // Route Configuration
@@ -245,6 +246,7 @@ async function bulkModerate(
 function AdminAIModerationPage() {
   const navigate = useNavigate();
   const searchParams = Route.useSearch();
+  const { confirmAction, dialog } = useConfirmDialog();
 
   const [generations, setGenerations] = useState<AIGeneration[]>([]);
   const [stats, setStats] = useState<ModerationStats | null>(null);
@@ -404,13 +406,13 @@ function AdminAIModerationPage() {
   const handleBulkApprove = async () => {
     if (selectedGenerations.size === 0) return;
 
-    if (
-      !confirm(
-        `Are you sure you want to approve ${selectedGenerations.size} generations?`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: `Approve ${selectedGenerations.size} generations?`,
+      body: "They become available to the customers who generated them.",
+      confirmLabel: "Approve generations",
+    });
+
+    if (!confirmed) return;
 
     try {
       await bulkModerate(Array.from(selectedGenerations), "approve");
@@ -919,6 +921,9 @@ function AdminAIModerationPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk approve asks here, in the page (#625). */}
+      {dialog}
     </div>
   );
 }

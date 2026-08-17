@@ -30,6 +30,7 @@ import { z } from 'zod'
 import { Pencil, Plus, Power, PowerOff, RefreshCw, Trash2 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 // ============================================================================
 // Route configuration
@@ -223,6 +224,8 @@ export function PromotionsTable({
   onDelete,
   onEdit,
 }: PromotionsTableProps) {
+  const { confirmAction, dialog } = useConfirmDialog()
+
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm" data-testid="admin-promotions-table">
@@ -317,15 +320,18 @@ export function PromotionsTable({
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => {
+                      onClick={async () => {
                         /**
                          * Confirm first. DELETE cascades the pinned and the
                          * excluded sets, so the curation of who was in the sale
                          * and who was kept out goes with it.
                          */
-                        const confirmed = window.confirm(
-                          `Delete “${promotion.name}”? Its product and exclusion lists go with it. This cannot be undone.`
-                        )
+                        const confirmed = await confirmAction({
+                          title: `Delete “${promotion.name}”?`,
+                          body: 'Its product and exclusion lists go with it. This cannot be undone.',
+                          confirmLabel: 'Delete promotion',
+                          destructive: true,
+                        })
                         if (confirmed) onDelete(promotion)
                       }}
                       aria-label={`Delete ${promotion.name}`}
@@ -340,6 +346,9 @@ export function PromotionsTable({
           })}
         </tbody>
       </table>
+
+      {/* Delete asks here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }

@@ -30,6 +30,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
+import { useConfirmDialog } from '~/components/admin/useConfirm'
 
 // ============================================================================
 // Route Configuration
@@ -213,6 +214,7 @@ function PhotoUploadSection({
   onDelete: () => Promise<void>
   loading: boolean
 }) {
+  const { confirmAction, dialog } = useConfirmDialog()
   const [urls, setUrls] = useState<string[]>([''])
   const [sendNotification, setSendNotification] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -251,9 +253,15 @@ function PhotoUploadSection({
   }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete all photos? This action cannot be undone.')) {
-      return
-    }
+    const confirmed = await confirmAction({
+      title: 'Delete all photos?',
+      body: 'Every photo on this approval is removed. This cannot be undone.',
+      confirmLabel: 'Delete photos',
+      destructive: true,
+    })
+
+    if (!confirmed) return
+
     setDeleting(true)
     try {
       await onDelete()
@@ -375,6 +383,9 @@ function PhotoUploadSection({
           Photos cannot be uploaded in the current status.
         </p>
       )}
+
+      {/* Delete-all asks here, in the page (#625). */}
+      {dialog}
     </div>
   )
 }
