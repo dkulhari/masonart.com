@@ -33,6 +33,7 @@ import {
   Gift,
   Truck,
   Frame,
+  Factory,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -118,6 +119,20 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Returns',
     href: '/admin/returns',
     icon: RotateCcw,
+  },
+  {
+    // The supplier directory (#618). Operational, so it sits in the primary
+    // list beside Orders and Returns rather than under Settings — a vendor is
+    // someone we send work to, not a catalogue axis like a frame.
+    //
+    // This entry and `admin-nav.ts` are edited together, always: route access
+    // and visible navigation are driven by the same module, and #603 exists
+    // because that pairing was bypassed. `/admin/vendors` stays OUT of
+    // CONTENT_MANAGER_ALLOWED_PREFIXES — payables and vendor cost are admin
+    // data, matching requireAdmin on the API.
+    label: 'Vendors',
+    href: '/admin/vendors',
+    icon: Factory,
   },
   {
     label: 'AI Generations',

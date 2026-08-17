@@ -48,6 +48,32 @@ export const ADMIN_PRODUCTS_SEARCH = {
 } as const
 
 /**
+ * Rows per page for the vendor directory.
+ *
+ * Matches `DEFAULT_PAGE_SIZE` in `routes/admin/vendors.ts` on the API side, and
+ * lives here rather than in the route module so `ADMIN_VENDORS_SEARCH` below and
+ * the route's own zod default cannot drift apart.
+ */
+export const VENDOR_PAGE_SIZE = 20
+
+/**
+ * Default search params for /admin/vendors.
+ *
+ * Same contract as ADMIN_PRODUCTS_SEARCH: the route declares these as zod
+ * defaults in validateSearch, but a link from outside the route has to spell
+ * them out so the URL we push already satisfies the schema.
+ *
+ * Deliberately NOT added to CONTENT_MANAGER_ALLOWED_PREFIXES — the vendor
+ * screens carry `amountOwed` and the rate card we buy at, and the API gates them
+ * with `requireAdmin`. `tests/lib/admin-nav-vendor-role.test.ts` asserts the
+ * refusal from the other side.
+ */
+export const ADMIN_VENDORS_SEARCH = {
+  page: 1,
+  pageSize: VENDOR_PAGE_SIZE,
+} as const
+
+/**
  * Label for the staff area entry point, by role. null = not staff, show nothing.
  *
  * Content managers only get the catalog sections, so calling their entry
