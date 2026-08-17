@@ -16,7 +16,6 @@ import { z } from 'zod'
 import {
   RefreshCw,
   AlertCircle,
-  Download,
   Calendar,
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
@@ -402,14 +401,14 @@ function AdminOrdersPage() {
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
-          {/* Export Button (placeholder) */}
-          <button
-            onClick={() => alert('Export functionality coming soon')}
-            className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          {/*
+           * No Export button here on purpose (#604). The one that used to sit
+           * beside Refresh popped a native alert reading "Export functionality
+           * coming soon" — an enabled-looking control that exported nothing,
+           * behind a blocking dialog that stalls the E2E harness. It comes back
+           * when `GET /api/admin/orders/export` streams a CSV built from the
+           * filters this list is showing, so the download matches the screen.
+           */}
         </div>
       </div>
 
