@@ -81,9 +81,19 @@ export const adminAuditLog = pgTable(
       .notNull(),
 
     // ── Who ──────────────────────────────────────────────────────────────────
-    actorUserId: text("actor_user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
+    /**
+     * Deliberately NOT a foreign key (#649).
+     *
+     * It was one, ON DELETE SET NULL, until the first user deletion failed:
+     * Postgres implements SET NULL as an UPDATE on this row, and the trigger
+     * below refuses every UPDATE. An append-only ledger must not carry a
+     * constraint whose whole job is to rewrite it.
+     *
+     * So a dangling id is the intended state once an account is deleted. That is
+     * the point of the snapshot columns beside it — the row still says who acted
+     * even when the account is gone. Reads join LEFT.
+     */
+    actorUserId: text("actor_user_id"),
     /** Snapshot. Outlives the account by design. */
     actorEmail: text("actor_email"),
     /** Snapshot of the role held when the action happened, not today's. */

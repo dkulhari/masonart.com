@@ -37,10 +37,14 @@ describe('admin_audit_log table', () => {
     expect(adminAuditLog.actorRole).toBeDefined();
   });
 
-  it('never cascades the actor reference — deleting a user must not delete the evidence', () => {
-    const { foreignKeys } = getTableConfig(adminAuditLog);
-    expect(foreignKeys).toHaveLength(1);
-    expect(foreignKeys[0]?.onDelete).toBe('set null');
+  it('holds no foreign key at all, so nothing can rewrite a row (#649)', () => {
+    // It had one, ON DELETE SET NULL — and Postgres implements SET NULL as an
+    // UPDATE, which the immutability trigger refuses, so deleting any user who
+    // appeared in the log failed. An append-only table must not carry a
+    // constraint whose job is to rewrite it. A dangling actor id after an
+    // account is deleted is the intended state; that is what the snapshot
+    // columns are for.
+    expect(getTableConfig(adminAuditLog).foreignKeys).toHaveLength(0);
   });
 
   it('records what happened, to what, and how it came out', () => {
