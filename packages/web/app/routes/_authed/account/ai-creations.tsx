@@ -14,11 +14,10 @@ import {
   ArrowLeft,
   Filter,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   X,
   Plus,
 } from 'lucide-react'
+import { Pagination } from '~/components/ui/Pagination'
 import { cn } from '~/lib/utils'
 import { authApi, aiApi } from '~/lib/api'
 import { AICreationsList, type AICreation, type AICreationStatus, type AIModerationStatus } from '~/components/account/AICreationsList'
@@ -562,117 +561,12 @@ function AICreationsHistoryPage() {
                 hasNextPage={pagination.hasNextPage}
                 hasPreviousPage={pagination.hasPreviousPage}
                 onPageChange={handlePageChange}
+                activeClassName="border-purple-500 bg-purple-500 text-white"
               />
             )}
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// Pagination Component
-// ============================================================================
-
-interface PaginationProps {
-  currentPage: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  onPageChange: (page: number) => void
-}
-
-function Pagination({
-  currentPage,
-  totalPages,
-  hasNextPage,
-  hasPreviousPage,
-  onPageChange,
-}: PaginationProps) {
-  // Generate page numbers to display
-  const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = []
-    const delta = 1 // Number of pages to show on each side of current
-
-    for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        (i >= currentPage - delta && i <= currentPage + delta)
-      ) {
-        pages.push(i)
-      } else if (pages[pages.length - 1] !== 'ellipsis') {
-        pages.push('ellipsis')
-      }
-    }
-
-    return pages
-  }
-
-  const pageNumbers = getPageNumbers()
-
-  return (
-    <div className="mt-8 flex items-center justify-center gap-2">
-      {/* Previous Button */}
-      <button
-        type="button"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={!hasPreviousPage}
-        className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
-          hasPreviousPage
-            ? 'border-border bg-background text-foreground hover:bg-muted'
-            : 'cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground'
-        )}
-        aria-label="Previous page"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-
-      {/* Page Numbers */}
-      <div className="flex items-center gap-1">
-        {pageNumbers.map((page, index) =>
-          page === 'ellipsis' ? (
-            <span
-              key={`ellipsis-${index}`}
-              className="flex h-10 w-10 items-center justify-center text-muted-foreground"
-            >
-              ...
-            </span>
-          ) : (
-            <button
-              key={page}
-              type="button"
-              onClick={() => onPageChange(page)}
-              className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors',
-                page === currentPage
-                  ? 'border-purple-500 bg-purple-500 text-white'
-                  : 'border-border bg-background text-foreground hover:bg-muted'
-              )}
-            >
-              {page}
-            </button>
-          )
-        )}
-      </div>
-
-      {/* Next Button */}
-      <button
-        type="button"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={!hasNextPage}
-        className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
-          hasNextPage
-            ? 'border-border bg-background text-foreground hover:bg-muted'
-            : 'cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground'
-        )}
-        aria-label="Next page"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
     </div>
   )
 }
