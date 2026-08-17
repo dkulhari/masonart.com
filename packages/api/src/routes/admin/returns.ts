@@ -38,6 +38,17 @@ import {
   GIFT_CARD_MIN_PAISE,
   GIFT_CARD_MAX_PAISE,
 } from "@chobii/shared";
+import { recordAudit } from "../../lib/audit";
+
+/**
+ * Store credit and a card refund are both "the money came back", but they are
+ * not the same event: one issues a bearer instrument that stays on our books,
+ * the other releases cash. Finance filters on them separately.
+ */
+const auditActionFor = (refundType: string) =>
+  refundType === "store_credit"
+    ? ("return.store_credit_issued" as const)
+    : ("return.refund_processed" as const);
 import {
   requireAuth,
   requireAdmin,
@@ -518,6 +529,25 @@ adminReturnsApp.patch(
         .where(eq(returnRequests.id, returnId))
         .returning();
 
+      await recordAudit(c, {
+        action: "return.status_changed",
+        entityType: "return",
+        entityId: returnId,
+        summary: `Edited return ${returnId}${
+          updates.status ? ` → ${updates.status}` : ""
+        }`,
+        before: { status: existingResult[0]?.status ?? null },
+        after: {
+          status: updatedReturn?.status ?? null,
+          ...(updates.refundAmount !== undefined
+            ? { refundAmount: updatedReturn?.refundAmount ?? null }
+            : {}),
+          ...(updates.adminNotes !== undefined
+            ? { adminNotes: updatedReturn?.adminNotes ?? null }
+            : {}),
+        },
+      });
+
       return c.json({
         message: "Return request updated successfully",
         return: updatedReturn,
@@ -561,6 +591,17 @@ adminReturnsApp.post("/:id/approve", async (c) => {
 
     // Can only approve pending returns
     if (existing.status !== "pending") {
+      // A refused approval is evidence: "who tried to re-approve a refunded
+      // return" is exactly the question an investigation asks.
+      await recordAudit(c, {
+        action: "return.approved",
+        entityType: "return",
+        entityId: returnId,
+        outcome: "failure",
+        summary: `Refused: cannot approve a return in status '${existing.status}'`,
+        before: { status: existing.status },
+      });
+
       return c.json(
         {
           error: `Cannot approve return request with status '${existing.status}'. Only pending requests can be approved.`,
@@ -588,6 +629,16 @@ adminReturnsApp.post("/:id/approve", async (c) => {
         updatedAt: new Date(),
       })
       .where(eq(orders.id, existing.orderId));
+
+    await recordAudit(c, {
+      action: "return.approved",
+      entityType: "return",
+      entityId: returnId,
+      summary: `Approved return ${returnId} on order ${existing.orderId}`,
+      before: { status: existing.status },
+      after: { status: approvedReturn?.status ?? "approved" },
+      metadata: { orderId: existing.orderId },
+    });
 
     return c.json({
       message: "Return request approved successfully",
@@ -653,6 +704,18 @@ adminReturnsApp.post(
         .where(eq(returnRequests.id, returnId))
         .returning();
 
+      await recordAudit(c, {
+        action: "return.rejected",
+        entityType: "return",
+        entityId: returnId,
+        summary: `Rejected return ${returnId}: ${reason}`,
+        before: { status: existing.status },
+        after: {
+          status: rejectedReturn?.status ?? "rejected",
+          adminNotes: rejectedReturn?.adminNotes ?? reason,
+        },
+      });
+
       return c.json({
         message: "Return request rejected",
         return: rejectedReturn,
@@ -712,6 +775,16 @@ adminReturnsApp.post(
       // Can only process refund for approved/received returns
       const refundableStatuses: ReturnStatus[] = ["approved", "shipped_back", "received"];
       if (!refundableStatuses.includes(existing.status as ReturnStatus)) {
+        await recordAudit(c, {
+          action: auditActionFor(refundType),
+          entityType: "return",
+          entityId: returnId,
+          outcome: "failure",
+          summary: `Refused: cannot refund a return in status '${existing.status}'`,
+          before: { status: existing.status },
+          metadata: { refundAmount, refundType },
+        });
+
         return c.json(
           {
             error: `Cannot process refund for return request with status '${existing.status}'. Return must be approved first.`,
@@ -723,6 +796,15 @@ adminReturnsApp.post(
       // Validate refund amount against order total
       const orderTotal = parseFloat(existing.order.total);
       if (refundAmount > orderTotal) {
+        await recordAudit(c, {
+          action: auditActionFor(refundType),
+          entityType: "return",
+          entityId: returnId,
+          outcome: "failure",
+          summary: `Refused: refund of ${refundAmount} exceeds the order total of ${orderTotal}`,
+          metadata: { refundAmount, refundType, orderTotal, orderId: existing.orderId },
+        });
+
         return c.json(
           {
             error: `Refund amount (${refundAmount}) cannot exceed order total (${orderTotal})`,
@@ -739,6 +821,16 @@ adminReturnsApp.post(
         // have agreed to take a voucher instead of their money; substituting
         // it silently is what invites chargebacks.
         if (!existing.storeCreditAcceptedAt) {
+          await recordAudit(c, {
+            action: "return.store_credit_issued",
+            entityType: "return",
+            entityId: returnId,
+            outcome: "failure",
+            summary:
+              "Refused: store credit attempted without the customer's recorded consent",
+            metadata: { refundAmount, orderId: existing.orderId },
+          });
+
           return c.json(
             {
               error:
@@ -752,6 +844,18 @@ adminReturnsApp.post(
         // because the return leaves the refundable statuses, but a duplicate
         // here is duplicated money.
         if (existing.storeCreditGiftCardId) {
+          await recordAudit(c, {
+            action: "return.store_credit_issued",
+            entityType: "return",
+            entityId: returnId,
+            outcome: "failure",
+            summary: "Refused: store credit was already issued for this return",
+            metadata: {
+              refundAmount,
+              existingGiftCardId: existing.storeCreditGiftCardId,
+            },
+          });
+
           return c.json(
             { error: "Store credit has already been issued for this return" },
             400,
@@ -821,6 +925,28 @@ adminReturnsApp.post(
           updatedAt: now,
         })
         .where(eq(orders.id, existing.orderId));
+
+      await recordAudit(c, {
+        action: auditActionFor(refundType),
+        entityType: "return",
+        entityId: returnId,
+        summary: isStoreCredit
+          ? `Issued store credit of ${refundAmount} for return ${returnId} on order ${existing.order.orderNumber}`
+          : `Refunded ${refundAmount} (${refundType}) on return ${returnId}, order ${existing.order.orderNumber}`,
+        before: { status: existing.status, paymentStatus: null },
+        after: {
+          status: refundedReturn?.status ?? "refunded",
+          refundAmount: refundedReturn?.refundAmount ?? refundAmount.toFixed(2),
+          refundType,
+          paymentStatus: newPaymentStatus,
+          storeCreditGiftCardId,
+        },
+        metadata: {
+          orderId: existing.orderId,
+          orderNumber: existing.order.orderNumber,
+          orderTotal,
+        },
+      });
 
       return c.json({
         message: isStoreCredit
