@@ -23,10 +23,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
-import type { SQL } from 'drizzle-orm'
 import '../../setup'
 
+import type { RecordedQuery } from '../../helpers/query-recorder'
 import { productionJobs } from '../../../src/database/schema/production-jobs'
 import { vendorRates } from '../../../src/database/schema/vendors'
 
@@ -34,90 +33,15 @@ import { vendorRates } from '../../../src/database/schema/vendors'
 // Recording database mock
 // ============================================================================
 
-interface RecordedQuery {
-  op: 'select' | 'insert' | 'update' | 'delete'
-  table: string | null
-  where?: unknown
-  limit?: number
-  offset?: number
-  values?: unknown
-}
+/**
+ * `repeatLast`: requireVendor re-issues the same vendor_users scope lookup on
+ * every request, so the last queued batch has to keep answering it.
+ */
+const recorder = await vi.hoisted(async () =>
+  (await import('../../helpers/query-recorder')).createQueryRecorder({ rows: 'repeatLast' })
+)
 
-const queries: RecordedQuery[] = []
-/** Rows keyed `op:table_name`. The last batch repeats once the queue empties. */
-const rowQueues = new Map<string, unknown[][]>()
-
-function tableName(table: unknown): string {
-  try {
-    return getTableConfig(table as never).name
-  } catch {
-    return 'unknown'
-  }
-}
-
-function nextRows(rec: RecordedQuery): unknown[] {
-  const queue = rowQueues.get(`${rec.op}:${rec.table}`)
-  if (!queue || queue.length === 0) return []
-  return (queue.length === 1 ? queue[0] : queue.shift()) as unknown[]
-}
-
-function builder(op: RecordedQuery['op'], table?: unknown) {
-  const rec: RecordedQuery = {
-    op,
-    table: table === undefined ? null : tableName(table),
-  }
-  queries.push(rec)
-
-  const chain = {
-    from(t: unknown) {
-      rec.table = tableName(t)
-      return chain
-    },
-    leftJoin: () => chain,
-    innerJoin: () => chain,
-    groupBy: () => chain,
-    orderBy: () => chain,
-    returning: () => chain,
-    where(w: unknown) {
-      rec.where = w
-      return chain
-    },
-    limit(n: number) {
-      rec.limit = n
-      return chain
-    },
-    offset(n: number) {
-      rec.offset = n
-      return chain
-    },
-    set(v: unknown) {
-      rec.values = v
-      return chain
-    },
-    values(v: unknown) {
-      rec.values = v
-      return chain
-    },
-    then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
-      return Promise.resolve(nextRows(rec)).then(resolve, reject)
-    },
-  }
-
-  return chain
-}
-
-/** Function DECLARATION — `vi.mock`'s factory is hoisted above every const. */
-function makeDb() {
-  return {
-    select: () => builder('select'),
-    insert: (t: unknown) => builder('insert', t),
-    update: (t: unknown) => builder('update', t),
-    delete: (t: unknown) => builder('delete', t),
-    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(makeDb()),
-  }
-}
-
-vi.mock('../../../src/database', () => ({ db: makeDb() }))
+vi.mock('../../../src/database', () => ({ db: recorder.db }))
 
 const mockGetSession = vi.fn()
 
@@ -135,22 +59,7 @@ import { vendorApp } from '../../../src/routes/vendor'
 // Helpers
 // ============================================================================
 
-const dialect = new PgDialect()
-
-function params(condition: unknown): unknown[] {
-  return dialect.sqlToQuery(condition as SQL).params as unknown[]
-}
-
-function queueRows(rows: Record<string, unknown[][]>) {
-  for (const [key, batches] of Object.entries(rows)) {
-    rowQueues.set(key, batches.map((b) => [...b]))
-  }
-}
-
-function ops(op: RecordedQuery['op'], table: unknown): RecordedQuery[] {
-  const name = tableName(table)
-  return queries.filter((q) => q.op === op && q.table === name)
-}
+const { queries, params, queueRows, ops } = recorder
 
 const VENDOR_ID = '33333333-3333-4333-8333-333333333333'
 const JOB_ID = '22222222-2222-4222-8222-222222222222'
@@ -239,8 +148,7 @@ function expectNoCustomerData(body: unknown) {
 }
 
 beforeEach(() => {
-  queries.length = 0
-  rowQueues.clear()
+  recorder.reset()
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('vendor'))
   // The vendor_users -> vendors join requireVendor resolves the caller with.

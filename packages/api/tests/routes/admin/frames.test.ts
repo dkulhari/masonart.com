@@ -16,6 +16,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import {
+  chainReturning,
+  requestAs,
+} from '../../helpers/admin-route-harness';
 import '../../setup';
 
 const selectMock = vi.fn();
@@ -33,22 +37,9 @@ vi.mock('../../../src/database', () => ({
   },
 }));
 
-vi.mock('../../../src/middleware/auth', () => ({
-  requireAuth: vi.fn((c, next) => {
-    const header = c.req.header('X-Test-User');
-    if (!header) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', JSON.parse(header));
-    return next();
-  }),
-  requireContentManager: vi.fn((c, next) => {
-    const user = c.get('user') as { role?: string } | undefined;
-    const allowed = ['content-manager', 'admin', 'super-admin'];
-    if (!user || !allowed.includes(user.role ?? '')) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-    return next();
-  }),
-}));
+vi.mock('../../../src/middleware/auth', async () =>
+  (await import('../../helpers/admin-route-harness')).headerAuthMocks()
+);
 
 vi.mock('../../../src/lib/redis', () => ({
   getCached: vi.fn().mockResolvedValue(null),
@@ -66,32 +57,7 @@ app.route('/api/admin/frames', adminFramesApp);
 const STAFF = JSON.stringify({ id: 'u1', role: 'admin' });
 const SHOPPER = JSON.stringify({ id: 'u2', role: 'customer' });
 
-const asStaff = (path: string, init: RequestInit = {}) =>
-  app.request(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Test-User': STAFF,
-      ...(init.headers ?? {}),
-    },
-  });
-
-function chainReturning(rows: unknown[]) {
-  const chain: Record<string, unknown> = {};
-  for (const key of [
-    'from',
-    'where',
-    'set',
-    'values',
-    'orderBy',
-    'limit',
-    'returning',
-  ]) {
-    chain[key] = () => chain;
-  }
-  chain.then = (resolve: (v: unknown) => void) => resolve(rows);
-  return chain;
-}
+const asStaff = requestAs(app, STAFF);
 
 const frameRow = {
   id: 'f1',

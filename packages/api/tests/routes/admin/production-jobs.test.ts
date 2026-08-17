@@ -25,10 +25,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
-import type { SQL } from 'drizzle-orm'
 import '../../setup'
 
+import type { RecordedQuery } from '../../helpers/query-recorder'
 import {
   productionJobs,
   productionJobItems,
@@ -39,125 +38,11 @@ import {
 // Recording database mock
 // ============================================================================
 
-interface RecordedQuery {
-  op: 'select' | 'insert' | 'update' | 'delete'
-  table: string | null
-  where?: unknown
-  orderBy?: unknown
-  limit?: number
-  offset?: number
-  values?: unknown
-  /** True when the query was issued inside a db.transaction callback. */
-  inTx: boolean
-}
+const recorder = await vi.hoisted(async () =>
+  (await import('../../helpers/query-recorder')).createQueryRecorder()
+)
 
-const queries: RecordedQuery[] = []
-/** Rows to hand back, keyed `op:table_name`, consumed in call order. */
-const rowQueues = new Map<string, unknown[][]>()
-/** Keys whose NEXT execution rejects, to reproduce a partway failure. */
-const failKeys = new Set<string>()
-
-let txDepth = 0
-let txRollbacks = 0
-let txCommits = 0
-
-function tableName(table: unknown): string {
-  try {
-    return getTableConfig(table as never).name
-  } catch {
-    return 'unknown'
-  }
-}
-
-function nextRows(rec: RecordedQuery): unknown[] {
-  const queue = rowQueues.get(`${rec.op}:${rec.table}`)
-  return queue && queue.length > 0 ? (queue.shift() as unknown[]) : []
-}
-
-function builder(op: RecordedQuery['op'], table?: unknown) {
-  const rec: RecordedQuery = {
-    op,
-    table: table === undefined ? null : tableName(table),
-    inTx: txDepth > 0,
-  }
-  queries.push(rec)
-
-  const chain = {
-    from(t: unknown) {
-      rec.table = tableName(t)
-      return chain
-    },
-    leftJoin: () => chain,
-    innerJoin: () => chain,
-    groupBy: () => chain,
-    returning: () => chain,
-    orderBy(o: unknown) {
-      rec.orderBy = o
-      return chain
-    },
-    where(w: unknown) {
-      rec.where = w
-      return chain
-    },
-    limit(n: number) {
-      rec.limit = n
-      return chain
-    },
-    offset(n: number) {
-      rec.offset = n
-      return chain
-    },
-    set(v: unknown) {
-      rec.values = v
-      return chain
-    },
-    values(v: unknown) {
-      rec.values = v
-      return chain
-    },
-    then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
-      const key = `${rec.op}:${rec.table}`
-      if (failKeys.has(key)) {
-        failKeys.delete(key)
-        return Promise.reject(new Error(`injected failure on ${key}`)).then(resolve, reject)
-      }
-      return Promise.resolve(nextRows(rec)).then(resolve, reject)
-    },
-  }
-
-  return chain
-}
-
-/**
- * Function DECLARATIONS, not consts: `vi.mock`'s factory is hoisted above every
- * `const` in this file, so a factory that closes over one dies in the temporal
- * dead zone.
- */
-function makeDb() {
-  return {
-    select: () => builder('select'),
-    insert: (t: unknown) => builder('insert', t),
-    update: (t: unknown) => builder('update', t),
-    delete: (t: unknown) => builder('delete', t),
-    transaction: (fn: (tx: unknown) => Promise<unknown>) => runTransaction(fn),
-  }
-}
-
-async function runTransaction(fn: (tx: unknown) => Promise<unknown>) {
-  txDepth += 1
-  try {
-    const result = await fn(makeDb())
-    txCommits += 1
-    return result
-  } catch (error) {
-    txRollbacks += 1
-    throw error
-  } finally {
-    txDepth -= 1
-  }
-}
-
-vi.mock('../../../src/database', () => ({ db: makeDb() }))
+vi.mock('../../../src/database', () => ({ db: recorder.db }))
 
 const mockGetSession = vi.fn()
 
@@ -175,37 +60,8 @@ import { adminProductionApp } from '../../../src/routes/admin/production-jobs'
 // Helpers
 // ============================================================================
 
-const dialect = new PgDialect()
-
-function render(condition: unknown): { sql: string; params: unknown[] } {
-  const query = dialect.sqlToQuery(condition as SQL)
-  return { sql: query.sql, params: query.params as unknown[] }
-}
-
-function queueRows(rows: Record<string, unknown[][]>) {
-  for (const [key, batches] of Object.entries(rows)) {
-    rowQueues.set(key, batches.map((b) => [...b]))
-  }
-}
-
-function failNext(key: string) {
-  failKeys.add(key)
-}
-
-function selects(table: unknown): RecordedQuery[] {
-  const name = tableName(table)
-  return queries.filter((q) => q.op === 'select' && q.table === name)
-}
-
-function inserts(table: unknown): RecordedQuery[] {
-  const name = tableName(table)
-  return queries.filter((q) => q.op === 'insert' && q.table === name)
-}
-
-function updates(table: unknown): RecordedQuery[] {
-  const name = tableName(table)
-  return queries.filter((q) => q.op === 'update' && q.table === name)
-}
+const { queries, rowQueues, render, queueRows, failNext, selects, inserts, updates, tx } =
+  recorder
 
 function sessionFor(role: string) {
   const now = new Date()
@@ -297,12 +153,7 @@ function jobRow(over: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  queries.length = 0
-  rowQueues.clear()
-  failKeys.clear()
-  txDepth = 0
-  txRollbacks = 0
-  txCommits = 0
+  recorder.reset()
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('admin'))
 })
@@ -341,8 +192,8 @@ describe('POST /api/admin/production', () => {
     const itemInsert = inserts(productionJobItems)[0]
     expect(jobInsert?.inTx).toBe(true)
     expect(itemInsert?.inTx).toBe(true)
-    expect(txCommits).toBe(1)
-    expect(txRollbacks).toBe(0)
+    expect(tx.commits).toBe(1)
+    expect(tx.rollbacks).toBe(0)
 
     expect(jobInsert?.values).toMatchObject({
       orderId: ORDER_ID,
@@ -370,8 +221,8 @@ describe('POST /api/admin/production', () => {
     )
     expect(res.status).toBe(500)
 
-    expect(txRollbacks).toBe(1)
-    expect(txCommits).toBe(0)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
     // The job insert happened inside the transaction that rolled back, so it
     // never becomes a row.
     expect(inserts(productionJobs)[0]?.inTx).toBe(true)

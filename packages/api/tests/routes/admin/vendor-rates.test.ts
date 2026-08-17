@@ -24,92 +24,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
-import type { SQL } from 'drizzle-orm'
 import '../../setup'
 
+import type { RecordedQuery } from '../../helpers/query-recorder'
 import { vendorRates } from '../../../src/database/schema/vendors'
 
 // ============================================================================
 // Recording database mock
 // ============================================================================
 
-interface RecordedQuery {
-  op: 'select' | 'insert' | 'update' | 'delete'
-  table: string | null
-  where?: unknown
-  limit?: number
-  offset?: number
-  values?: unknown
-}
+const recorder = await vi.hoisted(async () =>
+  (await import('../../helpers/query-recorder')).createQueryRecorder()
+)
 
-const queries: RecordedQuery[] = []
-/** Rows to hand back, keyed `op:table_name`, consumed in call order. */
-const rowQueues = new Map<string, unknown[][]>()
-
-function tableName(table: unknown): string {
-  try {
-    return getTableConfig(table as never).name
-  } catch {
-    return 'unknown'
-  }
-}
-
-function nextRows(rec: RecordedQuery): unknown[] {
-  const queue = rowQueues.get(`${rec.op}:${rec.table}`)
-  return queue && queue.length > 0 ? (queue.shift() as unknown[]) : []
-}
-
-function builder(op: RecordedQuery['op'], table?: unknown) {
-  const rec: RecordedQuery = { op, table: table === undefined ? null : tableName(table) }
-  queries.push(rec)
-
-  const chain = {
-    from(t: unknown) {
-      rec.table = tableName(t)
-      return chain
-    },
-    leftJoin: () => chain,
-    innerJoin: () => chain,
-    orderBy: () => chain,
-    groupBy: () => chain,
-    returning: () => chain,
-    where(w: unknown) {
-      rec.where = w
-      return chain
-    },
-    limit(n: number) {
-      rec.limit = n
-      return chain
-    },
-    offset(n: number) {
-      rec.offset = n
-      return chain
-    },
-    set(v: unknown) {
-      rec.values = v
-      return chain
-    },
-    values(v: unknown) {
-      rec.values = v
-      return chain
-    },
-    then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
-      return Promise.resolve(nextRows(rec)).then(resolve, reject)
-    },
-  }
-
-  return chain
-}
-
-vi.mock('../../../src/database', () => ({
-  db: {
-    select: () => builder('select'),
-    insert: (t: unknown) => builder('insert', t),
-    update: (t: unknown) => builder('update', t),
-    delete: (t: unknown) => builder('delete', t),
-  },
-}))
+vi.mock('../../../src/database', () => ({ db: recorder.db }))
 
 const mockGetSession = vi.fn()
 
@@ -127,24 +55,7 @@ import { adminVendorRatesApp } from '../../../src/routes/admin/vendor-rates'
 // Helpers
 // ============================================================================
 
-const dialect = new PgDialect()
-
-/** The real SQL a captured drizzle condition renders to. */
-function render(condition: unknown): { sql: string; params: unknown[] } {
-  const query = dialect.sqlToQuery(condition as SQL)
-  return { sql: query.sql, params: query.params as unknown[] }
-}
-
-function queueRows(rows: Record<string, unknown[][]>) {
-  for (const [key, batches] of Object.entries(rows)) {
-    rowQueues.set(key, batches.map((b) => [...b]))
-  }
-}
-
-function ops(op: RecordedQuery['op'], table: unknown): RecordedQuery[] {
-  const name = tableName(table)
-  return queries.filter((q) => q.op === op && q.table === name)
-}
+const { queries, render, queueRows, ops } = recorder
 
 function sessionFor(role: string) {
   const now = new Date()
@@ -215,8 +126,7 @@ const json = (body: unknown, method = 'POST') => ({
 const ratesPath = `/api/admin/vendors/${VENDOR_ID}/rates`
 
 beforeEach(() => {
-  queries.length = 0
-  rowQueues.clear()
+  recorder.reset()
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('admin'))
 })
