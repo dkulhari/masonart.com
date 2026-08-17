@@ -7,6 +7,7 @@ import { checkDatabaseConnection } from "./database";
 import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
 import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
+import { requestContext, REQUEST_ID_HEADER } from "./middleware/request-context";
 import { initSentry, captureException } from "./lib/sentry";
 import { logger } from "./lib/logger";
 import { alertCritical } from "./lib/alerts";
@@ -90,15 +91,11 @@ const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:3001")
   .map((o) => o.trim());
 
 // Global middleware
-app.use("*", async (c, next) => {
-  const start = Date.now();
-  await next();
-  const duration = Date.now() - start;
-  logger.info(
-    { method: c.req.method, url: c.req.path, status: c.res.status, duration },
-    `${c.req.method} ${c.req.path} ${c.res.status} ${duration}ms`
-  );
-});
+//
+// requestContext runs FIRST and owns the request-completion log line. Every
+// downstream line and every audit row carries the same requestId, so a support
+// ticket quoting the x-request-id header resolves to one request's whole story.
+app.use("*", requestContext());
 app.use("*", secureHeaders());
 app.use("*", compress());
 app.use(
@@ -106,6 +103,9 @@ app.use(
   cors({
     origin: corsOrigins.length === 1 ? (corsOrigins[0] ?? "http://localhost:3001") : corsOrigins,
     credentials: true,
+    // Without this the browser hides the correlation id from client code, so a
+    // web-side error report cannot quote the id the API already logged.
+    exposeHeaders: [REQUEST_ID_HEADER],
   })
 );
 
@@ -390,18 +390,30 @@ app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return err.getResponse();
   }
+  const requestId = c.get("requestId" as never) as string | undefined;
+
   captureException(err, {
     url: c.req.url,
     method: c.req.method,
+    ...(requestId ? { requestId } : {}),
   });
-  logger.error({ err, url: c.req.url, method: c.req.method }, "Unhandled error");
+  logger.error(
+    { err, url: c.req.url, method: c.req.method, requestId },
+    "Unhandled error"
+  );
   alertCritical(
     "Unhandled API Error",
     `\`${c.req.method} ${c.req.path}\` threw an unhandled error:\n\`\`\`${err instanceof Error ? err.message : String(err)}\`\`\``,
-    { url: c.req.url, method: c.req.method }
+    { url: c.req.url, method: c.req.method, requestId: requestId ?? "unknown" }
   );
+  // The id goes in the body as well as the header: a user reporting a failure
+  // pastes what they can see, and a screenshot has no headers in it.
   return c.json(
-    { error: "Internal Server Error", message: "An unexpected error occurred" },
+    {
+      error: "Internal Server Error",
+      message: "An unexpected error occurred",
+      requestId: requestId ?? null,
+    },
     500
   );
 });
