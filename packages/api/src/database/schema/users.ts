@@ -59,6 +59,11 @@ export const userRoleEnum = pgEnum("user_role", [
   "content-manager",
   "admin",
   "super-admin",
+  // Appended last on purpose: Postgres enum values are ordered and drizzle-kit
+  // emits ALTER TYPE ... ADD VALUE. Inserting mid-list rewrites the type for
+  // no benefit. A vendor is NOT a weaker admin — the role grants nothing on
+  // its own; access comes from the vendor_users link plus row scoping.
+  "vendor",
 ]);
 
 /**

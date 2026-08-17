@@ -54,3 +54,6 @@ export * from "./vendors";
 
 // Production jobs, their items, QC reviews and vendor settlements
 export * from "./production-jobs";
+
+// Which vendor a vendor-role user belongs to (exactly one)
+export * from "./vendor-users";

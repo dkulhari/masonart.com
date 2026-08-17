@@ -134,6 +134,13 @@
       "when": 1786406580000,
       "tag": "0018_gift_card_delivery_index_predicate",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786406640000,
+      "tag": "0019_vendor_management_phase_1",
+      "breakpoints": true
     }
   ]
 }
