@@ -35,7 +35,7 @@ interface GalleryItem {
   createdAt: string
 }
 
-interface GalleryPageData {
+export interface GalleryPageData {
   items: GalleryItem[]
   pagination: {
     page: number
@@ -48,7 +48,7 @@ interface GalleryPageData {
 }
 
 // Search params schema for URL state
-interface GallerySearchParams {
+export interface GallerySearchParams {
   page?: number
   stylePreset?: string
   sortBy?: 'createdAt' | 'likes'

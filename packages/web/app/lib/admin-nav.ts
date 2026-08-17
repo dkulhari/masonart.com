@@ -99,6 +99,22 @@ export const ADMIN_PRODUCTION_SEARCH = {
 } as const
 
 /**
+ * Same contract as ADMIN_PRODUCTS_SEARCH, for `/admin/orders`.
+ *
+ * Added in #626, where the typecheck was pointing at a real defect: the order
+ * detail screen's Back button called `navigate({ to: '/admin/orders' })` with
+ * no search at all. The orders route declares these params as required, so the
+ * pushed URL failed its own `validateSearch` — and a throw in `validateSearch`
+ * error-boundaries the route to a blank page instead of a message.
+ */
+export const ADMIN_ORDERS_SEARCH = {
+  page: 1,
+  pageSize: 20,
+  sortBy: 'createdAt',
+  sortOrder: 'desc',
+} as const
+
+/**
  * Label for the staff area entry point, by role. null = not staff, show nothing.
  *
  * Content managers only get the catalog sections, so calling their entry

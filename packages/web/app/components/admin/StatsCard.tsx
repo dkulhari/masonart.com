@@ -37,6 +37,12 @@ export interface StatsCardProps {
   className?: string
   /** Optional link destination */
   href?: string
+  /**
+   * Makes the tile a filter control. Rendered as a real `<button>` (#626) —
+   * the AI moderation tiles passed this for months while the prop was
+   * undeclared, so React dropped it and clicking them did nothing.
+   */
+  onClick?: () => void
   /** Compact mode for smaller displays */
   compact?: boolean
 }
@@ -132,6 +138,7 @@ export function StatsCard({
   isLoading = false,
   className,
   href,
+  onClick,
   compact = false,
 }: StatsCardProps) {
   const styles = variantStyles[variant]
@@ -143,7 +150,7 @@ export function StatsCard({
     <div
       className={cn(
         'rounded-xl border border-border bg-card transition-all',
-        href && 'cursor-pointer hover:border-brand-200 hover:shadow-sm',
+        (href || onClick) && 'cursor-pointer hover:border-brand-200 hover:shadow-sm',
         compact ? 'p-4' : 'p-5 sm:p-6',
         className
       )}
@@ -224,6 +231,19 @@ export function StatsCard({
 
   if (href) {
     return <a href={href}>{content}</a>
+  }
+
+  /*
+   * A button, not a div with a handler: these tiles are the only way to filter
+   * the queue they sit above, and a div is unreachable by keyboard and silent
+   * to a screen reader.
+   */
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="w-full text-left">
+        {content}
+      </button>
+    )
   }
 
   return content

@@ -535,28 +535,28 @@ function AdminAIModerationPage() {
             <StatsCard
               title="Pending Review"
               value={stats.pending_review}
-              icon={<Clock className="h-5 w-5" />}
+              icon={Clock}
               variant="warning"
               onClick={() => updateSearch({ status: "pending_review" })}
             />
             <StatsCard
               title="Approved"
               value={stats.approved}
-              icon={<CheckCircle2 className="h-5 w-5" />}
+              icon={CheckCircle2}
               variant="success"
               onClick={() => updateSearch({ status: "approved" })}
             />
             <StatsCard
               title="Rejected"
               value={stats.rejected}
-              icon={<XCircle className="h-5 w-5" />}
+              icon={XCircle}
               variant="danger"
               onClick={() => updateSearch({ status: "rejected" })}
             />
             <StatsCard
               title="Flagged"
               value={stats.flagged}
-              icon={<Flag className="h-5 w-5" />}
+              icon={Flag}
               variant="warning"
               onClick={() => updateSearch({ status: "flagged" })}
             />
@@ -767,9 +767,10 @@ function AdminAIModerationPage() {
                   </div>
 
                   {/* Risk score if flagged */}
-                  {generation.moderationResult?.riskScore > 0 && (
+                  {(generation.moderationResult?.riskScore ?? 0) > 0 && (
                     <div className="text-xs text-orange-600">
-                      Risk Score: {(generation.moderationResult.riskScore * 100).toFixed(0)}%
+                      Risk Score:{" "}
+                      {((generation.moderationResult?.riskScore ?? 0) * 100).toFixed(0)}%
                     </div>
                   )}
 

@@ -68,9 +68,14 @@ function getQueryClient() {
 }
 
 /**
- * Router context interface containing authenticated user session
+ * Router context interface containing authenticated user session.
+ *
+ * Exported because the package emits declarations (`composite: true`), and
+ * every route's exported `Route` has this type in its signature — an
+ * unexported one means tsc cannot name it and reports TS4023 on each of them
+ * (#626). Nothing else needs to import it.
  */
-interface RouterContext {
+export interface RouterContext {
   session: Session | null
   /**
    * The free-shipping threshold in force, in whole rupees (#570).

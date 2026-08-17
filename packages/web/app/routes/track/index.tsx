@@ -24,9 +24,8 @@ import {
   Phone,
   Hash,
 } from 'lucide-react'
-import { cn, formatDate } from '~/lib/utils'
-import { trackingApi, type GuestOrderLookupResponse, type ShipmentStatus } from '~/lib/api'
-import { TrackingStatusBadge } from '~/components/order/TrackingStatusBadge'
+import { cn } from '~/lib/utils'
+import { trackingApi, type GuestOrderLookupResponse } from '~/lib/api'
 import { TrackingTimeline } from '~/components/order/TrackingTimeline'
 
 // ============================================================================

@@ -14,6 +14,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import { getApiUrl } from '~/lib/utils'
 import { ProductForm, type ProductFormData } from '~/components/admin/ProductForm'
+import { ADMIN_PRODUCTS_SEARCH } from '~/lib/admin-nav'
 
 // ============================================================================
 // Route Configuration
@@ -135,7 +136,7 @@ function NewProductPage() {
 
       // Redirect to products list after a short delay
       setTimeout(() => {
-        navigate({ to: '/admin/products' })
+        navigate({ to: '/admin/products', search: ADMIN_PRODUCTS_SEARCH })
       }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create product')
@@ -145,7 +146,7 @@ function NewProductPage() {
 
   // Handle cancel
   const handleCancel = () => {
-    navigate({ to: '/admin/products' })
+    navigate({ to: '/admin/products', search: ADMIN_PRODUCTS_SEARCH })
   }
 
   return (

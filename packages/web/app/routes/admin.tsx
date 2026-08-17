@@ -48,7 +48,15 @@ export const Route = createFileRoute('/admin')({
       })
     }
 
-    const userRole = context.session.user.role?.toLowerCase()
+    /*
+     * Same narrowing the component does below, and for the same reason: Better
+     * Auth's inferred session user has no `role`, the field comes from the
+     * additionalFields config. Doing it here too means the authorization
+     * decision is made against a declared shape rather than an untyped read
+     * (#626).
+     */
+    const sessionUser = context.session.user as User
+    const userRole = sessionUser.role?.toLowerCase()
     const isAdminRole = userRole === 'admin' || userRole === 'super-admin'
     const isContentManagerRole = userRole === 'content-manager'
 

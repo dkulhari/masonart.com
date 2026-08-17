@@ -26,7 +26,7 @@ import { useConfirmDialog } from '~/components/admin/useConfirm'
 // Route Configuration
 // ============================================================================
 
-const searchParamsSchema = z.object({
+export const searchParamsSchema = z.object({
   page: z.coerce.number().positive().optional().default(1),
   pageSize: z.coerce.number().positive().max(100).optional().default(20),
   status: z
@@ -301,12 +301,18 @@ function AdminOrdersPage() {
     loadStats()
   }
 
-  // Update URL params
+  /*
+   * Update URL params, merging onto the route's own search rather than the
+   * reducer's `prev` (#626). TanStack types the reducer argument as the union
+   * of every route's search params — every field optional, since another route
+   * might not have it — so a reducer written against this route's shape does
+   * not typecheck. `Route.useSearch()` is the same value, already narrowed.
+   */
   const updateSearch = (updates: Partial<SearchParams>) => {
     navigate({
       to: '/admin/orders',
-      search: (prev: SearchParams) => ({
-        ...prev,
+      search: {
+        ...searchParams,
         ...updates,
         page:
           updates.page ||
@@ -314,8 +320,8 @@ function AdminOrdersPage() {
           updates.paymentStatus !== undefined ||
           updates.search !== undefined
             ? 1
-            : prev.page),
-      }),
+            : searchParams.page),
+      },
     })
   }
 

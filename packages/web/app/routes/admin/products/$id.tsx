@@ -28,6 +28,7 @@ import {
   type ProductVariant,
 } from '~/components/admin/ProductForm'
 import { useConfirmDialog } from '~/components/admin/useConfirm'
+import { ADMIN_PRODUCTS_SEARCH } from '~/lib/admin-nav'
 
 // ============================================================================
 // Route Configuration
@@ -343,7 +344,7 @@ function EditProductPage() {
 
   // Handle cancel
   const handleCancel = () => {
-    navigate({ to: '/admin/products' })
+    navigate({ to: '/admin/products', search: ADMIN_PRODUCTS_SEARCH })
   }
 
   // Handle archive
@@ -361,7 +362,7 @@ function EditProductPage() {
 
     try {
       await archiveProduct(id)
-      navigate({ to: '/admin/products' })
+      navigate({ to: '/admin/products', search: ADMIN_PRODUCTS_SEARCH })
     } catch (err) {
       setError('Failed to archive product. Please try again.')
     }
@@ -381,7 +382,7 @@ function EditProductPage() {
           The product you&apos;re looking for doesn&apos;t exist or has been removed.
         </p>
         <button
-          onClick={() => navigate({ to: '/admin/products' })}
+          onClick={() => navigate({ to: '/admin/products', search: ADMIN_PRODUCTS_SEARCH })}
           className="mt-6 flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 text-sm font-medium text-white hover:bg-brand-600"
         >
           <ArrowLeft className="h-4 w-4" />

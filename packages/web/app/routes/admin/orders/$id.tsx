@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
+import { ADMIN_ORDERS_SEARCH } from '~/lib/admin-nav'
 import {
   OrderDetail,
   OrderDetailSkeleton,
@@ -225,7 +226,7 @@ function AdminOrderDetailPage() {
 
   // Handle back navigation
   const handleBack = () => {
-    navigate({ to: '/admin/orders' })
+    navigate({ to: '/admin/orders', search: ADMIN_ORDERS_SEARCH })
   }
 
   // Handle refresh
