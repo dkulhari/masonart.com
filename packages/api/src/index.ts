@@ -8,6 +8,7 @@ import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
 import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
 import { requestContext, REQUEST_ID_HEADER } from "./middleware/request-context";
+import { auditRequests } from "./middleware/audit";
 import { initSentry, captureException } from "./lib/sentry";
 import { logger } from "./lib/logger";
 import { alertCritical } from "./lib/alerts";
@@ -212,6 +213,17 @@ app.route("/api/approvals", approvalsApp);
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
 // ============================================================================
+
+// The audit floor. Mounted BEFORE every admin and vendor router so that any
+// mutating request through either tree lands a row, whether or not its handler
+// remembered to call recordAudit. Handlers that do call it claim the request and
+// this middleware stays quiet — see middleware/audit.ts.
+//
+// Deliberately mounted here rather than inside each router: the gap this closes
+// is a route nobody instrumented, and per-router opt-in reproduces exactly that
+// failure mode.
+app.use("/api/admin/*", auditRequests());
+app.use("/api/vendor/*", auditRequests());
 
 // Admin Products API - CRUD for products
 app.route("/api/admin/products", adminProductsApp);

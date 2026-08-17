@@ -169,11 +169,23 @@ export interface AuditEntryInput {
 }
 
 /**
- * The subset of a Hono context this module reads. Declared structurally so a
+ * The subset of a Hono context this module reads.
+ *
+ * Declared structurally rather than as `Pick<Context, …>` for two reasons: a
  * caller inside a queue or a script can hand over a stub instead of faking a
- * whole request.
+ * whole request, and — the reason it is written this way — `Context` is generic
+ * over its Variables map, so a `Pick` of the default instantiation refuses every
+ * route that declares its own variables.
  */
-type AuditContext = Pick<Context, "get" | "set" | "req">;
+interface AuditContext {
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+  req: {
+    method: string;
+    path: string;
+    header(name: string): string | undefined;
+  };
+}
 
 /** The insert surface shared by `db` and a drizzle transaction handle. */
 type AuditWriter = { insert: typeof db.insert };
@@ -207,13 +219,13 @@ export async function recordAudit(
 ): Promise<void> {
   // Set before the write: if the insert fails we still do not want the
   // middleware writing a misleading `admin.request` row in its place.
-  c.set("audited" as never, true as never);
+  c.set("audited", true);
 
-  const user = c.get("user" as never) as
+  const user = c.get("user") as
     | { id?: string; email?: string; role?: string }
     | null
     | undefined;
-  const requestId = (c.get("requestId" as never) as string | undefined) ?? null;
+  const requestId = (c.get("requestId") as string | undefined) ?? null;
 
   try {
     const writer = tx ?? db;
@@ -236,7 +248,7 @@ export async function recordAudit(
         ...(entry.metadata ?? {}),
       }) as never,
       requestId,
-      ipAddress: getClientIp(c as Context),
+      ipAddress: getClientIp(c as unknown as Context),
       userAgent: c.req.header("user-agent") ?? null,
     });
   } catch (error) {
