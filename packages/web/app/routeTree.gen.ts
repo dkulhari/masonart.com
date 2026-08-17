@@ -22,6 +22,7 @@ import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SaleRouteImport } from './routes/sale'
 import { Route as ShippingRouteImport } from './routes/shipping'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as VendorRouteImport } from './routes/vendor'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderation'
@@ -45,6 +46,9 @@ import { Route as PostersIndexRouteImport } from './routes/posters/index'
 import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
 import { Route as TrackIndexRouteImport } from './routes/track/index'
 import { Route as TrackTokenRouteImport } from './routes/track/$token'
+import { Route as VendorIndexRouteImport } from './routes/vendor/index'
+import { Route as VendorPaymentsRouteImport } from './routes/vendor/payments'
+import { Route as VendorRatesRouteImport } from './routes/vendor/rates'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
 import { Route as AuthedAccountAddressesRouteImport } from './routes/_authed/account/addresses'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
@@ -63,8 +67,8 @@ import { Route as AdminGiftCardsIndexRouteImport } from './routes/admin/gift-car
 import { Route as AdminGiftCardsIdRouteImport } from './routes/admin/gift-cards/$id'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
-import { Route as AdminProductionIdRouteImport } from './routes/admin/production/$id'
 import { Route as AdminProductionIndexRouteImport } from './routes/admin/production/index'
+import { Route as AdminProductionIdRouteImport } from './routes/admin/production/$id'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
@@ -73,6 +77,7 @@ import { Route as AdminPromotionsIdRouteImport } from './routes/admin/promotions
 import { Route as AdminVendorsIndexRouteImport } from './routes/admin/vendors/index'
 import { Route as AdminVendorsIdRouteImport } from './routes/admin/vendors/$id'
 import { Route as AdminVendorsNewRouteImport } from './routes/admin/vendors/new'
+import { Route as VendorJobsIdRouteImport } from './routes/vendor/jobs/$id'
 import { Route as AuthedAccountOrdersIndexRouteImport } from './routes/_authed/account/orders.index'
 import { Route as AuthedAccountOrdersIdIndexRouteImport } from './routes/_authed/account/orders.$id.index'
 import { Route as AuthedAccountOrdersIdReturnRouteImport } from './routes/_authed/account/orders.$id.return'
@@ -139,6 +144,11 @@ const ShippingRoute = ShippingRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorRoute = VendorRouteImport.update({
+  id: '/vendor',
+  path: '/vendor',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WishlistRoute = WishlistRouteImport.update({
@@ -256,6 +266,21 @@ const TrackTokenRoute = TrackTokenRouteImport.update({
   path: '/track/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VendorIndexRoute = VendorIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => VendorRoute,
+} as any)
+const VendorPaymentsRoute = VendorPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => VendorRoute,
+} as any)
+const VendorRatesRoute = VendorRatesRouteImport.update({
+  id: '/rates',
+  path: '/rates',
+  getParentRoute: () => VendorRoute,
+} as any)
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   id: '/account/',
   path: '/account/',
@@ -348,14 +373,14 @@ const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminProductionIdRoute = AdminProductionIdRouteImport.update({
-  id: '/production/$id',
-  path: '/production/$id',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminProductionIndexRoute = AdminProductionIndexRouteImport.update({
   id: '/production/',
   path: '/production/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProductionIdRoute = AdminProductionIdRouteImport.update({
+  id: '/production/$id',
+  path: '/production/$id',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
@@ -398,6 +423,11 @@ const AdminVendorsNewRoute = AdminVendorsNewRouteImport.update({
   path: '/vendors/new',
   getParentRoute: () => AdminRoute,
 } as any)
+const VendorJobsIdRoute = VendorJobsIdRouteImport.update({
+  id: '/jobs/$id',
+  path: '/jobs/$id',
+  getParentRoute: () => VendorRoute,
+} as any)
 const AuthedAccountOrdersIndexRoute =
   AuthedAccountOrdersIndexRouteImport.update({
     id: '/account/orders/',
@@ -430,6 +460,7 @@ export interface FileRoutesByFullPath {
   '/sale': typeof SaleRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
+  '/vendor': typeof VendorRouteWithChildren
   '/wishlist': typeof WishlistRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
@@ -445,6 +476,8 @@ export interface FileRoutesByFullPath {
   '/collections/$slug': typeof CollectionsSlugRoute
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
+  '/vendor/payments': typeof VendorPaymentsRoute
+  '/vendor/rates': typeof VendorRatesRoute
   '/admin/': typeof AdminIndexRoute
   '/cart/': typeof CartIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
@@ -453,6 +486,7 @@ export interface FileRoutesByFullPath {
   '/gift-cards/': typeof GiftCardsIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/track/': typeof TrackIndexRoute
+  '/vendor/': typeof VendorIndexRoute
   '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
@@ -465,18 +499,19 @@ export interface FileRoutesByFullPath {
   '/admin/frames/new': typeof AdminFramesNewRoute
   '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
+  '/admin/production/$id': typeof AdminProductionIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/admin/promotions/$id': typeof AdminPromotionsIdRoute
   '/admin/vendors/$id': typeof AdminVendorsIdRoute
   '/admin/vendors/new': typeof AdminVendorsNewRoute
+  '/vendor/jobs/$id': typeof VendorJobsIdRoute
   '/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
-  '/admin/production/$id': typeof AdminProductionIdRoute
   '/admin/production/': typeof AdminProductionIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/admin/promotions/': typeof AdminPromotionsIndexRoute
@@ -512,6 +547,8 @@ export interface FileRoutesByTo {
   '/collections/$slug': typeof CollectionsSlugRoute
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
+  '/vendor/payments': typeof VendorPaymentsRoute
+  '/vendor/rates': typeof VendorRatesRoute
   '/admin': typeof AdminIndexRoute
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
@@ -520,6 +557,7 @@ export interface FileRoutesByTo {
   '/gift-cards': typeof GiftCardsIndexRoute
   '/posters': typeof PostersIndexRoute
   '/track': typeof TrackIndexRoute
+  '/vendor': typeof VendorIndexRoute
   '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
@@ -532,18 +570,19 @@ export interface FileRoutesByTo {
   '/admin/frames/new': typeof AdminFramesNewRoute
   '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
+  '/admin/production/$id': typeof AdminProductionIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/admin/promotions/$id': typeof AdminPromotionsIdRoute
   '/admin/vendors/$id': typeof AdminVendorsIdRoute
   '/admin/vendors/new': typeof AdminVendorsNewRoute
+  '/vendor/jobs/$id': typeof VendorJobsIdRoute
   '/account': typeof AuthedAccountIndexRoute
   '/admin/approvals': typeof AdminApprovalsIndexRoute
   '/admin/collections': typeof AdminCollectionsIndexRoute
   '/admin/frames': typeof AdminFramesIndexRoute
   '/admin/gift-cards': typeof AdminGiftCardsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
-  '/admin/production/$id': typeof AdminProductionIdRoute
   '/admin/production': typeof AdminProductionIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
   '/admin/promotions': typeof AdminPromotionsIndexRoute
@@ -567,6 +606,7 @@ export interface FileRoutesById {
   '/sale': typeof SaleRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
+  '/vendor': typeof VendorRouteWithChildren
   '/wishlist': typeof WishlistRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
@@ -582,6 +622,8 @@ export interface FileRoutesById {
   '/collections/$slug': typeof CollectionsSlugRoute
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
+  '/vendor/payments': typeof VendorPaymentsRoute
+  '/vendor/rates': typeof VendorRatesRoute
   '/admin/': typeof AdminIndexRoute
   '/cart/': typeof CartIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
@@ -590,6 +632,7 @@ export interface FileRoutesById {
   '/gift-cards/': typeof GiftCardsIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/track/': typeof TrackIndexRoute
+  '/vendor/': typeof VendorIndexRoute
   '/_authed/account/addresses': typeof AuthedAccountAddressesRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/_authed/account/notifications': typeof AuthedAccountNotificationsRoute
@@ -602,18 +645,19 @@ export interface FileRoutesById {
   '/admin/frames/new': typeof AdminFramesNewRoute
   '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
+  '/admin/production/$id': typeof AdminProductionIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/admin/promotions/$id': typeof AdminPromotionsIdRoute
   '/admin/vendors/$id': typeof AdminVendorsIdRoute
   '/admin/vendors/new': typeof AdminVendorsNewRoute
+  '/vendor/jobs/$id': typeof VendorJobsIdRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
-  '/admin/production/$id': typeof AdminProductionIdRoute
   '/admin/production/': typeof AdminProductionIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/admin/promotions/': typeof AdminPromotionsIndexRoute
@@ -637,6 +681,7 @@ export interface FileRouteTypes {
     | '/sale'
     | '/shipping'
     | '/terms'
+    | '/vendor'
     | '/wishlist'
     | '/admin/ai-moderation'
     | '/admin/customers'
@@ -652,6 +697,8 @@ export interface FileRouteTypes {
     | '/collections/$slug'
     | '/posters/$slug'
     | '/track/$token'
+    | '/vendor/payments'
+    | '/vendor/rates'
     | '/admin/'
     | '/cart/'
     | '/checkout/'
@@ -660,6 +707,7 @@ export interface FileRouteTypes {
     | '/gift-cards/'
     | '/posters/'
     | '/track/'
+    | '/vendor/'
     | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
@@ -672,18 +720,19 @@ export interface FileRouteTypes {
     | '/admin/frames/new'
     | '/admin/gift-cards/$id'
     | '/admin/orders/$id'
+    | '/admin/production/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/admin/promotions/$id'
     | '/admin/vendors/$id'
     | '/admin/vendors/new'
+    | '/vendor/jobs/$id'
     | '/account/'
     | '/admin/approvals/'
     | '/admin/collections/'
     | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
-    | '/admin/production/$id'
     | '/admin/production/'
     | '/admin/products/'
     | '/admin/promotions/'
@@ -719,6 +768,8 @@ export interface FileRouteTypes {
     | '/collections/$slug'
     | '/posters/$slug'
     | '/track/$token'
+    | '/vendor/payments'
+    | '/vendor/rates'
     | '/admin'
     | '/cart'
     | '/checkout'
@@ -727,6 +778,7 @@ export interface FileRouteTypes {
     | '/gift-cards'
     | '/posters'
     | '/track'
+    | '/vendor'
     | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
@@ -739,18 +791,19 @@ export interface FileRouteTypes {
     | '/admin/frames/new'
     | '/admin/gift-cards/$id'
     | '/admin/orders/$id'
+    | '/admin/production/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/admin/promotions/$id'
     | '/admin/vendors/$id'
     | '/admin/vendors/new'
+    | '/vendor/jobs/$id'
     | '/account'
     | '/admin/approvals'
     | '/admin/collections'
     | '/admin/frames'
     | '/admin/gift-cards'
     | '/admin/orders'
-    | '/admin/production/$id'
     | '/admin/production'
     | '/admin/products'
     | '/admin/promotions'
@@ -773,6 +826,7 @@ export interface FileRouteTypes {
     | '/sale'
     | '/shipping'
     | '/terms'
+    | '/vendor'
     | '/wishlist'
     | '/admin/ai-moderation'
     | '/admin/customers'
@@ -788,6 +842,8 @@ export interface FileRouteTypes {
     | '/collections/$slug'
     | '/posters/$slug'
     | '/track/$token'
+    | '/vendor/payments'
+    | '/vendor/rates'
     | '/admin/'
     | '/cart/'
     | '/checkout/'
@@ -796,6 +852,7 @@ export interface FileRouteTypes {
     | '/gift-cards/'
     | '/posters/'
     | '/track/'
+    | '/vendor/'
     | '/_authed/account/addresses'
     | '/_authed/account/ai-creations'
     | '/_authed/account/notifications'
@@ -808,18 +865,19 @@ export interface FileRouteTypes {
     | '/admin/frames/new'
     | '/admin/gift-cards/$id'
     | '/admin/orders/$id'
+    | '/admin/production/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/admin/promotions/$id'
     | '/admin/vendors/$id'
     | '/admin/vendors/new'
+    | '/vendor/jobs/$id'
     | '/_authed/account/'
     | '/admin/approvals/'
     | '/admin/collections/'
     | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
-    | '/admin/production/$id'
     | '/admin/production/'
     | '/admin/products/'
     | '/admin/promotions/'
@@ -843,6 +901,7 @@ export interface RootRouteChildren {
   SaleRoute: typeof SaleRoute
   ShippingRoute: typeof ShippingRoute
   TermsRoute: typeof TermsRoute
+  VendorRoute: typeof VendorRouteWithChildren
   WishlistRoute: typeof WishlistRoute
   ApproveTokenRoute: typeof ApproveTokenRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
@@ -953,6 +1012,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor': {
+      id: '/vendor'
+      path: '/vendor'
+      fullPath: '/vendor'
+      preLoaderRoute: typeof VendorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wishlist': {
@@ -1116,6 +1182,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrackTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vendor/': {
+      id: '/vendor/'
+      path: '/'
+      fullPath: '/vendor/'
+      preLoaderRoute: typeof VendorIndexRouteImport
+      parentRoute: typeof VendorRoute
+    }
+    '/vendor/payments': {
+      id: '/vendor/payments'
+      path: '/payments'
+      fullPath: '/vendor/payments'
+      preLoaderRoute: typeof VendorPaymentsRouteImport
+      parentRoute: typeof VendorRoute
+    }
+    '/vendor/rates': {
+      id: '/vendor/rates'
+      path: '/rates'
+      fullPath: '/vendor/rates'
+      preLoaderRoute: typeof VendorRatesRouteImport
+      parentRoute: typeof VendorRoute
+    }
     '/_authed/account/': {
       id: '/_authed/account/'
       path: '/account'
@@ -1242,18 +1329,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIdRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/production/$id': {
-      id: '/admin/production/$id'
-      path: '/production/$id'
-      fullPath: '/admin/production/$id'
-      preLoaderRoute: typeof AdminProductionIdRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/production/': {
       id: '/admin/production/'
       path: '/production'
       fullPath: '/admin/production/'
       preLoaderRoute: typeof AdminProductionIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/production/$id': {
+      id: '/admin/production/$id'
+      path: '/production/$id'
+      fullPath: '/admin/production/$id'
+      preLoaderRoute: typeof AdminProductionIdRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/products/': {
@@ -1311,6 +1398,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/vendors/new'
       preLoaderRoute: typeof AdminVendorsNewRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/vendor/jobs/$id': {
+      id: '/vendor/jobs/$id'
+      path: '/jobs/$id'
+      fullPath: '/vendor/jobs/$id'
+      preLoaderRoute: typeof VendorJobsIdRouteImport
+      parentRoute: typeof VendorRoute
     }
     '/_authed/account/orders/': {
       id: '/_authed/account/orders/'
@@ -1377,6 +1471,7 @@ interface AdminRouteChildren {
   AdminFramesNewRoute: typeof AdminFramesNewRoute
   AdminGiftCardsIdRoute: typeof AdminGiftCardsIdRoute
   AdminOrdersIdRoute: typeof AdminOrdersIdRoute
+  AdminProductionIdRoute: typeof AdminProductionIdRoute
   AdminProductsIdRoute: typeof AdminProductsIdRoute
   AdminProductsNewRoute: typeof AdminProductsNewRoute
   AdminPromotionsIdRoute: typeof AdminPromotionsIdRoute
@@ -1387,7 +1482,6 @@ interface AdminRouteChildren {
   AdminFramesIndexRoute: typeof AdminFramesIndexRoute
   AdminGiftCardsIndexRoute: typeof AdminGiftCardsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
-  AdminProductionIdRoute: typeof AdminProductionIdRoute
   AdminProductionIndexRoute: typeof AdminProductionIndexRoute
   AdminProductsIndexRoute: typeof AdminProductsIndexRoute
   AdminPromotionsIndexRoute: typeof AdminPromotionsIndexRoute
@@ -1408,6 +1502,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFramesNewRoute: AdminFramesNewRoute,
   AdminGiftCardsIdRoute: AdminGiftCardsIdRoute,
   AdminOrdersIdRoute: AdminOrdersIdRoute,
+  AdminProductionIdRoute: AdminProductionIdRoute,
   AdminProductsIdRoute: AdminProductsIdRoute,
   AdminProductsNewRoute: AdminProductsNewRoute,
   AdminPromotionsIdRoute: AdminPromotionsIdRoute,
@@ -1418,7 +1513,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFramesIndexRoute: AdminFramesIndexRoute,
   AdminGiftCardsIndexRoute: AdminGiftCardsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
-  AdminProductionIdRoute: AdminProductionIdRoute,
   AdminProductionIndexRoute: AdminProductionIndexRoute,
   AdminProductsIndexRoute: AdminProductsIndexRoute,
   AdminPromotionsIndexRoute: AdminPromotionsIndexRoute,
@@ -1426,6 +1520,23 @@ const AdminRouteChildren: AdminRouteChildren = {
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface VendorRouteChildren {
+  VendorPaymentsRoute: typeof VendorPaymentsRoute
+  VendorRatesRoute: typeof VendorRatesRoute
+  VendorIndexRoute: typeof VendorIndexRoute
+  VendorJobsIdRoute: typeof VendorJobsIdRoute
+}
+
+const VendorRouteChildren: VendorRouteChildren = {
+  VendorPaymentsRoute: VendorPaymentsRoute,
+  VendorRatesRoute: VendorRatesRoute,
+  VendorIndexRoute: VendorIndexRoute,
+  VendorJobsIdRoute: VendorJobsIdRoute,
+}
+
+const VendorRouteWithChildren =
+  VendorRoute._addFileChildren(VendorRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -1441,6 +1552,7 @@ const rootRouteChildren: RootRouteChildren = {
   SaleRoute: SaleRoute,
   ShippingRoute: ShippingRoute,
   TermsRoute: TermsRoute,
+  VendorRoute: VendorRouteWithChildren,
   WishlistRoute: WishlistRoute,
   ApproveTokenRoute: ApproveTokenRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
