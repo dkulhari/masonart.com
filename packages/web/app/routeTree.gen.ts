@@ -57,6 +57,7 @@ import { Route as AuthedAccountSettingsRouteImport } from './routes/_authed/acco
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
 import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$id'
+import { Route as AdminAuditLogIndexRouteImport } from './routes/admin/audit-log/index'
 import { Route as AdminCollectionsIndexRouteImport } from './routes/admin/collections/index'
 import { Route as AdminCollectionsIdRouteImport } from './routes/admin/collections/$id'
 import { Route as AdminCollectionsNewRouteImport } from './routes/admin/collections/new'
@@ -323,6 +324,11 @@ const AdminApprovalsIdRoute = AdminApprovalsIdRouteImport.update({
   path: '/approvals/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuditLogIndexRoute = AdminAuditLogIndexRouteImport.update({
+  id: '/audit-log/',
+  path: '/audit-log/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCollectionsIndexRoute = AdminCollectionsIndexRouteImport.update({
   id: '/collections/',
   path: '/collections/',
@@ -508,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/vendor/jobs/$id': typeof VendorJobsIdRoute
   '/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
+  '/admin/audit-log/': typeof AdminAuditLogIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
@@ -579,6 +586,7 @@ export interface FileRoutesByTo {
   '/vendor/jobs/$id': typeof VendorJobsIdRoute
   '/account': typeof AuthedAccountIndexRoute
   '/admin/approvals': typeof AdminApprovalsIndexRoute
+  '/admin/audit-log': typeof AdminAuditLogIndexRoute
   '/admin/collections': typeof AdminCollectionsIndexRoute
   '/admin/frames': typeof AdminFramesIndexRoute
   '/admin/gift-cards': typeof AdminGiftCardsIndexRoute
@@ -654,6 +662,7 @@ export interface FileRoutesById {
   '/vendor/jobs/$id': typeof VendorJobsIdRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
+  '/admin/audit-log/': typeof AdminAuditLogIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
@@ -729,6 +738,7 @@ export interface FileRouteTypes {
     | '/vendor/jobs/$id'
     | '/account/'
     | '/admin/approvals/'
+    | '/admin/audit-log/'
     | '/admin/collections/'
     | '/admin/frames/'
     | '/admin/gift-cards/'
@@ -800,6 +810,7 @@ export interface FileRouteTypes {
     | '/vendor/jobs/$id'
     | '/account'
     | '/admin/approvals'
+    | '/admin/audit-log'
     | '/admin/collections'
     | '/admin/frames'
     | '/admin/gift-cards'
@@ -874,6 +885,7 @@ export interface FileRouteTypes {
     | '/vendor/jobs/$id'
     | '/_authed/account/'
     | '/admin/approvals/'
+    | '/admin/audit-log/'
     | '/admin/collections/'
     | '/admin/frames/'
     | '/admin/gift-cards/'
@@ -1259,6 +1271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApprovalsIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/audit-log/': {
+      id: '/admin/audit-log/'
+      path: '/audit-log'
+      fullPath: '/admin/audit-log/'
+      preLoaderRoute: typeof AdminAuditLogIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/collections/': {
       id: '/admin/collections/'
       path: '/collections'
@@ -1478,6 +1497,7 @@ interface AdminRouteChildren {
   AdminVendorsIdRoute: typeof AdminVendorsIdRoute
   AdminVendorsNewRoute: typeof AdminVendorsNewRoute
   AdminApprovalsIndexRoute: typeof AdminApprovalsIndexRoute
+  AdminAuditLogIndexRoute: typeof AdminAuditLogIndexRoute
   AdminCollectionsIndexRoute: typeof AdminCollectionsIndexRoute
   AdminFramesIndexRoute: typeof AdminFramesIndexRoute
   AdminGiftCardsIndexRoute: typeof AdminGiftCardsIndexRoute
@@ -1509,6 +1529,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminVendorsIdRoute: AdminVendorsIdRoute,
   AdminVendorsNewRoute: AdminVendorsNewRoute,
   AdminApprovalsIndexRoute: AdminApprovalsIndexRoute,
+  AdminAuditLogIndexRoute: AdminAuditLogIndexRoute,
   AdminCollectionsIndexRoute: AdminCollectionsIndexRoute,
   AdminFramesIndexRoute: AdminFramesIndexRoute,
   AdminGiftCardsIndexRoute: AdminGiftCardsIndexRoute,

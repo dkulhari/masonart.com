@@ -79,11 +79,10 @@ work_session_summary:
   agents: {}
 tickets:
   todo:
-    "646": Web - /admin/audit-log viewer with filters and a before/after drawer
     "647": Ops - retention purge worker behind the immutability guard
     "648": E2E and runbook - an admin action appears in the viewer
   in_progress:
-    "645": Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
+    "646": Web - /admin/audit-log viewer with filters and a before/after drawer
   done:
     "635": Contract - shared audit action registry and zod schemas
     "636": Database - admin_audit_log table, indexes and the immutability trigger
@@ -95,9 +94,10 @@ tickets:
     "642": Tier 1 - audit order status changes and cancellation
     "643": Tier 1 - audit privilege changes and gift card tender
     "644": Tier 2 - audit catalogue and config writes
+    "645": Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
     "649": Bug - the actor FK and the immutability trigger contradict each other
 total_tickets: 15
-completion_percentage: 73
+completion_percentage: 80
 is_completed: false
 plan:
   phases:
@@ -137,5 +137,5 @@ plan:
         - 647
         - 648
   generated_at: "2026-08-17T07:21:59.707Z"
-last_activity: "2026-08-17T07:50:22.880Z"
+last_activity: "2026-08-17T07:52:32.346Z"
 started: "2026-08-17T07:22:12.112Z"

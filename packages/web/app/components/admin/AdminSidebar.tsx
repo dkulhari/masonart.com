@@ -31,6 +31,7 @@ import {
   Frame,
   Factory,
   Hammer,
+  ScrollText,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -173,6 +174,15 @@ export const NAV_ITEMS: NavItem[] = [
 ]
 
 export const SECONDARY_NAV_ITEMS: NavItem[] = [
+  {
+    // Admin and super-admin only at the API (rows carry customer emails), so
+    // a content-manager who follows this link gets a 403 rather than data.
+    // It is listed anyway: hiding the audit log from the people it audits is
+    // the wrong instinct, and the enforcement is server-side regardless.
+    label: 'Audit Log',
+    href: '/admin/audit-log',
+    icon: ScrollText,
+  },
   {
     label: 'Collections',
     href: '/admin/collections',
