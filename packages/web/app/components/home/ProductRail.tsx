@@ -25,8 +25,9 @@
  * five-up track under a small `text-xl` heading with no View All pill, and it
  * is live on `/posters/$slug`. Widening it with four new props to serve a
  * different band would put the PDP's two rows one prop-default away from
- * changing shape. The scroll/edge logic below is deliberately the same shape
- * as that file's so the two can be merged later if a third caller appears.
+ * changing shape. So the two remain separate components, and share only the
+ * part that was genuinely identical: the scroll/edge mechanics, now in
+ * `useScrollTrack` (#629).
  *
  * WHY THE CARD IS UNTOUCHED
  *
@@ -43,7 +44,7 @@
  * new arrivals a per-card "Featured" chip labels nothing.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useId } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react'
 import { cn } from '~/lib/utils'
@@ -55,6 +56,7 @@ import type {
 import { buttonVariants } from '~/components/ui/Button'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
 import { SectionBand, type SectionBandProps } from '~/components/ui/SectionBand'
+import { useScrollTrack } from '~/hooks/useScrollTrack'
 
 /**
  * Where the View All pill lands.
@@ -112,16 +114,6 @@ export interface ProductRailProps {
 const CARD_WIDTH =
   'w-[82%] shrink-0 snap-start sm:w-[calc((100%-40px)/3)] lg:w-[calc((100%-60px)/4)]'
 
-/** Fraction of a mismeasured scroll position that still counts as "at rest". */
-const EDGE_SLACK_PX = 1
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false
-  }
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 export function ProductRail({
   heading,
   products,
@@ -134,59 +126,9 @@ export function ProductRail({
   testId,
   className,
 }: ProductRailProps) {
-  const trackRef = useRef<HTMLUListElement>(null)
   const headingId = useId()
-  // Optimistic defaults: assume the track starts at its left edge with more to
-  // scroll, until a real measurement says otherwise. A track that has never
-  // been laid out reports scrollWidth === clientWidth === 0, which is
-  // indistinguishable from "fits, nothing to scroll" — so the mount effect
-  // skips measuring in that case rather than disabling an arrow on a container
-  // that simply has not painted yet.
-  const [atStart, setAtStart] = useState(true)
-  const [atEnd, setAtEnd] = useState(false)
-
-  const updateEdges = useCallback(() => {
-    const track = trackRef.current
-    if (!track) return
-    const maxScroll = track.scrollWidth - track.clientWidth
-    const scrollable = maxScroll > EDGE_SLACK_PX
-    setAtStart(track.scrollLeft <= EDGE_SLACK_PX)
-    setAtEnd(!scrollable || track.scrollLeft >= maxScroll - EDGE_SLACK_PX)
-  }, [])
-
-  useEffect(() => {
-    const track = trackRef.current
-    if (!track) return
-    if (track.scrollWidth === 0 && track.clientWidth === 0) return
-    updateEdges()
-  }, [updateEdges, products])
-
-  useEffect(() => {
-    window.addEventListener('resize', updateEdges)
-    return () => window.removeEventListener('resize', updateEdges)
-  }, [updateEdges])
-
-  const scrollByDirection = useCallback((direction: -1 | 1) => {
-    const track = trackRef.current
-    if (!track) return
-    track.scrollBy({
-      left: direction * track.clientWidth * 0.8,
-      // Checked at call time rather than baked into a class: this gates the
-      // *programmatic* scroll, while `motion-reduce:scroll-auto` on the track
-      // covers the CSS side.
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-    })
-  }, [])
-
-  const handleTrackKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
-    if (event.key === 'ArrowRight') {
-      event.preventDefault()
-      scrollByDirection(1)
-    } else if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      scrollByDirection(-1)
-    }
-  }
+  const { trackRef, atStart, atEnd, updateEdges, scrollByDirection, handleTrackKeyDown } =
+    useScrollTrack<HTMLUListElement>(products)
 
   /**
    * An empty catalogue is no band, not a heading over an empty track with two

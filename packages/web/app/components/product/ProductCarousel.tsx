@@ -21,29 +21,19 @@
  * arrow-key-scrolling of a focused overflow element is inconsistent across
  * browsers, so this makes it deterministic rather than hopeful.
  *
- * ## Arrow disable state
+ * ## Arrow disable state and reduced motion
  *
- * `updateEdges` reads the track's actual scroll geometry, but a track that
- * has never been laid out reports `scrollWidth === clientWidth === 0`, which
- * is indistinguishable from "fits, nothing to scroll" — the mount effect
- * skips measuring in that case and keeps the optimistic initial state (start
- * of track, more to scroll) rather than disabling the forward arrow on a
- * container that just hasn't painted yet. The scroll handler has no such
- * guard: a real scroll event only fires once the track has real geometry.
- *
- * ## prefers-reduced-motion
- *
- * Checked at call time (not baked into a class) because it gates the
- * *programmatic* `scrollBy` calls from both the arrows and the keyboard
- * handler — `motion-reduce:scroll-auto` on the track covers the CSS
- * `scroll-behavior` side (wheel/native scroll), this covers the JS side.
+ * Both live in `useScrollTrack` (#629), shared with home/ProductRail — see that
+ * hook for why an unlaid-out track keeps the optimistic state and why
+ * `prefers-reduced-motion` is read at call time rather than baked into a class.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useId } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { ProductCard, type ProductCardData } from './ProductCard'
 import { buttonVariants } from '~/components/ui/Button'
+import { useScrollTrack } from '~/hooks/useScrollTrack'
 
 export interface ProductCarouselProps {
   /** e.g. "Visually Similar Artworks" or "More to Love" (§ ticket #522). */
@@ -52,65 +42,10 @@ export interface ProductCarouselProps {
   className?: string
 }
 
-/** Fraction of a mocked/mismeasured scroll position that still counts as "at rest". */
-const EDGE_SLACK_PX = 1
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false
-  }
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 export function ProductCarousel({ heading, products, className }: ProductCarouselProps) {
-  const trackRef = useRef<HTMLUListElement>(null)
   const headingId = useId()
-  // Optimistic defaults: assume the track starts at its left edge with more
-  // to scroll, until a real measurement says otherwise (see module comment).
-  const [atStart, setAtStart] = useState(true)
-  const [atEnd, setAtEnd] = useState(false)
-
-  const updateEdges = useCallback(() => {
-    const track = trackRef.current
-    if (!track) return
-    const maxScroll = track.scrollWidth - track.clientWidth
-    const scrollable = maxScroll > EDGE_SLACK_PX
-    setAtStart(track.scrollLeft <= EDGE_SLACK_PX)
-    setAtEnd(!scrollable || track.scrollLeft >= maxScroll - EDGE_SLACK_PX)
-  }, [])
-
-  useEffect(() => {
-    const track = trackRef.current
-    if (!track) return
-    // An unlaid-out track (jsdom always; a real browser only for one frame)
-    // reports 0x0 — that is "unknown", not "nothing to scroll".
-    if (track.scrollWidth === 0 && track.clientWidth === 0) return
-    updateEdges()
-  }, [updateEdges, products])
-
-  useEffect(() => {
-    window.addEventListener('resize', updateEdges)
-    return () => window.removeEventListener('resize', updateEdges)
-  }, [updateEdges])
-
-  const scrollByDirection = useCallback((direction: -1 | 1) => {
-    const track = trackRef.current
-    if (!track) return
-    track.scrollBy({
-      left: direction * track.clientWidth * 0.8,
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-    })
-  }, [])
-
-  const handleTrackKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
-    if (event.key === 'ArrowRight') {
-      event.preventDefault()
-      scrollByDirection(1)
-    } else if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      scrollByDirection(-1)
-    }
-  }
+  const { trackRef, atStart, atEnd, updateEdges, scrollByDirection, handleTrackKeyDown } =
+    useScrollTrack<HTMLUListElement>(products)
 
   // Nothing to recommend is not an empty rail with dead arrows — it is no
   // rail, matching the section it replaces (posters/$slug.tsx's

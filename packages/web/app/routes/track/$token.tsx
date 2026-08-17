@@ -10,12 +10,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
-  Package,
   Loader2,
   AlertCircle,
-  CheckCircle,
-  Clock,
-  Truck,
   MapPin,
   ExternalLink,
   RefreshCw,
@@ -24,6 +20,11 @@ import {
 import { cn } from '~/lib/utils'
 import { trackingApi, type GuestOrderLookupResponse } from '~/lib/api'
 import { TrackingTimeline } from '~/components/order/TrackingTimeline'
+import {
+  getOrderStatusConfig,
+  getCarrierDisplayName,
+  buildTimelineSteps,
+} from '~/lib/orderTracking'
 
 // ============================================================================
 // Route Definition
@@ -39,99 +40,6 @@ export const Route = createFileRoute('/track/$token')({
   }),
   component: TokenTrackingPage,
 })
-
-// ============================================================================
-// Types
-// ============================================================================
-
-type OrderStatus =
-  | 'pending_payment'
-  | 'confirmed'
-  | 'processing'
-  | 'shipped'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded'
-
-interface StatusConfig {
-  label: string
-  icon: typeof Package
-  color: string
-  bgColor: string
-}
-
-// ============================================================================
-// Status Configuration
-// ============================================================================
-
-const ORDER_STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
-  pending_payment: {
-    label: 'Pending Payment',
-    icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
-  },
-  confirmed: {
-    label: 'Confirmed',
-    icon: CheckCircle,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
-  },
-  processing: {
-    label: 'Processing',
-    icon: Package,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-  },
-  shipped: {
-    label: 'Shipped',
-    icon: Truck,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
-  },
-  out_for_delivery: {
-    label: 'Out for Delivery',
-    icon: MapPin,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-100',
-  },
-  delivered: {
-    label: 'Delivered',
-    icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
-  },
-  cancelled: {
-    label: 'Cancelled',
-    icon: AlertCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-  },
-  refunded: {
-    label: 'Refunded',
-    icon: RefreshCw,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
-  },
-}
-
-// Carrier display names
-const CARRIER_DISPLAY_NAMES: Record<string, string> = {
-  usps: 'USPS',
-  fedex: 'FedEx',
-  ups: 'UPS',
-  dhl: 'DHL',
-  delhivery: 'Delhivery',
-  bluedart: 'Blue Dart',
-  dtdc: 'DTDC',
-  shiprocket: 'Shiprocket',
-  'india post': 'India Post',
-}
-
-function getCarrierDisplayName(carrier: string): string {
-  return CARRIER_DISPLAY_NAMES[carrier.toLowerCase()] || carrier
-}
 
 // ============================================================================
 // Main Component
@@ -222,7 +130,7 @@ function TokenTrackingPage() {
     )
   }
 
-  const statusConfig = ORDER_STATUS_CONFIG[orderData.status as OrderStatus] || ORDER_STATUS_CONFIG.confirmed
+  const statusConfig = getOrderStatusConfig(orderData.status)
   const StatusIcon = statusConfig.icon
 
   // Build timeline steps
@@ -368,56 +276,6 @@ function TokenTrackingPage() {
       </div>
     </div>
   )
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Build timeline steps from order data
- */
-function buildTimelineSteps(order: GuestOrderLookupResponse) {
-  const steps = [
-    {
-      status: 'confirmed',
-      label: 'Order Confirmed',
-      completed: true,
-      timestamp: order.timeline.orderedAt,
-    },
-    {
-      status: 'processing',
-      label: 'Processing',
-      completed: ['processing', 'shipped', 'in_transit', 'out_for_delivery', 'delivered'].includes(order.status),
-      timestamp: null,
-    },
-    {
-      status: 'shipped',
-      label: 'Shipped',
-      completed: !!order.timeline.shippedAt || ['shipped', 'in_transit', 'out_for_delivery', 'delivered'].includes(order.tracking?.status || ''),
-      timestamp: order.timeline.shippedAt || order.tracking?.shippedAt || null,
-    },
-    {
-      status: 'in_transit',
-      label: 'In Transit',
-      completed: ['in_transit', 'out_for_delivery', 'delivered'].includes(order.tracking?.status || ''),
-      timestamp: null,
-    },
-    {
-      status: 'out_for_delivery',
-      label: 'Out for Delivery',
-      completed: ['out_for_delivery', 'delivered'].includes(order.tracking?.status || ''),
-      timestamp: null,
-    },
-    {
-      status: 'delivered',
-      label: 'Delivered',
-      completed: !!order.timeline.deliveredAt || order.tracking?.status === 'delivered',
-      timestamp: order.timeline.deliveredAt || order.tracking?.deliveredAt || null,
-    },
-  ]
-
-  return steps
 }
 
 export default TokenTrackingPage
