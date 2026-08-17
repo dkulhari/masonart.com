@@ -31,6 +31,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import {
   orders,
   type PaymentStatus,
@@ -62,6 +63,16 @@ import { productionApprovals } from "../../database/schema/approvals";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+/**
+ * Cancellation gets its own action rather than hiding inside a status delta.
+ * It is the transition support and finance actually search for, and a filter
+ * that requires reading a jsonb field to find it is a filter nobody uses.
+ */
+const orderAuditAction = (status?: string | null) =>
+  status === "cancelled"
+    ? ("order.cancelled" as const)
+    : ("order.status_changed" as const);
+
 const ORDER_NUMBER_PREFIX = "MA";
 
 // ============================================================================
@@ -634,12 +645,27 @@ adminOrdersApp.patch(
       // an UNPAID order has to release any gift card hold, while a paid one
       // must be left to the refund path.
       const existing = await db
-        .select({ id: orders.id, paymentStatus: orders.paymentStatus })
+        .select({
+          id: orders.id,
+          // `status` is selected for the audit delta, not for the update: an
+          // audit row that says "changed to processing" without saying what it
+          // was is barely better than no row.
+          status: orders.status,
+          paymentStatus: orders.paymentStatus,
+        })
         .from(orders)
         .where(whereCondition)
         .limit(1);
 
       if (existing.length === 0) {
+        await recordAudit(c, {
+          action: orderAuditAction(input.status),
+          entityType: "order",
+          entityId: id,
+          outcome: "failure",
+          summary: `Refused: order ${id} not found`,
+        });
+
         return c.json({ error: "Order not found" }, 404);
       }
 
@@ -719,6 +745,25 @@ adminOrdersApp.patch(
         });
       }
 
+      await recordAudit(c, {
+        action: orderAuditAction(input.status),
+        entityType: "order",
+        entityId: updatedOrder.id,
+        summary:
+          input.status === "cancelled"
+            ? `Cancelled order ${updatedOrder.orderNumber}`
+            : `Edited order ${updatedOrder.orderNumber}`,
+        before: {
+          status: existingOrder.status,
+          paymentStatus: existingOrder.paymentStatus,
+        },
+        after: {
+          status: updatedOrder.status,
+          paymentStatus: updatedOrder.paymentStatus,
+        },
+        metadata: { orderNumber: updatedOrder.orderNumber },
+      });
+
       return c.json({
         message: "Order updated successfully",
         order: {
@@ -777,6 +822,15 @@ adminOrdersApp.patch(
         .limit(1);
 
       if (existing.length === 0) {
+        await recordAudit(c, {
+          action: orderAuditAction(status),
+          entityType: "order",
+          entityId: id,
+          outcome: "failure",
+          summary: `Refused: order ${id} not found`,
+          metadata: { requestedStatus: status },
+        });
+
         return c.json({ error: "Order not found" }, 404);
       }
 
@@ -847,6 +901,28 @@ adminOrdersApp.patch(
           console.error("[Orders] Failed to create approvals:", err);
         });
       }
+
+      await recordAudit(c, {
+        action: orderAuditAction(status),
+        entityType: "order",
+        entityId: updatedOrder.id,
+        summary:
+          status === "cancelled"
+            ? `Cancelled order ${updatedOrder.orderNumber}${reason ? `: ${reason}` : ""}`
+            : `Order ${updatedOrder.orderNumber}: ${existingOrder.status} → ${status}${
+                reason ? ` (${reason})` : ""
+              }`,
+        before: { status: existingOrder.status },
+        after: { status: updatedOrder.status },
+        metadata: {
+          orderNumber: updatedOrder.orderNumber,
+          ...(reason ? { reason } : {}),
+          // Whether the hold was released here or left to the refund path is
+          // the difference between a balance returned twice and not at all.
+          giftCardHoldVoided:
+            status === "cancelled" && existingOrder.paymentStatus !== "paid",
+        },
+      });
 
       return c.json({
         message: "Order status updated successfully",
@@ -1022,6 +1098,15 @@ adminOrdersApp.post(
 
       // Validate order can be refunded
       if (order.paymentStatus !== "paid") {
+        await recordAudit(c, {
+          action: "order.refunded",
+          entityType: "order",
+          entityId: order.id,
+          outcome: "failure",
+          summary: `Refused: order ${order.orderNumber} is ${order.paymentStatus}, not paid`,
+          metadata: { orderNumber: order.orderNumber, requestedAmount: amount, reason },
+        });
+
         return c.json(
           { error: "Order has not been paid or already refunded" },
           400
@@ -1035,6 +1120,15 @@ adminOrdersApp.post(
       const totalAmount = parseFloat(order.total);
 
       if (refundAmount > totalAmount) {
+        await recordAudit(c, {
+          action: "order.refunded",
+          entityType: "order",
+          entityId: order.id,
+          outcome: "failure",
+          summary: `Refused: refund of ${refundAmount} exceeds the order total of ${totalAmount}`,
+          metadata: { orderNumber: order.orderNumber, reason },
+        });
+
         return c.json(
           { error: "Refund amount cannot exceed order total" },
           400
@@ -1145,6 +1239,27 @@ adminOrdersApp.post(
           updatedAt: new Date(),
         })
         .where(eq(orders.id, order.id));
+
+      await recordAudit(c, {
+        action: "order.refunded",
+        entityType: "order",
+        entityId: order.id,
+        summary: `Refunded ${refundAmount} on order ${order.orderNumber}: ${reason}`,
+        before: { paymentStatus: order.paymentStatus },
+        after: {
+          paymentStatus: newPaymentStatus,
+          ...(isFullRefund ? { status: "refunded" } : {}),
+        },
+        metadata: {
+          orderNumber: order.orderNumber,
+          reason,
+          // The split is the part a dispute turns on: how much went back to
+          // the gateway and how much returned as card balance.
+          razorpayPaise: razorpayLeg,
+          giftCardPaise: giftCardLeg,
+          razorpayRefundId: refund.id || null,
+        },
+      });
 
       return c.json({
         message: "Refund initiated successfully",

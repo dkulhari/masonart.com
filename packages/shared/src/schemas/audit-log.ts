@@ -63,6 +63,7 @@ export const AUDIT_ACTIONS = [
   // Money — orders
   'order.status_changed',
   'order.cancelled',
+  'order.refunded',
   'order.shipment_marked_delivered',
 
   // Money — tender and balances
@@ -129,6 +130,7 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
 
   'order.status_changed': 'money',
   'order.cancelled': 'money',
+  'order.refunded': 'money',
   'order.shipment_marked_delivered': 'money',
 
   'gift_card.issued': 'money',
