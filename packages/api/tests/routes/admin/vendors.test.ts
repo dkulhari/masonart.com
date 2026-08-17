@@ -17,8 +17,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
+import { adminSessionFor } from '../../helpers/admin-session'
+import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
 
 import type { RecordedQuery } from '../../helpers/query-recorder'
@@ -58,40 +58,9 @@ import { adminVendorsApp } from '../../../src/routes/admin/vendors'
 
 const { queries, render, queueRows, selects } = recorder
 
-function sessionFor(role: string) {
-  const now = new Date()
-  return {
-    user: {
-      id: 'admin-user-1',
-      name: 'Admin User',
-      email: 'admin@example.com',
-      emailVerified: true,
-      image: null,
-      createdAt: now,
-      updatedAt: now,
-      role,
-      status: 'active',
-    },
-    session: {
-      id: 'sess-1',
-      token: 'tok-1',
-      userId: 'admin-user-1',
-      expiresAt: new Date(now.getTime() + 86_400_000),
-      createdAt: now,
-      updatedAt: now,
-    },
-  }
-}
+const sessionFor = adminSessionFor
 
-function buildApp(): Hono {
-  const app = new Hono()
-  app.route('/api/admin/vendors', adminVendorsApp)
-  app.onError((err, c) => {
-    if (err instanceof HTTPException) return err.getResponse()
-    return c.json({ error: err.message }, 500)
-  })
-  return app
-}
+const buildApp = () => buildRouteApp('/api/admin/vendors', adminVendorsApp)
 
 const VENDOR_ID = '11111111-1111-4111-8111-111111111111'
 const OTHER_ID = '22222222-2222-4222-8222-222222222222'

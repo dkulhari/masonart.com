@@ -13,9 +13,6 @@
  * @see packages/api/src/lib/vendor-scope.ts
  */
 
-import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
-
 export function vendorSessionFor(role: string, id = 'vendor-user-1') {
   const now = new Date()
   return {
@@ -39,22 +36,4 @@ export function vendorSessionFor(role: string, id = 'vendor-user-1') {
       updatedAt: now,
     },
   }
-}
-
-/**
- * The portal router at its real path, with `HTTPException` passed through so a
- * 403 from `requireVendor` stays a 403 instead of becoming an unhandled 500.
- *
- * `vendorApp` is passed in rather than imported here: the suites mock
- * `src/database` and `src/auth`, and importing the router from a helper would
- * pull it in outside the mocked graph.
- */
-export function buildVendorApp(vendorApp: Parameters<Hono['route']>[1]): Hono {
-  const app = new Hono()
-  app.route('/api/vendor', vendorApp)
-  app.onError((err, c) => {
-    if (err instanceof HTTPException) return err.getResponse()
-    return c.json({ error: err.message }, 500)
-  })
-  return app
 }

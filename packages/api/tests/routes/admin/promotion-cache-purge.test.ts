@@ -44,10 +44,8 @@ import {
 } from "vitest";
 import { Hono } from "hono";
 import { eq, like } from "drizzle-orm";
-import {
-  buildCachePurgeApp,
-  cachePurgeSessionFor,
-} from "../../helpers/cache-purge-harness";
+import { cachePurgeSessionFor } from "../../helpers/cache-purge-harness";
+import { buildRouteApp } from "../../helpers/route-app";
 import "../../setup";
 
 // ============================================================================
@@ -139,7 +137,7 @@ async function buildApp(): Promise<Hono> {
   const { adminPromotionsApp } = await import(
     "../../../src/routes/admin/promotions"
   );
-  return buildCachePurgeApp("/api/admin/promotions", adminPromotionsApp);
+  return buildRouteApp("/api/admin/promotions", adminPromotionsApp);
 }
 
 function promotionBody(overrides: Record<string, unknown> = {}) {

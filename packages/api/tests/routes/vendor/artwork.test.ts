@@ -31,10 +31,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
-import {
-  buildVendorApp,
-  vendorSessionFor,
-} from '../../helpers/vendor-session'
+import { buildRouteApp } from '../../helpers/route-app'
+import { vendorSessionFor } from '../../helpers/vendor-session'
 import '../../setup'
 
 import { productionJobs, productionJobItems } from '../../../src/database/schema/production-jobs'
@@ -176,7 +174,7 @@ const ARTWORK_CDN_URL = 'https://cdn.example.com/products/abc.jpg'
 const MAX_REASONABLE_TTL_SECONDS = 15 * 60
 
 const sessionFor = vendorSessionFor
-const buildApp = () => buildVendorApp(vendorApp)
+const buildApp = () => buildRouteApp('/api/vendor', vendorApp)
 
 const PAST = new Date('2026-01-01T00:00:00Z')
 

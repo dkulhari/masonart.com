@@ -22,9 +22,6 @@
  * @see packages/api/tests/routes/admin/promotion-cache-purge.test.ts
  */
 
-import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
-
 /** How many times each Redis command the purge could use was reached for. */
 export interface FakeRedisCalls {
   keys: number;
@@ -154,24 +151,6 @@ export function createFakeRedis(): FakeRedisHarness {
       calls.del = 0;
     },
   };
-}
-
-/**
- * The Hono app both suites build: one admin router mounted at its real path,
- * with `HTTPException` passed through so a 403 stays a 403 instead of becoming
- * an unhandled 500.
- */
-export function buildCachePurgeApp(
-  basePath: string,
-  routeApp: Parameters<Hono["route"]>[1]
-): Hono {
-  const app = new Hono();
-  app.route(basePath, routeApp);
-  app.onError((err, c) => {
-    if (err instanceof HTTPException) return err.getResponse();
-    return c.json({ error: err.message }, 500);
-  });
-  return app;
 }
 
 /** Identity of the admin caller each suite seeds and authenticates as. */

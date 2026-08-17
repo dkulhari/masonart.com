@@ -21,10 +21,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import {
-  buildVendorApp,
-  vendorSessionFor,
-} from '../../helpers/vendor-session'
+import { buildRouteApp } from '../../helpers/route-app'
+import { vendorSessionFor } from '../../helpers/vendor-session'
 import '../../setup'
 
 import type { RecordedQuery } from '../../helpers/query-recorder'
@@ -68,7 +66,7 @@ const JOB_ID = '22222222-2222-4222-8222-222222222222'
 const OTHER_JOB_ID = '2222222b-2222-4222-8222-222222222222'
 
 const sessionFor = vendorSessionFor
-const buildApp = () => buildVendorApp(vendorApp)
+const buildApp = () => buildRouteApp('/api/vendor', vendorApp)
 
 const PAST = new Date('2026-01-01T00:00:00Z')
 
