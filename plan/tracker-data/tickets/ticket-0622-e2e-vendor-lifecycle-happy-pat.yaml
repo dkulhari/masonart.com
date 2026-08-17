@@ -1,0 +1,128 @@
+ticket_number: 622
+title: E2E - vendor lifecycle happy path and the access-denied cases
+description: |-
+  ## Task
+  Playwright coverage of the full loop: admin creates vendor -> invites contact -> assigns job -> vendor logs in and sees only their own -> marks ready -> admin rates QC -> admin records settlement.
+
+  ## Context
+  Feature: vendor-management. Phase 7 of 7. Last ticket — depends on everything.
+
+  Specs live in `tests/e2e/` at the repo root, `*.spec.ts`. Follow the existing `admin-*.spec.ts` files.
+
+  **Repo hazards to honour rather than rediscover:**
+  - **Port.** `:5173` is a DIFFERENT app on this machine. Pointed there, the whole suite passes vacuously — it is not a flake, it is a false green. Confirm the base URL resolves to this app before trusting a pass.
+  - **Do not run admin suites in parallel with other admin suites.** They interfere.
+  - **Scope selectors for mobile/desktop** — the same test ids exist in both trees. `const desktopFilters = page.locator('div.hidden.lg\\:block')` is the established pattern.
+  - Use `await page.goto('/path', { waitUntil: 'networkidle' })` in `beforeEach`.
+  - Diff any failure against the main baseline before treating it as new.
+
+  Also cover the two access-denied paths, because they are the ones a regression would make silently permissive:
+  - a vendor session at `/admin` gets Access Denied
+  - a content-manager session at `/admin/vendors` gets Access Denied
+
+  The destructive step — recording a settlement — is reachable by E2E precisely because these screens use the inline two-step confirm rather than a native dialog. Native dialogs block the automation harness outright, which is why nine existing admin files have no coverage on their destructive paths. If this spec cannot drive the settlement, that is a signal a native dialog crept in, not a reason to skip the step.
+feature: vendor-management
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:01:45.536Z'
+last_updated: '2026-08-17T02:39:20.991Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-17T02:39:17.131Z'
+    text: |-
+      Done in 9fe39902. `tests/e2e/admin-vendor-lifecycle.spec.ts` — 9 tests, chromium, --workers=1, all passing; verified against the DB afterwards (job qc_passed / amount_expected 450.00 / settled, one `pass` review with its notes, one 450.00 settlement with the run's NEFT reference), so the pass is not vacuous. It failed twice for real reasons first.
+
+      Two app defects the spec surfaced, both fixed in the same commit:
+
+      1. `app.route("/api/admin", adminShipmentsApp)` in `packages/api/src/index.ts` also mounted that router's `GET /:id`. `GET /api/admin/:id` therefore swallowed every single-segment admin list route registered after it: `/api/admin/vendors`, `/api/admin/production`, `/api/admin/returns` and `/api/admin/approvals` all answered `400 Invalid shipment ID`. The vendor directory and the production queue were dead in the running app; the screens showed their honest "nothing was loaded" banner, which is why the heading-only assertion in the first draft of this spec passed over it. Fixed by splitting `POST /orders/:orderId/ship` into `adminOrderShipmentsApp`, so nothing with a bare `/:id` is mounted at `/api/admin`. Likely relevant to #605 (photo approvals unreachable).
+
+      2. `GET /api/admin/orders` 500ed on every request: the user lookup bound `sql`${users.id} = ANY(${userIds})``, which Postgres rejects with `op ANY/ALL (array) requires array on right side` as soon as one order has a userId. Now `inArray(users.id, userIds)`, and the catch logs the cause instead of swallowing it behind a generic 500.
+
+      STILL OPEN — worth its own ticket: the same broken `= ANY(${...})` bind exists in three more admin list endpoints and will 500 them the same way:
+      - `packages/api/src/routes/admin/returns.ts:263`
+      - `packages/api/src/routes/admin/shipments.ts:210`
+      - `packages/api/src/routes/admin/reviews.ts:283`
+
+      Notes for whoever runs this next:
+      - Run it alone: `SKIP_E2E_SERVER=true bunx playwright test tests/e2e/admin-vendor-lifecycle.spec.ts --project=chromium --workers=1`. It needs the web server on :3001 and the API on :3000.
+      - The file name deliberately avoids `.admin.spec.ts`, which would run it in both the `chromium` and `chromium-admin` projects.
+      - Every run leaves two vendors, two jobs, a settlement and one invited vendor login behind; nothing is cleaned up, and the directory assertions ask for `pageSize=100` to survive the accumulation.
+      - `packages/api/src/database/set-test-user-password.ts` is new test support: the invite endpoint mints the account with a password nobody knows and mails a reset link, and there is no mailbox here to read it from.
+  - author: system
+    timestamp: '2026-08-17T02:39:20.991Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 619
+    feature: vendor-management
+    description: Admin UI - payables tab and settlement recording
+  - ticket: 620
+    feature: vendor-management
+    description: Admin UI - production queue, job detail with QC review, and the order production panel
+  - ticket: 621
+    feature: vendor-management
+    description: Vendor Portal UI - /vendor route tree, guard and the four screens
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the vendor lifecycle spec
+    file: tests/e2e/vendor-management.spec.ts
+    command: bunx playwright test tests/e2e/vendor-management.spec.ts --project=chromium
+    expected_result: FAIL initially, then PASS
+    status: done
+    code: |-
+      // test.beforeEach(async ({ page }) => {
+      //   await page.goto('/admin/vendors', { waitUntil: 'networkidle' })
+      // })
+      //
+      // Happy path, one test, in order:
+      //   1. admin creates a vendor with a print capability and a rate band
+      //   2. admin invites a contact -> a vendor login exists
+      //   3. admin creates a production job from an order's items and assigns it;
+      //      the expected amount shows the rate-card figure
+      //   4. vendor logs in, sees exactly one job, and does NOT see a second
+      //      vendor's job seeded alongside it
+      //   5. vendor marks the job ready
+      //   6. admin records a QC pass; the review appears in the history
+      //   7. admin records a settlement; the payable total drops to zero
+      //
+      // Then two access tests:
+      //   8. vendor session at /admin -> Access Denied
+      //   9. content-manager session at /admin/vendors -> Access Denied
+      //
+      // Scope mobile/desktop selectors — the same test ids exist in both trees:
+      //   const desktopFilters = page.locator('div.hidden.lg\\:block')
+  - id: 2
+    action: verify-fail
+    description: Confirm the base URL is this app before trusting any result. :5173 is a DIFFERENT app and makes the suite pass vacuously.
+    command: bunx playwright test tests/e2e/vendor-management.spec.ts --project=chromium --reporter=list
+    expected_result: FAIL on real assertions — if it passes immediately, the base URL is wrong, not the code right
+    status: done
+  - id: 3
+    action: implement
+    description: Fix whatever the spec surfaces in the screens; do not weaken the spec to make it green
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Run the spec alone — not alongside other admin suites, which interfere
+    command: bunx playwright test tests/e2e/vendor-management.spec.ts --project=chromium --workers=1
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the E2E spec
+    command: 'git add tests/e2e/vendor-management.spec.ts && git commit -m "test(e2e): add vendor management lifecycle and access-denied coverage"'
+    status: done
+current_step: 5
+completed: '2026-08-17T02:39:20.991Z'

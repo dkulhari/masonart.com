@@ -1,0 +1,149 @@
+ticket_number: 624
+title: Bug - broken = ANY() bind still 500s in returns, shipments and reviews admin routes
+description: |-
+  ## Problem
+  An `= ANY()` parameter bind is constructed incorrectly and throws at query time, 500ing the endpoint. It was found and fixed in `/api/admin/orders` while building the vendor-management E2E spec (#622, commit 9fe39902), but **the same broken bind is still present in the returns, shipments and reviews admin routers**.
+
+  ## How it surfaced
+  The vendor-management E2E spec drives `/admin/orders/$id` as part of the production panel flow. That page 500ed. The cause was the bind, not anything vendor-related — it is a pre-existing defect that no existing test covered, because these particular admin list paths have no E2E coverage.
+
+  Why they have no E2E coverage is itself worth recording: nine admin files use native `confirm()` for their destructive actions, and a native dialog blocks the Playwright harness outright. The untested paths and the native dialogs are the same problem wearing two hats.
+
+  ## Scope
+  Three routers still carry it:
+  - `packages/api/src/routes/admin/returns.ts`
+  - `packages/api/src/routes/admin/shipments.ts`
+  - `packages/api/src/routes/admin/reviews.ts`
+
+  Compare against the corrected form in `packages/api/src/routes/admin/orders.ts` as of commit 9fe39902.
+
+  ## Why this is high priority
+  Each one is a live 500 on an admin surface, reachable by ordinary use, with no test catching it. The fix is already written and proven in the orders router — this is applying a known-good correction in three more places, not diagnosing something new.
+
+  ## Related
+  A second route-shadowing bug was fixed in the same commit: `GET /api/admin/:id` in the shipments router was matching and 400ing `/api/admin/vendors`, `/api/admin/production`, `/api/admin/returns` and `/api/admin/approvals`. That one is fixed; check whether any other router declares a similarly greedy top-level `:id` route.
+feature: vendor-management
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T02:41:31.972Z'
+last_updated: '2026-08-17T03:06:18.456Z'
+time_spent_minutes: 5
+labels:
+  - backend
+  - api
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T03:01:09.429Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T03:06:12.077Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e3c2620d` - fix(api): bind id arrays as arrays in admin returns, shipments and reviews
+
+      **Root Cause**: `sql\`${users.id} = ANY(${userIds})\`` does not bind the array as an array — drizzle interpolates one parameter per element, rendering `"user"."id" = ANY(($1, $2))`, i.e. ANY over a row expression. Postgres refuses it with `op ANY/ALL (array) requires array on right side`, so the endpoint 500s the moment its list contains one row with a userId.
+      **Location**: `packages/api/src/routes/admin/returns.ts:263`, `shipments.ts:210`, `reviews.ts:283` (line numbers before the fix)
+      **Fix**: `inArray(...)`, which renders `in ($1, $2)` — the correction already proven in `orders.ts` (9fe39902).
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/returns.ts` - customer lookup via `inArray`; `inArray` added to the drizzle import
+      - `packages/api/src/routes/admin/shipments.ts` - same
+      - `packages/api/src/routes/admin/reviews.ts` - product lookup via `inArray` (`inArray` was already imported)
+      - `packages/api/tests/routes/admin/list-array-membership-bind.test.ts` - new, 4 tests
+      - `packages/api/tests/routes/route-shadowing.test.ts` - new, 4 tests (step 5)
+
+      **Summary**:
+      The mock `src/database` these admin suites use executes no SQL, so it cannot reproduce Postgres's complaint. The test instead renders the condition the handler actually built through `PgDialect` and asserts the shape Postgres accepts. Reintroduce the `ANY()` form in any of the four routers and it goes red. Orders is included as the control: already fixed, green before and after, which is what makes the three failures meaningful rather than an assertion that rejects everything.
+
+      Step 5 (other greedy top-level `:id` routes) is a second test rather than a note. It asserts against the **composed** app's route table — 469 routes — that no literal path sits behind an earlier `/:param` sibling. The rule is order-aware on purpose: `/api/reviews/stats` in front of `/api/reviews/:reviewId` is the correct pattern and must not be flagged. Today there are zero collisions, so that assertion is green from the start; the detector's teeth are proved separately against a synthetic app carrying the exact #622 shape. Per-router suites structurally cannot see this class of bug — the collision only exists once every router is mounted together.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/list-array-membership-bind.test.ts` (from `packages/api`)
+      - RED first: `Tests 3 failed | 1 passed (4)`, all three failing on the identical rendered SQL — `"user"."id" = ANY(($1, $2))` for returns and shipments, `"products"."id" = ANY(($1))` for reviews. One cause, not three.
+      - Result after fix: PASS (4 tests, 0 failing)
+      - `bunx vitest run tests/routes/route-shadowing.test.ts` → PASS (4 tests)
+      - Regression: `bunx vitest run tests/routes/admin/{returns,shipments,reviews,orders}.test.ts` → `Test Files 4 passed (4)  Tests 299 passed (299)`. Those suites print "Database not available, skipping runtime tests", which is exactly why this defect survived them.
+      - Type-check: `bunx tsc --noEmit -p tsconfig.json` in `packages/api` → 0 errors.
+
+      **Not done**: no live-Postgres test was added. The rendered-SQL assertion pins the defect at its true location and needs no database; a live test would need an admin session plus seeded rows in four tables, on a database shared with other agents.
+  - author: system
+    timestamp: '2026-08-17T03:06:16.884Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-17T03:01:10.426Z'
+    agent: claude-code
+    summary: 'All 6 steps done. RED: 3 routers rendered `= ANY(($1,$2))`; fixed with inArray; 4/4 bind tests, 4/4 new route-shadowing guard, 299/299 existing suites, 0 tsc errors. Committed e3c2620d.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T03:06:18.454Z'
+    duration: '00:05:08'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing test hitting the affected list endpoint in each of the three routers
+    file: packages/api/tests/routes/admin/any-bind-regression.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/any-bind-regression.test.ts
+    expected_result: FAIL - 500 from the broken bind
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm each of the three endpoints 500s for the same reason, not three different ones
+    command: cd packages/api && bunx vitest run tests/routes/admin/any-bind-regression.test.ts
+    expected_result: FAIL - three failures, all the same bind error
+    status: done
+  - id: 3
+    action: implement
+    description: Apply the orders.ts correction to returns, shipments and reviews
+    file: packages/api/src/routes/admin/returns.ts
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Confirm all three endpoints answer
+    command: cd packages/api && bunx vitest run tests/routes/admin/any-bind-regression.test.ts tests/routes/admin/returns.test.ts tests/routes/admin/reviews.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: refactor
+    description: Check for other greedy top-level :id routes that could shadow sibling paths, as the shipments router's did
+    command: cd packages/api && grep -rn '\"/:id\"' src/routes/admin/ | head -20
+    expected_result: Any hit reviewed for whether it shadows a sibling prefix
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/api/src/routes/admin packages/api/tests/routes/admin/any-bind-regression.test.ts && git commit -m "fix(api): repair broken = ANY() bind in returns, shipments and reviews"'
+    status: done
+current_step: 6
+started: '2026-08-17T03:01:09.429Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/list-array-membership-bind.test.ts tests/routes/route-shadowing.test.ts tests/routes/admin/{returns,shipments,reviews,orders}.test.ts
+  test_output: bind suite 4/4, shadowing suite 4/4, existing four admin suites 299/299
+  build_passed: true
+  build_command: bunx tsc --noEmit -p tsconfig.json (packages/api)
+  verified_at: '2026-08-17T03:05:52.053Z'
+completed: '2026-08-17T03:06:16.884Z'

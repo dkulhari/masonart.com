@@ -1,0 +1,61 @@
+ticket_number: 623
+title: Tech debt - drizzle-kit db:generate is unusable, meta snapshots drift from migrations
+description: |-
+  ## Problem
+  `bun run db:generate` in `packages/api` cannot be used. The drizzle meta snapshots in `src/database/migrations/meta/` stop at 0013 while the migrations themselves run to 0018. Drizzle-kit therefore diffs the current schema against a five-migration-stale snapshot, tries to replay unrelated drift, and interactively prompts to rename `frame_type` -> `frame_category`.
+
+  Accepting that prompt would emit a migration containing changes nobody asked for, against tables this work does not touch.
+
+  ## How it surfaced
+  Found while implementing #609 (vendor-management Phase 1). That ticket's migration — `0019_vendor_management_phase_1.sql` — was hand-assembled from drizzle's own DDL and audited additive-only before being applied: 9 CREATE TABLE, 5 CREATE TYPE, 19 CREATE INDEX, 17 ADD CONSTRAINT (all on the new tables), 1 ALTER TYPE. No DROP, no TRUNCATE, no ALTER COLUMN, nothing touching a pre-existing table. `meta/_journal.json` was updated to idx 19 by hand to match.
+
+  ## Why it matters beyond this feature
+  Every future schema change in this repo hits the same wall, and the workaround — hand-writing migrations and hand-editing the journal — is exactly the practice that produced the drift. It also means the snapshot is now further out of date than before, because 0019 exists as a journal entry without a corresponding regenerated snapshot.
+
+  No remaining vendor-management phase adds a migration, so this does not block that feature.
+
+  ## Fix direction
+  Rebuild the meta snapshots to match the applied migration history — most likely by regenerating snapshots 0014-0019 from the schema state each migration produces, rather than by resolving the spurious `frame_type` rename. Confirm afterwards that a no-op `db:generate` against an unchanged schema produces no migration at all; that is the check that proves the drift is gone.
+feature: vendor-management
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:14:46.335Z'
+last_updated: '2026-08-17T01:14:46.335Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - tech-debt
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Establish the failing condition: db:generate on an unchanged schema must produce nothing'
+    command: cd packages/api && bun run db:generate
+    expected_result: FAIL - prompts to rename frame_type to frame_category instead of reporting no changes
+    status: pending
+  - id: 2
+    action: implement
+    description: Rebuild meta snapshots 0014-0019 to match applied migration history
+    file: packages/api/src/database/migrations/meta
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Confirm a no-op generate is genuinely a no-op
+    command: cd packages/api && bun run db:generate
+    expected_result: PASS - 'No schema changes, nothing to migrate'
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the repaired snapshots
+    command: 'git add packages/api/src/database/migrations/meta && git commit -m "fix(db): repair drizzle meta snapshots drifted from migration history"'
+    status: pending
+current_step: 1

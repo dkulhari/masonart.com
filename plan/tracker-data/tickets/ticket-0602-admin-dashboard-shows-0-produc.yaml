@@ -1,0 +1,136 @@
+ticket_number: 602
+title: Admin dashboard shows 0 products / 0 low stock — /api/admin/products/stats does not exist
+description: |-
+  ## Problem
+
+  The admin dashboard renders fabricated zeros for every product tile. Operators will read "0 products, 0 low stock, 0 out of stock" and trust it.
+
+  ## Root cause
+
+  `packages/web/app/routes/admin/index.tsx` `fetchProductStats()` calls:
+
+  ```
+  GET ${getApiUrl()}/api/admin/products/stats
+  ```
+
+  No `/stats` route is registered in `packages/api/src/routes/admin/products.ts`. Grepped the whole of `packages/api/src` — there is no products stats handler anywhere. The request therefore falls through to the `GET /:id` handler (products.ts:468) with `id="stats"`, which cannot resolve.
+
+  The client then swallows the failure:
+
+  ```ts
+  if (!response.ok) {
+    // Return default stats if endpoint doesn't exist yet
+    return {
+      totalProducts: 0,
+      activeProducts: 0,
+      lowStockProducts: 0,
+      outOfStockProducts: 0,
+    }
+  }
+  ```
+
+  So there is no error state, no console warning, no empty state — just plausible-looking wrong numbers on the first screen an admin sees. Low-stock is exactly the tile you would launch on.
+
+  Compare `fetchOrderStats()` in the same file, which hits the real `GET /api/admin/orders/stats` (orders.ts:356) and throws on failure. The two sit side by side with opposite error contracts.
+
+  ## Fix
+
+  1. Implement `GET /api/admin/products/stats` in `packages/api/src/routes/admin/products.ts`, returning `{ totalProducts, activeProducts, lowStockProducts, outOfStockProducts }`. Register it **above** `GET /:id` so the literal path wins. Mirror the shape of the orders stats handler.
+  2. Remove the silent zero fallback in `fetchProductStats()` — throw like `fetchOrderStats()` does, and let the dashboard show its error state.
+  3. Decide and document the low-stock threshold (there is no constant for it today).
+
+  ## Verification
+
+  - API test asserting `GET /api/admin/products/stats` returns the four counts against seeded fixtures, and that a product with stock below threshold lands in `lowStockProducts`.
+  - API test asserting `GET /api/admin/products/stats` is not shadowed by `GET /:id`.
+  - Web test asserting the dashboard surfaces an error (not zeros) when the stats call fails.
+feature: admin-panel
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-16T19:08:58.035Z'
+last_updated: '2026-08-16T19:21:03.034Z'
+time_spent_minutes: 6
+labels:
+  - admin
+  - dashboard
+  - data-integrity
+  - go-live
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-16T19:14:21.030Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-16T19:20:45.842Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-16T19:21:03.033Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `138209f9` — fix(admin): implement products stats endpoint and stop faking zeros
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/products.ts` — `GET /stats` registered ABOVE `GET /:id` (Hono matches in registration order; below it, "stats" hits the UUID validator and 400s — the original bug). Returns the four counts; a failed query answers 500, never zeros.
+      - `packages/api/tests/routes/admin/product-stats.test.ts` — mocked driver: route not shadowed by `/:id`, four numeric keys, 500 on query failure.
+      - `packages/api/tests/routes/admin/product-stats-counts.test.ts` — real Postgres, 9 seeded `T602-` fixtures, delta assertions (additive + self-reaping, so it is correct against a populated dev DB).
+      - `packages/web/app/routes/admin/index.tsx` — `fetchProductStats()` throws like `fetchOrderStats()`; error banner gets `role="alert"`; Active Products tile renders `—`, not `0`, when stats are unavailable.
+      - `packages/web/tests/routes/admin/dashboard-product-stats.test.tsx` — error surfaced, no fabricated zero, order tiles unaffected.
+
+      **Threshold decision (item 3 of the fix)**: no new constant. `product_variants.low_stock_threshold` already exists per variant (default 5) — a 12x16 print and a gallery canvas do not run out at the same number, and a hard-coded value here would silently override what a merchandiser set on the row.
+
+      **Counter scopes** (deliberately not the same population, documented in the handler):
+      - `totalProducts` — every product row, drafts and archived included.
+      - `activeProducts` — `status = 'active'`.
+      - `lowStockProducts` / `outOfStockProducts` — ACTIVE products only; these are restocking alarms, and a draft or retired product is not work waiting for an operator. Low = any active variant with `0 < stock <= its own threshold` (at-threshold counts: "5 left, threshold 5" is the moment to reorder). Out = no active variant with stock left, which includes a product carrying no sellable variant. Mutually exclusive by construction.
+
+      **Verification**:
+      - Command: `DATABASE_URL=…:5440 npx vitest run tests/routes/admin/product-stats.test.ts tests/routes/admin/product-stats-counts.test.ts`
+      - Result: PASS (2 files, 10 tests)
+      - Command: `npx vitest run tests/routes/admin/dashboard-product-stats.test.tsx` (web)
+      - Result: PASS (1 file, 4 tests)
+      - Typecheck: `npx tsc --noEmit` — api 0 errors; web 22 errors, all pre-existing, none in touched files.
+
+      **Two things worth recording:**
+      1. The counts suite passed VACUOUSLY on its first run — the baseline `/stats` request sat inside the same try/catch as the connectivity check, so a missing route read as "database unreachable" and the suite skipped itself green against the exact bug it was written for. Fixed by probing the driver (`select … limit 1`) and letting the endpoint request fail loudly. Mutation-checked afterwards (expected low delta 3 → 99) to confirm the assertions bind.
+      2. `tests/routes/admin/products-role-access.test.ts` has 2 failures ("allows content-manager/admin to list admin products", 500 vs 200). Confirmed pre-existing by running it against the HEAD copy of `products.ts` — unrelated to this change, not fixed here.
+
+      **Out of scope, but adjacent**: `fetchOrderStats()` failing still renders ₹0 revenue and 0 orders through the same `?? 0` pattern — same class of bug on the order tiles. Not touched; worth its own ticket.
+work_sessions:
+  - start: '2026-08-16T19:14:21.129Z'
+    agent: claude-code
+    summary: 'Implemented GET /api/admin/products/stats above GET /:id; removed the zero-filled fallback in fetchProductStats and gave the dashboard an error banner + em-dash tile. TDD: 3 test files (mocked-route shape, DB-backed counts against seeded fixtures, web error state). All green; committed 138209f9.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-16T19:20:45.594Z'
+    duration: '00:06:24'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-16T19:14:21.030Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:06:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:06:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/routes/admin/product-stats.test.ts tests/routes/admin/product-stats-counts.test.ts (api, DATABASE_URL=:5440) + npx vitest run tests/routes/admin/dashboard-product-stats.test.tsx (web)
+  test_output: 'API: 2 files, 10 tests passed. Web: 1 file, 4 tests passed.'
+  build_passed: true
+  build_command: npx tsc --noEmit (api)
+  verified_at: '2026-08-16T19:20:40.509Z'
+completed: '2026-08-16T19:20:45.842Z'

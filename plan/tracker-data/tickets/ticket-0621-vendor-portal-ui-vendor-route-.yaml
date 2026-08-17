@@ -1,0 +1,190 @@
+ticket_number: 621
+title: Vendor Portal UI - /vendor route tree, guard and the four screens
+description: |-
+  ## Task
+  A new top-level `/vendor` route tree with its own layout guard, and exactly four screens.
+
+  ## Context
+  Feature: vendor-management. Phase 6 of 7. Depends on Phase 4.
+
+  **Four screens deliberately.** A print shop will not learn more than that, and every added screen is another thing that must be right about isolation.
+  - `/vendor` — my jobs: assigned, in progress, due. Answers "what do I work on next" and nothing else.
+  - `/vendor/jobs/$id` — items, artwork download (signed URL), mark received / in progress / ready
+  - `/vendor/rates` — my rate card, read-only
+  - `/vendor/payments` — my amounts and settlement history
+
+  **The layout guard** mirrors `/admin`'s `beforeLoad` (`app/routes/admin.tsx:38`): no session redirects to login with a `redirect` param; a session whose role is not `vendor` gets Access Denied rather than a redirect loop. Do not reuse the admin guard — mirror its structure with its own role check, because sharing it would make a change for one tree silently apply to the other.
+
+  **Confirm the reverse direction too**, and by test rather than assumption: an admin visiting `/vendor` is not a vendor and gets Access Denied, and the vendor-role user gets no staff entry point rendered anywhere (`staffAreaLabel` returns null for `vendor` — already covered by the Phase 1 test, so just don't regress it).
+
+  Artwork download hits the signed-URL endpoint at click time and uses the returned short-lived URL. Do not fetch and hold URLs at page load — an expiring URL rendered into a page that sits open for an hour is a broken download, and a long-lived one to sidestep that is the incident the signing exists to prevent.
+
+  Same UI rules as the admin screens: no native `confirm()`, skeleton/empty/error on every list, URL state via a coercing `validateSearch`, pagination from day one.
+feature: vendor-management
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:01:45.421Z'
+last_updated: '2026-08-17T02:13:02.633Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T02:00:30.555Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T02:12:58.401Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `36bd4310` - feat(vendor): vendor portal — /vendor route tree, guard and four screens
+
+      **Files Changed**:
+      - `packages/web/app/routes/vendor.tsx` — layout + `vendorLayoutBeforeLoad` (own guard, mirrors admin.tsx's structure, shares none of its code) + `VendorAccessDenied`
+      - `packages/web/app/routes/vendor/index.tsx` — my jobs; coercing `vendorJobsSearchSchema`, three list states, limit/offset pagination
+      - `packages/web/app/routes/vendor/jobs/$id.tsx` — job detail; items, click-time signed artwork URLs, QC history, two-step confirms for the only two statuses a vendor may set (`received`, `sent`)
+      - `packages/web/app/routes/vendor/rates.tsx` — read-only rate card (no form controls at all on the screen)
+      - `packages/web/app/routes/vendor/payments.tsx` — outstanding + settlement history, paginated in the URL
+      - `packages/web/app/lib/vendor-nav.ts` — shared constants and formatters; `formatVendorAmount` returns null rather than ₹0.00
+      - `packages/web/tests/routes/vendor/{layout-guard,no-customer-data,vendor-screens}.test.tsx`
+      - `packages/web/app/routeTree.gen.ts` — regenerated (vendor entries only)
+
+      **Summary**:
+      Guard: no session → `redirect('/auth/login', { search: { redirect: location.href } })`; logged-in non-vendor → Access Denied, never a redirect. ADMIN and super-admin are denied — asserted, along with the reverse (the admin guard denies `vendor`) and with a source assertion that this file imports nothing from the admin route.
+
+      Artwork: the signed URL is requested in the click handler and used in the same tick. Tests assert zero fetches at render, one fetch on click with `credentials: 'include'`, and that no signed URL is ever in an href.
+
+      Isolation: every screen rendered against fixtures polluted with `customerName`, `customerEmail`, `shippingAddress`, `phone`, `orderId`, `orderNumber`, `orderItemId`, `userId`, `retailPrice`, `buyerNote` — whole innerHTML checked, plus a meta-test proving the assertion has teeth.
+
+      Also pinned: exactly four screens under the layout (directory listing asserted), no native `confirm()`/`alert()` in any of the five files, every error block digit-free, `vendorJobsSearchSchema` / `vendorPaymentsSearchSchema` coerce URL strings and `.catch()` garbage to defaults instead of error-boundarying to a blank page.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/vendor/layout-guard.test.tsx tests/routes/vendor/no-customer-data.test.tsx tests/routes/vendor/vendor-screens.test.tsx tests/lib/admin-nav-vendor-role.test.ts`
+      - Result: PASS (4 files, 54 tests passing, 0 failing) — includes the pre-existing `admin-nav-vendor-role` suite, unregressed
+      - Command: `bunx tsc --noEmit`
+      - Result: 22 errors, all in the pre-existing baseline files (`admin/ai-moderation`, `track/*`, `admin/products/*`, `admin/orders/*`, `admin.tsx`, `PromptSuggestions`). **Zero in any new vendor file.**
+  - author: system
+    timestamp: '2026-08-17T02:13:02.633Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 616
+    feature: vendor-management
+    description: Vendor Portal API - jobs, rates and payments through the scoped module
+  - ticket: 617
+    feature: vendor-management
+    description: Vendor Portal API - signed artwork URLs and the isolation property tests
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the /vendor layout guard
+    file: packages/web/tests/routes/vendor-guard.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/vendor-guard.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases:
+      //   1. No session -> redirect to /auth/login carrying a redirect param back to
+      //      the requested /vendor path.
+      //   2. A session with role 'customer' -> Access Denied, NOT a redirect. A
+      //      redirect for a logged-in user is a loop.
+      //   3. A session with role 'admin' -> Access Denied. An admin is not a vendor;
+      //      this tree is not a staff surface.
+      //   4. A session with role 'vendor' -> renders the outlet.
+      //   5. The guard is its own code, not an import of the admin guard — assert by
+      //      structure or by a comment-backed test that changing the admin role list
+      //      does not change who reaches /vendor.
+  - id: 2
+    action: verify-fail
+    description: Confirm the guard tests fail
+    command: cd packages/web && bunx vitest run tests/routes/vendor-guard.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Create the /vendor layout route with its own beforeLoad guard
+    file: packages/web/app/routes/vendor.tsx
+    status: done
+    code: |-
+      // Mirrors app/routes/admin.tsx:38 in structure, with its own role check.
+      // Deliberately NOT a shared guard: sharing would mean a change made for the
+      // admin tree silently applies to the vendor tree, and these two have opposite
+      // membership.
+      //
+      // createFileRoute('/vendor')({
+      //   beforeLoad: async ({ context, location }) => {
+      //     if (!context.session?.user) throw redirect({ to: '/auth/login', search: { redirect: location.href } })
+      //     if (context.session.user.role !== 'vendor') return { accessDenied: true }
+      //   },
+      //   component: VendorLayout,
+      // })
+  - id: 4
+    action: verify-pass
+    description: Confirm the guard tests pass
+    command: cd packages/web && bunx vitest run tests/routes/vendor-guard.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: implement
+    description: Build the jobs list and job detail screens
+    file: packages/web/app/routes/vendor/index.tsx
+    status: done
+    code: |-
+      // /vendor — my jobs. Coercing validateSearch, skeleton/empty/error, paginated.
+      // /vendor/jobs/$id — items, size, finish, due date, QC history, status marks.
+      //
+      // Artwork download: request the signed URL AT CLICK TIME and use it
+      // immediately. Never fetch URLs at page load — they expire in minutes, and
+      // lengthening the expiry to make page-load fetching work is exactly the
+      // incident signing exists to prevent.
+  - id: 6
+    action: implement
+    description: Build the read-only rates and payments screens
+    file: packages/web/app/routes/vendor/rates.tsx
+    status: done
+    code: |-
+      // /vendor/rates    — my rate card, read-only, current and scheduled rows
+      // /vendor/payments — my unsettled amount and settlement history
+      // Both: skeleton, empty and error states. An error is never a 0 amount.
+  - id: 7
+    action: write-test
+    description: Write a test asserting no customer-shaped field renders anywhere in the portal
+    file: packages/web/tests/routes/vendor-no-customer-data.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/vendor-no-customer-data.test.tsx
+    expected_result: FAIL then PASS
+    status: done
+    code: |-
+      // Render each of the four screens against a fixture whose API responses have
+      // been deliberately polluted with customerName / shippingAddress / phone, and
+      // assert none of it reaches the DOM. This is the client-side half of the
+      // API's isolation property: the API must not send it, and the client must not
+      // display it if a future endpoint regresses. Belt and braces on the one rule
+      // this feature states as an absolute.
+  - id: 8
+    action: verify-pass
+    description: Confirm all vendor portal tests pass
+    command: cd packages/web && bunx vitest run tests/routes/vendor-guard.test.tsx tests/routes/vendor-no-customer-data.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 9
+    action: verify-pass
+    description: Typecheck
+    command: cd packages/web && bun run typecheck
+    expected_result: PASS - no new errors versus the main baseline
+    status: done
+  - id: 10
+    action: commit
+    description: Commit the vendor portal
+    command: 'git add packages/web/app/routes/vendor.tsx packages/web/app/routes/vendor packages/web/tests/routes/vendor-guard.test.tsx packages/web/tests/routes/vendor-no-customer-data.test.tsx && git commit -m "feat(vendor): add vendor portal route tree, guard and the four screens"'
+    status: done
+current_step: 10
+started: '2026-08-17T02:00:30.555Z'
+completed: '2026-08-17T02:13:02.633Z'

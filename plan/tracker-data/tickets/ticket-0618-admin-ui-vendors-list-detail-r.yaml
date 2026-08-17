@@ -1,0 +1,177 @@
+ticket_number: 618
+title: Admin UI - vendors list, detail, rate card editor and nav wiring
+description: |-
+  ## Task
+  `/admin/vendors` list, `/admin/vendors/new`, `/admin/vendors/$id` with contacts, capabilities and the rate card editor. Nav entry wired into both places that must agree.
+
+  ## Context
+  Feature: vendor-management. Phase 5 of 7. Depends on Phase 3.
+
+  Routes live in `packages/web/app/routes/admin/`. Follow the existing `admin/products` directory for structure.
+
+  **Four rules these screens must not break** — all four come from the admin consistency audit, and every one of them is a defect present in the existing admin:
+  1. **No native `confirm()` / `alert()`.** Use the inline two-step pattern established by `ReviewMediaStrip` (`reviews.tsx:269` documents why: native dialogs block the automation harness outright). Nine admin files violate this today, which is why those destructive paths have no E2E coverage at all.
+  2. **Skeleton, empty AND error states on every list.** Only 4 of 13 existing admin lists have all three.
+  3. **List state in the URL via `validateSearch`.** REPO HAZARD: `router.tsx` overrides TanStack's search serialisation, so the schema MUST coerce numbers and split comma-joined arrays — otherwise the route error-boundaries to a blank page. `ADMIN_PRODUCTS_SEARCH` in `app/lib/admin-nav.ts` is the precedent for defaults that external links must spell out.
+  4. **Paginate from day one.** The collections and frames list endpoints have no LIMIT today; vendor jobs will outgrow both.
+
+  **Nav wiring** goes into `components/admin/AdminSidebar.tsx` AND `app/lib/admin-nav.ts` TOGETHER — that pairing is the repo's stated guard against route/nav drift, and #603 exists because it was bypassed. Vendors is operational, so it belongs in the primary nav list, not the Settings group. Do NOT add these paths to `CONTENT_MANAGER_ALLOWED_PREFIXES`: payables and vendor cost are admin data.
+
+  Rate card editor: effective dating is a first-class field, not an advanced toggle. Surface the 422 overlap response by naming the conflicting band inline on the offending row.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:00:54.156Z'
+last_updated: '2026-08-17T01:52:07.952Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:51:59.254Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:52:07.951Z'
+    text: |-
+      Shipped in 8d00ec41 (packages/web only; packages/api untouched).
+
+      Files: app/routes/admin/vendors/{index,new,$id,VendorForm}.tsx, tests/routes/admin/vendors-list.test.tsx, app/lib/admin-nav.ts, app/components/admin/AdminSidebar.tsx, app/routeTree.gen.ts.
+
+      - 27 new tests pass (vendors-list.test.tsx); frames-list + both admin-nav suites still pass (44 total across the four files).
+      - Web typecheck: 22 errors, all pre-existing; zero in the new files. One error I introduced (the `search: (prev) => ...` reducer form that /admin/products and /admin/orders also carry) was fixed by passing a merged object instead.
+      - Native-dialog grep over app/routes/admin/vendors/ is clean; the only `confirm(` hit is the doc comment explaining why there is none.
+      - `/admin/vendors` is in NAV_ITEMS (primary), not SECONDARY_NAV_ITEMS, and was deliberately NOT added to CONTENT_MANAGER_ALLOWED_PREFIXES — admin-nav-vendor-role.test.ts still green.
+      - routeTree.gen.ts picked the three routes up from a running dev server, correctly placed; VendorForm.tsx was not treated as a route.
+
+      Not done here, by scope: no E2E (#622), no payables tab (#619), no production screens (#620).
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 612
+    feature: vendor-management
+    description: Admin API - vendors CRUD, contacts, capabilities and role gating
+  - ticket: 613
+    feature: vendor-management
+    description: Admin API - rate card routes with effective dating and overlap rejection
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests for the vendors list route: search schema coercion, and the three list states'
+    file: packages/web/tests/routes/admin-vendors.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin-vendors.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases:
+      //   1. validateSearch coerces `page` from the string '2' to the number 2 and
+      //      splits a comma-joined `kind` into an array. router.tsx overrides
+      //      TanStack's serialisation, so a schema that expects real numbers/arrays
+      //      error-boundaries the route to a blank page — this is the repo hazard
+      //      and the reason this is the first test.
+      //   2. validateSearch supplies defaults matching the ADMIN_VENDORS_SEARCH
+      //      constant, so a link from outside the route satisfies the schema.
+      //   3. Loading renders a skeleton, not a spinner-free blank.
+      //   4. An empty result renders an empty state with a create action.
+      //   5. A failed fetch renders an error state — NOT a zero. #602 and #606 were
+      //      both dashboards fabricating a 0 from a failed request; do not repeat it
+      //      on this list's counts.
+  - id: 2
+    action: verify-fail
+    description: Confirm the list tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin-vendors.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Create the vendors list route with a coercing search schema and all three states
+    file: packages/web/app/routes/admin/vendors/index.tsx
+    status: done
+    code: |-
+      // createFileRoute('/admin/vendors/')({ validateSearch: zodSearch, component })
+      //
+      // const searchSchema = z.object({
+      //   page: z.coerce.number().int().min(1).default(1),
+      //   pageSize: z.coerce.number().int().min(1).max(100).default(20),
+      //   status: z.enum(['active','inactive','suspended']).optional(),
+      //   // comma-joined by router.tsx's serialisation override — split on read
+      //   kind: z.preprocess(
+      //     (v) => (typeof v === 'string' ? v.split(',').filter(Boolean) : v),
+      //     z.array(z.enum(['print','frame'])).optional()
+      //   ),
+      // })
+      //
+      // Columns: name, status, capability summary, open jobs, amount owed.
+      // Skeleton + empty + error states, all three. Pagination controls bound to the
+      // search params so the URL is the state.
+  - id: 4
+    action: implement
+    description: Add ADMIN_VENDORS_SEARCH defaults and the nav entry to admin-nav.ts
+    file: packages/web/app/lib/admin-nav.ts
+    status: done
+    code: |-
+      export const ADMIN_VENDORS_SEARCH = {
+        page: 1,
+        pageSize: 20,
+      } as const
+
+      // Do NOT add '/admin/vendors' or '/admin/production' to
+      // CONTENT_MANAGER_ALLOWED_PREFIXES — payables and vendor cost are admin data.
+  - id: 5
+    action: implement
+    description: Add the sidebar entry in the same change as the nav constant
+    file: packages/web/app/components/admin/AdminSidebar.tsx
+    status: done
+    code: |-
+      // Primary nav list, not the Settings group — Vendors is operational.
+      // This file and app/lib/admin-nav.ts change together, always. That pairing is
+      // the repo's guard against route/nav drift and #603 exists because it was
+      // bypassed.
+  - id: 6
+    action: verify-pass
+    description: Confirm the list tests pass
+    command: cd packages/web && bunx vitest run tests/routes/admin-vendors.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: implement
+    description: Create the new/detail routes with contacts, capabilities and the rate card editor
+    file: packages/web/app/routes/admin/vendors/$id.tsx
+    status: done
+    code: |-
+      // Tabs: Details | Contacts | Capabilities | Rates | Payables (payables tab is
+      // its own ticket).
+      //
+      // Rate editor: effective-from is a first-class field, not an advanced toggle.
+      // On a 422 from the API, render the conflicting band inline on the offending
+      // row — the response names it precisely so the admin can go fix that row.
+      //
+      // Destructive actions (remove contact, close a rate) use the inline two-step
+      // confirm pattern from ReviewMediaStrip. NO native confirm() — it blocks the
+      // automation harness outright, which is why nine admin files have no E2E
+      // coverage on their destructive paths.
+  - id: 8
+    action: verify-pass
+    description: Confirm no native dialog crept in
+    command: cd packages/web && grep -rn "confirm(\|alert(" app/routes/admin/vendors/ app/routes/admin/production* 2>/dev/null
+    expected_result: No matches
+    status: done
+  - id: 9
+    action: verify-pass
+    description: Typecheck the web package
+    command: cd packages/web && bun run typecheck
+    expected_result: PASS - no new errors versus the main baseline (26 pre-existing)
+    status: done
+  - id: 10
+    action: commit
+    description: Commit the admin vendor screens and nav
+    command: 'git add packages/web/app/routes/admin/vendors packages/web/app/lib/admin-nav.ts packages/web/app/components/admin/AdminSidebar.tsx packages/web/tests/routes/admin-vendors.test.tsx && git commit -m "feat(admin): add vendor directory screens, rate card editor and nav entry"'
+    status: done
+current_step: 10
+completed: '2026-08-17T01:51:59.254Z'

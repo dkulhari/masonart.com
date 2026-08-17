@@ -1,0 +1,160 @@
+ticket_number: 614
+title: Admin API - production jobs, assignment pricing and QC reviews
+description: |-
+  ## Task
+  `/api/admin/production` — job queue, job creation from order items, vendor assignment (which computes `amountExpected`), the `amountActual` override, and QC review recording.
+
+  ## Context
+  Feature: vendor-management. Phase 3 of 7. Depends on Phase 1 + 2 and the admin vendors router.
+
+  **This spec defines the job RECORD; production-pipeline defines the WORKFLOW.** Status is settable, but do NOT add a transition state machine, routing rules, reprint loops or lead-time calculation — all four are explicitly the next sub-project. If a transition guard feels missing, that is correct.
+
+  - `POST /api/admin/production` takes an `orderId`, a `stage` and a list of `orderItemIds`, and creates the job plus its `production_job_items` rows in ONE transaction. Items join to `order_items`, not to the order, so a mixed basket splits across vendors.
+  - `POST /:jobId/assign` takes a `vendorId`. It resolves each item's longest edge from the variant (`productVariants.widthInches` / `heightInches`, `max()` of the two), calls `selectRateInForce` against the vendor's card **at the assignment instant**, sums the results into `amountExpected`, and sets `assignedAt` + `status = 'assigned'`. If any item has no covering band, respond 422 naming the item and the size — do NOT default the missing band to zero. A silent zero is how a job ends up unbillable with nothing to show why.
+  - `PATCH /:jobId` allows an `amountActual` override and the date fields. Print shops negotiate; making that invisible pushes staff into workarounds.
+  - `POST /:jobId/reviews` appends a QC review. **Append-only — never update an existing review row.** Reject -> rework -> re-review must leave multiple rows; a test asserting three reviews after two rejections is what protects that.
+  - `GET /api/admin/production` — paginated queue filterable by stage, status and vendor.
+  - Gated `requireAuth, requireAdmin`. content-manager 403.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:58:44.787Z'
+last_updated: '2026-08-17T01:38:18.656Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:31:40.040Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:38:15.820Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `50581058` - feat(api): add production job queue, assignment pricing and QC reviews
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/production-jobs.ts` (new) - the admin production router
+      - `packages/api/tests/routes/admin/production-jobs.test.ts` (new) - 34 tests
+      - `packages/api/src/index.ts` - two lines: the import and `app.route("/api/admin/production", adminProductionApp)`
+
+      **Summary**:
+      - `GET /` paginated queue (default 20, capped 100) filterable by stage/status/vendorId, each row carrying `payableAmount` from `lib/vendor-payables.jobPayableAmount`.
+      - `POST /` validates the order exists and that every submitted `orderItemId` is on THAT order (422 with `missingOrderItemIds` otherwise), then writes the job and its `production_job_items` in one `db.transaction`.
+      - `GET /:jobId` job + items (with variant dimensions) + reviews newest-first + payable.
+      - `POST /:jobId/assign` takes ONE `new Date()` before the loop and passes it to `selectRateInForce` for every item, with the band chosen by `longestEdgeInches`. Misses collect into a 422 `{ unpriced: [{ orderItemId, longestEdge, size }] }` and nothing is written — no zero default. Amounts are summed by `sumPayable` in integer paise.
+      - `PATCH /:jobId` amountActual override + dueAt/sentAt/receivedAt + status, deliberately with NO transition guard (state machine belongs to production-pipeline).
+      - `POST /:jobId/reviews` INSERT-only; `reviewerId` comes from the session.
+      - `requireAuth, requireAdmin` — content-manager 403 on every route, asserted per-route.
+
+      Notable test-harness detail: the recording db mock now models `db.transaction` (tagging every query issued inside it) plus a failure injector, which is how "a partway failure leaves no orphan job" is asserted without a database. `vi.mock`'s factory is hoisted, so the db mock is built by a function *declaration* — a `const` dies in the TDZ.
+
+      Deliberately out of scope: per-item quantity multiplication on `amountExpected` (spec says sum the resolved rates), and any status transition rules.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/routes/admin/production-jobs.test.ts`
+      - Result: PASS (34 tests, 34 passing, 0 failing)
+      - Output: `Test Files 1 passed (1) / Tests 34 passed (34)`
+      - `bunx tsc --noEmit` reports no errors in `production-jobs.ts`; the only hit near my edits is `./routes/admin/vendor-invite` (ticket #615's file, in flight).
+  - author: system
+    timestamp: '2026-08-17T01:38:18.656Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 611
+    feature: vendor-management
+    description: Access Control - rate resolution, band overlap rejection and payables derivation
+  - ticket: 612
+    feature: vendor-management
+    description: Admin API - vendors CRUD, contacts, capabilities and role gating
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for job creation, assignment pricing and append-only QC reviews
+    file: packages/api/tests/routes/admin/production-jobs.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/production-jobs.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases this file must cover:
+      //   1. POST creates a job and its production_job_items in one transaction; a
+      //      failure partway leaves no orphan job.
+      //   2. Two jobs over different order_items of the SAME order, assigned to two
+      //      different vendors, both succeed. This is the mixed-basket split and is
+      //      the reason items join to order_items rather than to the order.
+      //   3. POST /:jobId/assign computes amountExpected from the rate card in force
+      //      AT THE ASSIGNMENT INSTANT. Seed a rate of 100.00 plus a future rate of
+      //      150.00 and assert the job is priced at 100.00 — a scheduled rise must
+      //      not be charged early.
+      //   4. Longest edge drives the band: a 24x36 item prices from the 36 band, and
+      //      a 36x24 item prices identically. Orientation must not change the price.
+      //   5. Assigning when an item's size has no covering band -> 422 naming the
+      //      item and the size. Assert amountExpected was NOT written as 0 — a
+      //      silent zero is an unbillable job with no explanation.
+      //   6. PATCH sets amountActual and the payable for that job becomes the
+      //      override, not the expectation.
+      //   7. POST /:jobId/reviews twice with verdict fail then once with pass leaves
+      //      THREE review rows, newest first, and no row was mutated. Append-only is
+      //      how rework history survives.
+      //   8. GET queue filters by stage, status and vendor, and paginates.
+      //   9. A content-manager gets 403.
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/production-jobs.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Create the admin production router
+    file: packages/api/src/routes/admin/production-jobs.ts
+    status: done
+    code: |-
+      // export const adminProductionApp = new Hono<{ Variables: AuthVariables }>()
+      // adminProductionApp.use('*', requireAuth, requireAdmin)
+      //
+      // GET  '/'                — paginated queue; filters stage/status/vendorId
+      // POST '/'                — { orderId, stage, orderItemIds[] } in a transaction
+      // GET  '/:jobId'          — job + items + reviews + vendor
+      // POST '/:jobId/assign'   — { vendorId }:
+      //        load the vendor's rates once
+      //        for each item: longestEdgeInches(variant) -> selectRateInForce(at: now)
+      //        any miss -> 422 { unpriced: [{ orderItemId, longestEdge }] }, no write
+      //        else sum in paise, write amountExpected, assignedAt, status='assigned'
+      // PATCH '/:jobId'         — amountActual override, dueAt/sentAt/receivedAt, status
+      // POST '/:jobId/reviews'  — INSERT ONLY. { verdict, defects[], notes }
+      //                           reviewerId = c.get('user').id
+      //
+      // No transition guards here. Status is a vocabulary; the state machine is
+      // production-pipeline's job.
+  - id: 4
+    action: implement
+    description: Mount the production router
+    file: packages/api/src/index.ts
+    status: done
+    code: |-
+      import { adminProductionApp } from "./routes/admin/production-jobs";
+      app.route("/api/admin/production", adminProductionApp);
+  - id: 5
+    action: verify-pass
+    description: Confirm the production route tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/production-jobs.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the production job API
+    command: 'git add packages/api/src/routes/admin/production-jobs.ts packages/api/src/index.ts packages/api/tests/routes/admin/production-jobs.test.ts && git commit -m "feat(api): add production job queue, assignment pricing and QC reviews"'
+    status: done
+current_step: 6
+started: '2026-08-17T01:31:40.040Z'
+completed: '2026-08-17T01:38:18.656Z'

@@ -1,0 +1,133 @@
+ticket_number: 613
+title: Admin API - rate card routes with effective dating and overlap rejection
+description: |-
+  ## Task
+  `/api/admin/vendors/:id/rates` — list, create, update, close. Every write runs the overlap check; every read can be asked for the card as of a given instant.
+
+  ## Context
+  Feature: vendor-management. Phase 3 of 7. Depends on `lib/vendor-rates.ts` (Phase 2) and the admin vendors router.
+
+  This is a separate ticket from vendors CRUD because the write path has real rules and deserves its own test file.
+
+  - Every POST/PATCH loads the vendor's existing rates and calls `findOverlappingBand`. A collision is **422 with the conflicting row in the response** — the admin needs to know WHICH band they collided with, not just that they did. A bare 400 sends them hunting.
+  - `GET ?at=<iso>` resolves the card in force at that instant via `selectRateInForce`, defaulting to now. This is what the assignment screen calls.
+  - Closing a rate sets `effectiveTo`; it does not delete the row. Historical jobs reference the price that was live when they were assigned, and a deleted rate makes an old job's amount unexplainable.
+  - **Do not clobber a scheduled future rate.** `wallet-config.ts` ends every open row for its key on write; `shipping-config.ts` deliberately departed from that because it silently deleted scheduled values. Follow shipping-config: close only the row actually in force at the new value's start, let later rows survive, and return them in `warnings` so the admin is told their new rate has an expiry they did not set.
+  - Money is `decimal(10,2)` INR. The payload carries a string or a number of rupees; it must never be paise.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:58:44.721Z'
+last_updated: '2026-08-17T01:39:23.512Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:39:09.396Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:39:23.512Z'
+    text: |-
+      Done in ea326fc3.
+
+      New files:
+      - packages/api/src/routes/admin/vendor-rates.ts — separate Hono app mounted at /api/admin/vendors alongside adminVendorsApp (Hono merges additively), so vendors.ts was not touched and #614/#615 files were not touched.
+      - packages/api/tests/routes/admin/vendor-rates.test.ts — 37 tests, same recording-db + real-middleware harness as tests/routes/admin/vendors.test.ts.
+
+      Routes: GET /:id/rates (?at, ?includeExpired, ?kind + ?longestEdge | ?widthInches&?heightInches), POST /:id/rates, PATCH /:id/rates/:rateId, POST /:id/rates/:rateId/close. No DELETE, deliberately.
+
+      Decisions worth recording:
+      - Overlap => 422 with `conflict` carrying id, kind, finish, size range, amount and window; the prose error names the range too. Nothing is written on a conflict.
+      - Supersede is keyed on an EXACT (kind, finish, min, max) match. A same-band write with a later effectiveFrom is a re-price and closes the incumbent; a merely intersecting band (e.g. 12-36 over 0-24) is a conflict, because half-repricing a band silently is worse than refusing.
+      - Scheduled rows survive: only the row in force at the new start is closed, later same-band rows cap the new row's effectiveTo and come back in `warnings`. Follows shipping-config, not wallet-config.
+      - The overlap check runs against a PROJECTED card (incumbent modelled as closed at startsAt) rather than by excluding the incumbent, so findOverlappingBand still decides whether the closure removed the collision.
+      - No band or effective-dating arithmetic in the route: findOverlappingBand, selectRateInForce (also used to find the incumbent for a band at an instant) and longestEdgeInches do it. lib/vendor-rates.ts was not modified.
+      - amount accepts a rupee string or number, normalised to a 2dp string; 3+ decimals rejected rather than rounded.
+
+      Verification: `npx vitest run tests/routes/admin/vendor-rates.test.ts tests/lib/vendor-rates.test.ts` → 47 passed. tests/routes/admin/vendors.test.ts → 37 passed (unaffected). tsc clean for the touched files.
+
+      index.ts note: three agents were editing it concurrently, so only my two lines were staged (via git update-index on a HEAD-derived blob); #615's vendor-payables/vendor-invite import lines remain uncommitted in the working tree and tsc reports the expected "cannot find module ./routes/admin/vendor-invite" until they land.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 611
+    feature: vendor-management
+    description: Access Control - rate resolution, band overlap rejection and payables derivation
+  - ticket: 612
+    feature: vendor-management
+    description: Admin API - vendors CRUD, contacts, capabilities and role gating
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests for rate writes: overlap 422 with the conflicting row, scheduled-rate preservation, and as-of reads'
+    file: packages/api/tests/routes/admin/vendor-rates.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-rates.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases this file must cover:
+      //   1. POST a band overlapping an existing one for the same (vendor, kind,
+      //      finish) with intersecting effective windows -> 422, and the response
+      //      body names the conflicting row's id and its size range. A bare 400 with
+      //      no detail sends the admin hunting; assert the detail is present.
+      //   2. POST the SAME size band with an effectiveFrom after the existing row's
+      //      effectiveTo -> 201. That is how a price change is recorded and must not
+      //      be rejected.
+      //   3. POST an adjacent band (existing 0-24, new 24-48) -> 201. Exclusive max.
+      //   4. POST a rate while a FUTURE rate is already scheduled -> 201, the future
+      //      row still exists afterwards, and the response `warnings` array says the
+      //      new rate has an expiry the admin did not set. This is the
+      //      shipping-config departure from wallet-config; without this test the
+      //      wallet-config habit silently deletes a scheduled price rise.
+      //   5. GET /rates?at=2026-09-15 returns the row in force on that date, not
+      //      today's.
+      //   6. DELETE /rates/:rateId closes the row (sets effectiveTo) and the row is
+      //      still readable afterwards — an old job's amount must stay explainable.
+      //   7. A content-manager gets 403.
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-rates.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Add the rate card routes, either nested in the vendors router or as a sibling module mounted under the same prefix
+    file: packages/api/src/routes/admin/vendor-rates.ts
+    status: done
+    code: |-
+      // GET    /:id/rates?at=<iso>   — selectRateInForce over the vendor's rows
+      // POST   /:id/rates            — findOverlappingBand first; 422 + conflict row
+      // PATCH  /:id/rates/:rateId    — same check, excluding the row being edited
+      // DELETE /:id/rates/:rateId    — sets effectiveTo = now, never deletes
+      //
+      // On create, close only the row in force at the new effectiveFrom. Rows with a
+      // later effectiveFrom survive and come back in `warnings`:
+      //   { warnings: ['A rate scheduled from 2026-09-01 will replace this one'] }
+  - id: 4
+    action: verify-pass
+    description: Confirm the rate route tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-rates.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm the Phase 2 rate helper tests still pass
+    command: cd packages/api && bunx vitest run tests/lib/vendor-rates.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the rate card API
+    command: 'git add packages/api/src/routes/admin/vendor-rates.ts packages/api/src/routes/admin/vendors.ts packages/api/tests/routes/admin/vendor-rates.test.ts && git commit -m "feat(api): add vendor rate card endpoints with overlap rejection"'
+    status: done
+current_step: 6
+completed: '2026-08-17T01:39:09.396Z'

@@ -1,0 +1,243 @@
+ticket_number: 634
+title: 'Deduplicate OrdersTable and ProductsTable: status badges, sortable header, row menu and table shell'
+description: |-
+  ## Task
+
+  `packages/web/app/components/admin/OrdersTable.tsx` and `ProductsTable.tsx` are near-copies of each other outside their column definitions. #630 took the pagination footer out into `<TablePagination>`; five clone regions survive, totalling ~180 duplicated lines.
+
+  These are **production admin UI with almost no test coverage** — the only spec touching either file is `tests/components/admin/product-popularity.test.tsx`. That is the reason this is worth doing (two copies of a table shell drift silently) and also the reason to be careful: write a characterization test first, before moving anything.
+
+  ## The clone regions
+
+  **1. Status badge — `OrdersTable.tsx:116-180` (a self-clone: `OrderStatusBadge` vs `PaymentStatusBadge`)**
+
+  Both are the identical shape — a `Record<Status, string>` of classes, a `Record<Status, string>` of labels, and one `<span>`:
+
+  ```tsx
+  function OrderStatusBadge({ status }: { status: OrderStatus }) {
+    const styles: Record<OrderStatus, string> = { pending: 'bg-amber-100 …', … }
+    const labels: Record<OrderStatus, string> = { pending: 'Pending', … }
+    return <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', styles[status])}>{labels[status]}</span>
+  }
+  ```
+
+  Extract a `<StatusBadge styles labels status />`, or a `makeStatusBadge(styles, labels)` factory. `ProductsTable` has the same shape for its own status set.
+
+  **Note, do not fix here:** these maps use raw palette classes (`bg-amber-100`, `text-green-700`) rather than design tokens. Moving them is in scope; re-colouring them is not — that would change how the admin screens look and belongs in its own ticket.
+
+  **2. Sortable column header — `OrdersTable.tsx:322-347` vs `ProductsTable.tsx:255-280` (26 lines)**
+
+  Identical apart from the generic: `Column<AdminOrder, unknown>` vs `Column<AdminProduct, unknown>`. The asc/desc/unsorted chevron ladder is duplicated verbatim. Extract a generic `<SortableHeader<TData> column>{children}</SortableHeader>`.
+
+  **3. Row actions dropdown — `OrdersTable.tsx:233-253` vs `ProductsTable.tsx:143-163` (21 lines)**
+
+  The `MoreHorizontal` trigger, the full-screen click-away backdrop, and the absolutely-positioned menu shell. Only the menu *items* differ. Extract `<RowActionsMenu>` taking the items as children.
+
+  **4. Table shell — `OrdersTable.tsx:584-628` + `643-662` vs `ProductsTable.tsx:604-648` + `666-685` (45 + 20 lines, the big one)**
+
+  `<thead>` from `getHeaderGroups()`, the five-row loading skeleton, the empty state, and the `<tbody>` cell loop. Only the empty-state icon and copy differ (`Package` in Orders). Extract `<AdminDataTable table columns isLoading emptyIcon emptyTitle emptyBody />`.
+
+  **5. Skeleton widths block — `OrdersTable.tsx:701-716` vs `ProductsTable.tsx:721-736` (16 lines)**
+
+  The `[150, 200, 140, …].map(...)` pulse-bar rows inside `OrdersTableSkeleton` / `ProductsTableSkeleton`. Fold into the extracted skeleton, taking the width array as a prop.
+
+  ## Acceptance criteria
+
+  - Each region above is one shared component under `packages/web/app/components/admin/`.
+  - **Behaviour-preserving**: both admin tables look and act exactly as before — same classes, same sort ladder, same empty and loading states, same menu behaviour including click-away.
+  - The raw palette classes in the badge maps are moved as-is, not retokenised.
+  - `bun run typecheck` stays at 0 errors.
+  - Re-running the scan shows these five pairs gone and total duplication below the current 2.93%.
+
+  ## Context
+
+  - Follow-on from #630. `<TablePagination>` (`app/components/admin/TablePagination.tsx`) is the pattern to copy: props for what genuinely differs, one named constant for a class string repeated across siblings.
+  - Coverage is thin. `tests/components/admin/product-popularity.test.tsx` is the only spec that renders either table, so a green run proves very little on its own. Step 1 is a characterization test that renders both tables and asserts the header sort ladder, the empty state and the loading skeleton — otherwise there is nothing to catch a regression.
+  - `tests/styles/storefront-token-compliance.test.ts` guards design tokens. It passes today with these raw palette classes in place, so the extraction must not move them into a path the guard covers differently. Run `bunx vitest run tests/styles/` after the badge extraction.
+
+  ## Verification
+
+  ```
+  cd packages/web
+  bunx vitest run tests/components/admin/ tests/styles/
+  cd ../.. && bun run typecheck
+  ```
+
+  Then visually confirm both screens — `/admin/orders` and `/admin/products` — still sort, paginate, open their row menus and render their empty states.
+
+  Then re-run the scan scoped as the #630 baseline was:
+
+  ```
+  npx jscpd@5.0.12 packages \
+    --format typescript,tsx,javascript,jsx \
+    --ignore '**/node_modules/**,**/migrations/**,**/dist/**,**/build/**,**/.turbo/**,**/*.d.ts' \
+    --min-lines 15
+  ```
+feature: code-deduplication
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T05:12:37.577Z'
+last_updated: '2026-08-17T05:12:37.577Z'
+time_spent_minutes: 0
+labels:
+  - refactor
+  - dry
+  - frontend
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Characterization test: render both tables and pin the shared behaviour before moving any of it'
+    file: packages/web/tests/components/admin/admin-tables-shared.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/admin/admin-tables-shared.test.tsx
+    expected_result: PASS - this test describes CURRENT behaviour, so it must pass before the refactor and after it. If it fails now, the assertion is wrong, not the component.
+    status: pending
+    code: |
+      /**
+       * What OrdersTable and ProductsTable must keep doing while their shared parts
+       * are extracted (#630 follow-on).
+       *
+       * These assertions describe behaviour that exists TODAY. They are written
+       * before the refactor so the extraction has something to be checked against —
+       * the only spec that renders either table right now is product-popularity,
+       * which would stay green through almost any regression here.
+       */
+
+      import { describe, it, expect, afterEach } from 'vitest'
+      import { render, screen, cleanup, within } from '@testing-library/react'
+
+      import { OrdersTable } from '~/app/components/admin/OrdersTable'
+      import { ProductsTable } from '~/app/components/admin/ProductsTable'
+
+      afterEach(cleanup)
+
+      describe('the admin tables share a shell', () => {
+        it('renders the empty state when there are no rows', () => {
+          render(<OrdersTable orders={[]} isLoading={false} />)
+          expect(screen.getByText(/no orders/i)).toBeInTheDocument()
+        })
+
+        it('renders skeleton rows, not an empty state, while loading', () => {
+          const { container } = render(<OrdersTable orders={[]} isLoading />)
+          expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
+          expect(screen.queryByText(/no orders/i)).toBeNull()
+        })
+
+        it('gives every sortable header a button that toggles the sort', () => {
+          render(<ProductsTable products={[]} isLoading={false} />)
+          const header = screen.getByRole('button', { name: /title/i })
+          expect(header).toBeInTheDocument()
+        })
+      })
+  - id: 2
+    action: verify-pass
+    description: Confirm the characterization test and the existing admin specs are green BEFORE refactoring
+    command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
+    expected_result: PASS - record the counts; this is the contract for every later step
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit the characterization test on its own, so the refactor diff is reviewable against it
+    command: 'git add packages/web/tests/components/admin/admin-tables-shared.test.tsx && git commit -m "test(web): pin the shared behaviour of the admin tables before extracting it"'
+    status: pending
+  - id: 4
+    action: implement
+    description: Extract StatusBadge (region 1), moving the palette classes as-is
+    file: packages/web/app/components/admin/StatusBadge.tsx
+    expected_result: OrderStatusBadge and PaymentStatusBadge both become thin wrappers over one component; no class string changes
+    status: pending
+    code: |-
+      import { cn } from '~/lib/utils'
+
+      interface StatusBadgeProps<TStatus extends string> {
+        status: TStatus
+        styles: Record<TStatus, string>
+        labels: Record<TStatus, string>
+      }
+
+      /**
+       * A pill for one enum value.
+       *
+       * The colour and copy maps stay with the caller: order status, payment status
+       * and product status are different vocabularies, and merging them would mean a
+       * single map that has to be exhaustive over all three.
+       */
+      export function StatusBadge<TStatus extends string>({
+        status,
+        styles,
+        labels,
+      }: StatusBadgeProps<TStatus>) {
+        return (
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+              styles[status]
+            )}
+          >
+            {labels[status]}
+          </span>
+        )
+      }
+  - id: 5
+    action: verify-pass
+    description: Confirm the badge extraction changed nothing, including the token guard
+    command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
+    expected_result: PASS - same counts as step 2
+    status: pending
+  - id: 6
+    action: implement
+    description: Extract SortableHeader (region 2) and RowActionsMenu (region 3)
+    file: packages/web/app/components/admin/SortableHeader.tsx
+    expected_result: Both tables use one generic header button and one menu shell; the click-away backdrop behaviour is preserved exactly
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Confirm the header and menu extractions changed nothing
+    command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
+    expected_result: PASS - same counts as step 2
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the badge, header and menu extractions
+    command: 'git add packages/web/app/components/admin && git commit -m "refactor(web): extract StatusBadge, SortableHeader and RowActionsMenu from the admin tables"'
+    status: pending
+  - id: 9
+    action: implement
+    description: Extract AdminDataTable (region 4) and fold the skeleton widths block (region 5) into it
+    file: packages/web/app/components/admin/AdminDataTable.tsx
+    expected_result: thead, loading skeleton, empty state and tbody are one component; the empty-state icon and copy come in as props
+    status: pending
+  - id: 10
+    action: verify-pass
+    description: 'Full check: admin specs, style guards and typecheck'
+    command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/ && cd ../.. && bun run typecheck
+    expected_result: PASS - counts match step 2 exactly, typecheck 0 errors
+    status: pending
+  - id: 11
+    action: verify-pass
+    description: Look at both screens in a browser - the tests cannot see a layout regression
+    command: 'cd packages/api && DATABASE_URL=''postgresql://poster_app:dev_password@localhost:5440/poster_app_dev'' bun run dev  # then web, then visit /admin/orders and /admin/products'
+    expected_result: Manual verification - both tables sort, paginate, open row menus and render empty and loading states exactly as before
+    status: pending
+  - id: 12
+    action: verify-pass
+    description: Re-run the duplication scan and confirm the five pairs are gone
+    command: npx jscpd@5.0.12 packages --format typescript,tsx,javascript,jsx --ignore '**/node_modules/**,**/migrations/**,**/dist/**,**/build/**,**/.turbo/**,**/*.d.ts' --min-lines 15
+    expected_result: Total duplication below 2.93%; no OrdersTable/ProductsTable pair over 15 lines remains
+    status: pending
+  - id: 13
+    action: commit
+    description: Commit the table shell extraction
+    command: 'git add packages/web/app/components/admin && git commit -m "refactor(web): extract AdminDataTable shell from the admin tables"'
+    status: pending
+current_step: 1

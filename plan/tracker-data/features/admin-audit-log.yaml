@@ -1,0 +1,34 @@
+name: admin-audit-log
+title: Admin Audit Log
+priority: critical
+created: '2026-08-16T21:23:26.095Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Cross-cutting audit trail for admin actions. Separate from the fulfilment decomposition; queued for its own brainstorming pass.
+
+  PROBLEM: grepped the whole schema — there is no audit table. Actor is recorded only for gift cards (issued_by_user_id), promotions on create (created_by), approvals, AI moderation (ai_generation_reviews), and shipping config (created_by). Actor is NOT recorded for: refunds (routes/admin/returns.ts approve/reject/process-refund), order cancellation, order status changes, role changes (routes/admin/customers.ts:355 reads currentUser only to block self-demotion, never stores who promoted whom), or product price/stock edits. Money moves and privilege escalates with no record of who did it.
+
+  PROPOSED SPLIT (not yet approved): the WRITE path is a launch gate; the read UI is not. History cannot be backfilled — launching without the write path means the first disputed refund has no answer. A viewer can be added any time.
+
+  DESIGN FORK to settle in brainstorming: generic append-only admin_audit_log captured in middleware, versus more per-domain actor columns. Repo has precedent both ways. Claude's lean is generic — the gap is precisely the paths nobody remembered to add a column to, and per-domain columns need a migration per action forever, each one another chance to forget.
+
+  OPEN QUESTIONS: scope tiers (money / privilege / catalogue / config — all four or money+privilege first); payload (actor id+email+role, action, entity type+id, before/after delta, IP, request id); IP must come from cf-connecting-ip not the first x-forwarded-for entry, per #291; retention window and PII handling (entries carry customer emails — India DPDP Act applies); immutability (revoke UPDATE/DELETE grants, or app-level discipline).
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

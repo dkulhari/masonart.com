@@ -1,0 +1,106 @@
+ticket_number: 603
+title: Admin sidebar links to four routes that do not exist (ai-generations, analytics, categories, settings)
+description: |-
+  ## Problem
+
+  Four of the sixteen admin nav items 404. They are among the first things a new operator clicks.
+
+  | Link | Declared at | Reality |
+  |---|---|---|
+  | `/admin/ai-generations` | `AdminSidebar.tsx:113`, `admin/index.tsx:324` | No route. The screen was renamed to `/admin/ai-moderation`; the nav was never updated. |
+  | `/admin/analytics` | `AdminSidebar.tsx:123`, `admin/index.tsx:241` | No route, no API. (`analytics-dashboard` feature is todo/0%.) |
+  | `/admin/categories` | `AdminSidebar.tsx:145` | No route, no API, and **no categories table in the schema** — `category` exists only as `frameCategoryEnum` on frames (`database/schema/products.ts:260`). Product taxonomy is collections. The nav item points at a concept the data model does not have. |
+  | `/admin/settings` | `AdminSidebar.tsx:156` | No route, no API. |
+
+  Verified against `packages/web/app/routeTree.gen.ts` — the only `/admin/*` paths that exist are: ai-moderation, approvals, collections, customers, frames, gift-cards, orders, products, promotions, returns, reviews, shipping.
+
+  Note both the sidebar **and** the dashboard quick-action cards carry the stale links, so removing them from `AdminSidebar.tsx` alone is not enough.
+
+  ## Fix
+
+  - Point `AI Generations` at `/admin/ai-moderation` and relabel it to match the screen (or drop it, since `AI Moderation` is already listed at `AdminSidebar.tsx:103` — right now they are two nav entries for one screen).
+  - Remove `Analytics`, `Categories`, `Settings` from `NAV_ITEMS` / `SECONDARY_NAV_ITEMS` until the screens exist. `Categories` should not come back at all unless a categories model is introduced.
+  - Remove the matching quick-action cards in `admin/index.tsx` (lines ~241 and ~324).
+
+  ## Verification
+
+  Add a test in `packages/web/tests/components/admin/AdminSidebar.test.tsx` that asserts every `href` in `NAV_ITEMS` and `SECONDARY_NAV_ITEMS` resolves to a path present in the generated route tree. That turns this class of drift into a failing test rather than a 404 in production.
+feature: admin-panel
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-16T19:08:58.082Z'
+last_updated: '2026-08-17T02:43:09.882Z'
+time_spent_minutes: 3
+labels:
+  - admin
+  - navigation
+  - go-live
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T02:39:46.840Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T02:42:56.484Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T02:43:08.835Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c1489c6a` - fix(admin): remove nav links to four routes that never existed
+
+      **Files Changed**:
+      - `packages/web/app/components/admin/AdminSidebar.tsx` — dropped `AI Generations`, `Analytics`, `Categories`, `Settings`; exported NAV_ITEMS/SECONDARY_NAV_ITEMS; pruned now-unused icon imports; secondary heading renamed `Settings` -> `Catalog` (it now holds only Collections and Frames)
+      - `packages/web/app/routes/admin/index.tsx` — revenue tile loses its `/admin/analytics` href; AI generations tile now points at `/admin/ai-moderation`
+      - `packages/web/app/lib/admin-nav.ts` — removed `/admin/categories` from CONTENT_MANAGER_ALLOWED_PREFIXES (it only ever granted access to a 404)
+      - `packages/web/tests/components/admin/AdminSidebar.test.tsx` — new `#603` block: every nav href must appear in `FileRoutesByTo` in routeTree.gen.ts, no duplicate hrefs, and every `href="/..."` in the dashboard source must resolve
+
+      **Summary**:
+      `AI Generations` was dropped rather than repointed — the screen it meant is `/admin/ai-moderation`, already listed, so repointing would have left two entries for one screen. `Analytics` and `Settings` have no route and no API; they return with their screens. `Categories` is gone for good: no categories table, and product taxonomy here is collections (`category` exists only as `frameCategoryEnum` on frames).
+
+      The route tree is read as text rather than imported — importing routeTree.gen.ts pulls in every route module and their loaders to answer a question about a list of strings.
+
+      **Verification**:
+      - Command: `npx vitest run tests/components/admin/AdminSidebar.test.tsx` (packages/web)
+      - Result: PASS (25 tests passing). Pre-fix the same file was 5 failed / 24 passed — 4 unresolvable nav hrefs plus `['/admin/analytics', '/admin/ai-generations']` from the dashboard scan.
+      - Also: `tests/lib/admin-nav.test.ts` + `tests/lib/admin-nav-vendor-role.test.ts` — 7 passed (the prefix removal touches the content-manager guard).
+      - Build: `npx tsc --noEmit` — no errors in any changed file (unrelated pre-existing TS6133 errors elsewhere are baseline).
+work_sessions:
+  - start: '2026-08-17T02:39:47.263Z'
+    agent: claude-code
+    summary: Removed four dead admin nav links and the two stale dashboard tile hrefs; added a nav-vs-routeTree drift test. Committed c1489c6a. 25 sidebar tests + 7 admin-nav tests pass, tsc clean on changed files.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T02:43:09.875Z'
+    duration: '00:03:22'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-17T02:39:46.840Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/components/admin/AdminSidebar.test.tsx tests/lib/admin-nav.test.ts tests/lib/admin-nav-vendor-role.test.ts (packages/web)
+  test_output: 'AdminSidebar.test.tsx: 25 passed. admin-nav.test.ts + admin-nav-vendor-role.test.ts: 7 passed. Pre-fix run of AdminSidebar.test.tsx: 5 failed / 24 passed (4 unresolvable nav hrefs + 2 dashboard hrefs).'
+  build_passed: true
+  build_command: npx tsc --noEmit -p tsconfig.json (packages/web)
+  verified_at: '2026-08-17T02:42:56.402Z'
+completed: '2026-08-17T02:42:56.484Z'

@@ -1,0 +1,176 @@
+ticket_number: 612
+title: Admin API - vendors CRUD, contacts, capabilities and role gating
+description: |-
+  ## Task
+  `/api/admin/vendors` — list (paginated, filterable), create, get, update; nested contacts and capabilities routes. Mounted and role-gated.
+
+  ## Context
+  Feature: vendor-management. Phase 3 of 7. Depends on Phase 1 + 2.
+
+  Follow `packages/api/src/routes/admin/shipping-config.ts` for file shape: `new Hono<{ Variables: AuthVariables }>()`, `zValidator` + zod schemas at the top, a doc comment explaining the departures from precedent. Mount in `src/index.ts` next to the other `app.route("/api/admin/...")` lines (around line 208-235) with a matching import at the top.
+
+  Gating: `requireAuth, requireAdmin`. **NOT** `requireContentManager` — payables and vendor cost are admin data, and a content-manager must be refused. Test that explicitly; `tests/routes/admin/products-role-access.test.ts` is the existing pattern for a role-access test.
+
+  Endpoints:
+  - `GET /api/admin/vendors` — paginated list with name, status, capability summary, open job count, amount owed. Filter by `status` and by capability `kind`. **Paginate from day one**: the collections and frames list endpoints have no LIMIT today and that is a known defect, not a precedent to copy.
+  - `POST /api/admin/vendors`, `GET /:id`, `PATCH /:id`
+  - `GET|POST /:id/contacts`, `PATCH|DELETE /:id/contacts/:contactId`
+  - `GET|POST /:id/capabilities`, `PATCH|DELETE /:id/capabilities/:capId`
+
+  The list's `amountOwed` uses `sumPayable` / the same SQL derivation as `lib/vendor-payables.ts` — do not write a second summation.
+
+  Capability filtering must support the assignment use case: "vendors that can print at least 36 inches" means `kind = 'print' AND (max_width_inches >= n OR max_height_inches >= n)`.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:58:44.653Z'
+last_updated: '2026-08-17T01:29:33.416Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:22:50.133Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:29:30.353Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a006079f` - feat(api): add admin vendors, contacts and capabilities endpoints
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/vendors.ts` (new) - vendors list/create/read/update plus nested contacts and capabilities routes
+      - `packages/api/src/index.ts` - import + `app.route("/api/admin/vendors", adminVendorsApp)` alongside the other admin mounts
+      - `packages/api/tests/routes/admin/vendors.test.ts` (new) - 37 tests
+
+      **Summary**:
+      - Gated `requireAuth + requireAdmin`, NOT `requireContentManager`. A content-manager is 403'd on all ten route/method combinations (parameterised test), vendor-role and customer are 403'd, unauthenticated is 401'd, super-admin passes.
+      - List paginated from day one: `pageSize` defaults to 20 and clamps at 100, and the test asserts a LIMIT/offset are applied on a request with no page param — the unbounded collections/frames endpoints were not copied.
+      - `amountOwed` comes from `lib/vendor-payables.sumPayable` over the page's unsettled jobs; no second summation was written. `openJobCount` is a SQL COUNT over jobs not in ('qc_passed','cancelled').
+      - Capability filter serves assignment: `kind = 'print' AND (max_width_inches >= n OR max_height_inches >= n)`. Asserted by rendering the captured drizzle condition through `PgDialect`, so it is a claim about real SQL. It runs as its own query and feeds an id list back into the page query, so a vendor with two matching capabilities cannot be double-counted in `total` or the page.
+      - Rates are read on `GET /:id` but never written — #613 owns rate writes because of the overlap check.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/routes/admin/vendors.test.ts`
+      - Result: PASS (37 tests, 37 passing, 0 failing)
+      - Command: `cd packages/api && DATABASE_URL=…@localhost:5440/poster_app_dev bunx vitest run tests/server.test.ts`
+      - Result: 70 passing, 3 failing — all three pre-existing and unrelated (root endpoint missing `documentation`, `/api/health` returning `healthy` instead of `ok`). Both admin-route-mount assertions pass. Without the 5440 override the same file fails 21 tests on DB connectivity alone.
+      - Command: `bunx tsc --noEmit -p tsconfig.json` — no errors in `src/routes/admin/vendors.ts`, `tests/routes/admin/vendors.test.ts` or `src/index.ts`.
+      - Route tests mock `db`, which per #387 cannot catch a bad column reference, so every query in the router was additionally executed against the real dev DB on port 5440 via a throwaway script: all ten queries ran clean ("ALL QUERIES OK"); the vendor tables are empty, as expected for a directory nothing has seeded yet.
+  - author: system
+    timestamp: '2026-08-17T01:29:33.416Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 610
+    feature: vendor-management
+    description: Access Control - requireVendor middleware and the scoped query module
+  - ticket: 611
+    feature: vendor-management
+    description: Access Control - rate resolution, band overlap rejection and payables derivation
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing route tests: CRUD happy paths, pagination, capability filter, and content-manager denial'
+    file: packages/api/tests/routes/admin/vendors.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendors.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Mirror the mocking style of tests/routes/admin/products.test.ts: vi.mock the
+      // database module and the auth middleware, then exercise the Hono app directly.
+      //
+      // Cases this file must cover:
+      //   1. GET /api/admin/vendors returns a paginated envelope (items + total +
+      //      page + pageSize) and applies a LIMIT. Assert the LIMIT is applied even
+      //      when no page param is sent — unbounded-by-default is the defect in the
+      //      collections and frames endpoints and must not be repeated here.
+      //   2. GET ?status=active filters by status.
+      //   3. GET ?kind=print&minLongestEdge=36 returns only vendors with a print
+      //      capability whose max_width_inches OR max_height_inches is >= 36.
+      //   4. POST creates a vendor and records createdBy from the session user.
+      //   5. PATCH /:id updates and 404s an unknown id.
+      //   6. POST /:id/contacts and /:id/capabilities attach to the vendor and 404
+      //      when the vendor does not exist.
+      //   7. A content-manager gets 403 on every route in this file. Payables and
+      //      vendor cost are admin data — see products-role-access.test.ts for the
+      //      established shape of this test.
+      //   8. The list's amountOwed for a vendor with one unsettled job at
+      //      amountExpected 100.00 and an override of 90.00 is '90.00'.
+  - id: 2
+    action: verify-fail
+    description: Confirm the route tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendors.test.ts
+    expected_result: FAIL - Cannot find module '../../../src/routes/admin/vendors'
+    status: done
+  - id: 3
+    action: implement
+    description: Create the admin vendors router with zod validation and pagination
+    file: packages/api/src/routes/admin/vendors.ts
+    status: done
+    code: |-
+      // Shape follows routes/admin/shipping-config.ts.
+      //
+      // export const adminVendorsApp = new Hono<{ Variables: AuthVariables }>()
+      // adminVendorsApp.use('*', requireAuth, requireAdmin)
+      //
+      // Zod schemas at the top:
+      //   listQuerySchema  — page/pageSize coerced ints with defaults (1/20, cap 100),
+      //                      status enum optional, kind enum optional,
+      //                      minLongestEdge coerced int optional
+      //   createVendorSchema, updateVendorSchema
+      //   contactSchema, capabilitySchema
+      //
+      // GET '/'      — paginated. LEFT JOIN capabilities for the summary; the open
+      //                job count and amountOwed come from a grouped subquery over
+      //                production_jobs using the same COALESCE(actual, expected)
+      //                WHERE settlement_id IS NULL derivation as lib/vendor-payables.
+      //                Do not write a second summation.
+      // POST '/'     — createdBy = c.get('user').id
+      // GET '/:id'   — vendor + contacts + capabilities + current rate rows
+      // PATCH '/:id'
+      // GET|POST '/:id/contacts', PATCH|DELETE '/:id/contacts/:contactId'
+      // GET|POST '/:id/capabilities', PATCH|DELETE '/:id/capabilities/:capId'
+      //
+      // Capability filter for assignment:
+      //   and(eq(vendorCapabilities.kind, kind),
+      //       or(gte(vendorCapabilities.maxWidthInches, n),
+      //          gte(vendorCapabilities.maxHeightInches, n)))
+  - id: 4
+    action: implement
+    description: Mount the router in the app
+    file: packages/api/src/index.ts
+    status: done
+    code: |-
+      import { adminVendorsApp } from "./routes/admin/vendors";
+      // ...alongside the other admin mounts near line 208-235:
+      app.route("/api/admin/vendors", adminVendorsApp);
+  - id: 5
+    action: verify-pass
+    description: Confirm the route tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendors.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: verify-pass
+    description: Confirm the server smoke test still passes with the new mount
+    command: cd packages/api && bunx vitest run tests/server.test.ts
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: commit
+    description: Commit the admin vendors API
+    command: 'git add packages/api/src/routes/admin/vendors.ts packages/api/src/index.ts packages/api/tests/routes/admin/vendors.test.ts && git commit -m "feat(api): add admin vendors, contacts and capabilities endpoints"'
+    status: done
+current_step: 7
+started: '2026-08-17T01:22:50.133Z'
+completed: '2026-08-17T01:29:33.416Z'

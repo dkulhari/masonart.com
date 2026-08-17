@@ -1,0 +1,127 @@
+ticket_number: 628
+title: Make the typecheck a gate locally, now that it is at zero
+description: |-
+  ## Context
+
+  #626 took `packages/web` from 22 type errors to 0, and `bun run typecheck` (turbo, all three packages) now passes repo-wide in ~7s. CI already runs it — `.github/workflows/test.yml` has a `lint` job doing `bun run typecheck`, and the summary job fails the build if it fails. That job has presumably been red for a long time, and is only meaningful as of #626.
+
+  What is missing is the local half. Nothing stops a commit that reintroduces an error; the author finds out from CI minutes later, or — with several agents committing on this machine — someone else finds out instead.
+
+  ## Fix
+
+  A committed pre-commit hook, no new dependency:
+
+  - `.githooks/pre-commit` runs `bun run typecheck`. Turbo caches it, so an unchanged tree costs a cache hit rather than a compile.
+  - Root `package.json` gains `"prepare": "git config core.hooksPath .githooks"`, so `bun install` wires it up for everyone without anyone having to read a README.
+  - The hook must be skippable (`git commit --no-verify` already is, and that is enough — do not invent a second escape hatch).
+
+  ## Watch out for
+
+  - **The stale `.tsbuildinfo` problem #626 hit.** `packages/web` is `composite: true`, and a stale build info file hid ~130 errors until an edit invalidated it. A hook that trusts an incremental cache can report clean on a tree that is not. Confirm the hook's result matches a cold run before trusting it.
+  - Several agents share this machine and commit concurrently. The hook must not hold a lock or leave processes behind.
+
+  ## Verification
+
+  - With a deliberate type error staged, `git commit` is refused and names the error.
+  - With the tree clean, `git commit` succeeds and the hook adds no noticeable delay on a warm cache.
+  - A fresh clone plus `bun install` gets the hook without extra steps (`git config core.hooksPath` reads `.githooks`).
+feature: admin-panel
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T03:40:44.607Z'
+last_updated: '2026-08-17T03:45:08.515Z'
+time_spent_minutes: 0
+labels:
+  - tooling
+  - ci
+  - tech-debt
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T03:43:36.136Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T03:44:36.944Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T03:44:58.791Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f51dd5b1` — chore: refuse commits that do not typecheck
+
+      **Correction to the ticket's premise**: CI was already running the typecheck — `.github/workflows/test.yml` has a `lint` job doing `bun run typecheck`, and `test-summary` fails the build on it. Nothing needed adding there. What that job has been doing all along is failing, silently as far as local work was concerned; it became a real gate the moment #626 took the count to zero. Verified: `bun run typecheck` across all three packages (`@chobii/shared`, `@chobii/api`, `@chobii/web`) now passes in ~7s cold.
+
+      **What was actually missing was the local half**
+      - `.githooks/pre-commit` runs `bun run typecheck`, and exits immediately when no `.ts`/`.tsx` is staged so doc and tracker commits stay instant.
+      - Root `package.json` gains `"prepare": "git config core.hooksPath .githooks"`, so `bun install` wires it up — no README step to miss.
+      - Skippable only via `git commit --no-verify`. Deliberately no env-var escape hatch: one nobody remembers setting is how a gate turns into decoration.
+
+      **Verification, both directions**
+      - Staged `export const probe: number = 'not a number'` → commit **refused**, output naming `app/lib/__gate-probe.ts(1,14): error TS2322`, in **2.5s** (turbo served 3 of 4 tasks from cache). Probe removed afterwards.
+      - Clean tree → this ticket's own commit went through the hook normally.
+
+      **Limit recorded in the hook itself**: `packages/web` is `composite: true`, and a stale `.tsbuildinfo` can under-report — that is how #626 hid ~130 errors until an edit invalidated the cache. A hook that trusts the incremental cache can therefore pass on a tree that would fail cold. CI runs cold on a fresh checkout, which is the backstop; the comment says so, so the next person does not assume the hook is exhaustive.
+
+      **Worth knowing for future tickets**: "no new type errors" is no longer the standard to verify against. It is "zero", and both a hook and CI now enforce it.
+work_sessions:
+  - start: '2026-08-17T03:45:04.050Z'
+    agent: claude-code
+    summary: Added .githooks/pre-commit running bun run typecheck (skips when no TS staged) plus a prepare script wiring core.hooksPath. CI already had the typecheck job; it only became meaningful at zero. Verified refusal with a deliberate error (2.5s) and clean pass. Committed f51dd5b1.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T03:45:08.513Z'
+    duration: '00:00:04'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Add .githooks/pre-commit running bun run typecheck, executable, with a comment explaining why it exists and how to skip it.
+    file: .githooks/pre-commit
+    status: pending
+  - id: 2
+    action: implement
+    description: Add the prepare script to root package.json so bun install points core.hooksPath at .githooks.
+    file: package.json
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: 'Prove the gate both ways: a staged type error is refused, a clean tree commits. Verify against a cold typecheck too, since a stale composite .tsbuildinfo can report clean on a dirty tree.'
+    command: git config core.hooksPath && bun run typecheck
+    expected_result: PASS - hooksPath is .githooks, typecheck exits 0, and a deliberate error is refused at commit time
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the hook and the prepare script.
+    command: 'git add .githooks package.json && git commit -m "chore: gate commits on the typecheck"'
+    status: pending
+current_step: 1
+started: '2026-08-17T03:43:36.136Z'
+verification:
+  tests_passed: true
+  test_command: git commit with a deliberate type error staged (app/lib/__gate-probe.ts)
+  test_output: 'Commit refused: "app/lib/__gate-probe.ts(1,14): error TS2322" then "pre-commit: typecheck failed — commit refused." Clean tree commits normally.'
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-17T03:44:36.842Z'
+completed: '2026-08-17T03:44:36.944Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:00:00'
+      tokens: 0

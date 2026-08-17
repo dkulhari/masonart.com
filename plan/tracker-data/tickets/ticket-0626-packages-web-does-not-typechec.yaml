@@ -1,0 +1,153 @@
+ticket_number: 626
+title: 'packages/web does not typecheck: 22 errors across router navigation, unused imports and unguarded nullables'
+description: |-
+  ## Problem
+
+  `npx tsc --noEmit -p packages/web` reports **22 errors**. None are new — they accumulated because the typecheck is not a gate — but their existence is what makes every ticket's verification step ambiguous: an agent that introduces a real type error has to diff against a 22-error baseline to notice, and #604 and #625 both had to do exactly that.
+
+  Six clusters:
+
+  | Cluster | Count | Where |
+  |---|---|---|
+  | `TS2345` — `navigate({ to })` without required `search` | 6 | `orders/$id.tsx:228`, `products/$id.tsx:346,364,384`, `products/new.tsx:138,148` |
+  | `TS6133` — unused imports/locals | 6 | `track/index.tsx:27,28,29`, `track/$token.tsx:24,25,142`, `ai-generator/PromptSuggestions.tsx:15` |
+  | `TS2741` — `<Icon />` element passed where `LucideIcon` component expected | 4 | `ai-moderation.tsx:538,545,552,559` |
+  | `TS2322` — `updateSearch` reducer not assignable | 2 | `orders/index.tsx:308`, `products/index.tsx:177` |
+  | `TS18048` / `TS18047` — unguarded nullable | 2 | `ai-moderation.tsx:770,772` |
+  | `TS2339` — `user.role` missing on the session user type | 1 | `admin.tsx:51` |
+
+  ## Notes per cluster
+
+  - **The navigate ones are a real latent bug, not noise.** Those routes declare required search params, so a `navigate({ to: '/admin/products' })` with no `search` pushes a URL that fails the route's own `validateSearch` — and a throw inside `validateSearch` error-boundaries the route to a blank page rather than showing a message. `app/lib/admin-nav.ts` already exports `ADMIN_PRODUCTS_SEARCH` and friends for exactly this; the fix is to pass them.
+  - **`admin.tsx:51` is the admin guard.** `context.session.user.role` is read to decide who may enter the admin panel, and the session user type has no `role`. It works at runtime; it is unchecked at compile time, which is the wrong way round for an authorization decision. `routes/vendor.tsx` already solved this with an explicit `VendorPortalUser` interface — mirror it.
+  - **The `ai-moderation` icons** pass `icon={<Clock />}` where `StatsCard` declares `icon?: LucideIcon` and renders `<Icon />` itself. Every other caller passes the component.
+  - **The risk score** is rendered from `generation.moderationResult.riskScore` behind a `?.` guard that does not cover the arithmetic.
+
+  ## Fix
+
+  Drive the count to zero, cluster by cluster, changing behaviour nowhere except where the types are pointing at a real defect (the navigate calls). Then the typecheck is usable as a gate and later tickets can assert "no type errors" instead of "no NEW type errors".
+
+  ## Verification
+
+  - `npx tsc --noEmit -p packages/web` exits 0.
+  - `npx vitest run tests/routes tests/components` shows no regression against the pre-change run.
+  - The admin guard keeps refusing non-admin roles — its existing tests must still pass, since that is the one cluster touching an authorization path.
+feature: admin-panel
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T03:27:05.785Z'
+last_updated: '2026-08-17T03:36:58.138Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - types
+  - tech-debt
+  - go-live
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T03:36:30.306Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T03:36:48.850Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `7f974443` — fix(web): drive the typecheck from 22 errors to zero
+
+      **Result**: `npx tsc --noEmit -p packages/web` exits **0**.
+
+      **Two clusters were live defects, not noise**
+
+      1. **`StatsCardProps` never declared `onClick`.** The four filter tiles on `/admin/ai-moderation` passed it, React dropped it, and clicking them did nothing — and they are the only way to filter that queue. Now declared, and rendered as a real `<button>` rather than a div with a handler, so it is keyboard-reachable. Covered by a new 3-test file (`tests/components/admin/stats-card-click.test.tsx`), written RED first: it failed on `Unable to find an accessible element with the role "button"`.
+      2. **Six `navigate({ to })` calls with no `search`** on routes that declare required search params. The pushed URL fails the target route's own `validateSearch`, and a throw there error-boundaries to a blank page rather than a message — the exact failure mode the vendors screen documents. Fixed by passing the shared `lib/admin-nav` defaults; added `ADMIN_ORDERS_SEARCH` beside the existing products/vendors/production constants, plus `tests/lib/admin-search-defaults.test.ts` proving each constant parses under the schema of the route it targets, including through `router.tsx`'s string round trip.
+
+      **The rest**
+      - Two `updateSearch` reducers typed `prev` as their own route's params; TanStack types that argument as the union of every route's params (all optional), so they never typechecked. Now merge onto `Route.useSearch()` — same value, already narrowed.
+      - The admin guard read `context.session.user.role`, absent from Better Auth's inferred session type (it comes from `additionalFields`). Now narrows to the file's own `User` shape first, as the component in the same file already did.
+      - Six unused imports/locals; one nullable behind an optional chain that did not cover the arithmetic.
+
+      **Found mid-fix, not in the original ticket**: `RouterContext` in `__root.tsx` and two types in `gallery/index.tsx` were unexported while appearing in exported route signatures. With `composite: true` / `declaration: true` that is TS4023 on nearly every route — **130 further errors** that a stale `.tsbuildinfo` had been hiding, and that surfaced the moment an edit to a widely-imported module invalidated it. Exporting the three types cleared all of them. Worth knowing: the "22" was never the real number, and any future baseline claim should be made after a cache-invalidating run.
+
+      **Verification**
+      - Typecheck: `npx tsc --noEmit -p packages/web` → 0 errors (was 22, briefly 152 once the cache invalidated).
+      - Tests: `npx vitest run tests` (full web unit suite, justified — this touched `__root.tsx`, `StatsCard` and two route search reducers) → **3264 passing**, 174 files.
+      - 3 failures, **all pre-existing on HEAD in files this commit does not touch**, verified with `git show HEAD:<file>`: two storefront-token violations in the vendor portal (`vendor.tsx`, `vendor/jobs/$id.tsx` — banned `font-bold` / `bg-brand-*` classes, arrived with #621), and `wishlist-page.test.ts` asserting the source does not contain `beforeLoad` when the word appears in a comment. Neither is mine to fix here; both deserve a ticket.
+
+      **Follow-up worth filing**: the typecheck should now become a gate (CI step or pre-commit), otherwise this ticket gets rewritten in three months. It is only worth gating now that the count is zero.
+work_sessions:
+  - start: '2026-08-17T03:36:53.719Z'
+    agent: claude-code
+    summary: 'Typecheck 22 to 0. Two clusters were real defects: inert onClick on StatsCard filter tiles, six navigate() calls whose URLs failed the target route''s validateSearch. Uncovered 130 TS4023 errors hidden by a stale tsbuildinfo, cleared by exporting RouterContext and two gallery types. Full unit suite 3264 passing; 3 failures pre-existing on HEAD. Committed 7f974443.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T03:36:58.137Z'
+    duration: '00:00:04'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Delete the six unused imports/locals (TS6133) in track/index.tsx, track/$token.tsx and ai-generator/PromptSuggestions.tsx. Check each is genuinely unused rather than a side-effect import before removing.
+    file: packages/web/app/routes/track/index.tsx, packages/web/app/routes/track/$token.tsx, packages/web/app/components/ai-generator/PromptSuggestions.tsx
+    status: pending
+  - id: 2
+    action: implement
+    description: Pass StatsCard the icon component rather than an element in ai-moderation.tsx (icon={Clock}, not icon={<Clock />}), matching every other caller, and guard the risk-score arithmetic so the optional chain covers the multiplication too.
+    file: packages/web/app/routes/admin/ai-moderation.tsx
+    status: pending
+  - id: 3
+    action: implement
+    description: Give the admin guard an explicit session-user type carrying the optional role, mirroring VendorPortalUser in routes/vendor.tsx, so the authorization decision is compile-time checked.
+    file: packages/web/app/routes/admin.tsx
+    status: pending
+  - id: 4
+    action: implement
+    description: 'Fix the six navigate({ to }) calls missing required search by passing the exported defaults from app/lib/admin-nav.ts. This is the cluster with a real failure mode: without search the pushed URL fails the target route''s validateSearch, which error-boundaries to a blank page.'
+    file: packages/web/app/routes/admin/orders/$id.tsx, packages/web/app/routes/admin/products/$id.tsx, packages/web/app/routes/admin/products/new.tsx
+    status: pending
+  - id: 5
+    action: implement
+    description: Fix the two updateSearch reducer assignability errors in orders/index.tsx and products/index.tsx.
+    file: packages/web/app/routes/admin/orders/index.tsx, packages/web/app/routes/admin/products/index.tsx
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Typecheck clean and no test regression.
+    command: npx tsc --noEmit -p . && npx vitest run tests/routes tests/components
+    expected_result: PASS - tsc exits 0, tests match the pre-change baseline
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the typecheck cleanup.
+    command: 'git add packages/web && git commit -m "fix(web): drive the typecheck to zero errors"'
+    status: pending
+current_step: 1
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests (full web unit suite, cwd packages/web)
+  test_output: Tests 3264 passed, 3 failed — all 3 pre-existing on HEAD in untouched files (2 storefront-token violations in vendor portal, 1 wishlist source assertion)
+  build_passed: true
+  build_command: npx tsc --noEmit -p packages/web
+  verified_at: '2026-08-17T03:36:30.179Z'
+completed: '2026-08-17T03:36:30.306Z'
+started: '2026-08-17T03:36:53.719Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:00:00'
+      tokens: 0

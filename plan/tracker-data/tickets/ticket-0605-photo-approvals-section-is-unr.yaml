@@ -1,0 +1,94 @@
+ticket_number: 605
+title: Photo approvals section is unreachable from the admin sidebar
+description: |-
+  ## Problem
+
+  `/admin/approvals` is fully built — `packages/web/app/routes/admin/approvals/index.tsx` (557 lines), `approvals/$id.tsx` (686 lines), backed by `packages/api/src/routes/admin/approvals.ts` (468 lines, mounted at `/api/admin/approvals`), and the `photo-approval-workflow` feature is at 100%.
+
+  It appears in neither `NAV_ITEMS` nor `SECONDARY_NAV_ITEMS` in `packages/web/app/components/admin/AdminSidebar.tsx`, and there is no quick-action card for it on the dashboard. The only way in is to type the URL.
+
+  Customer-submitted photos therefore queue up with nothing in the UI pointing an operator at the queue. This is the mirror image of the dead-links bug: four nav entries with no screen, one screen with no nav entry.
+
+  ## Fix
+
+  - Add an `Approvals` entry to `NAV_ITEMS` (operational surface — belongs in the primary list next to Reviews / AI Moderation, not under the Settings group).
+  - Confirm the intended role gate. `approvals.ts:108-109` uses `requireAuth` + `requireAdmin`, so it must stay invisible to `content-manager` — `isAdminNavItemVisible` already handles this correctly as long as `/admin/approvals` is not added to `CONTENT_MANAGER_ALLOWED_PREFIXES`.
+  - Consider a pending-count badge; `NavItem` already supports `badge` (`AdminSidebar.tsx:49`) and `GET /api/admin/approvals/stats` already exists (`approvals.ts:197`), but no nav item uses either today.
+
+  ## Verification
+
+  - `AdminSidebar.test.tsx`: Approvals renders for `admin`/`super-admin`, and does **not** render for `content-manager`.
+  - Covered by the route-tree parity test proposed in the dead-links ticket, from the other direction: every admin route should be reachable from the nav, or be explicitly listed as an intentional detail-only route.
+feature: admin-panel
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-16T19:08:58.236Z'
+last_updated: '2026-08-16T21:13:18.891Z'
+time_spent_minutes: 2
+labels:
+  - admin
+  - navigation
+  - go-live
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-16T21:13:14.921Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `cc592489` - fix(admin): surface photo approvals in the admin sidebar
+
+      **Files Changed**:
+      - `packages/web/app/components/admin/AdminSidebar.tsx` - Approvals entry added to NAV_ITEMS (ClipboardCheck icon), placed after AI Moderation
+      - `packages/web/tests/components/admin/AdminSidebar.test.tsx` - two tests: link renders for admin at /admin/approvals, absent for content-manager
+
+      **Summary**:
+      /admin/approvals was reachable only by typing the URL. Added it to the primary nav next to Reviews / AI Moderation. Not added to CONTENT_MANAGER_ALLOWED_PREFIXES, so isAdminNavItemVisible hides it from content-manager, matching requireAuth + requireAdmin on approvals.ts:108-109.
+
+      **Not done (deliberate)**: the pending-count badge. NavItem supports `badge` and GET /api/admin/approvals/stats exists, but no nav item fetches data today — wiring the first one turns the sidebar from presentational into a data component. Worth its own ticket. Same for a dashboard quick-action card.
+
+      **Verification**:
+      - Command: `npx vitest run tests/components/admin/AdminSidebar.test.tsx` (from packages/web)
+      - Result: PASS (8 tests, 8 passing, 0 failing) — RED confirmed first: `Unable to find role="link" and name /approvals/i`
+      - Also: `npx vitest run tests/lib/admin-nav.test.ts` PASS (5 tests); `npx tsc --noEmit` reports no errors in the touched files
+  - author: system
+    timestamp: '2026-08-16T21:13:17.511Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions:
+  - start: '2026-08-16T21:11:43.923Z'
+    agent: claude-code
+    summary: Added Approvals to NAV_ITEMS with role-gate tests; RED then GREEN, 8/8 passing; committed cc592489
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-16T21:13:18.856Z'
+    duration: '00:01:34'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-16T21:11:43.923Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:02:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:02:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/components/admin/AdminSidebar.test.tsx (packages/web)
+  test_output: 'Test Files 1 passed (1) | Tests 8 passed (8). admin-nav.test.ts: 5 passed. tsc --noEmit: no errors in AdminSidebar.tsx or admin-nav.ts'
+  build_passed: true
+  build_command: npx tsc --noEmit
+  verified_at: '2026-08-16T21:13:08.867Z'
+completed: '2026-08-16T21:13:17.511Z'

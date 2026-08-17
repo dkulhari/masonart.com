@@ -1,0 +1,165 @@
+ticket_number: 617
+title: Vendor Portal API - signed artwork URLs and the isolation property tests
+description: |-
+  ## Task
+  Job-scoped signed artwork URLs, plus the isolation test suite that asserts the feature's three security properties as properties rather than per-route afterthoughts.
+
+  ## Context
+  Feature: vendor-management. Phase 4 of 7. Depends on the vendor portal API ticket.
+
+  **Artwork delivery.** `GET /api/vendor/jobs/:id/artwork/:itemId` returns a signed, expiring, job-scoped URL. `getPresignedDownloadUrl` already exists in `src/lib/storage.ts:463`. Never a public CDN path: a leaked permanent URL to a customer's commissioned artwork is a worse incident than a leaked job list. Short expiry — minutes, not days.
+
+  **The three properties, tested as properties:**
+  1. Vendor A cannot read or write vendor B's data — one case per vendor-facing endpoint, driven from a list of the routes so a newly added route without a case is visible. Plus the Phase 2 test that the scoped module refuses to run without a vendorId; if a later route bypasses the module, that is what catches it.
+  2. No vendor-facing payload contains a customer field — asserted over EVERY vendor response shape by walking the JSON for forbidden keys, not by eyeballing each handler.
+  3. Artwork URLs are signed, expiring and job-scoped; vendor B's session cannot obtain a URL for vendor A's artwork.
+
+  Property 2 is worth the awkward implementation. Dispatch is in-house — the piece returns to us before it ships — so a vendor needs zero customer data, which is what makes a blanket assertion possible at all. A per-endpoint eyeball check would pass today and rot the first time someone adds a convenience field.
+
+  Mark this ticket security-relevant: it is the one that proves the portal safe to expose.
+feature: vendor-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:00:54.094Z'
+last_updated: '2026-08-17T01:56:42.208Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - security
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-17T01:56:39.575Z'
+    text: |-
+      Done in f89f3783. 107 tests passing across tests/routes/vendor/ + tests/lib/vendor-*.
+
+      Artwork: GET /api/vendor/jobs/:id/artwork/:itemId, 300s presigned URL via getPresignedDownloadUrl. Key resolved by a new scoped read getVendorJobArtwork(vendorId, jobId, itemId) — enrolled in the vendor-scope contract test. Job loaded scoped FIRST, so the presigner is never reached on a cross-vendor miss (asserted as call count 0, not as a 404).
+
+      Isolation suite (tests/routes/vendor/isolation.test.ts) is driven from ROUTE_TABLE, diffed both ways against vendorApp.routes so an uncovered new route fails the first test. Property 2 asserts on the SELECT projection (no wholesale db.select(), no forbidden column) as well as a recursive case-insensitive body walk, and the walker has its own not-vacuous test.
+
+      TWO REAL LEAKS FOUND AND FIXED, both narrowed at source:
+      1. getVendorJobItems selected production_job_items.orderItemId — a direct handle into the customer's order, contradicting the module's own "no person-linked order reference" absolute. Nothing consumed it (artwork keys on production_job_items.id). Dropped from the select.
+      2. The artwork key was whatever snapshot.imageUrl decoded to, making the route a general-purpose bucket signer. Several prefixes are user-partitioned (ai-generations/<userId>/, avatars/<userId>/) and the key rides inside the signed URL where a JSON-key assertion cannot see it. Allow-listed to products/, failing closed; custom per-customer artwork will need copying to an identity-free job-scoped key before it can reach a vendor.
+  - author: system
+    timestamp: '2026-08-17T01:56:42.208Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 616
+    feature: vendor-management
+    description: Vendor Portal API - jobs, rates and payments through the scoped module
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing artwork URL tests
+    file: packages/api/tests/routes/vendor/artwork.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/vendor/artwork.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases:
+      //   1. GET /api/vendor/jobs/:id/artwork/:itemId for an owned job returns a
+      //      signed URL. Assert the URL carries a signature query parameter and is
+      //      NOT the raw public CDN path — getPublicUrl output must not appear.
+      //   2. The URL has a short expiry (minutes). Assert the presigner was called
+      //      with an expiresIn under an hour; a day-long URL to a customer's
+      //      commissioned artwork is the incident this guards against.
+      //   3. Vendor B requesting vendor A's job artwork -> 404, and the presigner is
+      //      never called. Assert the mock was not invoked — a signed URL that is
+      //      generated and then withheld has still been generated.
+      //   4. An itemId not belonging to the named job -> 404, even when both the job
+      //      and the item belong to this vendor.
+  - id: 2
+    action: verify-fail
+    description: Confirm the artwork tests fail
+    command: cd packages/api && bunx vitest run tests/routes/vendor/artwork.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Add the signed artwork endpoint using the existing presigner
+    file: packages/api/src/routes/vendor.ts
+    status: done
+    code: |-
+      // GET '/jobs/:id/artwork/:itemId'
+      //   const job = await getVendorJob(vid(c), c.req.param('id'))
+      //   if (!job) return 404                       // before anything is signed
+      //   const items = await getVendorJobItems(vid(c), job.id)
+      //   if (!items.some(i => i.id === itemId)) return 404
+      //   const key = <artwork storage key for that order item>
+      //   const url = await getPresignedDownloadUrl(key, 600)   // 10 minutes
+      //   return c.json({ url, expiresInSeconds: 600 })
+      //
+      // getPresignedDownloadUrl is src/lib/storage.ts:463. Never getPublicUrl.
+  - id: 4
+    action: write-test
+    description: Write the isolation property suite driven from a route table
+    file: packages/api/tests/routes/vendor/isolation.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/vendor/isolation.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Structure this as properties over a ROUTE TABLE, not as a case per handler.
+      // A route added later without a table entry should be visibly missing.
+      //
+      // const VENDOR_ROUTES = [
+      //   { method: 'GET',   path: () => '/api/vendor/jobs' },
+      //   { method: 'GET',   path: (ctx) => `/api/vendor/jobs/${ctx.otherVendorJobId}` },
+      //   { method: 'PATCH', path: (ctx) => `/api/vendor/jobs/${ctx.otherVendorJobId}` },
+      //   { method: 'GET',   path: (ctx) => `/api/vendor/jobs/${ctx.otherVendorJobId}/artwork/${ctx.otherItemId}` },
+      //   { method: 'GET',   path: () => '/api/vendor/rates' },
+      //   { method: 'GET',   path: () => '/api/vendor/payments' },
+      // ]
+      //
+      // Property 1 — A cannot reach B:
+      //   for each route addressing vendor B's rows, vendor A's session gets 404/403
+      //   and, for writes, vendor B's row is byte-identical afterwards.
+      //
+      // Property 2 — no customer data anywhere:
+      //   const FORBIDDEN = [
+      //     'customerName','customerEmail','customerPhone','shippingAddress',
+      //     'billingAddress','addressLine1','postalCode','orderNumber','userId','email','phone',
+      //   ]
+      //   walk every 200 response body recursively and assert no key matches
+      //   FORBIDDEN (case-insensitive). Dispatch is in-house, so a vendor needs none
+      //   of it — which is what lets this be a blanket rule instead of a judgement
+      //   call per field.
+      //
+      // Property 3 — the scoped module cannot be called unscoped:
+      //   re-assert here (cheap) that every exported query in lib/vendor-scope
+      //   throws without a vendorId, so this file is a complete statement of the
+      //   isolation guarantee rather than half of one.
+  - id: 5
+    action: verify-fail
+    description: Confirm the isolation suite fails
+    command: cd packages/api && bunx vitest run tests/routes/vendor/isolation.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 6
+    action: implement
+    description: Fix whatever the isolation suite surfaces — the point of the suite is that it finds the leaks
+    status: done
+    code: |-
+      // Expect real findings here, particularly around response shapes that include
+      // a joined row wholesale. Narrow the select; do not delete the key from the
+      // object after the fact — the next handler will forget.
+  - id: 7
+    action: verify-pass
+    description: Confirm artwork and isolation suites pass
+    command: cd packages/api && bunx vitest run tests/routes/vendor/
+    expected_result: PASS
+    status: done
+  - id: 8
+    action: commit
+    description: Commit artwork delivery and the isolation suite
+    command: 'git add packages/api/src/routes/vendor.ts packages/api/tests/routes/vendor/artwork.test.ts packages/api/tests/routes/vendor/isolation.test.ts && git commit -m "feat(api): signed job-scoped artwork URLs and vendor isolation property tests"'
+    status: done
+current_step: 8
+completed: '2026-08-17T01:56:42.208Z'

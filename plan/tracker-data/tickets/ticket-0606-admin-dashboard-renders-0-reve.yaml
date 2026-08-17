@@ -1,0 +1,122 @@
+ticket_number: 606
+title: Admin dashboard renders ₹0 revenue / 0 orders when the order stats call fails
+description: |-
+  ## Problem
+
+  Same class as #602, other half of the same screen. `fetchOrderStats()` throws correctly, but `packages/web/app/routes/admin/index.tsx` swallows it:
+
+  ```ts
+  const [orders, products, recent] = await Promise.all([
+    fetchOrderStats().catch(() => null),
+    ...
+  ])
+  ```
+
+  `orderStats` becomes `null` and every tile fed by it renders a fabricated figure through `?? 0` / `|| 0`:
+
+  - Total Revenue — `formatPrice(parseFloat(orderStats?.totalRevenue || '0'))` → **₹0**
+  - This Month — same → **₹0**
+  - Today's Orders — `orderStats?.todayOrders || 0` → **0**
+  - Pending Orders — derived from `orderStats.byStatus`, defaults to **0**
+  - Total Orders / Paid Orders — reduced over an empty object → **0**
+
+  An operator reads "₹0 revenue, 0 orders today, 0 pending" and cannot tell a dead endpoint from a dead trading day. Revenue is the worst possible tile to be confidently wrong about.
+
+  Unlike #602 the endpoint exists (`GET /api/admin/orders/stats`, `packages/api/src/routes/admin/orders.ts:356`), so this only bites on a 5xx, an auth expiry, or a network failure — rarer than #602, and correspondingly more likely to be believed when it happens.
+
+  ## Fix
+
+  Mirror what #602 did for products (commit `138209f9`):
+
+  1. When `orderStats` is null, set the dashboard error state naming the orders half, same as the products branch already does.
+  2. Render `—` rather than a number in each order-fed tile. Money tiles need it most: `formatPrice(0)` produces a real-looking ₹0.00.
+  3. Keep the failure scoped — a dead orders call must not blank the product tiles, and vice versa.
+
+  ## Verification
+
+  - Web test: orders stats call fails → an alert is surfaced and no order tile renders `0` or `₹0.00`.
+  - Web test: orders fails while products succeeds → product tiles still show their real counts.
+  - Existing `packages/web/tests/routes/admin/dashboard-product-stats.test.tsx` covers the mirror case and should keep passing.
+feature: admin-panel
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-16T19:58:18.367Z'
+last_updated: '2026-08-17T02:45:26.113Z'
+time_spent_minutes: 5
+labels:
+  - admin
+  - dashboard
+  - data-integrity
+  - go-live
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T02:40:39.717Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T02:45:20.961Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c4987e79` - fix(admin): stop the dashboard reporting ₹0 revenue when orders stats dies
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/index.tsx` - order-fed tiles render `—` instead of a fabricated 0/₹0.00; derived stats resolve to `null` not `0`; error banner names which halves failed
+      - `packages/web/tests/routes/admin/dashboard-order-stats.test.tsx` - new, 11 tests
+
+      **Summary**:
+      - `totalOrders`, `pendingOrders`, `paidOrders` now derive to `null` when `orderStats` is null. Reducing an absent `byStatus` to `0` was the bug.
+      - Total Revenue, This Month, Today's Orders, Pending Orders, Total Orders, Paid Orders each render `—`. Money tiles mattered most: `formatPrice(0)` produces a real-looking ₹0.00.
+      - The "+12% vs last month" trend is dropped when there are no stats — a comparison against a month never fetched is a second fabricated number.
+      - Error banner composes from which calls died: "order", "product", or "order or product". Existing #602 test (alert mentions /product/i) still passes.
+      - Failure stays scoped: a dead orders call leaves the product tiles at their real counts, and vice versa.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/dashboard-order-stats.test.tsx tests/routes/admin/dashboard-product-stats.test.tsx` (from `packages/web`)
+      - Result: PASS (2 files, 15 tests, 0 failing)
+      - Output: `✓ tests/routes/admin/dashboard-product-stats.test.tsx (4 tests) 212ms` / `✓ tests/routes/admin/dashboard-order-stats.test.tsx (11 tests) 321ms` / `Test Files 2 passed (2)  Tests 15 passed (15)`
+      - RED first: before the fix the same file was 10 failed / 1 passed — only the happy path passed, every failure-mode assertion failed on the fabricated zeros.
+      - Type-check: `bunx tsc --noEmit` reports 22 errors in `packages/web`, all pre-existing and none in the two changed files (baseline was ~26 before recent work). Recorded as buildPassed:false for honesty, not as a regression from this ticket.
+
+      **Note**: the error-banner hunk was still in the working tree when a concurrent agent committed `c1489c6a` (#603) with `git add -A`, so that one hunk lives in c1489c6a rather than c4987e79. Both are on `main`; nothing is lost.
+  - author: system
+    timestamp: '2026-08-17T02:45:24.405Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-17T02:40:40.828Z'
+    agent: claude-code
+    summary: 'TDD: 11 new tests red, then order-fed dashboard tiles render em dash instead of fabricated 0/₹0.00; derived order stats null not 0; error banner names failed halves. 15/15 green, committed c4987e79.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T02:45:26.098Z'
+    duration: '00:04:45'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-17T02:40:39.717Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/dashboard-order-stats.test.tsx tests/routes/admin/dashboard-product-stats.test.tsx
+  test_output: Test Files 2 passed (2) | Tests 15 passed (15)
+  build_passed: false
+  build_command: bunx tsc --noEmit -p tsconfig.json (packages/web)
+  verified_at: '2026-08-17T02:45:10.832Z'
+completed: '2026-08-17T02:45:24.405Z'

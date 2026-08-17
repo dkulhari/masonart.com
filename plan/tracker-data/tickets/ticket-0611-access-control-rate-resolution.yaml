@@ -1,0 +1,407 @@
+ticket_number: 611
+title: Access Control - rate resolution, band overlap rejection and payables derivation
+description: |-
+  ## Task
+  Three pure-ish helpers the API phase depends on: resolve the rate in force, reject overlapping rate bands on write, and derive payables.
+
+  ## Context
+  Feature: vendor-management. Phase 2 of 7. Can run alongside the requireVendor ticket — different files.
+
+  **Rate resolution.** Bands match on the item's LONGEST EDGE in inches: `max(widthInches, heightInches)` from `productVariants` (`schema/products.ts:206-207`). Ranges are inclusive-min, exclusive-max. Effective dating follows the `shipping_config` precedent — `lib/shipping-config.ts` resolves against the caller's clock, do the same. The test that matters: a rate scheduled to start next month must NOT be returned today. A vendor announcing a price rise from the 1st is the ordinary case, and quietly charging it early is the bug.
+
+  **Overlap rejection.** Two bands must not overlap for a given `(vendorId, kind, finish)` AT ANY INSTANT. Two rows covering 0-24 and 12-36 overlap only if their effective windows also intersect — the same size band at two different times is the normal way a price changes, and rejecting that would make effective dating useless. This is enforced on write in this helper, not by a database constraint.
+
+  **Payables derivation.** `SUM(COALESCE(amountActual, amountExpected))` over jobs where `settlementId IS NULL`. Derived, never stored. `getVendorPayableTotal` in `lib/vendor-scope.ts` is the vendor-facing read; this ticket adds the admin-facing per-vendor and per-job breakdown that the payables tab needs. Both must agree — add a test asserting they produce the same total for the same vendor, because two implementations of one sum is exactly how a ledger drifts.
+
+  Money is `decimal(10,2)` INR throughout. Drizzle returns decimals as STRINGS — do not let a float into the sum.
+feature: vendor-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:56:49.804Z'
+last_updated: '2026-08-17T01:13:41.462Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:10:49.100Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:13:38.674Z'
+    text: |-
+      Done in commit 31f5a3ae. 16/16 tests passing (10 rates, 6 payables), packages/api typecheck clean (0 errors).
+
+      Both modules are pure functions over locally-defined row types with zero imports, so they landed independently of #609's migration.
+
+      Two fixes to the ticket's supplied TEST FACTORIES (assertions untouched — both bugs meant the test could not construct the case it named):
+      1. vendor-rates.test.ts: factory hardcoded `kind: 'print'` and `vendorId: 'v1'`, ignoring the passed overrides. The "does not compare across different kinds" case was therefore building two print rows and failing. Now `o.kind ?? 'print'` / `o.vendorId ?? 'v1'`.
+      2. vendor-payables.test.ts: `amountExpected: o.amountExpected ?? '100.00'` resurrected an explicitly-passed null, so "treats a job with neither amount as zero" was asserting against a 100.00 job. Now defaults only when the key is absent (`=== undefined`).
+
+      One deviation from the description worth flagging for the API phase: the description asks for a test asserting the admin-facing sum agrees with `getVendorPayableTotal` in lib/vendor-scope.ts. The step-5 code does not include one, and vendor-scope.ts belongs to #610, so it was out of scope here. The agreement test should be added once #610 lands — that cross-check is the point of the note about two implementations of one sum.
+
+      Also note `jobPayableAmount` is exported and implemented but has no direct test coverage (only exercised transitively via sumPayable's shared helpers).
+  - author: system
+    timestamp: '2026-08-17T01:13:41.462Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 609
+    feature: vendor-management
+    description: Database Schema - vendor role, vendor_users link and the migration
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests for rate resolution: longest edge, inclusive-min/exclusive-max, and the future-rate exclusion'
+    file: packages/api/tests/lib/vendor-rates.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/vendor-rates.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import {
+        longestEdgeInches,
+        selectRateInForce,
+        findOverlappingBand,
+        type RateRow,
+      } from '../../src/lib/vendor-rates'
+
+      const rate = (o: Partial<RateRow>): RateRow => ({
+        id: o.id ?? 'r',
+        vendorId: 'v1',
+        kind: 'print',
+        finish: o.finish ?? null,
+        longestEdgeMinInches: o.longestEdgeMinInches ?? 0,
+        longestEdgeMaxInches: o.longestEdgeMaxInches ?? 24,
+        amount: o.amount ?? '100.00',
+        effectiveFrom: o.effectiveFrom ?? new Date('2020-01-01'),
+        effectiveTo: o.effectiveTo ?? null,
+      })
+
+      describe('longestEdgeInches', () => {
+        it('takes the longer side regardless of orientation', () => {
+          expect(longestEdgeInches({ widthInches: 24, heightInches: 36 })).toBe(36)
+          expect(longestEdgeInches({ widthInches: 36, heightInches: 24 })).toBe(36)
+          expect(longestEdgeInches({ widthInches: 20, heightInches: 20 })).toBe(20)
+        })
+      })
+
+      describe('selectRateInForce', () => {
+        const now = new Date('2026-08-17T00:00:00Z')
+
+        it('is inclusive of min and exclusive of max', () => {
+          const rows = [rate({ id: 'a', longestEdgeMinInches: 0, longestEdgeMaxInches: 24 })]
+          expect(selectRateInForce(rows, { longestEdge: 0, kind: 'print', finish: null, at: now })?.id).toBe('a')
+          expect(selectRateInForce(rows, { longestEdge: 23, kind: 'print', finish: null, at: now })?.id).toBe('a')
+          // 24 belongs to the NEXT band, not this one
+          expect(selectRateInForce(rows, { longestEdge: 24, kind: 'print', finish: null, at: now })).toBeNull()
+        })
+
+        it('does not leak a rate scheduled to start in the future', () => {
+          const rows = [
+            rate({ id: 'current', amount: '100.00' }),
+            rate({ id: 'future', amount: '150.00', effectiveFrom: new Date('2026-09-01') }),
+          ]
+          // A vendor announcing a rise from the 1st is ordinary; charging it early is the bug.
+          expect(selectRateInForce(rows, { longestEdge: 12, kind: 'print', finish: null, at: now })?.id).toBe('current')
+        })
+
+        it('ignores a rate whose window has closed', () => {
+          const rows = [rate({ id: 'expired', effectiveTo: new Date('2026-01-01') })]
+          expect(selectRateInForce(rows, { longestEdge: 12, kind: 'print', finish: null, at: now })).toBeNull()
+        })
+
+        it('matches on finish when one is asked for', () => {
+          const rows = [
+            rate({ id: 'matte', finish: 'matte', amount: '100.00' }),
+            rate({ id: 'gloss', finish: 'gloss', amount: '120.00' }),
+          ]
+          expect(selectRateInForce(rows, { longestEdge: 12, kind: 'print', finish: 'gloss', at: now })?.id).toBe('gloss')
+        })
+      })
+
+      describe('findOverlappingBand', () => {
+        it('rejects two size bands whose effective windows also intersect', () => {
+          const existing = [rate({ id: 'a', longestEdgeMinInches: 0, longestEdgeMaxInches: 24 })]
+          const candidate = rate({ id: 'b', longestEdgeMinInches: 12, longestEdgeMaxInches: 36 })
+          expect(findOverlappingBand(existing, candidate)?.id).toBe('a')
+        })
+
+        it('allows the SAME size band at a later time — that is how a price changes', () => {
+          const existing = [
+            rate({ id: 'a', effectiveFrom: new Date('2026-01-01'), effectiveTo: new Date('2026-09-01') }),
+          ]
+          const candidate = rate({ id: 'b', effectiveFrom: new Date('2026-09-01') })
+          expect(findOverlappingBand(existing, candidate)).toBeNull()
+        })
+
+        it('allows adjacent bands — exclusive max means 24 does not collide with 0-24', () => {
+          const existing = [rate({ id: 'a', longestEdgeMinInches: 0, longestEdgeMaxInches: 24 })]
+          const candidate = rate({ id: 'b', longestEdgeMinInches: 24, longestEdgeMaxInches: 48 })
+          expect(findOverlappingBand(existing, candidate)).toBeNull()
+        })
+
+        it('does not compare across different kinds or finishes', () => {
+          const existing = [rate({ id: 'a', kind: 'print', finish: 'matte' })]
+          expect(findOverlappingBand(existing, rate({ id: 'b', kind: 'frame', finish: 'matte' }))).toBeNull()
+          expect(findOverlappingBand(existing, rate({ id: 'c', kind: 'print', finish: 'gloss' }))).toBeNull()
+        })
+
+        it('ignores the row being edited when checking itself', () => {
+          const existing = [rate({ id: 'a' })]
+          expect(findOverlappingBand(existing, rate({ id: 'a', amount: '200.00' }))).toBeNull()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the rate tests fail
+    command: cd packages/api && bunx vitest run tests/lib/vendor-rates.test.ts
+    expected_result: FAIL - Cannot find module '../../src/lib/vendor-rates'
+    status: done
+  - id: 3
+    action: implement
+    description: Create the rate resolution and overlap helpers as pure functions over rows
+    file: packages/api/src/lib/vendor-rates.ts
+    status: done
+    code: |
+      /**
+       * Vendor Rate Card Resolution
+       *
+       * Pure functions over rate rows, so the rules are testable without a database
+       * and the same rules can run on a candidate row before it is written.
+       *
+       * Two rules, both easy to get subtly wrong:
+       *
+       * 1. **Bands are inclusive-min, exclusive-max, on the LONGEST EDGE.** A 24x36
+       *    piece is a 36 regardless of which way it is hung, and a 24 belongs to the
+       *    band that starts at 24, not the one that ends there.
+       *
+       * 2. **Overlap is a question about size AND time.** The same size band existing
+       *    twice is not a conflict — it is how a price change is recorded. It is only
+       *    a conflict when the effective windows also intersect, because only then is
+       *    there an instant with two answers. Following the shipping_config
+       *    precedent, everything resolves against the caller's clock.
+       */
+
+      export interface RateRow {
+        id: string
+        vendorId: string
+        kind: 'print' | 'frame'
+        finish: string | null
+        longestEdgeMinInches: number
+        longestEdgeMaxInches: number
+        /** decimal(10,2) comes back from drizzle as a STRING. Keep it one. */
+        amount: string
+        effectiveFrom: Date
+        effectiveTo: Date | null
+      }
+
+      export function longestEdgeInches(dims: { widthInches: number; heightInches: number }): number {
+        return Math.max(dims.widthInches, dims.heightInches)
+      }
+
+      function windowContains(row: Pick<RateRow, 'effectiveFrom' | 'effectiveTo'>, at: Date): boolean {
+        if (row.effectiveFrom.getTime() > at.getTime()) return false
+        if (row.effectiveTo && row.effectiveTo.getTime() <= at.getTime()) return false
+        return true
+      }
+
+      function windowsIntersect(a: RateRow, b: RateRow): boolean {
+        const aEnd = a.effectiveTo?.getTime() ?? Infinity
+        const bEnd = b.effectiveTo?.getTime() ?? Infinity
+        return a.effectiveFrom.getTime() < bEnd && b.effectiveFrom.getTime() < aEnd
+      }
+
+      function bandsIntersect(a: RateRow, b: RateRow): boolean {
+        // Exclusive max on both sides: 0-24 and 24-48 are adjacent, not overlapping.
+        return (
+          a.longestEdgeMinInches < b.longestEdgeMaxInches &&
+          b.longestEdgeMinInches < a.longestEdgeMaxInches
+        )
+      }
+
+      /**
+       * The rate in force for one item at one instant, or null if the vendor has no
+       * band covering it. Null is a real answer — it means "this vendor has not
+       * priced this size" — and the assignment route must surface it rather than
+       * defaulting to zero.
+       */
+      export function selectRateInForce(
+        rows: RateRow[],
+        query: { longestEdge: number; kind: 'print' | 'frame'; finish: string | null; at: Date }
+      ): RateRow | null {
+        const candidates = rows.filter(
+          (r) =>
+            r.kind === query.kind &&
+            (query.finish == null || r.finish == null || r.finish === query.finish) &&
+            query.longestEdge >= r.longestEdgeMinInches &&
+            query.longestEdge < r.longestEdgeMaxInches &&
+            windowContains(r, query.at)
+        )
+
+        if (candidates.length === 0) return null
+
+        // An exact finish match beats a finish-agnostic band; then the most recently
+        // effective row wins. Overlap validation should make this a single row, but
+        // resolution must stay deterministic even if a bad row got in before the
+        // check existed.
+        candidates.sort((a, b) => {
+          const aExact = a.finish === query.finish ? 1 : 0
+          const bExact = b.finish === query.finish ? 1 : 0
+          if (aExact !== bExact) return bExact - aExact
+          return b.effectiveFrom.getTime() - a.effectiveFrom.getTime()
+        })
+
+        return candidates[0]
+      }
+
+      /**
+       * The row `candidate` collides with, or null. Call before every rate write.
+       * Comparing by id means editing a row does not report itself.
+       */
+      export function findOverlappingBand(existing: RateRow[], candidate: RateRow): RateRow | null {
+        return (
+          existing.find(
+            (r) =>
+              r.id !== candidate.id &&
+              r.vendorId === candidate.vendorId &&
+              r.kind === candidate.kind &&
+              (r.finish ?? null) === (candidate.finish ?? null) &&
+              bandsIntersect(r, candidate) &&
+              windowsIntersect(r, candidate)
+          ) ?? null
+        )
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm rate tests pass
+    command: cd packages/api && bunx vitest run tests/lib/vendor-rates.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: write-test
+    description: Write failing test for the admin-facing payables derivation, including agreement with the vendor-facing total
+    file: packages/api/tests/lib/vendor-payables.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/vendor-payables.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { sumPayable, type PayableJob } from '../../src/lib/vendor-payables'
+
+      const job = (o: Partial<PayableJob>): PayableJob => ({
+        id: o.id ?? 'j',
+        amountExpected: o.amountExpected ?? '100.00',
+        amountActual: o.amountActual ?? null,
+        settlementId: o.settlementId ?? null,
+      })
+
+      describe('sumPayable', () => {
+        it('prefers the actual amount over the expected one', () => {
+          expect(sumPayable([job({ amountExpected: '100.00', amountActual: '90.00' })])).toBe('90.00')
+        })
+
+        it('falls back to expected when there is no override', () => {
+          expect(sumPayable([job({ amountExpected: '100.00', amountActual: null })])).toBe('100.00')
+        })
+
+        it('counts only unsettled jobs', () => {
+          expect(
+            sumPayable([job({ id: 'a' }), job({ id: 'b', settlementId: 's1' })])
+          ).toBe('100.00')
+        })
+
+        it('stays exact on values a float would round — money is decimal(10,2), not a double', () => {
+          const jobs = Array.from({ length: 3 }, (_, i) => job({ id: String(i), amountExpected: '0.10' }))
+          expect(sumPayable(jobs)).toBe('0.30')
+        })
+
+        it('treats a job with neither amount as zero rather than NaN', () => {
+          expect(sumPayable([job({ amountExpected: null, amountActual: null })])).toBe('0.00')
+        })
+
+        it('is 0.00 for no jobs', () => {
+          expect(sumPayable([])).toBe('0.00')
+        })
+      })
+  - id: 6
+    action: verify-fail
+    description: Confirm the payables test fails
+    command: cd packages/api && bunx vitest run tests/lib/vendor-payables.test.ts
+    expected_result: FAIL - Cannot find module '../../src/lib/vendor-payables'
+    status: done
+  - id: 7
+    action: implement
+    description: Create the payables derivation helper using integer paise arithmetic internally
+    file: packages/api/src/lib/vendor-payables.ts
+    status: done
+    code: |
+      /**
+       * Payables Derivation
+       *
+       * owed = SUM(COALESCE(amountActual, amountExpected)) over jobs with no
+       * settlement. DERIVED, never stored — there is no balance column, so there is
+       * no parallel ledger to drift out of sync with the jobs.
+       *
+       * Sums in integer paise and formats back to a decimal(10,2) string. The values
+       * are stored as decimal precisely so they are exact; adding them as JS floats
+       * would give that away at the last step for no reason (0.1 + 0.1 + 0.1).
+       */
+
+      export interface PayableJob {
+        id: string
+        amountExpected: string | null
+        amountActual: string | null
+        settlementId: string | null
+      }
+
+      function toPaise(value: string | null): number {
+        if (!value) return 0
+        const n = Math.round(Number(value) * 100)
+        return Number.isFinite(n) ? n : 0
+      }
+
+      function fromPaise(paise: number): string {
+        const sign = paise < 0 ? '-' : ''
+        const abs = Math.abs(paise)
+        return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`
+      }
+
+      /** The amount owed on one job: the override if there is one, else the expectation. */
+      export function jobPayableAmount(job: PayableJob): string {
+        return fromPaise(toPaise(job.amountActual ?? job.amountExpected))
+      }
+
+      export function sumPayable(jobs: PayableJob[]): string {
+        const total = jobs
+          .filter((j) => j.settlementId == null)
+          .reduce((acc, j) => acc + toPaise(j.amountActual ?? j.amountExpected), 0)
+        return fromPaise(total)
+      }
+  - id: 8
+    action: verify-pass
+    description: Confirm both helper suites pass
+    command: cd packages/api && bunx vitest run tests/lib/vendor-rates.test.ts tests/lib/vendor-payables.test.ts
+    expected_result: PASS
+    status: done
+  - id: 9
+    action: verify-pass
+    description: Typecheck the package
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS - no new errors versus the main baseline
+    status: done
+  - id: 10
+    action: commit
+    description: Commit the rate and payables logic
+    command: 'git add packages/api/src/lib/vendor-rates.ts packages/api/src/lib/vendor-payables.ts packages/api/tests/lib/vendor-rates.test.ts packages/api/tests/lib/vendor-payables.test.ts && git commit -m "feat(api): add rate card resolution, band overlap rejection and payables derivation"'
+    status: done
+current_step: 10
+started: '2026-08-17T01:10:49.100Z'
+completed: '2026-08-17T01:13:41.462Z'

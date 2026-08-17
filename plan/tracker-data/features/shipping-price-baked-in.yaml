@@ -1,0 +1,39 @@
+name: shipping-price-baked-in
+title: Shipping Price Baked In
+priority: high
+created: '2026-08-16T21:23:18.185Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Retire visible shipping charges: bake cost into product prices via a per-tier uplift, show "Free shipping" unconditionally.
+
+  Sub-project 5 of 5. Deliberately LAST — the uplift must be calibrated against real vendor and freight costs recorded by vendor-management and order-dispatch-tracking. Guessing it before a single vendor invoice is paid is exactly what this ordering avoids.
+
+  DECISIONS (brainstormed 2026-08-17):
+  - Customer-facing model: baked into product price, free shipping on everything. Chosen over visible flat/slab rates, hybrid surcharges, and dynamic carrier quotes at checkout.
+  - Uplift shape: per-tier by size and framing, NOT a uniform percentage or flat amount. A rolled A3 in a tube and a 24x36 framed glass piece differ roughly 4-6x in landed cost; a uniform uplift either under-recovers on cheap posters or overprices framed pieces.
+  - COD: NOT offered at launch. Prepaid only (Razorpay/UPI/cards). Keeps the uplift sized against ~3-5% prepaid RTO rather than ~25% COD RTO, and avoids shipping fragile framed glass to customers who never committed money. Revisit with real data; "COD on cheap items only" is the natural second step. Note `cod` already exists unused in the payment_method enum (packages/api/src/db/schema.ts:20, shared/src/schemas/order.ts:36).
+
+  TEARDOWN this requires — not free, must be in the spec: retires the ₹999 free-shipping threshold and most of #569/#570. Affects shipping_config table, the /admin/shipping screen, qualifiesForFreeShipping and netAmountForShipping (shared/src/constants/shipping.ts), and the threshold copy on the storefront banner, PDP badges, cart, and policy pages — all become unconditional "Free shipping on all orders".
+
+  ALSO REQUIRED: orders keep an internal shipping-cost field even though the customer is charged ₹0. Without it, per-order margin visibility is lost permanently.
+
+  Note: calculateShippingCost (routes/orders.ts:216) currently returns hardcoded "199.00"/"99.00" string literals. Separately, a complete shipping-options system (shippingOptions table, /api/admin/shipping/options, public /api/shipping/options + /estimate, client wrappers in web/app/lib/api.ts:1826-1872) exists with ZERO callers — checkout never reads it and never sets shippingMethod, so express is unreachable. This feature should delete that dead system rather than leave two contradictory rate sources.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

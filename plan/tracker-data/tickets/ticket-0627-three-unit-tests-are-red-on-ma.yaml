@@ -1,0 +1,145 @@
+ticket_number: 627
+title: 'Three unit tests are red on main: vendor portal trips the storefront token guard, wishlist guard test trips on a comment'
+description: |-
+  ## Problem
+
+  `npx vitest run tests` in `packages/web` is 3264 passing / **3 failing** on main. Both failures are guards firing at the wrong target, which is worse than useless: a red suite trains everyone to ignore it, and these two guards exist precisely to be believed.
+
+  ### 1 & 2. The vendor portal trips the storefront token guard
+
+  `tests/styles/storefront-token-compliance.test.ts` forbids `font-bold` and `(bg|from|to|ring|border)-brand-*` outside a short exempt list (`components/admin/`, `routes/admin`, `components/ai-generator/`). The vendor portal (#621) is neither exempt nor storefront, so it fails on four lines:
+
+  - `routes/vendor.tsx:165` — `data-[active=true]:bg-brand-50 data-[active=true]:text-brand-700`
+  - `routes/vendor.tsx:206` — `font-bold` on the Access Denied heading
+  - `routes/vendor.tsx:214` — `bg-brand-500 ... hover:bg-brand-600`
+  - `routes/vendor/jobs/$id.tsx:234` — `bg-brand-600 ... hover:bg-brand-700`
+
+  The vendor portal is an internal supplier tool built to follow the admin screens, not a customer-facing surface — the same category as `routes/admin`, which is exempt for exactly that reason. The exemption list is the fix, not a restyle. The test file states that widening it requires making the case in writing, so the case goes in the comment.
+
+  **One caveat to record while doing it**: the `font-bold` rule is not a palette preference. Weight 700 is never loaded (see the font link in `__root.tsx`), so `font-bold` renders as synthesised faux-bold *anywhere*, admin and vendor included. Exempting the tree hides that, and the exempt trees already carry the same defect. Worth its own ticket rather than silently accepting it.
+
+  ### 3. The wishlist guard test trips on a comment
+
+  `tests/routes/wishlist-page.test.ts` asserts the route source does not contain `beforeLoad` — the point being that `/wishlist` must not gain an auth guard, since saving needs no account (#477). The word now appears at `routes/wishlist.tsx:38` inside a comment explaining where the session comes from. The rule is right; the matcher reads prose as code.
+
+  Same defect the #625 guard had to solve: strip comments and string literals before matching. `tests/routes/admin/admin-native-dialogs.test.ts` already exports a `stripCommentsAndStrings` helper for this.
+
+  ## Verification
+
+  - `npx vitest run tests/styles/storefront-token-compliance.test.ts tests/routes/wishlist-page.test.ts` — PASS.
+  - The guards still bite: adding `bg-brand-500` to a storefront file, or a real `beforeLoad` to `wishlist.tsx`, must still fail. Assert that with fixtures rather than by trusting the regex.
+  - Full web unit suite back to zero failures.
+feature: admin-panel
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T03:40:44.527Z'
+last_updated: '2026-08-17T03:45:03.857Z'
+time_spent_minutes: 4
+labels:
+  - frontend
+  - tests
+  - tech-debt
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T03:40:57.042Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T03:43:36.024Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T03:44:49.361Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f75afe91` — test(web): stop two guards firing at prose and at the wrong tree
+
+      **Wishlist guard** — asserted the route source lacks `beforeLoad`; the route now explains where its session comes from in a comment at `wishlist.tsx:38`, and the comment says the word. Fixed by matching against code rather than raw text. The `stripCommentsAndStrings` helper #625 wrote for the native-dialog guard moved out of that test file into `tests/utils/source-guards.ts`, and both guards now import it — a second copy would have drifted. Added a fixture proving the matcher still catches a real `beforeLoad` in source and still ignores one in a comment, so this fix cannot be mistaken for weakening the rule.
+
+      **Storefront token guard** — `routes/vendor` added to the exempt list. The vendor portal (#621) is a supplier-facing operations tool built to follow the admin screens and never seen by a customer; `routes/admin` is exempt for exactly that reason, and the portal was simply missed when it landed. The case is written into the exemption as that file requires.
+
+      **Recorded rather than quietly accepted**: the `font-bold` rule is not a palette preference. Weight 700 is never loaded (see the font link in `__root.tsx`), so `font-bold` renders as synthesised faux-bold *everywhere* — including all three exempt trees, which now carry that defect unguarded. Noted in the exemption comment; worth its own ticket, and not something this exemption fixed.
+
+      **Verification**
+      - Command: `npx vitest run tests` (full web unit suite, cwd `packages/web`)
+      - Result: PASS — `Test Files 174 passed (174) | Tests 3268 passed (3268)`, **0 failing** (was 3264 passing / 3 failing)
+      - RED first: the wishlist test failed on `stripCommentsAndStrings is not defined`, then the two token assertions failed naming the four offending lines.
+      - Guards still bite: fixtures in both files, plus the existing "does not accidentally exempt the storefront" assertion still passes.
+work_sessions:
+  - start: '2026-08-17T03:40:57.778Z'
+    agent: claude-code
+    summary: 'Fixed both misfiring guards: wishlist matcher now strips comments (helper extracted to tests/utils/source-guards.ts, shared with the native-dialog guard), vendor portal added to the storefront token exemption with the case written in. Full web unit suite 3268 passing, 0 failing. Committed f75afe91.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T03:45:03.855Z'
+    duration: '00:04:06'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Extend the wishlist test with a fixture proving the matcher reads code and not prose: a real beforeLoad in source must fail, the same word inside a comment must not.'
+    file: packages/web/tests/routes/wishlist-page.test.ts
+    command: npx vitest run tests/routes/wishlist-page.test.ts
+    expected_result: FAIL - the current matcher flags the comment
+    status: pending
+  - id: 2
+    action: implement
+    description: Strip comments and string literals before the beforeLoad / auth-login assertions, reusing the helper from admin-native-dialogs.test.tsx rather than writing a second copy.
+    file: packages/web/tests/routes/wishlist-page.test.ts
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Wishlist guard green and still biting.
+    command: npx vitest run tests/routes/wishlist-page.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: implement
+    description: 'Add routes/vendor to the storefront token guard''s exempt list with the reasoning written in place: an internal supplier tool, same category as routes/admin, which is exempt for the same reason. Record the faux-bold caveat in the comment.'
+    file: packages/web/tests/styles/storefront-token-compliance.test.ts
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: 'Token guard green, and the exemption did not swallow the storefront: the existing ''does not accidentally exempt the storefront'' assertion must still pass.'
+    command: npx vitest run tests/styles/storefront-token-compliance.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Whole web unit suite at zero failures.
+    command: npx vitest run tests
+    expected_result: PASS - 0 failing
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the two guard fixes.
+    command: 'git add packages/web/tests && git commit -m "test(web): stop two guards firing at the wrong target"'
+    status: pending
+current_step: 1
+started: '2026-08-17T03:40:57.042Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests (full web unit suite, cwd packages/web)
+  test_output: Test Files 174 passed (174) | Tests 3268 passed (3268) — 0 failing, from 3 failing
+  verified_at: '2026-08-17T03:43:35.819Z'
+completed: '2026-08-17T03:43:36.024Z'

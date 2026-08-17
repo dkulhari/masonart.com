@@ -1,0 +1,254 @@
+ticket_number: 609
+title: Database Schema - vendor role, vendor_users link and the migration
+description: |-
+  ## Task
+  Add `vendor` to the `user_role` pgEnum, add the `vendor_users` link table, then generate and apply the single migration covering all of Phase 1.
+
+  ## Context
+  Feature: vendor-management. Phase 1 of 7. Last Phase 1 ticket — depends on both schema tickets.
+
+  Design constraints:
+  - `userRoleEnum` is at `packages/api/src/database/schema/users.ts:56`. Append `vendor` at the END of the enum. Postgres enum values are ordered and drizzle-kit emits `ALTER TYPE ... ADD VALUE`; inserting in the middle produces a far messier migration for no gain.
+  - `vendor_users` has a UNIQUE constraint on `userId`: one user belongs to exactly one vendor. That uniqueness is what makes `requireVendor` a lookup rather than a choice.
+  - Adding the role value does NOT grant anything. Two existing guards must keep turning a vendor away, and the design says to confirm them by test rather than assume: `app/routes/admin.tsx` beforeLoad admits only admin/super-admin/content-manager, and `staffAreaLabel`/`staffAreaHref` in `app/lib/admin-nav.ts` return null for unrecognised roles. Add those two tests here — they are cheap now and are the regression net for the whole feature.
+  - Migration generation is `bun run db:generate` in `packages/api` (drizzle-kit). Migrations land in `src/database/migrations/` as `00NN_*.sql`; the last one is `0018_gift_card_delivery_index_predicate.sql`, so expect `0019_*`.
+  - DB HAZARD: the real dev database is on port 5440, not the 5433 baked into `vitest.config.ts`. Pass `DATABASE_URL` explicitly when applying the migration; do not assume the default is pointing where you think.
+feature: vendor-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:54:24.372Z'
+last_updated: '2026-08-17T01:13:22.408Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:07:20.982Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:13:19.514Z'
+    text: |-
+      Done in dfc43083.
+
+      Deviation on step 8, worth carrying forward: `bun run db:generate` is not usable in this repo right now. The drizzle snapshot history in `src/database/migrations/meta/` stops at `0013_snapshot.json` while migrations run to 0018 — 0014-0018 were hand-written SQL with manual `_journal.json` entries and no snapshots. drizzle-kit therefore diffs current schema against the 0013 snapshot and wants to replay five migrations of unrelated drift, opening with an interactive "Is frame_category created or renamed from frame_type?" prompt. Answering that wrong on a dev database shared with a dozen concurrent sessions is a rename-or-drop coin flip.
+
+      Instead: generated the full schema into a throwaway out-dir with empty history (no prior snapshot means no rename prompts), then assembled `0019_vendor_management_phase_1.sql` from drizzle's own DDL for just the nine new tables, five new enums, 17 FKs, 19 indexes and the `ALTER TYPE user_role ADD VALUE 'vendor'`. Same authoring style as 0014-0018. Audited before applying: no DROP, no TRUNCATE, no ALTER COLUMN, and every ADD CONSTRAINT targets a table created in the same file.
+
+      Applied against 5440 (5433 is surveytrack-postgres, a different project). Verified after: all nine tables present, `user_role` reads customer,trade,content-manager,admin,super-admin,vendor with vendor last, `vendor_users_user_id_unique` present, `__drizzle_migrations` at 20. Server is PG 16.14, so ADD VALUE inside drizzle's transaction is fine — and nothing in 0019 uses the literal, which is what actually bit 0015 (see 0018's note).
+
+      Also updated the pre-existing `tests/schema/user-role.test.ts`, which asserted exactly five roles and would otherwise have failed step 11.
+
+      Tests: `tests/schema/` 18 passing across 6 files; `packages/web tests/lib/admin-nav-vendor-role.test.ts` 2 passing; `bun run typecheck` clean.
+
+      Follow-up someone should own: the meta/ snapshot gap is a live trap for every future schema ticket in this feature. Phase 2 will hit the same prompt.
+  - author: system
+    timestamp: '2026-08-17T01:13:22.408Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 607
+    feature: vendor-management
+    description: Database Schema - Vendor core tables (vendors, contacts, capabilities, rates)
+  - ticket: 608
+    feature: vendor-management
+    description: Database Schema - Production job, items, QC reviews and settlements
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test for the vendor role value and the vendor_users link table
+    file: packages/api/tests/schema/vendor-users.test.ts
+    command: cd packages/api && bunx vitest run tests/schema/vendor-users.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { getTableConfig } from 'drizzle-orm/pg-core'
+      import { userRoleEnum } from '../../src/database/schema/users'
+      import { vendorUsers } from '../../src/database/schema/vendor-users'
+
+      describe('vendor role and linkage', () => {
+        it('adds vendor to the user_role enum without disturbing existing values', () => {
+          // Appended, not inserted: drizzle-kit emits ALTER TYPE ... ADD VALUE and
+          // the existing five keep their ordinals.
+          expect(userRoleEnum.enumValues).toEqual([
+            'customer',
+            'trade',
+            'content-manager',
+            'admin',
+            'super-admin',
+            'vendor',
+          ])
+        })
+
+        it('vendor_users binds one user to exactly one vendor', () => {
+          const config = getTableConfig(vendorUsers)
+          expect(config.name).toBe('vendor_users')
+          const cols = Object.fromEntries(config.columns.map((c) => [c.name, c]))
+          expect(cols['vendor_id'].notNull).toBe(true)
+          expect(cols['user_id'].notNull).toBe(true)
+          // UNIQUE on user_id is what makes requireVendor a lookup, not a choice
+          const uniqueOnUser = config.uniqueConstraints.some((u) =>
+            u.columns.some((c) => c.name === 'user_id')
+          )
+          expect(uniqueOnUser).toBe(true)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails on both the missing enum value and the missing module
+    command: cd packages/api && bunx vitest run tests/schema/vendor-users.test.ts
+    expected_result: FAIL - Cannot find module '../../src/database/schema/vendor-users'
+    status: done
+  - id: 3
+    action: implement
+    description: Append 'vendor' to the user_role enum
+    file: packages/api/src/database/schema/users.ts
+    status: done
+    code: |-
+      export const userRoleEnum = pgEnum("user_role", [
+        "customer",
+        "trade",
+        "content-manager",
+        "admin",
+        "super-admin",
+        // Appended last on purpose: Postgres enum values are ordered and drizzle-kit
+        // emits ALTER TYPE ... ADD VALUE. Inserting mid-list rewrites the type for
+        // no benefit. A vendor is NOT a weaker admin — the role grants nothing on
+        // its own; access comes from the vendor_users link plus row scoping.
+        "vendor",
+      ]);
+  - id: 4
+    action: implement
+    description: Create the vendor_users link table module and export it from the barrel
+    file: packages/api/src/database/schema/vendor-users.ts
+    status: done
+    code: |
+      /**
+       * Vendor / User Linkage
+       *
+       * One user belongs to one vendor. The UNIQUE on user_id is load-bearing:
+       * it is what lets `requireVendor` resolve a caller to a single vendorId as a
+       * lookup rather than a choice, and it makes "which vendor is this?" a question
+       * with exactly one answer at the database level.
+       *
+       * The `vendor` role by itself grants nothing. Every other role in this system
+       * is a blanket grant, so requireRole is a complete check for them; a vendor
+       * sees only their own rows, which requireRole cannot express. See
+       * `lib/vendor-scope.ts` for where that is actually enforced.
+       */
+
+      import { pgTable, text, timestamp, uuid, index, unique } from 'drizzle-orm/pg-core'
+      import { relations } from 'drizzle-orm'
+      import { users } from './users'
+      import { vendors } from './vendors'
+
+      export const vendorUsers = pgTable(
+        'vendor_users',
+        {
+          id: uuid('id').primaryKey().defaultRandom(),
+          vendorId: uuid('vendor_id')
+            .references(() => vendors.id, { onDelete: 'cascade' })
+            .notNull(),
+          userId: text('user_id')
+            .references(() => users.id, { onDelete: 'cascade' })
+            .notNull(),
+          createdAt: timestamp('created_at').defaultNow().notNull(),
+        },
+        (table) => ({
+          vendorIdIdx: index('vendor_users_vendor_id_idx').on(table.vendorId),
+          userUnique: unique('vendor_users_user_id_unique').on(table.userId),
+        })
+      )
+
+      export const vendorUsersRelations = relations(vendorUsers, ({ one }) => ({
+        vendor: one(vendors, { fields: [vendorUsers.vendorId], references: [vendors.id] }),
+        user: one(users, { fields: [vendorUsers.userId], references: [users.id] }),
+      }))
+
+      export type VendorUser = typeof vendorUsers.$inferSelect
+      export type NewVendorUser = typeof vendorUsers.$inferInsert
+  - id: 5
+    action: verify-pass
+    description: Confirm the schema test passes
+    command: cd packages/api && bunx vitest run tests/schema/vendor-users.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: write-test
+    description: Write tests confirming the two existing web guards already turn a vendor away
+    file: packages/web/tests/lib/admin-nav-vendor-role.test.ts
+    command: cd packages/web && bunx vitest run tests/lib/admin-nav-vendor-role.test.ts
+    expected_result: PASS - these guards are expected to be correct already; the test is the regression net
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import {
+        staffAreaLabel,
+        staffAreaHref,
+        isContentManagerPathAllowed,
+      } from '~/lib/admin-nav'
+
+      /**
+       * Adding `vendor` to the role enum grants nothing. These two guards are
+       * expected to be correct as written — the design says confirm by test rather
+       * than assume, because everything in the vendor portal rests on them.
+       */
+      describe('vendor role against the existing staff guards', () => {
+        it('renders no staff entry point for a vendor', () => {
+          expect(staffAreaLabel('vendor')).toBeNull()
+          expect(staffAreaHref('vendor')).toBeNull()
+        })
+
+        it('does not treat vendor admin paths as content-manager territory', () => {
+          // Payables and vendor cost are admin data. content-manager must not reach them.
+          expect(isContentManagerPathAllowed('/admin/vendors')).toBe(false)
+          expect(isContentManagerPathAllowed('/admin/vendors/abc')).toBe(false)
+          expect(isContentManagerPathAllowed('/admin/production')).toBe(false)
+        })
+      })
+  - id: 7
+    action: verify-pass
+    description: Confirm the guard tests pass (adjust the import name if staffAreaHref is not exported)
+    command: cd packages/web && bunx vitest run tests/lib/admin-nav-vendor-role.test.ts
+    expected_result: PASS
+    status: done
+  - id: 8
+    action: implement
+    description: Generate the Phase 1 migration with drizzle-kit
+    command: cd packages/api && bun run db:generate
+    expected_result: A new src/database/migrations/0019_*.sql containing CREATE TABLE for vendors, vendor_contacts, vendor_capabilities, vendor_rates, production_jobs, production_job_items, production_job_reviews, vendor_settlements, vendor_users plus ALTER TYPE user_role ADD VALUE 'vendor'
+    status: done
+  - id: 9
+    action: verify-pass
+    description: Read the generated SQL before applying it — confirm it only adds, never drops
+    command: cd packages/api && ls src/database/migrations | tail -3
+    expected_result: 0019_*.sql present; inspect it and confirm there is no DROP or ALTER COLUMN against an existing table
+    status: done
+  - id: 10
+    action: implement
+    description: 'Apply the migration against the dev database. HAZARD: the real dev DB is on 5440, not the 5433 default — pass DATABASE_URL explicitly.'
+    command: cd packages/api && DATABASE_URL="postgresql://poster_app:dev_password@localhost:5440/poster_app_dev" bun run db:migrate
+    expected_result: Migration applied with no error
+    status: done
+  - id: 11
+    action: verify-pass
+    description: Confirm both schema suites and typecheck still pass after the migration
+    command: cd packages/api && bunx vitest run tests/schema/ && bun run typecheck
+    expected_result: PASS
+    status: done
+  - id: 12
+    action: commit
+    description: Commit the role, link table and migration
+    command: 'git add packages/api/src/database/schema/users.ts packages/api/src/database/schema/vendor-users.ts packages/api/src/database/schema/index.ts packages/api/src/database/migrations packages/api/tests/schema/vendor-users.test.ts packages/web/tests/lib/admin-nav-vendor-role.test.ts && git commit -m "feat(db): add vendor role, vendor_users link and Phase 1 migration"'
+    status: done
+current_step: 12
+started: '2026-08-17T01:07:20.982Z'
+completed: '2026-08-17T01:13:22.408Z'

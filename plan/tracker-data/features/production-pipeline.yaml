@@ -1,0 +1,34 @@
+name: production-pipeline
+title: Production Pipeline
+priority: high
+created: '2026-08-16T21:22:47.873Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Two-stage production state machine (print → frame) with vendor routing, rework loops and lead-time calculation.
+
+  Sub-project 2 of 5. Depends on vendor-management for the vendor and job records.
+
+  Problem: order_status has exactly one state — "processing" (commented "Order being prepared/printed") — covering send-to-print, printing, receipt, framing, QC and readiness. shipment_status starts later still, at "pending" (awaiting label). The entire production phase, which is the longer and more variable half of the customer's wait, is invisible to staff and customer alike.
+
+  Scope: job state machine across both stages with QC approval gates between them; assignment/routing of jobs to eligible vendors; reprint/rework loop when QC fails; lead-time model (vendor turnaround + handling) feeding a customer-facing delivery estimate; handling of mixed baskets (rolled poster vs framed piece follow different paths — split or hold-and-combine); batching of jobs to a vendor.
+
+  Open questions for the spec: split vs hold-and-combine for mixed baskets; whether batching is modelled or left to staff judgement; how production states surface in order_status without breaking existing consumers.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

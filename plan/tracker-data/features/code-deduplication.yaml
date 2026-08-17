@@ -1,0 +1,41 @@
+name: code-deduplication
+title: Code Deduplication
+priority: medium
+created: "2026-08-17T03:40:57.377Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Remove duplicated code found by the DRYwall/jscpd scan of packages/** (TS/TSX, excluding generated drizzle migration snapshots and mirrored .claude/.agents/.gemini skill docs).
+
+  Baseline scan (2026-08-17): 389 clones, 9,171 duplicated lines, 3.47% of 264,475 lines. Most duplication lives in test scaffolding; a smaller amount is real app code.
+
+  Goal: extract the highest-impact clones into shared hooks, components, and test helpers so behaviour stays identical and the duplication percentage drops.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 2
+  total_duration: "00:24:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 2
+      duration: "00:24:00"
+      tokens: 0
+tickets:
+  todo:
+    "633": Deduplicate the gift-card live-database test harness across 11 suites
+    "634": "Deduplicate OrdersTable and ProductsTable: status badges, sortable header, row menu and table shell"
+  in_progress: {}
+  done:
+    "629": "Deduplicate app code: extract useScrollTrack hook and share track route types/helpers"
+    "630": Deduplicate test scaffolding and shared UI blocks across api and web packages
+total_tickets: 4
+completion_percentage: 50
+is_completed: false
+last_activity: "2026-08-17T04:55:31.151Z"
+started: "2026-08-17T04:29:07.040Z"
+completed: "2026-08-17T04:55:26.569Z"

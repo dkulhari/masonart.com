@@ -1,0 +1,124 @@
+ticket_number: 619
+title: Admin UI - payables tab and settlement recording
+description: |-
+  ## Task
+  The payables tab on `/admin/vendors/$id`: unsettled jobs, a running total, and recording a settlement against selected jobs.
+
+  ## Context
+  Feature: vendor-management. Phase 5 of 7. Depends on the payables API and the vendor detail screen.
+
+  This is the screen where a mistake costs money, so two things matter more than usual:
+
+  **The total must never be fabricated.** If the payables request fails, show an error state — not a zero, not a dash pretending to be a total. #602 and #606 are both open tickets about admin surfaces rendering a fabricated 0 when the underlying request failed, and a fabricated 0 on a payables screen reads as "we owe this vendor nothing".
+
+  **Settlement is not undoable from this screen.** Selecting jobs, entering the amount paid, and submitting stamps `settlementId` on those rows. Use the inline two-step confirm (never native `confirm()`) and show the exact set of jobs and the exact total in the second step, so the confirming click is against the real number rather than against a remembered one.
+
+  The amount field defaults to the selected jobs' derived total but is editable — a vendor may be paid a rounded figure. Show the difference when the entered amount and the derived total disagree, rather than silently accepting it.
+
+  Money is INR rupees with two decimals throughout. Do not introduce a paise conversion on this screen: the API speaks decimal rupees and the repo already documents a 100x hazard from mixed units.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:00:54.207Z'
+last_updated: '2026-08-17T02:03:28.016Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T02:03:16.217Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T02:03:28.016Z'
+    text: |-
+      Done in 5bdaa819. 28 tests in packages/web/tests/routes/admin-vendor-payables.test.tsx, all passing, run 6x for flake.
+
+      New file: packages/web/app/routes/admin/vendors/$id.payables.tsx — exports VendorPayablesSection and no Route, so the file router leaves it alone (same arrangement as VendorForm.tsx / FrameForm.tsx). routeTree.gen.ts therefore needed no regeneration.
+
+      Notes for whoever picks up #622 (E2E):
+      - Error path renders ONLY the error + retry. No total, no settlement form, and the whole subtree is digit-free — the test asserts container.textContent has no '0' and no /\d/ at all.
+      - Two-step confirm test ids: vendor-settlement-submit → vendor-settlement-confirm-panel → vendor-settlement-confirm / -cancel. The panel restates both the amount being recorded and the derived total of the selected jobs. Any selection or amount change disarms it.
+      - The amount is DERIVED from the selection (amountEdited ? draft : derivedTotal), not synced by an effect. The effect version was genuinely flaky: it left one render where the field was empty and the record button disabled, and a fast click landed in that window.
+      - Step 5's grep now returns nothing at all over app/routes/admin/vendors/. The only hit was a prose `confirm()` in $id.tsx's InlineConfirm doc comment (pre-existing from #618); reworded to "a native browser dialog" so the audit grep is self-clean rather than needing a human to eyeball each hit.
+
+      Wired as a tab in $id.tsx (details | payables) rather than a child route — a $id.payables ROUTE would make /admin/vendors/$id a layout and force every existing section onto an Outlet. The $id.tsx edit is 43 lines with no re-indentation of the existing sections.
+
+      Web typecheck: 25 errors, none in routes/admin/vendors/**. The delta over the ~22 baseline is app/routes/vendor.tsx and app/routes/admin/production/** from the concurrent #617/#620 work, not this.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 615
+    feature: vendor-management
+    description: Admin API - payables, settlements and the vendor account invite
+  - ticket: 618
+    feature: vendor-management
+    description: Admin UI - vendors list, detail, rate card editor and nav wiring
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the payables tab
+    file: packages/web/tests/routes/admin-vendor-payables.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin-vendor-payables.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases:
+      //   1. Renders unsettled jobs with each job's payable amount (override where
+      //      present, expectation otherwise) and a running total.
+      //   2. A FAILED payables request renders an error state and NO total. Assert
+      //      the string '0' does not appear as the total — a fabricated zero here
+      //      reads as "we owe this vendor nothing" (#602, #606 are the same bug on
+      //      other admin surfaces).
+      //   3. Selecting a subset of jobs updates the settlement amount default to
+      //      that subset's total.
+      //   4. Editing the amount away from the derived total surfaces the difference
+      //      rather than accepting it silently.
+      //   5. Submitting goes through a two-step inline confirm that restates the job
+      //      count and the exact total. No native confirm() anywhere in the file.
+      //   6. After a successful settlement the settled jobs disappear from the list
+      //      and the total drops by the settled amount.
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin-vendor-payables.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Build the payables tab
+    file: packages/web/app/routes/admin/vendors/$id.payables.tsx
+    status: done
+    code: |-
+      // Unsettled job table with row selection; running total from the selection.
+      // Settlement form: amount (defaults to selection total, editable), reference,
+      // paidAt, note.
+      //
+      // Error state on a failed fetch — never a 0 total.
+      // Two-step inline confirm restating job count and exact total before POST.
+      // INR rupees, two decimals, no paise conversion anywhere on this screen.
+  - id: 4
+    action: verify-pass
+    description: Confirm the payables tests pass
+    command: cd packages/web && bunx vitest run tests/routes/admin-vendor-payables.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm no native dialogs
+    command: cd packages/web && grep -rn "confirm(\|alert(" app/routes/admin/vendors/
+    expected_result: No matches
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the payables tab
+    command: 'git add packages/web/app/routes/admin/vendors packages/web/tests/routes/admin-vendor-payables.test.tsx && git commit -m "feat(admin): add vendor payables tab and settlement recording"'
+    status: done
+current_step: 6
+completed: '2026-08-17T02:03:16.217Z'

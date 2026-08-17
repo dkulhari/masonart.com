@@ -1,0 +1,220 @@
+name: vendor-management
+title: Vendor Management
+priority: high
+created: '2026-08-16T21:22:41.852Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Vendor directory, capabilities, rate cards, vendor portal, plus the minimal production-job record that QC ratings and payables attach to.
+
+  Sub-project 1 of 5 in the fulfilment decomposition (order: vendor-management → production-pipeline → order-dispatch-tracking → production-qc-inspection → shipping-price-baked-in).
+
+  Fulfilment reality this serves: an order is sent out to third-party print shops, then framed, then returned, then dispatched. Multiple vendors exist for both printing and framing. Today the schema has no vendor concept at all, and order_status collapses the entire pipeline into one opaque "processing" state.
+
+  Scope: vendors + contacts; capabilities (kind print|frame, size limits, finishes, stated turnaround) used to filter assignment; per-vendor rate cards with effective dating; vendor logins with a limited, row-scoped portal; a minimal production_jobs record (order, stage, vendor, status, dates, expected/actual amount); job↔order_items join so mixed baskets split; production_job_reviews for QC verdict + defects with full rework history; payables derived from unsettled jobs plus vendor_settlements recording out-of-band payment.
+
+  Explicitly out of scope: the two-stage state machine, routing rules, reprint loops and lead-time calculation (production-pipeline); AI defect inspection (production-qc-inspection); executing vendor payments (stays outside the system by decision).
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+tickets:
+  todo:
+    '623': Tech debt - drizzle-kit db:generate is unusable, meta snapshots drift from migrations
+  in_progress: {}
+  done:
+    '607': Database Schema - Vendor core tables (vendors, contacts, capabilities, rates)
+    '608': Database Schema - Production job, items, QC reviews and settlements
+    '609': Database Schema - vendor role, vendor_users link and the migration
+    '610': Access Control - requireVendor middleware and the scoped query module
+    '611': Access Control - rate resolution, band overlap rejection and payables derivation
+    '612': Admin API - vendors CRUD, contacts, capabilities and role gating
+    '613': Admin API - rate card routes with effective dating and overlap rejection
+    '614': Admin API - production jobs, assignment pricing and QC reviews
+    '615': Admin API - payables, settlements and the vendor account invite
+    '616': Vendor Portal API - jobs, rates and payments through the scoped module
+    '617': Vendor Portal API - signed artwork URLs and the isolation property tests
+    '618': Admin UI - vendors list, detail, rate card editor and nav wiring
+    '619': Admin UI - payables tab and settlement recording
+    '620': Admin UI - production queue, job detail with QC review, and the order production panel
+    '621': Vendor Portal UI - /vendor route tree, guard and the four screens
+    '622': E2E - vendor lifecycle happy path and the access-denied cases
+    '624': Bug - broken = ANY() bind still 500s in returns, shipments and reviews admin routes
+total_tickets: 18
+completion_percentage: 94
+is_completed: false
+design:
+  approach: |-
+    ## 1. Context and problem
+
+    An order is sent to a third-party print shop, framed, returned, then dispatched. Multiple vendors exist for both printing and framing. QC approval is required at each of the two production steps.
+
+    The schema has no vendor concept whatsoever. `order_status` collapses this entire pipeline into one opaque state — `processing`, commented "Order being prepared/printed" (schema/orders.ts:113) — and `shipment_status` begins later still, at `pending` (awaiting label). The longer and more variable half of the customer's wait is invisible to staff and customer alike.
+
+    This is sub-project 1 of 5. Build order: vendor-management -> production-pipeline -> order-dispatch-tracking -> production-qc-inspection -> shipping-price-baked-in.
+
+    ## 2. Scope
+
+    IN: vendors and contacts; capabilities used to filter assignment; effective-dated rate cards; vendor logins with a row-scoped portal; the production_jobs record; job-to-order_items join; QC review records; derived payables and out-of-band settlement records.
+
+    OUT (each named to prevent absorption):
+    - Two-stage state machine, routing rules, reprint loops, lead-time calculation -> production-pipeline. This spec has a status column; it does not have a workflow.
+    - AI defect detection and capture medium -> production-qc-inspection. This spec stores a verdict; it does not produce one.
+    - Customer-facing delivery estimate -> production-pipeline.
+    - Shiprocket API of any kind -> order-dispatch-tracking (manual at launch regardless).
+    - Per-tier price uplift -> shipping-price-baked-in.
+    - Vendor payment execution -> outside the system, permanently.
+    - Auto-routing, capacity tracking, purchase orders, vendor invoices, performance scorecards -> later, once production history makes the numbers meaningful.
+    - Batching jobs into vendor runs -> production-pipeline.
+    - Vendor onboarding paperwork (KYC, contracts, GST) -> not modelled. Deliberate omission.
+
+    ## 3. Data model
+
+    Conventions: Drizzle pgTable, uuid PKs, pgEnum for states, decimal(10,2) INR for money, timestamps with $onUpdate, explicit indexes — matching existing schema/ modules.
+
+    **vendors** — name, status pgEnum(active|inactive|suspended), address fields, notes, createdBy, timestamps.
+
+    **vendor_contacts** — vendorId, name, phone, email, contactRole, isPrimary. A child table rather than loose columns: a shop has an owner and a production contact, and it is the seam the portal needs.
+
+    **vendor_capabilities** — vendorId, kind pgEnum(print|frame), maxWidthInches, maxHeightInches, finishes text[], statedTurnaroundDays, notes. One row per capability, so "prints up to 24x36, frames up to 40x60" is two rows and neither constrains the other. Drives the assignment filter.
+
+    **vendor_rates** — vendorId, kind, longestEdgeMinInches, longestEdgeMaxInches, finish, amount decimal(10,2), effectiveFrom, effectiveTo (nullable), createdBy. Bands match on the item's LONGEST EDGE in inches; ranges are inclusive-min, exclusive-max, and must not overlap for a given (vendorId, kind, finish) at any instant — enforced on write.
+
+    **production_jobs** — orderId, stage pgEnum(print|frame), vendorId, status pgEnum(draft|assigned|sent|received|qc_passed|qc_failed|cancelled), assignedAt, sentAt, dueAt, receivedAt, amountExpected decimal(10,2) (computed from the rate card live at assignment), amountActual decimal(10,2) nullable (the override), settlementId nullable, createdBy, timestamps. The enum defines the vocabulary only; legal transitions belong to production-pipeline.
+
+    **production_job_items** — jobId, orderItemId. Lets a mixed basket split across vendors.
+
+    **production_job_reviews** — jobId, reviewerId, verdict pgEnum(pass|fail), defects text[], notes, createdAt. Append-only; MULTIPLE rows per job are expected and are how rework history is preserved. Defect vocabulary is open at this stage; a controlled vocabulary lands with production-qc-inspection.
+
+    **vendor_settlements** — vendorId, amount decimal(10,2), reference, paidAt, note, createdBy.
+
+    **Payables are derived**, not stored: owed = SUM(COALESCE(amountActual, amountExpected)) over jobs WHERE settlementId IS NULL. No parallel ledger to drift.
+
+    ## 4. Access control and isolation
+
+    `vendor` is added to the user_role pgEnum (migration). `requireVendor` alone is NOT sufficient and that distinction is the core of this section: every existing role is a blanket grant, so requireRole is a complete check for them. A vendor sees only their own rows.
+
+    - **vendor_users** — vendorId, userId, UNIQUE on userId. One user belongs to one vendor.
+    - **requireVendor** resolves the caller's vendorId into context; a missing link is 403, never an unscoped query.
+    - **Scoped query module** — all vendor-facing data access goes through functions taking vendorId as a required first argument. Routes cannot reach the tables directly. This makes unfiltered access inexpressible rather than merely discouraged, and puts the isolation guarantee in one testable place instead of an audit across every route forever.
+
+    **Vendors need zero customer data.** Because dispatch is in-house, the piece returns to you before it ships, so no vendor-facing payload contains a customer name, address, phone, or person-linked order reference. Stated as an absolute so it can be tested as one.
+
+    A vendor sees: their jobs, the items on them, the artwork to print, size, finish, due date, their own rate card, their own amounts and settlements. Not other vendors' anything, not retail prices, not margins.
+
+    **Artwork delivery** — signed, expiring, job-scoped URLs. Never a public CDN path. A leaked permanent URL to a customer's commissioned artwork is a worse incident than a leaked job list.
+
+    **Account lifecycle** — vendors cannot self-register. Admin creates the vendor and invites a contact by email; the invite mints the account with role=vendor and the vendor_users link in ONE transaction. Suspending a vendor suspends its logins.
+
+    Two existing guards already behave correctly and should be confirmed by test rather than assumed: admin.tsx beforeLoad admits only admin/super-admin/content-manager (so a vendor at /admin gets Access Denied), and staffAreaLabel/staffAreaHref in lib/admin-nav.ts return null for unrecognised roles (so no staff entry point renders).
+
+    ## 5. Surfaces
+
+    **Admin** (inside the existing /admin shell):
+    - /admin/vendors — list: name, status, capability summary, open jobs, amount owed; filter by capability and status
+    - /admin/vendors/new, /admin/vendors/$id — vendor CRUD, contacts, capabilities, rate card editor with effective dating
+    - /admin/vendors/$id payables tab — unsettled jobs, running total, record a settlement against selected jobs
+    - /admin/production — job queue filtered by stage/status/vendor; where assignment happens
+    - /admin/production/$id — job detail: items, amounts, QC review, history
+    - /admin/orders/$id — existing screen gains a production panel
+
+    Nav goes into AdminSidebar.tsx AND lib/admin-nav.ts together — that pairing is the repo's stated guard against route/nav drift, and #603 exists because it was bypassed. Vendors is operational, so it belongs in the primary nav list, not the Settings group. content-manager must NOT see it (payables and vendor cost are admin data), so these paths stay out of CONTENT_MANAGER_ALLOWED_PREFIXES.
+
+    **Vendor portal** — new top-level /vendor route tree with its own layout guard mirroring /admin's beforeLoad:
+    - /vendor — my jobs: assigned, in progress, due. Answers "what do I work on next" and nothing else.
+    - /vendor/jobs/$id — items, artwork download (signed URL), mark received / in progress / ready
+    - /vendor/rates — my rate card, read-only
+    - /vendor/payments — my amounts and settlement history
+
+    Four screens deliberately. A print shop will not learn more than that, and every added screen is another thing that must be right about isolation.
+
+    **New screens do not repeat the drift found in the admin consistency audit:**
+    - No native confirm()/alert(). Use the inline two-step pattern established by ReviewMediaStrip (reviews.tsx:269 documents why: native dialogs block the automation harness outright). Nine admin files currently violate this, which is why those destructive paths have no E2E coverage.
+    - Skeleton, empty and error states on every list. Only 4 of 13 existing admin lists have all three.
+    - List state in the URL via validateSearch, with the repo caveat that router.tsx overrides TanStack's search serialisation: schemas MUST coerce numbers and split comma-joined arrays, or the route error-boundaries to a blank page.
+    - Paginate from day one. The collections and frames list endpoints have no LIMIT today; vendor jobs will outgrow both.
+
+    ## 6. Testing
+
+    Cadence: unit + integration per ticket (Vitest *.test.ts), E2E per feature (Playwright *.spec.ts).
+
+    Isolation is tested as a property, not as a per-route afterthought:
+    1. Vendor A cannot read or write vendor B's data — one test per vendor-facing endpoint, PLUS a test that the scoped query module refuses to run without a vendorId. If a later route bypasses the module, that second test is what catches it.
+    2. No vendor-facing payload contains a customer field — asserted over every vendor response shape.
+    3. Artwork URLs are signed, expiring and job-scoped; vendor B's session cannot fetch vendor A's artwork.
+
+    Then: capability filter excludes an undersized vendor; rate-card effective dating picks the row live at assignment and does not leak a scheduled future rate; overlapping rate bands are rejected on write; amountExpected computes from the rate card and amountActual overrides it; payables sum only unsettled jobs; settlement clears them; QC reject -> rework -> re-review leaves multiple review rows; vendor at /admin gets Access Denied; content-manager at /admin/vendors gets Access Denied.
+
+    E2E happy path: admin creates vendor -> invites contact -> assigns job -> vendor logs in and sees only their own -> marks ready -> admin rates QC -> admin records settlement.
+
+    Known repo test hazards to write into tickets rather than rediscover: run E2E against the correct port (:5173 is a DIFFERENT app and makes suites pass vacuously); stub localStorage in vi.hoisted above imports if any store persists (Node 25's inert localStorage shadows jsdom's); do not run admin suites in parallel with other admin suites; diff failures against the main baseline rather than treating them as new.
+  decisions:
+    - Scope is directory + capability matching with human assignment. Not auto-routing (needs capacity data that does not exist), not full procurement (needs production history to be meaningful).
+    - Vendors get logins and a limited portal, and this is the decision that adds real security surface.
+    - 'Row-scoping, not role-gating. Every existing role is a blanket grant: a content-manager sees ALL products, so requireRole is the complete check. A vendor sees only their own rows, which requireRole cannot express. Enforced in one scoped query module where vendorId is a required first argument, so unfiltered access is not expressible rather than merely discouraged.'
+    - 'Vendors need ZERO customer data, because dispatch is in-house: the piece returns to you before it ships. This is a consequence of the fulfilment model, not an imposed restriction, which is why it can be tested as a blanket rule (no vendor-facing payload contains a customer field).'
+    - Rate card per vendor WITH per-job override. The computed expected amount keeps cost data structured for shipping-price-baked-in calibration; the override acknowledges that print shops negotiate. Rate-card-only pushes staff into workarounds; manual-only makes overcharging invisible.
+    - Rate cards are effective-dated, following the shipping_config precedent (lib/shipping-config.ts resolves against the caller's clock). A vendor announcing a price rise from the 1st is the ordinary case, not an edge case.
+    - 'QC verdicts live in production_job_reviews, a separate table rather than a column on the job, so reject -> rework -> re-review keeps its history. Deliberately mirrors ai_generation_reviews (schema/ai-generation-reviews.ts): same problem, same shape, existing repo pattern.'
+    - Payables are DERIVED (sum of amountActual ?? amountExpected across jobs with settlementId IS NULL), not a parallel ledger that can drift out of sync.
+    - Vendor payment execution stays outside the system permanently. The system records what is owed and what was paid; money moves elsewhere.
+    - The job entity is pulled INTO this spec from production-pipeline. QC ratings and payables both attach to a job, so a pure directory would ship nothing usable on its own. This spec defines the job RECORD; production-pipeline defines the WORKFLOW over it.
+    - Money uses decimal(10,2) in INR, matching orders and products. NOT walletPricingConfig's paise, NOT shipping_config's whole rupees. The repo already documents this 100x hazard and vendor money is transactional, so it follows orders.
+    - Jobs join to order_items via production_job_items rather than to orders directly, so a mixed basket (rolled poster + framed piece) splits across vendors cleanly instead of forcing one vendor per order.
+    - Vendor onboarding paperwork (KYC, contracts, GST) is NOT modelled in this spec. Recorded as a deliberate omission rather than an oversight; revisit if compliance requires it.
+    - 'New screens do not inherit the drift found in the admin audit: no native confirm()/alert(), skeleton+empty+error on every list, list state in the URL via validateSearch, and pagination from day one.'
+  approved: true
+  approved_at: '2026-08-16T21:32:46.261Z'
+plan:
+  phases:
+    - name: 'Phase 1: Database Schema'
+      location: packages/api/src/database/schema
+      tickets:
+        - 607
+        - 608
+        - 609
+    - name: 'Phase 2: Access Control and Core Logic'
+      location: packages/api/src/middleware, packages/api/src/lib
+      tickets:
+        - 610
+        - 611
+    - name: 'Phase 3: Admin API'
+      location: packages/api/src/routes/admin
+      tickets:
+        - 612
+        - 613
+        - 614
+        - 615
+    - name: 'Phase 4: Vendor Portal API'
+      location: packages/api/src/routes/vendor.ts
+      tickets:
+        - 616
+        - 617
+    - name: 'Phase 5: Admin UI'
+      location: packages/web/app/routes/admin
+      tickets:
+        - 618
+        - 619
+        - 620
+    - name: 'Phase 6: Vendor Portal UI'
+      location: packages/web/app/routes/vendor
+      tickets:
+        - 621
+    - name: 'Phase 7: E2E'
+      location: tests/e2e
+      tickets:
+        - 622
+  generated_at: '2026-08-17T01:02:19.863Z'
+last_activity: '2026-08-17T03:06:18.503Z'
+started: '2026-08-17T01:03:22.080Z'

@@ -1,0 +1,146 @@
+ticket_number: 616
+title: Vendor Portal API - jobs, rates and payments through the scoped module
+description: |-
+  ## Task
+  `/api/vendor/*` — the four reads the portal needs, every one of them through `lib/vendor-scope.ts`.
+
+  ## Context
+  Feature: vendor-management. Phase 4 of 7. Depends on Phase 2 and Phase 3.
+
+  Endpoints, all gated `requireAuth, requireVendor`:
+  - `GET /api/vendor/jobs` — my jobs; assigned, in progress, due. Answers "what do I work on next" and nothing else.
+  - `GET /api/vendor/jobs/:id` — items, size, finish, due date, QC history
+  - `PATCH /api/vendor/jobs/:id` — mark received / in progress / ready. The ONLY write a vendor gets, and it may only touch status and the date fields, never amounts.
+  - `GET /api/vendor/rates` — my rate card, read-only
+  - `GET /api/vendor/payments` — my amounts and settlement history
+
+  **Routes do not touch the tables.** Every read goes through the scoped module with `vendorId` from context. If a handler here needs data the module does not expose, add a scoped function to the module — do not reach around it. The Phase 2 test that asserts no unscoped exported query exists is what keeps that honest.
+
+  The write path needs its own scoping care: `PATCH /jobs/:id` must load the job through `getVendorJob(vendorId, id)` first and 404 on a miss, rather than updating by id and checking ownership afterwards. Same result on the happy path, very different result when someone gets the ownership check wrong.
+
+  **Zero customer data** in any response. Not a name, not an address, not a phone, not an order number that identifies a person. The isolation test ticket asserts this over every response shape here.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:00:54.028Z'
+last_updated: '2026-08-17T01:44:49.595Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:40:52.209Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:44:45.276Z'
+    text: |-
+      Done in e98115b7. src/routes/vendor.ts mounted at /api/vendor, gated requireAuth + requireVendor. No db/table/query-builder import in the router — grep for '../database' returns nothing; every read and the single write go through lib/vendor-scope with the context vendorId.
+
+      PATCH /jobs/:id loads via getVendorJob(vendorId, id) first and 404s on a miss before any write is built; its zod body has only status + sentAt/receivedAt, with no amount field present at all, and status is narrowed to sent/received (QC verdicts stay ours).
+
+      Added updateVendorJob to lib/vendor-scope — the only mutation there, scoped twice (pre-read plus vendorId in the UPDATE's WHERE) and returning the re-read customer-free column list rather than the raw .returning() row, which would carry orderId. Enrolled it in tests/lib/vendor-scope.test.ts's scopedFns so it is covered by the refuses-without-vendorId assertions (10 passing).
+
+      tests/routes/vendor/jobs.test.ts: 23 passing. Real requireAuth/requireVendor/vendor-scope over a recording db mock, so the isolation assertions read the WHERE clause that actually reached the driver. Covers scoped list + pagination, 404 (not 403) on another vendor's job, status/date update, amounts ignored, 400 on an amounts-only body, self-QC refused, 404 with zero UPDATE issued on a foreign job, scoped rates, settlements + derived payable total, and 403 on every route for a vendor-role user with no link, an admin with no link, and a suspended vendor. Every response body is asserted free of customer fields.
+  - author: system
+    timestamp: '2026-08-17T01:44:49.595Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 610
+    feature: vendor-management
+    description: Access Control - requireVendor middleware and the scoped query module
+  - ticket: 614
+    feature: vendor-management
+    description: Admin API - production jobs, assignment pricing and QC reviews
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the vendor portal endpoints
+    file: packages/api/tests/routes/vendor/jobs.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/vendor/jobs.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases this file must cover:
+      //   1. GET /api/vendor/jobs returns only jobs whose vendorId matches the
+      //      session's link, paginated.
+      //   2. GET /api/vendor/jobs/:id for another vendor's job -> 404, not 403. A
+      //      404 leaks nothing about whether the job exists.
+      //   3. PATCH /api/vendor/jobs/:id updates status and the date fields.
+      //   4. PATCH with amountExpected or amountActual in the body does NOT change
+      //      either. A vendor may not price their own job.
+      //   5. PATCH against another vendor's job -> 404 and no write. The handler
+      //      must load through getVendorJob(vendorId, id) FIRST, not update-then-check.
+      //   6. GET /api/vendor/rates returns only this vendor's rate rows.
+      //   7. GET /api/vendor/payments returns this vendor's settlements and the
+      //      derived payable total.
+      //   8. A caller with role 'vendor' but no vendor_users row -> 403 on every
+      //      route (requireVendor), never an unscoped result set.
+      //   9. An admin session with no vendor link also gets 403 here. This route
+      //      tree is not an admin surface.
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/vendor/jobs.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Create the vendor portal router using only scoped module calls
+    file: packages/api/src/routes/vendor.ts
+    status: done
+    code: |-
+      // export const vendorApp = new Hono<{ Variables: VendorVariables }>()
+      // vendorApp.use('*', requireAuth, requireVendor)
+      //
+      // const vid = (c) => c.get('vendorId')
+      //
+      // GET   '/jobs'      -> listVendorJobs(vid(c), { status, limit, offset })
+      // GET   '/jobs/:id'  -> getVendorJob(vid(c), id) ?? 404
+      //                       + getVendorJobItems + getVendorJobReviews
+      // PATCH '/jobs/:id'  -> getVendorJob(vid(c), id) FIRST; 404 on miss.
+      //                       zod body allows ONLY status + receivedAt/sentAt.
+      //                       Amount fields are not in the schema, so they cannot
+      //                       arrive by accident.
+      // GET   '/rates'     -> listVendorRates(vid(c))
+      // GET   '/payments'  -> listVendorSettlements(vid(c)) + getVendorPayableTotal(vid(c))
+      //
+      // No db import in this file. If a handler needs something the scoped module
+      // does not expose, add a scoped function there — reaching around the module is
+      // exactly what the Phase 2 contract test forbids.
+  - id: 4
+    action: implement
+    description: Mount the vendor router
+    file: packages/api/src/index.ts
+    status: done
+    code: |-
+      import { vendorApp } from "./routes/vendor";
+      app.route("/api/vendor", vendorApp);
+  - id: 5
+    action: verify-pass
+    description: Confirm the vendor route tests pass
+    command: cd packages/api && bunx vitest run tests/routes/vendor/jobs.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: refactor
+    description: Grep the new router for direct database access and remove any
+    command: cd packages/api && grep -n "from '../database\|from \"../database" src/routes/vendor.ts
+    expected_result: No matches — the router reaches the data only through lib/vendor-scope
+    status: done
+  - id: 7
+    action: commit
+    description: Commit the vendor portal API
+    command: 'git add packages/api/src/routes/vendor.ts packages/api/src/index.ts packages/api/tests/routes/vendor/jobs.test.ts && git commit -m "feat(api): add vendor portal endpoints via the scoped query module"'
+    status: done
+current_step: 7
+started: '2026-08-17T01:40:52.209Z'
+completed: '2026-08-17T01:44:49.595Z'

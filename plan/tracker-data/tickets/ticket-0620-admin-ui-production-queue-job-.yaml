@@ -1,0 +1,138 @@
+ticket_number: 620
+title: Admin UI - production queue, job detail with QC review, and the order production panel
+description: |-
+  ## Task
+  `/admin/production` queue, `/admin/production/$id` detail with the QC review form, and a production panel on the existing `/admin/orders/$id`.
+
+  ## Context
+  Feature: vendor-management. Phase 5 of 7. Depends on the production API and the vendors screens.
+
+  **Queue** — filter by stage, status and vendor; paginated; state in the URL via `validateSearch` with the coercion/split hazard handled (`router.tsx` overrides TanStack's serialisation). Skeleton, empty and error states, all three.
+
+  **Assignment** is where the capability filter earns its keep: when assigning a job, show only vendors with a capability covering that stage and the largest item's longest edge, and show each candidate's rate for that size. If the API returns 422 because an item has no covering band, name the item and the size — do not present it as a generic failure, because the fix is "add a rate band", which the admin can do immediately.
+
+  **QC review form** — verdict pass/fail plus free-text defects and notes. Every submission appends a row; the detail screen shows the full review history in order. A rejected-then-reworked-then-passed job displays three entries, and that history being visible is the reason the reviews live in their own table.
+
+  **Order production panel** — on `/admin/orders/$id`, show the jobs covering that order's items, which items are on which job, and which items are on no job at all. That last one matters: an order item with no production job is invisible work, and this panel is the only place it would show up.
+
+  Same four rules as the other admin screens: no native `confirm()`, three list states, URL state, pagination.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T01:00:54.258Z'
+last_updated: '2026-08-17T02:09:58.912Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T02:09:47.445Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T02:09:58.912Z'
+    text: |-
+      Shipped in 2c83d0c7 on main.
+
+      Files:
+      - packages/web/app/routes/admin/production/index.tsx — queue, coercing+comma-splitting validateSearch, skeleton/empty/error, pagination
+      - packages/web/app/routes/admin/production/$id.tsx — job detail: capability-filtered assign picker with per-size rates, AssignmentFailure naming item+size on 422, QcReviewHistory (oldest first, numbered), QcReviewForm
+      - packages/web/app/routes/admin/production/OrderProductionPanel.tsx — order panel incl. unassignedOrderItems
+      - packages/web/app/routes/admin/orders/$id.tsx — panel mounted below OrderDetail
+      - packages/web/app/lib/admin-nav.ts + app/components/admin/AdminSidebar.tsx — Production nav entry, edited in the same commit; /admin/production stays OUT of CONTENT_MANAGER_ALLOWED_PREFIXES
+      - packages/web/app/routeTree.gen.ts — /admin/production and /admin/production/$id registered
+
+      Tests: 79 new across tests/routes/admin/{production-queue,production-detail,order-production-panel}.test.tsx. 121 passing including tests/routes/admin/vendors-list.test.tsx, tests/lib/admin-nav*.test.ts and tests/components/admin/AdminSidebar.test.tsx (no regressions).
+
+      Typecheck: 0 errors originating in the new files; web baseline of 22 unchanged.
+
+      Notes for follow-up:
+      - GET /api/admin/production has no orderId filter, so the panel scans the queue client-side (bounded at 10x100). It already sends `orderId` in the query, so it narrows for free the day the API learns it. A truncated scan withholds the coverage verdict rather than fabricating "all covered".
+      - The candidate picker fans out to GET /api/admin/vendors/:id per shortlisted vendor for the rate card. A rates-by-size endpoint would collapse that to one request.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 614
+    feature: vendor-management
+    description: Admin API - production jobs, assignment pricing and QC reviews
+  - ticket: 618
+    feature: vendor-management
+    description: Admin UI - vendors list, detail, rate card editor and nav wiring
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the production queue and QC history rendering
+    file: packages/web/tests/routes/admin-production.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin-production.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases:
+      //   1. validateSearch coerces page/pageSize and splits comma-joined status and
+      //      stage filters — the router.tsx serialisation hazard again.
+      //   2. Skeleton, empty and error states on the queue.
+      //   3. The assign picker lists only vendors whose capability covers the stage
+      //      and the largest item's longest edge, each with the rate for that size.
+      //   4. A 422 'unpriced item' response renders the item and its size, with the
+      //      remedy visible — not a generic 'something went wrong'.
+      //   5. The job detail shows QC history oldest-to-newest with three entries for
+      //      a fail -> rework -> pass job. That history is why reviews are a table.
+      //   6. Submitting a QC verdict appends; the previously shown entries are still
+      //      present afterwards.
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin-production.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Build the production queue route
+    file: packages/web/app/routes/admin/production/index.tsx
+    status: done
+    code: |-
+      // Coercing search schema, three list states, pagination.
+      // Columns: job, order, stage, vendor, status, due, amount.
+  - id: 4
+    action: implement
+    description: Build the job detail route with assignment and the QC review form
+    file: packages/web/app/routes/admin/production/$id.tsx
+    status: done
+    code: |-
+      // Items, amounts (expected + override), assignment picker filtered by
+      // capability, QC review form, full review history in order.
+      // Two-step inline confirm on anything destructive. No native confirm().
+  - id: 5
+    action: implement
+    description: Add the production panel to the existing order detail screen
+    file: packages/web/app/routes/admin/orders/$id.tsx
+    status: done
+    code: |-
+      // A panel listing this order's production jobs, the items on each, and —
+      // importantly — any order items on NO job. An unassigned item is invisible
+      // work and this is the only surface where it would appear.
+  - id: 6
+    action: verify-pass
+    description: Confirm the production tests pass
+    command: cd packages/web && bunx vitest run tests/routes/admin-production.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: verify-pass
+    description: Confirm the existing admin orders tests did not regress
+    command: cd packages/web && bunx vitest run tests/routes/
+    expected_result: PASS - no new failures versus the main baseline
+    status: done
+  - id: 8
+    action: commit
+    description: Commit the production screens
+    command: 'git add packages/web/app/routes/admin/production packages/web/app/routes/admin/orders packages/web/tests/routes/admin-production.test.tsx && git commit -m "feat(admin): add production queue, job detail with QC review and order production panel"'
+    status: done
+current_step: 8
+completed: '2026-08-17T02:09:47.445Z'

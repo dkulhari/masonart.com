@@ -1,0 +1,269 @@
+ticket_number: 633
+title: Deduplicate the gift-card live-database test harness across 11 suites
+description: |-
+  ## Task
+
+  Eleven gift-card suites each stand up the same live-database harness by hand. #630 shared one slice of it (`tests/helpers/gift-card-fixtures.ts` — the Razorpay reset and the row purge for two suites); this ticket finishes the job across the whole family.
+
+  Every suite that imports `tests/helpers/live-db.ts`:
+
+  - `tests/routes/admin-gift-card-refund.test.ts`
+  - `tests/routes/admin/gift-cards.test.ts`
+  - `tests/routes/admin/returns-store-credit.test.ts`
+  - `tests/routes/cart-gift-card-lines.test.ts`
+  - `tests/routes/gift-card-payment.test.ts`
+  - `tests/routes/gift-card-purchase.test.ts`
+  - `tests/routes/gift-card-quote.test.ts`
+  - `tests/routes/gift-card-release.test.ts`
+  - `tests/services/gift-card-delivery.test.ts`
+  - `tests/services/gift-card-redeem.test.ts`
+  - `tests/services/gift-card-refund.test.ts`
+
+  ## The duplicated pieces
+
+  **1. Connect-or-mark-unreachable (~20 lines x 11)**
+  `admin-gift-card-refund.test.ts:65-84`, `gift-card-payment.test.ts:65-84`, `gift-card-release.test.ts:69-88`, `services/gift-card-delivery.test.ts:45-64`, `services/gift-card-refund.test.ts:49-64`.
+
+  Every one is the same block:
+
+  ```ts
+  const DATABASE_URL = liveDbUrl()
+  let client: ReturnType<typeof postgres>
+  let db: ReturnType<typeof drizzle<typeof schema>>
+  let reachable = false
+
+  beforeAll(async () => {
+    if (!DATABASE_URL) return
+    try {
+      client = postgres(DATABASE_URL, { max: 5, onnotice: () => {} })
+      await client`SELECT 1`
+      db = drizzle(client, { schema })
+      reachable = true
+    } catch {
+      reachable = false
+    }
+    // ...suite-specific seeding
+  })
+
+  afterAll(async () => {
+    if (client) await client.end()
+  })
+  ```
+
+  Extract a `connectLiveDb()` helper returning `{ client, db, reachable }` plus a matching teardown, into `tests/helpers/live-db.ts` (it already owns `liveDbUrl` / `assertLiveDbReachable`).
+
+  **2. `freshCode()` — 7 copies**
+  `gift-card-quote`, `gift-card-payment`, `gift-card-release`, `admin-gift-card-refund`, `admin/gift-cards`, `services/gift-card-refund`, `services/gift-card-redeem` all carry:
+
+  ```ts
+  let counter = 0
+  function freshCode(): string {
+    counter += 1
+    return `PAY${String(process.pid).padStart(6, '0')}${String(counter).padStart(7, '0')}`.slice(0, 16)
+  }
+  ```
+
+  Only the 3-letter prefix differs (`PAY`, `REL`, `TEST`, …). Extract `freshGiftCardCode(prefix)` into `tests/helpers/gift-card-fixtures.ts`.
+
+  **3. Shared import block (~19 lines x N)**
+  `admin-gift-card-refund.test.ts:15-33` / `gift-card-release.test.ts:13-31` / `services/gift-card-redeem.test.ts:17-46`. Same drizzle, postgres, gift-card schema and `hashGiftCardCode` imports. This one largely dissolves on its own once 1 and 2 land — do not chase it separately.
+
+  **4. Near-whole-file clone: redeem vs refund**
+  `services/gift-card-redeem.test.ts` and `services/gift-card-refund.test.ts` share **~127 of ~160 lines** across four regions (`17-46`/`20-48`, `64-104`/`66-105`, `104-134`/`105-135`, `134-158`/`135-159`). This is the single worst pair in the report. Look at it first — it may be one shared harness module rather than four separate extractions.
+
+  **5. Auth + Razorpay module mocks**
+  `admin-gift-card-refund.test.ts:35-48` and the sibling route suites repeat the same `vi.mock('../../src/middleware/auth', ...)` header-driven `requireAuth` and the `vi.mock('../../src/lib/razorpay', ...)` partial mock. Note `tests/helpers/admin-route-harness.ts` already has a header-auth mock, but for `requireContentManager`, not `requireAdmin` — extend it rather than adding a third variant.
+
+  ## Trap: the purge order is NOT the same everywhere
+
+  `services/gift-card-redeem.test.ts:67-88` deletes **transactions → orderGiftCards → giftCards → orders**.
+  `tests/helpers/gift-card-fixtures.ts` (from #630) deletes **orderGiftCards → transactions → giftCards → orders**.
+
+  Both satisfy their own FK edges. Do not assume one is a typo and unify blindly — confirm against the schema, then unify deliberately, or keep the order a parameter.
+
+  ## Acceptance criteria
+
+  - The five duplicated pieces above are each a single copy, living under `packages/api/tests/helpers/`.
+  - No test behaviour changes: the same assertions run and every touched suite still passes.
+  - The redeem/refund pair is no longer a ~127-line clone.
+  - Re-running the scan shows the gift-card clone family gone and total duplication below the current 2.93%.
+
+  ## Verification
+
+  These are live-database suites. **They need the port override or they fail against a different project's Postgres:**
+
+  ```
+  cd packages/api
+  DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' \
+    bunx vitest run tests/routes/gift-card-payment.test.ts tests/routes/gift-card-release.test.ts \
+      tests/routes/gift-card-quote.test.ts tests/routes/gift-card-purchase.test.ts \
+      tests/routes/admin-gift-card-refund.test.ts tests/routes/admin/gift-cards.test.ts \
+      tests/routes/admin/returns-store-credit.test.ts tests/routes/cart-gift-card-lines.test.ts \
+      tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts \
+      tests/services/gift-card-delivery.test.ts
+  ```
+
+  Record the pass count BEFORE touching anything — that number is the contract.
+
+  Then re-run the scan scoped as the #630 baseline was:
+
+  ```
+  npx jscpd@5.0.12 packages \
+    --format typescript,tsx,javascript,jsx \
+    --ignore '**/node_modules/**,**/migrations/**,**/dist/**,**/build/**,**/.turbo/**,**/*.d.ts' \
+    --min-lines 15
+  ```
+
+  ## Context
+
+  - Follow-on from #630, which left this family explicitly out of scope.
+  - `vi.mock` factories are hoisted above every `const`, so a factory that needs a helper must use `await vi.hoisted(async () => (await import('...')).thing())` or an async factory. Every helper landed in #630 uses one of those two shapes — copy them.
+  - Prefer small commits, one piece at a time. A single sweeping commit over 11 suites is unreviewable and risks silently changing a mock.
+feature: code-deduplication
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T05:12:37.390Z'
+last_updated: '2026-08-17T05:12:37.390Z'
+time_spent_minutes: 0
+labels:
+  - refactor
+  - dry
+  - testing
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: verify-pass
+    description: Record the green baseline for all 11 gift-card suites before touching anything
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes/gift-card-payment.test.ts tests/routes/gift-card-release.test.ts tests/routes/gift-card-quote.test.ts tests/routes/gift-card-purchase.test.ts tests/routes/admin-gift-card-refund.test.ts tests/routes/admin/gift-cards.test.ts tests/routes/admin/returns-store-credit.test.ts tests/routes/cart-gift-card-lines.test.ts tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts tests/services/gift-card-delivery.test.ts
+    expected_result: PASS - write down the file and test counts; this is the contract for every later step
+    status: pending
+  - id: 2
+    action: implement
+    description: Add connectLiveDb() / closeLiveDb() to the existing live-db helper
+    file: packages/api/tests/helpers/live-db.ts
+    expected_result: Helper returns { client, db, reachable } and swallows a connect failure into reachable:false, exactly as the inline blocks do
+    status: pending
+    code: |-
+      import { drizzle } from 'drizzle-orm/postgres-js'
+      import postgres from 'postgres'
+      import * as schema from '../../src/database/schema'
+
+      export interface LiveDbHandle {
+        client: ReturnType<typeof postgres> | undefined
+        db: ReturnType<typeof drizzle<typeof schema>> | undefined
+        reachable: boolean
+      }
+
+      /**
+       * Connect, or report unreachable. Never throws: a suite that needs a real
+       * database asserts that separately with assertLiveDbReachable, so a missing
+       * database is a loud skip rather than eleven identical stack traces.
+       */
+      export async function connectLiveDb(): Promise<LiveDbHandle> {
+        const url = liveDbUrl()
+        if (!url) return { client: undefined, db: undefined, reachable: false }
+
+        try {
+          const client = postgres(url, { max: 5, onnotice: () => {} })
+          await client`SELECT 1`
+          return { client, db: drizzle(client, { schema }), reachable: true }
+        } catch {
+          return { client: undefined, db: undefined, reachable: false }
+        }
+      }
+
+      export async function closeLiveDb(handle: LiveDbHandle): Promise<void> {
+        if (handle.client) await handle.client.end()
+      }
+  - id: 3
+    action: verify-pass
+    description: Move the 11 suites onto connectLiveDb/closeLiveDb, one or two at a time, re-running after each
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes/gift-card-payment.test.ts tests/routes/gift-card-release.test.ts tests/routes/gift-card-quote.test.ts tests/routes/gift-card-purchase.test.ts tests/routes/admin-gift-card-refund.test.ts tests/routes/admin/gift-cards.test.ts tests/routes/admin/returns-store-credit.test.ts tests/routes/cart-gift-card-lines.test.ts tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts tests/services/gift-card-delivery.test.ts
+    expected_result: PASS - same counts as step 1
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the live-db connection helper
+    command: 'git add packages/api/tests/helpers/live-db.ts packages/api/tests && git commit -m "test(api): share the live-database connect/teardown across the gift-card suites"'
+    status: pending
+  - id: 5
+    action: implement
+    description: Add freshGiftCardCode(prefix) and delete the 7 local freshCode copies
+    file: packages/api/tests/helpers/gift-card-fixtures.ts
+    expected_result: Same 16-char pid+counter shape as the copies it replaces, so parallel suites still cannot collide
+    status: pending
+    code: |-
+      let counter = 0
+
+      /**
+       * A gift-card code unique to this process and this call.
+       *
+       * The pid is in there because suites run in parallel workers against ONE
+       * database and the code column is unique — two workers generating "TEST0001"
+       * is a flake that only shows up under load.
+       */
+      export function freshGiftCardCode(prefix: string): string {
+        counter += 1
+        return `${prefix}${String(process.pid).padStart(6, '0')}${String(counter).padStart(7, '0')}`.slice(0, 16)
+      }
+  - id: 6
+    action: verify-pass
+    description: Confirm the suites still pass on the shared code generator
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes/gift-card-payment.test.ts tests/routes/gift-card-release.test.ts tests/routes/gift-card-quote.test.ts tests/routes/admin-gift-card-refund.test.ts tests/routes/admin/gift-cards.test.ts tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts
+    expected_result: PASS - no unique-constraint violations
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the shared code generator
+    command: 'git add packages/api/tests && git commit -m "test(api): share freshGiftCardCode across the gift-card suites"'
+    status: pending
+  - id: 8
+    action: refactor
+    description: Collapse the redeem/refund near-whole-file clone (~127 of ~160 lines) into one harness
+    file: packages/api/tests/services/gift-card-redeem.test.ts
+    expected_result: 'The two service suites share a harness module; check the schema first and decide the purge order deliberately - redeem and the #630 helper currently disagree'
+    status: pending
+  - id: 9
+    action: verify-pass
+    description: Confirm both service suites pass unchanged
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts tests/services/gift-card-delivery.test.ts
+    expected_result: PASS - same counts as step 1
+    status: pending
+  - id: 10
+    action: commit
+    description: Commit the service-suite harness
+    command: 'git add packages/api/tests && git commit -m "test(api): share the gift-card service test harness"'
+    status: pending
+  - id: 11
+    action: implement
+    description: Extend admin-route-harness with a requireAdmin variant and fold in the repeated Razorpay partial mock
+    file: packages/api/tests/helpers/admin-route-harness.ts
+    expected_result: One header-auth mock covering both requireContentManager and requireAdmin - do not add a third variant
+    status: pending
+  - id: 12
+    action: verify-pass
+    description: Full re-run of all 11 suites plus typecheck
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes/gift-card-payment.test.ts tests/routes/gift-card-release.test.ts tests/routes/gift-card-quote.test.ts tests/routes/gift-card-purchase.test.ts tests/routes/admin-gift-card-refund.test.ts tests/routes/admin/gift-cards.test.ts tests/routes/admin/returns-store-credit.test.ts tests/routes/cart-gift-card-lines.test.ts tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts tests/services/gift-card-delivery.test.ts && cd ../.. && bun run typecheck
+    expected_result: PASS - counts match step 1 exactly, typecheck 0 errors
+    status: pending
+  - id: 13
+    action: verify-pass
+    description: Re-run the duplication scan and confirm the gift-card family is gone
+    command: npx jscpd@5.0.12 packages --format typescript,tsx,javascript,jsx --ignore '**/node_modules/**,**/migrations/**,**/dist/**,**/build/**,**/.turbo/**,**/*.d.ts' --min-lines 15
+    expected_result: Total duplication below 2.93%; no gift-card pair over 15 lines remains
+    status: pending
+  - id: 14
+    action: commit
+    description: Commit the auth/Razorpay mock consolidation
+    command: 'git add packages/api/tests && git commit -m "test(api): share the admin auth and Razorpay mocks across the gift-card suites"'
+    status: pending
+current_step: 1

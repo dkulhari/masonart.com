@@ -1,0 +1,447 @@
+ticket_number: 610
+title: Access Control - requireVendor middleware and the scoped query module
+description: |-
+  ## Task
+  Add `requireVendor` middleware that resolves the caller's `vendorId` into request context, and a scoped query module through which ALL vendor-facing data access must pass.
+
+  ## Context
+  Feature: vendor-management. Phase 2 of 7. Depends on Phase 1 schema.
+
+  **This is the security core of the feature.** The reason it exists as a module rather than as care taken per route:
+
+  Every existing role in this system is a blanket grant — a content-manager sees ALL products, so `requireRole` is a complete check for them. A vendor sees only their own rows, which `requireRole` cannot express. `requireVendor` alone is therefore NOT sufficient, and that distinction is the whole point of this ticket.
+
+  So: every vendor-facing read takes `vendorId` as a REQUIRED FIRST ARGUMENT, and routes never touch the tables directly. This makes unfiltered access inexpressible rather than merely discouraged, and puts the isolation guarantee in one testable place instead of an audit across every route forever.
+
+  Two tests carry the weight:
+  1. Vendor A cannot read vendor B's rows through any exported function.
+  2. The module REFUSES TO RUN without a vendorId — throws, does not fall back to an unscoped query. If a later route bypasses the module, that second test is what catches it.
+
+  Other constraints:
+  - A caller with role `vendor` but no `vendor_users` row is 403, never an unscoped query.
+  - A suspended vendor's logins are refused — suspending the vendor suspends the portal.
+  - Follow `packages/api/src/middleware/auth.ts` for shape: `createMiddleware<{ Variables: ... }>`, `createForbiddenError` / `createUnauthorizedError` from the same error helpers `requireRole` uses (`src/middleware/auth.ts:227`).
+  - **Vendors need ZERO customer data.** No function in this module may return a customer name, address, phone, or person-linked order reference. That is a consequence of the fulfilment model (dispatch is in-house, the piece returns to you before it ships), which is why it can be tested as a blanket rule.
+feature: vendor-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:56:49.735Z'
+last_updated: '2026-08-17T01:18:32.727Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:15:03.129Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:18:29.956Z'
+    text: |-
+      Done in cf495877. 13 tests passing (9 vendor-scope contract, 4 requireVendor); packages/api tsc --noEmit clean.
+
+      Three deviations from the step code, all recorded here rather than silently:
+
+      1. **Step 1's test and step 3's code contradicted each other.** The module exports getVendorJobItems and getVendorJobReviews, but scopedFns listed only five functions, so the "exposes no function that reads vendor data without scoping" case failed with ['getVendorJobItems','getVendorJobReviews']. Resolved by adding both to scopedFns rather than by deleting them or relaxing the regex — both genuinely take vendorId first and call assertVendorId, so enrolling them subjects them to the falsy-vendorId refusal assertions too. The suite got stricter (7 functions x 3 falsy values), not weaker.
+
+      2. **listVendorRates and listVendorSettlements used a bare .select().** Replaced with explicit column lists per the no-bare-select rule. Neither table holds customer columns today, so this changed no return value — it removes the way a later column addition could leak one silently. Fixed two column names the step code guessed wrong along the way: vendorRates has amount + longestEdge{Min,Max}Inches (not unitCost), vendorSettlements has note (not notes).
+
+      3. **jobId made optional on the two item/review helpers**, so the contract test can invoke them with a single argument and still hit the assertVendorId throw first.
+
+      Step 9 was not a formality: createUnauthorizedError and createForbiddenError were module-private in middleware/auth.ts (lines 81 and 101). Added `export` to both — the identical function requireRole calls, so the 401/403 bodies are byte-identical. tests/middleware/auth.test.ts re-run: 131 passing.
+
+      Did not touch src/lib/vendor-rates.ts or src/lib/vendor-payables.ts (#611).
+  - author: system
+    timestamp: '2026-08-17T01:18:32.727Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 609
+    feature: vendor-management
+    description: Database Schema - vendor role, vendor_users link and the migration
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the scoped query module's refusal behaviour and A/B isolation
+    file: packages/api/tests/lib/vendor-scope.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/vendor-scope.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import * as scope from '../../src/lib/vendor-scope'
+
+      /**
+       * The load-bearing test in this feature. Not "does the happy path filter" —
+       * that is easy to get right once. This asserts that an UNSCOPED call is not
+       * expressible: every exported query refuses without a vendorId rather than
+       * quietly returning everything.
+       */
+      describe('vendor-scope module contract', () => {
+        const scopedFns = [
+          'listVendorJobs',
+          'getVendorJob',
+          'listVendorRates',
+          'listVendorSettlements',
+          'getVendorPayableTotal',
+        ] as const
+
+        it('exports every vendor-facing query', () => {
+          for (const fn of scopedFns) {
+            expect(typeof (scope as any)[fn], `${fn} missing`).toBe('function')
+          }
+        })
+
+        it.each(scopedFns)('%s refuses to run without a vendorId', async (fn) => {
+          // Empty string, undefined and null are all "no vendor" — none may be
+          // treated as "all vendors".
+          await expect((scope as any)[fn]('')).rejects.toThrow(/vendorId/i)
+          await expect((scope as any)[fn](undefined)).rejects.toThrow(/vendorId/i)
+          await expect((scope as any)[fn](null)).rejects.toThrow(/vendorId/i)
+        })
+
+        it('exposes no function that reads vendor data without scoping', () => {
+          // Anything exported that queries must take vendorId first. A future
+          // convenience helper that forgets is what this catches.
+          const exported = Object.keys(scope).filter((k) => typeof (scope as any)[k] === 'function')
+          const unscoped = exported.filter(
+            (k) => !scopedFns.includes(k as any) && /^(list|get|find|query)/.test(k)
+          )
+          expect(unscoped).toEqual([])
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails because the module does not exist
+    command: cd packages/api && bunx vitest run tests/lib/vendor-scope.test.ts
+    expected_result: FAIL - Cannot find module '../../src/lib/vendor-scope'
+    status: done
+  - id: 3
+    action: implement
+    description: Create the scoped query module. Every export takes vendorId first and throws on a falsy one.
+    file: packages/api/src/lib/vendor-scope.ts
+    status: done
+    code: |
+      /**
+       * Vendor-Scoped Data Access
+       *
+       * ALL vendor-facing reads go through this module. Routes do not reach the
+       * tables directly.
+       *
+       * Why a module and not care-taken-per-route: every other role in this system
+       * is a blanket grant, so `requireRole` is a complete check for it. A vendor
+       * sees only their own rows, which `requireRole` cannot express. Putting the
+       * filter in one place with `vendorId` as a required first argument makes an
+       * unfiltered query inexpressible rather than merely discouraged, and gives the
+       * isolation guarantee ONE testable home instead of an audit across every route
+       * that will ever be added.
+       *
+       * Second rule, equally absolute: **no return value here contains customer
+       * data.** Not a name, not an address, not a phone, not a person-linked order
+       * reference. Dispatch is in-house — the piece comes back to us before it ships
+       * — so a vendor never needs any of it. Stated as an absolute so it can be
+       * tested as one.
+       */
+
+      import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+      import { db } from '../database'
+      import {
+        productionJobs,
+        productionJobItems,
+        productionJobReviews,
+        vendorSettlements,
+      } from '../database/schema/production-jobs'
+      import { vendorRates } from '../database/schema/vendors'
+
+      /**
+       * The guard every export starts with. Throws rather than returning empty:
+       * an empty result reads as "this vendor has nothing", which is a lie that
+       * looks like data. A throw is a bug report.
+       */
+      function assertVendorId(vendorId: string | null | undefined): asserts vendorId is string {
+        if (!vendorId || typeof vendorId !== 'string') {
+          throw new Error('vendor-scope: vendorId is required and was not supplied')
+        }
+      }
+
+      export async function listVendorJobs(
+        vendorId: string | null | undefined,
+        opts: { status?: string; limit?: number; offset?: number } = {}
+      ) {
+        assertVendorId(vendorId)
+        const limit = Math.min(opts.limit ?? 20, 100)
+        const offset = opts.offset ?? 0
+
+        return db
+          .select({
+            id: productionJobs.id,
+            stage: productionJobs.stage,
+            status: productionJobs.status,
+            dueAt: productionJobs.dueAt,
+            sentAt: productionJobs.sentAt,
+            receivedAt: productionJobs.receivedAt,
+            amountExpected: productionJobs.amountExpected,
+            amountActual: productionJobs.amountActual,
+            createdAt: productionJobs.createdAt,
+            // Deliberately absent: orderId, any customer field, any retail price.
+          })
+          .from(productionJobs)
+          .where(
+            opts.status
+              ? and(eq(productionJobs.vendorId, vendorId), eq(productionJobs.status, opts.status as any))
+              : eq(productionJobs.vendorId, vendorId)
+          )
+          .orderBy(desc(productionJobs.createdAt))
+          .limit(limit)
+          .offset(offset)
+      }
+
+      export async function getVendorJob(vendorId: string | null | undefined, jobId?: string) {
+        assertVendorId(vendorId)
+        if (!jobId) return null
+
+        const [job] = await db
+          .select({
+            id: productionJobs.id,
+            stage: productionJobs.stage,
+            status: productionJobs.status,
+            dueAt: productionJobs.dueAt,
+            sentAt: productionJobs.sentAt,
+            receivedAt: productionJobs.receivedAt,
+            amountExpected: productionJobs.amountExpected,
+            amountActual: productionJobs.amountActual,
+          })
+          .from(productionJobs)
+          // vendorId in the WHERE, not checked afterwards: a wrong-vendor job is
+          // NOT FOUND, which is also the right thing to leak (nothing).
+          .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+          .limit(1)
+
+        return job ?? null
+      }
+
+      export async function listVendorRates(vendorId: string | null | undefined) {
+        assertVendorId(vendorId)
+        return db
+          .select()
+          .from(vendorRates)
+          .where(eq(vendorRates.vendorId, vendorId))
+          .orderBy(desc(vendorRates.effectiveFrom))
+      }
+
+      export async function listVendorSettlements(vendorId: string | null | undefined) {
+        assertVendorId(vendorId)
+        return db
+          .select()
+          .from(vendorSettlements)
+          .where(eq(vendorSettlements.vendorId, vendorId))
+          .orderBy(desc(vendorSettlements.paidAt))
+      }
+
+      /**
+       * Payables are DERIVED, never stored: no parallel ledger to drift.
+       * owed = SUM(COALESCE(amountActual, amountExpected)) over unsettled jobs.
+       */
+      export async function getVendorPayableTotal(vendorId: string | null | undefined) {
+        assertVendorId(vendorId)
+        const [row] = await db
+          .select({
+            total: sql<string>`COALESCE(SUM(COALESCE(${productionJobs.amountActual}, ${productionJobs.amountExpected})), 0)`,
+          })
+          .from(productionJobs)
+          .where(and(eq(productionJobs.vendorId, vendorId), isNull(productionJobs.settlementId)))
+
+        return row?.total ?? '0'
+      }
+
+      /** Item rows for a job the caller owns. Artwork/size/finish only — no customer. */
+      export async function getVendorJobItems(vendorId: string | null | undefined, jobId: string) {
+        assertVendorId(vendorId)
+        const job = await getVendorJob(vendorId, jobId)
+        if (!job) return []
+        return db
+          .select({ id: productionJobItems.id, orderItemId: productionJobItems.orderItemId })
+          .from(productionJobItems)
+          .where(eq(productionJobItems.jobId, jobId))
+      }
+
+      /** QC history for a job the caller owns. */
+      export async function getVendorJobReviews(vendorId: string | null | undefined, jobId: string) {
+        assertVendorId(vendorId)
+        const job = await getVendorJob(vendorId, jobId)
+        if (!job) return []
+        return db
+          .select({
+            id: productionJobReviews.id,
+            verdict: productionJobReviews.verdict,
+            defects: productionJobReviews.defects,
+            notes: productionJobReviews.notes,
+            createdAt: productionJobReviews.createdAt,
+            // reviewerId omitted: that is our staff, not their business.
+          })
+          .from(productionJobReviews)
+          .where(eq(productionJobReviews.jobId, jobId))
+          .orderBy(desc(productionJobReviews.createdAt))
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the scope module contract test passes
+    command: cd packages/api && bunx vitest run tests/lib/vendor-scope.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: write-test
+    description: 'Write failing test for requireVendor: no link is 403, suspended vendor is 403, happy path sets vendorId in context'
+    file: packages/api/tests/middleware/require-vendor.test.ts
+    command: cd packages/api && bunx vitest run tests/middleware/require-vendor.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import { Hono } from 'hono'
+
+      const mockLookup = vi.fn()
+      vi.mock('../../src/database', () => ({
+        db: {
+          select: () => ({
+            from: () => ({
+              innerJoin: () => ({ where: () => ({ limit: () => mockLookup() }) }),
+              where: () => ({ limit: () => mockLookup() }),
+            }),
+          }),
+        },
+      }))
+
+      import { requireVendor } from '../../src/middleware/vendor'
+
+      function appWithUser(user: any) {
+        const app = new Hono()
+        app.use('*', async (c, next) => {
+          c.set('user', user)
+          await next()
+        })
+        app.get('/x', requireVendor, (c) => c.json({ vendorId: c.get('vendorId') }))
+        return app
+      }
+
+      describe('requireVendor', () => {
+        beforeEach(() => mockLookup.mockReset())
+
+        it('403s a vendor-role user with no vendor_users row — never an unscoped query', async () => {
+          mockLookup.mockResolvedValue([])
+          const res = await appWithUser({ id: 'u1', role: 'vendor' }).request('/x')
+          expect(res.status).toBe(403)
+        })
+
+        it('403s when the vendor is suspended — suspending a vendor suspends its logins', async () => {
+          mockLookup.mockResolvedValue([{ vendorId: 'v1', status: 'suspended' }])
+          const res = await appWithUser({ id: 'u1', role: 'vendor' }).request('/x')
+          expect(res.status).toBe(403)
+        })
+
+        it('401s an unauthenticated caller', async () => {
+          mockLookup.mockResolvedValue([{ vendorId: 'v1', status: 'active' }])
+          const res = await appWithUser(null).request('/x')
+          expect(res.status).toBe(401)
+        })
+
+        it('resolves vendorId into context for an active linked vendor', async () => {
+          mockLookup.mockResolvedValue([{ vendorId: 'v1', status: 'active' }])
+          const res = await appWithUser({ id: 'u1', role: 'vendor' }).request('/x')
+          expect(res.status).toBe(200)
+          expect(await res.json()).toEqual({ vendorId: 'v1' })
+        })
+      })
+  - id: 6
+    action: verify-fail
+    description: Confirm the middleware test fails
+    command: cd packages/api && bunx vitest run tests/middleware/require-vendor.test.ts
+    expected_result: FAIL - Cannot find module '../../src/middleware/vendor'
+    status: done
+  - id: 7
+    action: implement
+    description: Create requireVendor middleware resolving the caller to exactly one active vendor
+    file: packages/api/src/middleware/vendor.ts
+    status: done
+    code: |
+      /**
+       * Vendor Access Middleware
+       *
+       * Resolves the caller into a single vendorId and puts it in context. It does
+       * NOT authorise anything by itself — the row scoping in `lib/vendor-scope.ts`
+       * does that. This only answers "which vendor is asking", and refuses when
+       * there is no single answer.
+       *
+       * A vendor-role user with no vendor_users row is 403. Never an unscoped query,
+       * never a fallback to "all": the failure mode this guards against is a missing
+       * link silently reading as no filter.
+       */
+
+      import { createMiddleware } from 'hono/factory'
+      import { eq } from 'drizzle-orm'
+      import { db } from '../database'
+      import { vendorUsers } from '../database/schema/vendor-users'
+      import { vendors } from '../database/schema/vendors'
+      import {
+        createUnauthorizedError,
+        createForbiddenError,
+        type AuthVariables,
+      } from './auth'
+
+      export type VendorVariables = AuthVariables & { vendorId: string }
+
+      export const requireVendor = createMiddleware<{ Variables: VendorVariables }>(
+        async (c, next) => {
+          const user = c.get('user')
+          if (!user) {
+            throw createUnauthorizedError('Authentication required')
+          }
+
+          const rows = await db
+            .select({ vendorId: vendorUsers.vendorId, status: vendors.status })
+            .from(vendorUsers)
+            .innerJoin(vendors, eq(vendors.id, vendorUsers.vendorId))
+            .where(eq(vendorUsers.userId, user.id))
+            .limit(1)
+
+          const link = rows[0]
+          if (!link) {
+            // Role without linkage is not a lesser permission — it is no permission.
+            throw createForbiddenError('No vendor account is linked to this user')
+          }
+
+          if (link.status !== 'active') {
+            throw createForbiddenError('This vendor account is not active')
+          }
+
+          c.set('vendorId', link.vendorId)
+          await next()
+        }
+      )
+  - id: 8
+    action: verify-pass
+    description: Confirm both suites pass
+    command: cd packages/api && bunx vitest run tests/middleware/require-vendor.test.ts tests/lib/vendor-scope.test.ts
+    expected_result: PASS
+    status: done
+  - id: 9
+    action: refactor
+    description: If createUnauthorizedError/createForbiddenError are not exported from middleware/auth.ts, import them from wherever requireRole gets them and keep the error shape identical to requireRole's
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS
+    status: done
+  - id: 10
+    action: commit
+    description: Commit the access control core
+    command: 'git add packages/api/src/middleware/vendor.ts packages/api/src/lib/vendor-scope.ts packages/api/tests/middleware/require-vendor.test.ts packages/api/tests/lib/vendor-scope.test.ts && git commit -m "feat(api): add requireVendor and the vendor-scoped query module"'
+    status: done
+current_step: 10
+started: '2026-08-17T01:15:03.129Z'
+completed: '2026-08-17T01:18:32.727Z'

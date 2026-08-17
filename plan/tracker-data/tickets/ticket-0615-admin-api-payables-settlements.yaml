@@ -1,0 +1,170 @@
+ticket_number: 615
+title: Admin API - payables, settlements and the vendor account invite
+description: |-
+  ## Task
+  Payables read, settlement recording, and the invite that mints a vendor login.
+
+  ## Context
+  Feature: vendor-management. Phase 3 of 7. Depends on Phase 1 + 2 and the admin vendors router.
+
+  **Payables** — `GET /api/admin/vendors/:id/payables` returns the unsettled jobs and a running total, derived via `lib/vendor-payables.ts`. No stored balance anywhere. Add a test that this total equals `getVendorPayableTotal` from `lib/vendor-scope.ts` for the same vendor: two implementations of one sum is exactly how a ledger drifts, and the vendor portal reads the other one.
+
+  **Settlements** — `POST /api/admin/vendors/:id/settlements` takes an amount, a reference, a paid-at and a list of job ids. In ONE transaction it inserts the `vendor_settlements` row and stamps `settlementId` onto those jobs. Guards: every job must belong to this vendor (else 422), and no job may already be settled (else 422 — double-settling is a silent overpay). The system records what is owed and what was paid; **executing the payment stays outside the system permanently.**
+
+  **Invite** — `POST /api/admin/vendors/:id/invite` takes a contact email. In ONE transaction it mints the user account with `role = 'vendor'` and creates the `vendor_users` link. Vendors cannot self-register, so this is the only path to a vendor login. Two failure modes worth their own tests: an email that already has a non-vendor account must not be silently converted, and a user already linked to another vendor must be refused (the UNIQUE on `user_id` will also stop it, but a 422 beats a constraint violation surfacing as a 500).
+
+  Suspending a vendor suspends its logins — that is already handled by `requireVendor` checking vendor status, so add a test asserting it rather than a second mechanism.
+feature: vendor-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:58:44.833Z'
+last_updated: '2026-08-17T01:41:12.836Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:35:19.633Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:41:08.964Z'
+    text: |-
+      Done in 12fb5221. 36 tests passing (19 payables/settlements, 17 invite), `bun run typecheck` clean.
+
+      - `src/routes/admin/vendor-payables.ts` — GET /:id/payables (derived via lib/vendor-payables), GET /:id/settlements, POST /:id/settlements. Verification read takes FOR UPDATE inside the transaction; unknown job / foreign vendor / already-settled are each 422 with no write, and the UPDATE re-states the predicate so a partial match rolls back.
+      - `src/routes/admin/vendor-invite.ts` — POST /:id/invite. Account via `auth.api.signUpEmail`, role promotion + vendor_users link in one transaction, compensating delete of the Better Auth account if that transaction fails (signup cannot join our tx). Existing non-vendor account -> 409, already-linked -> 422, UNIQUE(user_id) race -> 422 on both the mint path and the adopt-an-unlinked-vendor-account path. Best-effort `requestPasswordReset` after commit; failure is reported as `passwordResetSent: false`, not as a failed invite.
+      - Both mounted at /api/admin/vendors via narrow appends to src/index.ts (#613 and #614's lines untouched).
+
+      Carried-over #611 assertion is test "agrees with lib/vendor-scope.getVendorPayableTotal on the same rows": the db mock evaluates the vendor-scope aggregate with an independent decimal-string sum (not sumPayable) over the same seeded rows, and the test also renders the aggregate's WHERE to confirm it is scoped to the vendor and to settlement_id IS NULL.
+
+      Gap worth a follow-up: nothing checks the settlement `amount` against the sum of the named jobs. Deliberate — partial and rounded payments are real — but it means a typo'd amount is recorded silently. A warning field on the response (owed vs paid) would cost nothing.
+  - author: system
+    timestamp: '2026-08-17T01:41:12.836Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 611
+    feature: vendor-management
+    description: Access Control - rate resolution, band overlap rejection and payables derivation
+  - ticket: 612
+    feature: vendor-management
+    description: Admin API - vendors CRUD, contacts, capabilities and role gating
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for payables and settlements
+    file: packages/api/tests/routes/admin/vendor-payables.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-payables.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases this file must cover:
+      //   1. GET /payables lists only unsettled jobs and totals them with
+      //      COALESCE(actual, expected).
+      //   2. The total from this endpoint EQUALS getVendorPayableTotal() from
+      //      lib/vendor-scope for the same seeded data. The vendor portal reads the
+      //      other one; two implementations of one sum is how a ledger drifts.
+      //   3. POST /settlements stamps settlementId on the named jobs and inserts one
+      //      vendor_settlements row, in a single transaction.
+      //   4. After settling, the payable total drops by exactly the settled amount
+      //      and those jobs no longer appear in /payables.
+      //   5. Settling a job that belongs to a DIFFERENT vendor -> 422, nothing
+      //      written.
+      //   6. Settling an already-settled job -> 422. Double-settling is a silent
+      //      overpay, so it must be loud.
+      //   7. A content-manager gets 403.
+  - id: 2
+    action: verify-fail
+    description: Confirm the payables tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-payables.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Add the payables and settlement routes
+    file: packages/api/src/routes/admin/vendor-payables.ts
+    status: done
+    code: |-
+      // GET  /:id/payables      — unsettled jobs + total via lib/vendor-payables
+      // GET  /:id/settlements   — settlement history
+      // POST /:id/settlements   — { amount, reference, paidAt, jobIds[] }
+      //        transaction:
+      //          verify every jobId belongs to :id and has settlementId IS NULL
+      //          insert vendor_settlements
+      //          update production_jobs set settlement_id = <new id> where id in (...)
+      //        any violation -> 422 before any write
+  - id: 4
+    action: write-test
+    description: Write failing tests for the vendor invite transaction
+    file: packages/api/tests/routes/admin/vendor-invite.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-invite.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      // Cases this file must cover:
+      //   1. POST /:id/invite with a fresh email creates a user with role 'vendor'
+      //      AND the vendor_users link, in one transaction. Assert both exist.
+      //   2. If the link insert fails, no orphan user account is left behind. A
+      //      user with role vendor and no link is refused by requireVendor, so an
+      //      orphan is an account that can log in and do nothing — confusing, and
+      //      indistinguishable from a bug in the guard.
+      //   3. An email that already has a customer account is NOT silently converted
+      //      to role vendor -> 409 or 422 with a clear message.
+      //   4. A user already linked to another vendor -> 422, not a 500 from the
+      //      UNIQUE(user_id) constraint surfacing raw.
+      //   5. Vendors cannot self-register: assert there is no unauthenticated path
+      //      to this endpoint (401 without a session, 403 for a non-admin).
+      //   6. Suspending the vendor then calling a /api/vendor/* route with that
+      //      user's session -> 403, via requireVendor's status check. No second
+      //      mechanism.
+  - id: 5
+    action: verify-fail
+    description: Confirm the invite tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-invite.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 6
+    action: implement
+    description: Add the invite endpoint minting account and link together
+    file: packages/api/src/routes/admin/vendor-invite.ts
+    status: done
+    code: |-
+      // POST /:id/invite — { email, name, contactId? }
+      //   one transaction:
+      //     reject if a user with this email already exists and is not an unlinked
+      //       vendor-role account
+      //     create the user with role 'vendor' via the project's existing account
+      //       creation path (see src/auth/ — do NOT hand-insert into the users table
+      //       and skip whatever better-auth expects)
+      //     insert vendor_users { vendorId, userId }
+      //   respond 201 with the invite result
+      //
+      // Vendors cannot self-register. This is the only path to a vendor login.
+  - id: 7
+    action: verify-pass
+    description: Confirm both suites pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/vendor-payables.test.ts tests/routes/admin/vendor-invite.test.ts
+    expected_result: PASS
+    status: done
+  - id: 8
+    action: verify-pass
+    description: Typecheck
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS - no new errors versus the main baseline
+    status: done
+  - id: 9
+    action: commit
+    description: Commit payables, settlements and invite
+    command: 'git add packages/api/src/routes/admin/vendor-payables.ts packages/api/src/routes/admin/vendor-invite.ts packages/api/src/index.ts packages/api/tests/routes/admin/vendor-payables.test.ts packages/api/tests/routes/admin/vendor-invite.test.ts && git commit -m "feat(api): add vendor payables, settlements and account invite"'
+    status: done
+current_step: 9
+started: '2026-08-17T01:35:19.633Z'
+completed: '2026-08-17T01:41:12.836Z'

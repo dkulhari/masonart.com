@@ -1,0 +1,39 @@
+name: production-qc-inspection
+title: Production Qc Inspection
+priority: medium
+created: '2026-08-16T21:23:04.269Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  QC approval gates at each production stage, with AI-assisted defect flagging.
+
+  Sub-project 4 of 5. Depends on vendor-management (job + review records) and production-pipeline (stage gates).
+
+  Requirement: QC approval required at each of the two production steps, performed either online or in person, with AI checking for problems.
+
+  OPEN — capture medium not decided. Research required before speccing: what vision models reliably detect on prints and framed glass (colour shift, banding, dust under glass, scratches, corner alignment, size/artwork mismatch), and what the realistic false-positive rate is. If detection is poor against the real defect list, QC stays human and this feature shrinks to a workflow.
+
+  Options recorded during brainstorming:
+  (a) Guided photo capture — fixed shot list per stage (full front, each corner, raking light), AI checks stills against the order's expected artwork and size, human approves/rejects; live video reserved for disputes. Recommended by Claude: controlled angle and lighting suit the actual defect list, and stills are a reviewable audit artifact for vendor disputes at no extra cost.
+  (b) Live video AI check as originally specified — WebRTC or equivalent, real-time inference, recording for the audit trail. Larger and more fragile; a handheld stream from a print shop on a mobile network gives neither controlled angle nor lighting.
+  (c) Both.
+
+  The verdict/defect/rework data model already lands in vendor-management (production_job_reviews), so this feature adds the capture and inference layer, not the record-keeping.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

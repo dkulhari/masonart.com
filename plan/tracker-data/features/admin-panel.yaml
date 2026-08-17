@@ -1,7 +1,7 @@
 name: admin-panel
 title: Admin Panel
 priority: medium
-created: "2026-01-27T19:24:46.545Z"
+created: '2026-01-27T19:24:46.545Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -25,26 +25,40 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 1
-  total_duration: "00:20:00"
+  total_sessions: 11
+  total_duration: '00:59:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 1
-      duration: "00:20:00"
+      sessions: 11
+      duration: '00:59:00'
       tokens: 0
 tickets:
-  todo: {}
+  todo:
+    '632': Decide what to do about font-semibold — weight 600 is not loaded either, and the storefront uses it 176 times
   in_progress: {}
   done:
-    "9": Build admin panel for product/order management
-    "187": "Bug: Admin sign out tests fail after domcontentloaded migration"
-    "188": "Bug: Admin dashboard tests fail due to non-waiting assertions and hydration timing"
-    "190": "Bug: Admin orders date filter test fails due to hydration timing"
-    "339": "Bug - Admin sidebar covers page: site header overlap, drawer below 1024px, dead gap when collapsed"
-    "340": "Bug - Add Product has no file picker: image upload was never implemented (URL-only placeholder)"
-    "341": "BUG: Admin sidebar sign-out redirects home without ending the session"
-    "363": "Admin customers: per-field filtering incl. joined date range, server-side"
-total_tickets: 8
-completion_percentage: 100
-is_completed: true
+    '9': Build admin panel for product/order management
+    '187': 'Bug: Admin sign out tests fail after domcontentloaded migration'
+    '188': 'Bug: Admin dashboard tests fail due to non-waiting assertions and hydration timing'
+    '190': 'Bug: Admin orders date filter test fails due to hydration timing'
+    '339': 'Bug - Admin sidebar covers page: site header overlap, drawer below 1024px, dead gap when collapsed'
+    '340': 'Bug - Add Product has no file picker: image upload was never implemented (URL-only placeholder)'
+    '341': 'BUG: Admin sidebar sign-out redirects home without ending the session'
+    '363': 'Admin customers: per-field filtering incl. joined date range, server-side'
+    '602': Admin dashboard shows 0 products / 0 low stock — /api/admin/products/stats does not exist
+    '603': Admin sidebar links to four routes that do not exist (ai-generations, analytics, categories, settings)
+    '604': Orders list ships an Export button that fires a blocking native alert('Export functionality coming soon')
+    '605': Photo approvals section is unreachable from the admin sidebar
+    '606': Admin dashboard renders ₹0 revenue / 0 orders when the order stats call fails
+    '625': Admin screens open 16 blocking native prompt()/confirm() dialogs — replace with one shared dialog primitive
+    '626': 'packages/web does not typecheck: 22 errors across router navigation, unused imports and unguarded nullables'
+    '627': 'Three unit tests are red on main: vendor portal trips the storefront token guard, wishlist guard test trips on a comment'
+    '628': Make the typecheck a gate locally, now that it is at zero
+    '631': font-bold renders as synthesised faux-bold in the admin and vendor trees — weight 700 is never loaded
+total_tickets: 19
+completion_percentage: 95
+is_completed: false
+last_activity: '2026-08-17T03:51:29.535Z'
+started: '2026-08-16T19:14:21.060Z'
+completed: '2026-08-17T03:50:55.848Z'

@@ -1,0 +1,34 @@
+name: order-dispatch-tracking
+title: Order Dispatch Tracking
+priority: critical
+created: '2026-08-16T21:22:56.705Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Admin dispatch UI over the existing shipments API, consolidating the two competing tracking stores so the customer tracking page actually works.
+
+  Sub-project 3 of 5 by build order (spec order 4). Independent of vendors and QC — can ship on its own.
+
+  LIVE BUG this fixes: routes/tracking.ts:122 reads order_shipments and returns `tracking: shipment ? {...} : null` with no fallback. The only writer of order_shipments is routes/admin/shipments.ts, which has NO UI. The admin screen that does exist (/admin/orders/:id → PATCH /orders/:id/shipping) writes carrier/tracking onto the ORDER instead. So an admin enters a tracking number and the customer's tracking page still shows nothing, permanently. The completed order-tracking-notifications feature is structurally starved by this.
+
+  Decision: dispatch is MANUAL at launch — admin creates the shipment in Shiprocket's own dashboard and pastes carrier + AWB into the admin. No Shiprocket API, no token refresh, no webhooks. Honest at low volume; revisit when order volume justifies the integration.
+
+  Scope: admin UI over the existing (619-line, UI-less) /api/admin/shipments router; consolidate order-level and order_shipments tracking onto order_shipments as the single source of truth; add missing fields for real dispatch (external AWB/shipment ids, label URL, actual shipped weight/dims, and what YOU paid — essential for margin since the customer now pays ₹0); extend shipment_status with RTO/NDR states which the current 7-state enum lacks.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

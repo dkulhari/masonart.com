@@ -1,0 +1,137 @@
+ticket_number: 631
+title: font-bold renders as synthesised faux-bold in the admin and vendor trees — weight 700 is never loaded
+description: |-
+  ## Problem
+
+  `__root.tsx` loads Poppins 300/400/500 and Urbanist 300/500. **Nothing above 500 exists in the document.** Every `font-bold` (700), `font-extrabold` (800) and `font-black` (900) is therefore drawn by the browser's synthetic-bold algorithm — the real glyphs smeared wider and heavier than either face draws, which is exactly the artefact the storefront sweep removed from 47 files.
+
+  The storefront is guarded against it by `tests/styles/storefront-token-compliance.test.ts`. The guard carries three exemptions — `components/admin/`, `routes/admin`, `components/ai-generator/`, plus `routes/vendor` added in #627 — and those trees are where the defect still lives: **21 sites across 17 files**.
+
+  The exemptions are right about the palette (the `--brand-*` scale is deliberately admin-only) and wrong about the weight. A missing font weight is not a styling preference: the internal tools render the same muddy synthetic glyphs, and nobody has looked because the guard says they are exempt.
+
+  ## Fix
+
+  1. Sweep the 21 sites. `globals.css` already sets `--font-heading` on `h1–h6` at the base layer, precisely so the storefront sweep could **delete** `font-bold` from headings rather than replace it — same here. The handful of non-heading sites (sidebar wordmark, stat values) take `font-medium`, which is the heaviest weight actually loaded.
+  2. Split the guard's exemption model. The weight rule applies to every file under `app/`; the palette and idiom rules keep the exempt list. Today one flat `EXEMPT` array governs all five patterns, which is what let this hide.
+
+  ## Out of scope, but found while measuring
+
+  `font-semibold` is 600, also not loaded, also synthesised — **176 uses, 45 of them in storefront files the guard already covers**. The guard never banned it. Fixing that means changing the visual weight of most of the customer-facing site, so it is a separate decision, not a sweep to bundle in here.
+
+  ## Verification
+
+  - No `font-(bold|extrabold|black)` anywhere under `app/`.
+  - The widened rule fails if one is reintroduced in an admin file (fixture, not trust).
+  - The palette rules still exempt admin: adding `bg-brand-500` to an admin file must still pass, or the split broke them.
+  - Full web unit suite stays at zero failures.
+feature: admin-panel
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T03:47:51.539Z'
+last_updated: '2026-08-17T03:51:29.490Z'
+time_spent_minutes: 3
+labels:
+  - frontend
+  - design-system
+  - a11y
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T03:48:04.150Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T03:50:55.848Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T03:51:27.665Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `1515c4d9` — fix(web): stop rendering faux-bold in the admin and vendor trees
+
+      **Swept**: 21 sites across 17 files, all `font-bold` → `font-medium`. Files: `components/admin/{AdminSidebar,OrderDetail,StatsCard}.tsx`, `routes/admin.tsx`, `routes/vendor.tsx`, and `routes/admin/{index,orders/index,orders/$id,products/index,products/$id,products/new,reviews,returns,customers,ai-moderation,approvals/index,approvals/$id}.tsx`.
+
+      **Why `font-medium` and not simply deleting the class**: `globals.css` styles `h1–h6` at the base layer precisely so the storefront sweep could delete rather than replace, and most of these sites are headings. But admin and vendor are dense operational screens, and a page title at Urbanist 300 reads as a caption there. 500 is the closest true weight to the intent, and unlike 700 it is a weight the document actually has. Deliberate, and stated in the commit.
+
+      **The guard change is the durable half.** It was one flat `EXEMPT` array governing all five patterns, so exempting a tree from the palette rules silently exempted it from everything — which is exactly how this defect survived in the internal tools while the storefront was clean. Rules now carry a scope:
+      - `storefront` — taste, and the exempt trees are allowed their own (the `--brand-*` scale really is admin-only).
+      - `everywhere` — the document is wrong and no surface opts out. A missing font weight is not a preference.
+
+      Both halves are pinned by assertions: the storefront must stay in scope for the palette rules, **and** the admin tree must stay out of them while staying in scope for the weight rule. Without that second one, `everywhere` could drift into "everything" and the admin palette would start failing with no stated reason.
+
+      **Verification**
+      - RED first: the widened rule failed listing all 17 offending files by name.
+      - Command: `npx vitest run tests` (full web unit suite, cwd `packages/web`)
+      - Result: PASS — `Test Files 174 passed (174) | Tests 3269 passed (3269)`, 0 failing.
+      - The #628 pre-commit hook typechecked this commit on the way in (2.5s, 3 of 4 turbo tasks cached) — first real use of that gate.
+
+      **Follow-up filed as #632**: `font-semibold` is 600, also not loaded, also synthesised — **176 uses, 45 in storefront files this guard already covers**. Not swept here because changing it alters the visual weight of most of the customer-facing site; that is a design decision with three defensible answers (sweep to 500, load 600, or accept synthetic 600 and write down why), and the honest way to pick is a five-minute side-by-side render.
+work_sessions:
+  - start: '2026-08-17T03:48:05.322Z'
+    agent: claude-code
+    summary: 'Swept 21 font-bold sites across 17 admin/vendor files to font-medium, and split the token guard into storefront-scoped and everywhere-scoped rules so a palette exemption can no longer hide a rendering defect. Full suite 3269 passing, 0 failing. Committed 1515c4d9. Filed #632 for the font-semibold decision.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T03:51:29.489Z'
+    duration: '00:03:24'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Split the guard so the weight rule has no exemptions while the palette and idiom rules keep theirs, and pin both halves with fixtures: a font-bold in an admin path is flagged, a bg-brand-500 in an admin path is not.'
+    file: packages/web/tests/styles/storefront-token-compliance.test.ts
+    command: npx vitest run tests/styles/storefront-token-compliance.test.ts
+    expected_result: FAIL - 21 admin/vendor sites now in scope
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the failure names the real offenders rather than a broken walk.
+    command: npx vitest run tests/styles/storefront-token-compliance.test.ts
+    expected_result: FAIL listing 17 files
+    status: pending
+  - id: 3
+    action: implement
+    description: Delete font-bold from the h1/h2 sites (the base layer already styles headings) and replace the non-heading ones with font-medium.
+    file: packages/web/app/routes/admin/**, packages/web/app/components/admin/**, packages/web/app/routes/vendor.tsx, packages/web/app/routes/admin.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Guard green, and the whole suite with it — several admin screens assert on their own headings.
+    command: npx vitest run tests
+    expected_result: PASS - 0 failing
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the sweep and the guard split.
+    command: 'git add packages/web && git commit -m "fix(web): stop rendering faux-bold in the admin and vendor trees"'
+    status: pending
+current_step: 1
+started: '2026-08-17T03:48:04.150Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests (full web unit suite, cwd packages/web)
+  test_output: Test Files 174 passed (174) | Tests 3269 passed (3269) — 0 failing
+  build_passed: true
+  build_command: 'bun run typecheck (via the #628 pre-commit hook)'
+  verified_at: '2026-08-17T03:50:55.750Z'
+completed: '2026-08-17T03:50:55.848Z'

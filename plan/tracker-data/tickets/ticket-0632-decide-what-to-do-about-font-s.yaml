@@ -1,0 +1,100 @@
+ticket_number: 632
+title: Decide what to do about font-semibold — weight 600 is not loaded either, and the storefront uses it 176 times
+description: |-
+  ## The finding
+
+  #631 swept `font-bold` out of the last trees that still rendered it, on the grounds that weight 700 is never loaded and the browser synthesises it. Measuring for that sweep turned up the same problem one notch down:
+
+  `__root.tsx` loads **Poppins 300/400/500** and **Urbanist 300/500**. `font-semibold` is **600**. It is not loaded, so it is synthesised too — the identical artefact, one step milder.
+
+  **176 uses**, 45 of them in storefront files the token guard already covers. The guard has never banned it, so this is not drift; it is a rule that was drawn at 700 when the evidence points at 600.
+
+  ## Recommendation: sweep to the real weights (option 1), split by element type
+
+  Three options were weighed. The recommendation is the sweep, and the reasoning is evidence rather than taste:
+
+  1. **The reference design never uses 600.** `docs/design/mesonart/mesonart-parity-analysis.md` measures mesonart at Poppins 300 body, Urbanist 300 headings, Poppins 500 product titles and nav (§2 rows 147–150). There is no 600 anywhere in the spec. Loading it would mean paying a font request to keep a weight nobody chose.
+  2. **Most storefront `font-semibold` sits on headings, which already contradicts Phase A.** The uses are `h2`/`h3` in `ProductTabs`, `AddressForm`, `OrderSummary`, `FilterSortDrawer`. `globals.css` styles `h1–h6` as Urbanist 300 at the base layer precisely so headings stop carrying weight classes, and the Phase A finding was recorded as *"every heading `font-bold` at a weight that was never loaded"*. A `font-semibold` on an `h3` is the same override, one notch down and still synthetic.
+  3. **Accepting it fails the rule's own logic.** The ban exists because the weight is not loaded and the browser fakes it. That is equally true at 600. Leaving the line at 700 means the guard enforces a boundary drawn by accident.
+
+  ### The plan
+
+  - **Headings (`h1`–`h6`): delete the class.** The base layer already supplies Urbanist 300, which is the measured spec. This is the bulk of the 176.
+  - **Non-heading emphasis (`<strong>`, spans, labels, captions): `font-medium`.** 500 is real, and is what mesonart uses for product titles and nav.
+  - **Widen the guard** to `font-(semibold|bold|extrabold|black)` on the `everywhere` scope added in #631, so 600 cannot return.
+
+  ### Check before committing, not after
+
+  Small uppercase tracking labels (`text-xs font-semibold uppercase`, e.g. `track/$token.tsx`) lose the most apparent weight. If any read too faint, the fix is size, tracking or colour — not a fake weight. Screenshot home / PDP / checkout / account against the current build before and after; hold the commit if anything reads wrong.
+
+  Risk is bounded: one mechanical sweep, revertible in a single commit, with 3269 unit tests and the token guard around it.
+
+  ## Whichever way it goes
+
+  The answer goes into `tests/styles/storefront-token-compliance.test.ts` — either as a widened `everywhere` pattern, or as a comment on the existing weight rule stating why 600 is deliberately allowed. The point of that file is that the next person does not have to re-derive this.
+feature: admin-panel
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T03:51:13.668Z'
+last_updated: '2026-08-17T03:51:13.668Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - design-system
+  - needs-decision
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: 'Confirm the recommendation still holds before acting on it: re-read the measured weights in docs/design/mesonart/mesonart-parity-analysis.md §2, and re-count the font-semibold sites by element type (heading vs emphasis). The plan assumes most are headings — if that has changed, so does the split.'
+    command: grep -rn "font-semibold" packages/web/app | wc -l
+    expected_result: Manual verification — the counts and the spec agree with the recommendation, or the plan is revised
+    status: pending
+  - id: 2
+    action: implement
+    description: 'Capture the before screenshots: home, PDP, checkout and account, at the current build. These are the comparison, and they have to exist before anything changes.'
+    expected_result: Manual verification — four baseline screenshots
+    status: pending
+  - id: 3
+    action: implement
+    description: Delete font-semibold from h1–h6 sites — the base layer already supplies Urbanist 300, which is the measured spec.
+    file: packages/web/app
+    status: pending
+  - id: 4
+    action: implement
+    description: Replace font-semibold with font-medium on non-heading emphasis (strong, spans, labels, captions). 500 is real, and is what mesonart uses for product titles and nav.
+    file: packages/web/app
+    status: pending
+  - id: 5
+    action: write-test
+    description: Widen the everywhere-scoped weight rule added in #631 to font-(semibold|bold|extrabold|black), so 600 cannot return. Extend the fixtures alongside it.
+    file: packages/web/tests/styles/storefront-token-compliance.test.ts
+    command: npx vitest run tests/styles/storefront-token-compliance.test.ts
+    expected_result: PASS after the sweep — and FAIL if run before it, which is the proof the rule bites
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: 'Screenshot the same four pages and compare against the baselines. Small uppercase tracking labels lose the most apparent weight — if any read too faint, fix size, tracking or colour rather than restoring a fake weight. Hold the commit if anything reads wrong.'
+    expected_result: Manual verification — no page reads worse than its baseline
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Full web unit suite, since several screens assert on their own headings.
+    command: npx vitest run tests
+    expected_result: PASS - 0 failing
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the sweep and the widened rule, recording in the message which of the three options was taken and why.
+    command: 'git add packages/web && git commit -m "fix(web): stop rendering faux-semibold across the storefront"'
+    status: pending
+current_step: 1

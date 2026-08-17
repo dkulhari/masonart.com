@@ -1,0 +1,345 @@
+ticket_number: 607
+title: Database Schema - Vendor core tables (vendors, contacts, capabilities, rates)
+description: |-
+  ## Task
+  Add the vendor directory tables: `vendors`, `vendor_contacts`, `vendor_capabilities`, `vendor_rates`. Table definitions, relations and type exports only — no routes, no validation logic (that lands in the access-control and API phases).
+
+  ## Context
+  Feature: vendor-management (sub-project 1 of 5). Phase 1 of 7.
+
+  Follow `packages/api/src/database/schema/ai-generation-reviews.ts` for file shape: pgTable + pgEnum + explicit `index()` entries in the table's second argument, `relations()` block, `$inferSelect`/`$inferInsert` type exports at the bottom.
+
+  Key design constraints from the approved design:
+  - Money is `decimal(10,2)` INR, matching orders/products. NOT walletPricingConfig's paise, NOT shipping_config's whole rupees. The repo documents this 100x hazard.
+  - `vendor_capabilities` is one row per capability, so "prints up to 24x36, frames up to 40x60" is two rows and neither constrains the other.
+  - `vendor_rates` bands match on the item's LONGEST EDGE in inches, inclusive-min / exclusive-max, effective-dated via `effectiveFrom` / nullable `effectiveTo`. Overlap enforcement is a write-time concern and belongs to the Phase 2 ticket, not to the schema.
+  - `vendor_contacts` is a child table rather than loose columns on vendors: a shop has an owner and a production contact, and it is the seam the portal needs.
+
+  Export the new module from `packages/api/src/database/schema/index.ts`. Do NOT generate the migration in this ticket — the migration is generated once, after all Phase 1 tables exist.
+feature: vendor-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T00:54:24.235Z'
+last_updated: '2026-08-17T01:06:15.983Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T01:06:06.553Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T01:06:15.983Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `add96981` - feat(db): add vendor directory, capability and rate card tables
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/vendors.ts` - new module: vendors, vendor_contacts, vendor_capabilities, vendor_rates + vendor_status / vendor_capability_kind enums, relations blocks, $inferSelect/$inferInsert type exports
+      - `packages/api/src/database/schema/index.ts` - barrel export for ./vendors (narrow append only)
+      - `packages/api/tests/schema/vendors.test.ts` - schema-shape test over getTableConfig
+
+      **Summary**:
+      Phase 1 vendor core tables added exactly per the ticket's implementation steps. Money on vendor_rates is decimal(10,2) INR (verified in test as `numeric(10, 2)`), capabilities are one row per kind, rate bands are effective-dated with a nullable effective_to. No migration generated — that is #609.
+
+      Concurrency note: ticket #608 was editing the same barrel file at the same time. Its `export * from "./production-jobs"` line was left untouched in the worktree and deliberately excluded from this commit (its module file is still untracked, so including the export would have broken the build at this revision). Only the ./vendors hunk was staged.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/schema/vendors.test.ts`
+      - Result: PASS (4 tests, 4 passing, 0 failing)
+      - Output: `Test Files 1 passed (1) / Tests 4 passed (4)`
+      - Command: `cd packages/api && bun run typecheck`
+      - Result: PASS (`tsc --noEmit`, 0 errors)
+      - Pre-implementation red state confirmed: `Cannot find module '../../src/database/schema/vendors'`
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing schema-shape test for the four vendor tables
+    file: packages/api/tests/schema/vendors.test.ts
+    command: cd packages/api && bunx vitest run tests/schema/vendors.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { getTableConfig } from 'drizzle-orm/pg-core'
+      import {
+        vendors,
+        vendorContacts,
+        vendorCapabilities,
+        vendorRates,
+        vendorStatusEnum,
+        vendorCapabilityKindEnum,
+      } from '../../src/database/schema/vendors'
+
+      const cols = (t: any) => Object.fromEntries(getTableConfig(t).columns.map((c) => [c.name, c]))
+
+      describe('vendor core schema', () => {
+        it('vendors table has status enum and audit columns', () => {
+          const c = cols(vendors)
+          expect(getTableConfig(vendors).name).toBe('vendors')
+          expect(c['name'].notNull).toBe(true)
+          expect(c['status']).toBeDefined()
+          expect(c['created_by']).toBeDefined()
+          expect(c['created_at']).toBeDefined()
+          expect(c['updated_at']).toBeDefined()
+          expect(vendorStatusEnum.enumValues).toEqual(['active', 'inactive', 'suspended'])
+        })
+
+        it('vendor_contacts hangs off vendors and marks a primary', () => {
+          const c = cols(vendorContacts)
+          expect(getTableConfig(vendorContacts).name).toBe('vendor_contacts')
+          expect(c['vendor_id'].notNull).toBe(true)
+          expect(c['is_primary']).toBeDefined()
+          expect(c['contact_role']).toBeDefined()
+        })
+
+        it('vendor_capabilities is one row per kind with size limits', () => {
+          const c = cols(vendorCapabilities)
+          expect(getTableConfig(vendorCapabilities).name).toBe('vendor_capabilities')
+          expect(c['kind'].notNull).toBe(true)
+          expect(c['max_width_inches']).toBeDefined()
+          expect(c['max_height_inches']).toBeDefined()
+          expect(c['finishes']).toBeDefined()
+          expect(c['stated_turnaround_days']).toBeDefined()
+          expect(vendorCapabilityKindEnum.enumValues).toEqual(['print', 'frame'])
+        })
+
+        it('vendor_rates carries effective dating and a decimal amount', () => {
+          const c = cols(vendorRates)
+          expect(getTableConfig(vendorRates).name).toBe('vendor_rates')
+          expect(c['longest_edge_min_inches'].notNull).toBe(true)
+          expect(c['longest_edge_max_inches'].notNull).toBe(true)
+          expect(c['effective_from'].notNull).toBe(true)
+          // effective_to nullable: an open-ended rate is the normal case
+          expect(c['effective_to'].notNull).toBe(false)
+          // money is decimal(10,2) INR, never paise, never whole rupees
+          expect(c['amount'].getSQLType()).toBe('numeric(10, 2)')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails because the schema module does not exist
+    command: cd packages/api && bunx vitest run tests/schema/vendors.test.ts
+    expected_result: FAIL - Cannot find module '../../src/database/schema/vendors'
+    status: done
+  - id: 3
+    action: implement
+    description: Create the vendor core schema module
+    file: packages/api/src/database/schema/vendors.ts
+    status: done
+    code: |
+      /**
+       * Vendor Directory Schema
+       *
+       * Third-party print shops and framers, their contacts, what they can make,
+       * and what they charge. Sub-project 1 of the fulfilment decomposition.
+       *
+       * Money is decimal(10,2) INR, matching orders and products — NOT
+       * walletPricingConfig's paise and NOT shipping_config's whole rupees. Vendor
+       * money is transactional, so it follows orders.
+       */
+
+      import {
+        pgTable,
+        text,
+        timestamp,
+        uuid,
+        pgEnum,
+        index,
+        boolean,
+        integer,
+        decimal,
+      } from 'drizzle-orm/pg-core'
+      import { relations } from 'drizzle-orm'
+      import { users } from './users'
+
+      export const vendorStatusEnum = pgEnum('vendor_status', ['active', 'inactive', 'suspended'])
+
+      /** A capability, and a rate, is either for printing or for framing. */
+      export const vendorCapabilityKindEnum = pgEnum('vendor_capability_kind', ['print', 'frame'])
+
+      export const vendors = pgTable(
+        'vendors',
+        {
+          id: uuid('id').primaryKey().defaultRandom(),
+          name: text('name').notNull(),
+          status: vendorStatusEnum('status').default('active').notNull(),
+          addressLine1: text('address_line1'),
+          addressLine2: text('address_line2'),
+          city: text('city'),
+          state: text('state'),
+          postalCode: text('postal_code'),
+          country: text('country').default('IN'),
+          notes: text('notes'),
+          createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+          createdAt: timestamp('created_at').defaultNow().notNull(),
+          updatedAt: timestamp('updated_at')
+            .defaultNow()
+            .notNull()
+            .$onUpdate(() => new Date()),
+        },
+        (table) => ({
+          statusIdx: index('vendors_status_idx').on(table.status),
+          nameIdx: index('vendors_name_idx').on(table.name),
+        })
+      )
+
+      /**
+       * A child table rather than loose columns on `vendors`: a shop has an owner
+       * and a production contact, and this is the seam the portal invite needs.
+       */
+      export const vendorContacts = pgTable(
+        'vendor_contacts',
+        {
+          id: uuid('id').primaryKey().defaultRandom(),
+          vendorId: uuid('vendor_id')
+            .references(() => vendors.id, { onDelete: 'cascade' })
+            .notNull(),
+          name: text('name').notNull(),
+          phone: text('phone'),
+          email: text('email'),
+          contactRole: text('contact_role'),
+          isPrimary: boolean('is_primary').default(false).notNull(),
+          createdAt: timestamp('created_at').defaultNow().notNull(),
+          updatedAt: timestamp('updated_at')
+            .defaultNow()
+            .notNull()
+            .$onUpdate(() => new Date()),
+        },
+        (table) => ({
+          vendorIdIdx: index('vendor_contacts_vendor_id_idx').on(table.vendorId),
+        })
+      )
+
+      /**
+       * One row per capability, so "prints up to 24x36, frames up to 40x60" is two
+       * rows and neither constrains the other. Drives the assignment filter.
+       */
+      export const vendorCapabilities = pgTable(
+        'vendor_capabilities',
+        {
+          id: uuid('id').primaryKey().defaultRandom(),
+          vendorId: uuid('vendor_id')
+            .references(() => vendors.id, { onDelete: 'cascade' })
+            .notNull(),
+          kind: vendorCapabilityKindEnum('kind').notNull(),
+          maxWidthInches: integer('max_width_inches'),
+          maxHeightInches: integer('max_height_inches'),
+          finishes: text('finishes').array(),
+          statedTurnaroundDays: integer('stated_turnaround_days'),
+          notes: text('notes'),
+          createdAt: timestamp('created_at').defaultNow().notNull(),
+          updatedAt: timestamp('updated_at')
+            .defaultNow()
+            .notNull()
+            .$onUpdate(() => new Date()),
+        },
+        (table) => ({
+          vendorIdIdx: index('vendor_capabilities_vendor_id_idx').on(table.vendorId),
+          kindIdx: index('vendor_capabilities_kind_idx').on(table.kind),
+        })
+      )
+
+      /**
+       * Rate bands match on the item's LONGEST EDGE in inches. Ranges are
+       * inclusive-min, exclusive-max, and must not overlap for a given
+       * (vendorId, kind, finish) at any instant — enforced on write, in the
+       * validation helper, not by a constraint here.
+       *
+       * Effective-dated following the shipping_config precedent: a vendor
+       * announcing a price rise from the 1st is the ordinary case.
+       */
+      export const vendorRates = pgTable(
+        'vendor_rates',
+        {
+          id: uuid('id').primaryKey().defaultRandom(),
+          vendorId: uuid('vendor_id')
+            .references(() => vendors.id, { onDelete: 'cascade' })
+            .notNull(),
+          kind: vendorCapabilityKindEnum('kind').notNull(),
+          longestEdgeMinInches: integer('longest_edge_min_inches').notNull(),
+          longestEdgeMaxInches: integer('longest_edge_max_inches').notNull(),
+          finish: text('finish'),
+          amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+          effectiveFrom: timestamp('effective_from').defaultNow().notNull(),
+          effectiveTo: timestamp('effective_to'),
+          createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+          createdAt: timestamp('created_at').defaultNow().notNull(),
+          updatedAt: timestamp('updated_at')
+            .defaultNow()
+            .notNull()
+            .$onUpdate(() => new Date()),
+        },
+        (table) => ({
+          vendorIdIdx: index('vendor_rates_vendor_id_idx').on(table.vendorId),
+          lookupIdx: index('vendor_rates_lookup_idx').on(table.vendorId, table.kind, table.effectiveFrom),
+        })
+      )
+
+      export const vendorsRelations = relations(vendors, ({ many, one }) => ({
+        contacts: many(vendorContacts),
+        capabilities: many(vendorCapabilities),
+        rates: many(vendorRates),
+        creator: one(users, { fields: [vendors.createdBy], references: [users.id] }),
+      }))
+
+      export const vendorContactsRelations = relations(vendorContacts, ({ one }) => ({
+        vendor: one(vendors, { fields: [vendorContacts.vendorId], references: [vendors.id] }),
+      }))
+
+      export const vendorCapabilitiesRelations = relations(vendorCapabilities, ({ one }) => ({
+        vendor: one(vendors, { fields: [vendorCapabilities.vendorId], references: [vendors.id] }),
+      }))
+
+      export const vendorRatesRelations = relations(vendorRates, ({ one }) => ({
+        vendor: one(vendors, { fields: [vendorRates.vendorId], references: [vendors.id] }),
+      }))
+
+      export type Vendor = typeof vendors.$inferSelect
+      export type NewVendor = typeof vendors.$inferInsert
+      export type VendorContact = typeof vendorContacts.$inferSelect
+      export type NewVendorContact = typeof vendorContacts.$inferInsert
+      export type VendorCapability = typeof vendorCapabilities.$inferSelect
+      export type NewVendorCapability = typeof vendorCapabilities.$inferInsert
+      export type VendorRate = typeof vendorRates.$inferSelect
+      export type NewVendorRate = typeof vendorRates.$inferInsert
+      export type VendorStatus = (typeof vendorStatusEnum.enumValues)[number]
+      export type VendorCapabilityKind = (typeof vendorCapabilityKindEnum.enumValues)[number]
+  - id: 4
+    action: implement
+    description: Export the new module from the schema barrel
+    file: packages/api/src/database/schema/index.ts
+    status: done
+    code: |-
+      // Vendors, contacts, capabilities and rate cards
+      export * from "./vendors";
+  - id: 5
+    action: verify-pass
+    description: Confirm the schema test passes
+    command: cd packages/api && bunx vitest run tests/schema/vendors.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: verify-pass
+    description: Confirm typecheck is clean for the package
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS - no new errors versus the main baseline
+    status: done
+  - id: 7
+    action: commit
+    description: Commit the vendor core schema
+    command: 'git add packages/api/src/database/schema/vendors.ts packages/api/src/database/schema/index.ts packages/api/tests/schema/vendors.test.ts && git commit -m "feat(db): add vendor directory, capability and rate card tables"'
+    status: done
+current_step: 7
+completed: '2026-08-17T01:06:06.553Z'

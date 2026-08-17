@@ -1,0 +1,205 @@
+ticket_number: 630
+title: Deduplicate test scaffolding and shared UI blocks across api and web packages
+description: |-
+  Remove the remaining duplications found by the DRYwall/jscpd scan on 2026-08-17. The two pure app-code clones are handled in the sibling ticket; this ticket covers the copied test harnesses plus two shared-UI clones.
+
+  Scan baseline: 389 clones, 9,171 duplicated lines, 3.47% of 264,475 lines across `packages/**` (TS/TSX; generated drizzle migration snapshots and the mirrored `.claude`/`.agents`/`.gemini` skill docs were excluded as noise).
+
+  ## Test scaffolding clones
+
+  1. **Cache-purge harness — 150 lines**
+     `packages/api/tests/routes/admin/product-cache-purge.test.ts:47-196`
+     `packages/api/tests/routes/admin/promotion-cache-purge.test.ts:36-187`
+     The whole harness (Hono app setup, `HTTPException` handling, drizzle mocks) is copied.
+     Extract to `packages/api/tests/helpers/cache-purge-harness.ts`.
+
+  2. **Drizzle query recorder — 88 + 66 lines**
+     `packages/api/tests/routes/admin/vendor-rates.test.ts:37-124`
+     `packages/api/tests/routes/admin/vendors.test.ts:38-125`
+     `packages/api/tests/routes/admin/production-jobs.test.ts:81-146`
+     `packages/api/tests/routes/vendor/jobs.test.ts:67-132`
+     The same `RecordedQuery` interface and chainable query-builder mock (`from`/`leftJoin`/`innerJoin`/`groupBy`/…) appears in all four.
+     Extract to `packages/api/tests/helpers/query-recorder.ts`.
+
+  3. **Select-queue helper — 46 + 45 lines**
+     `packages/api/tests/routes/review-card-shape.test.ts:31-76` and `:191-235`
+     `packages/api/tests/routes/review-feed.test.ts:25-71` and `:134-178`
+     Duplicated import block and the `queueSelects(...)` helper ("queue one result array per `db.select()` call, in call order").
+     Extract to `packages/api/tests/helpers/select-queue.ts`.
+
+  4. **Vendor portal session fixture — 51 lines**
+     `packages/api/tests/routes/vendor/artwork.test.ts:176-226`
+     `packages/api/tests/routes/vendor/jobs.test.ts:159-210`
+     Identical `sessionFor(role, id)` builder.
+     Extract to `packages/api/tests/helpers/vendor-session.ts` (can live beside the query recorder).
+
+  5. **Gift-card afterEach teardown — 46 lines**
+     `packages/api/tests/routes/gift-card-payment.test.ts:89-134`
+     `packages/api/tests/routes/gift-card-release.test.ts:95-140`
+     Same Razorpay mock reset and cleanup block.
+     Extract to a shared teardown helper.
+
+  6. **TanStack router mock — 56 lines**
+     `packages/web/tests/routes/admin/dashboard-order-stats.test.tsx:14-69`
+     `packages/web/tests/routes/admin/dashboard-product-stats.test.tsx:15-73`
+     Same `vi.mock('@tanstack/react-router', ...)` block.
+     Extract to `packages/web/tests/helpers/router-mock.tsx`.
+
+  7. **Review fixtures — 55 lines**
+     `packages/web/tests/components/reviews/ReviewGrid.test.tsx:43-97`
+     `packages/web/tests/routes/posters-review-section.test.tsx:52-108`
+     Duplicated `ReviewCardData` fixture block.
+     Extract to `packages/web/tests/fixtures/reviews.ts`.
+
+  8. **Admin route test harness — 52 lines**
+     `packages/api/tests/routes/admin/collection-membership.test.ts:12-63`
+     `packages/api/tests/routes/admin/frames.test.ts:17-67`
+     Same `selectMock`/`insertMock`/`updateMock` scaffolding. Fold into the shared helper from item 2 if the shapes line up.
+
+  ## Shared UI clones
+
+  9. **Paginated list block — 98 lines**
+     `packages/web/app/routes/_authed/account/ai-creations.tsx:554-651`
+     `packages/web/app/routes/_authed/account/orders.index.tsx:328-424`
+     Same loading/error/empty handling plus the `<Pagination>` wiring.
+     Extract a `<PaginatedList>` component (or a `usePaginatedList` hook if the rendering diverges too much).
+
+  10. **Admin table pagination controls — 54 lines**
+      `packages/web/app/components/admin/OrdersTable.tsx:675-728`
+      `packages/web/app/components/admin/ProductsTable.tsx:698-751`
+      Identical TanStack Table pagination control markup.
+      Extract `<TablePagination table={table} />` into `packages/web/app/components/admin/`.
+
+  ## Acceptance criteria
+
+  - Each listed clone pair is replaced by a single shared helper, fixture, or component.
+  - Extracted test helpers live under a `tests/helpers/` or `tests/fixtures/` directory in their own package — do not cross the api/web package boundary.
+  - No test behaviour changes: the same assertions run, and every touched suite still passes.
+  - Shared UI extractions are behaviour-preserving; the account pages and admin tables look and act the same.
+  - Re-running the scan shows these clone pairs gone and total duplication meaningfully below the 3.47% baseline.
+
+  ## Notes
+
+  - Prefer doing this in small commits, one clone group at a time — a single sweeping commit is hard to review and risks silently changing a mock's behaviour.
+  - Watch for near-identical-but-not-identical mocks: parameterize rather than forcing one call site to change its expectations.
+
+  ## Verification
+
+  Run the touched suites per group rather than the whole tree, e.g.:
+
+  ```
+  bunx vitest run packages/api/tests/routes/admin
+  bunx vitest run packages/api/tests/routes/vendor
+  bunx vitest run packages/api/tests/routes/review-card-shape.test.ts packages/api/tests/routes/review-feed.test.ts
+  bunx vitest run packages/web/tests/routes/admin
+  bunx vitest run packages/web/tests/components/reviews
+  ```
+
+  Then re-run the duplication scan scoped the same way as the baseline:
+
+  ```
+  npx jscpd@5.0.12 packages \
+    --format typescript,tsx,javascript,jsx \
+    --ignore '**/node_modules/**,**/migrations/**,**/dist/**,**/build/**,**/.turbo/**,**/*.d.ts' \
+    --min-lines 15
+  ```
+feature: code-deduplication
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T03:41:39.948Z'
+last_updated: '2026-08-17T04:55:31.112Z'
+time_spent_minutes: 17
+labels:
+  - refactor
+  - dry
+  - testing
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T04:38:05.839Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-17T04:55:26.508Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits** (one per clone group, oldest first):
+      - `e4c65513` test(api): extract the shared cache-purge harness
+      - `1ba34407` test(api): share the recording drizzle mock and the admin route harness
+      - `dceade0a` test(api): share the reviews select-queue recorder
+      - `45a572a6` test(api): share the vendor session fixture and the gift-card teardown
+      - `dc9f68c6` test(web): share the router mock, dashboard fetch stub and review fixtures
+      - `2c9c2ba4` refactor(web): extract TablePagination from the admin tables
+      - `5604418f` refactor(web): extract the account Pagination component
+      - `e59d232b` test(api): share the admin session fixture and the route-app builder
+
+      **New shared files**:
+      - `packages/api/tests/helpers/cache-purge-harness.ts` — in-memory Redis fake + cache-purge caller session (item 1)
+      - `packages/api/tests/helpers/query-recorder.ts` — RecordedQuery + chainable drizzle mock, with transaction bookkeeping, injectable failures and a `rows: 'repeatLast'` queue (item 2)
+      - `packages/api/tests/helpers/admin-route-harness.ts` — `chainReturning`, header-driven auth middleware, `requestAs` (item 8)
+      - `packages/api/tests/helpers/select-queue.ts` — recording `db.select()` for the reviews reads (item 3)
+      - `packages/api/tests/helpers/vendor-session.ts` — portal caller (item 4)
+      - `packages/api/tests/helpers/gift-card-fixtures.ts` — Razorpay reset + children-first row purge (item 5)
+      - `packages/api/tests/helpers/admin-session.ts`, `route-app.ts` — admin caller and the one Hono mount with the `HTTPException` passthrough (follow-on: four helpers had grown their own copy)
+      - `packages/web/tests/helpers/router-mock.tsx` — TanStack router stand-in (item 6)
+      - `packages/web/tests/helpers/admin-dashboard-fetch.ts` — URL-routed fetch stub + stats fixtures
+      - `packages/web/tests/fixtures/reviews.ts` — ReviewCardData fixtures + page envelope (item 7)
+      - `packages/web/app/components/ui/Pagination.tsx` — account pagination (item 9)
+      - `packages/web/app/components/admin/TablePagination.tsx` — admin table pagination (item 10)
+
+      **Notes on judgement calls**:
+      - Items 2 and 8 were NOT forced into one shape. `frames`/`collection-membership` mock `db` with plain `vi.fn()`s, not a recording builder — a shared helper would have had to change what those suites assert. They got their own harness.
+      - `ai-creations` kept its purple active-page colour through an `activeClassName` prop rather than being silently moved onto the primary token, so the extraction is behaviour-preserving as required.
+      - Every `vi.mock` factory that needs a helper uses `await vi.hoisted(async () => await import(...))` or an async factory — a plain top-level import would die in the temporal dead zone under `vi.mock` hoisting.
+
+      **Verification**:
+      - Command: `DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run <13 touched api specs>`
+      - Result: PASS — 13 files, 252 tests, 0 failing. Identical to the pre-refactor baseline (252 passing).
+      - Command: `bunx vitest run <7 touched web specs + tests/styles/>`
+      - Result: PASS — 10 files, 101 tests, 0 failing.
+      - Command: `bun run typecheck` (turbo, all 3 packages) — PASS, gated on every commit by the pre-commit hook.
+
+      **Duplication scan** (`npx jscpd@5.0.12 packages --format typescript,tsx,javascript,jsx --min-lines 15`, same ignores as the baseline):
+
+      | | clones | duplicated lines | % |
+      |---|---|---|---|
+      | baseline | 389 | 9,171 | 3.47% |
+      | now | 361 | 7,746 | **2.93%** |
+
+      All ten named clone pairs are gone from the report. What remains in those files is different, smaller regions — the largest survivors are a wider gift-card fixture family spanning eight suites (`admin-gift-card-refund`, `gift-card-quote`, `gift-card-purchase`, `services/gift-card-*`) and other regions of `OrdersTable`/`ProductsTable` (column defs, toolbar, skeleton), none of which were in this ticket's scope.
+
+      **Baseline gotcha for whoever runs these next**: the four live-DB suites here need `DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev'`. Without it they fail against `:5433`, which is a different project's Postgres.
+  - author: system
+    timestamp: '2026-08-17T04:55:26.569Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-17T04:38:06.651Z'
+    agent: claude-code
+    summary: Deduplicated all 10 clone groups across api and web in 8 commits. 12 new shared helpers/fixtures/components. Duplication 3.47% -> 2.93%. 252 api + 101 web tests pass, typecheck clean.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T04:55:31.111Z'
+    duration: '00:17:24'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-17T04:38:05.839Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:17:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:17:00'
+      tokens: 0
+completed: '2026-08-17T04:55:26.569Z'

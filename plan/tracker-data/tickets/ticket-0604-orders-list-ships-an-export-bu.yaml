@@ -1,0 +1,115 @@
+ticket_number: 604
+title: Orders list ships an Export button that fires a blocking native alert('Export functionality coming soon')
+description: |-
+  ## Problem
+
+  `packages/web/app/routes/admin/orders/index.tsx:407`:
+
+  ```tsx
+  {/* Export Button (placeholder) */}
+  <button onClick={() => alert('Export functionality coming soon')}>
+  ```
+
+  Two problems, not one:
+
+  1. A shipped, enabled-looking button that does nothing. On a launched store an operator will try to export orders for accounting on day one.
+  2. `alert()` is a **blocking native dialog**. It freezes the browser automation harness outright, so any E2E run that clicks near it stalls — the same hazard `reviews.tsx:269` documents in its own comment about `window.confirm`.
+
+  ## Fix
+
+  Pick one:
+
+  - **Remove the button** until CSV export is built (cheapest, unblocks launch), or
+  - **Implement it**: `GET /api/admin/orders/export?...` streaming CSV with the same filters the list is currently showing, so what you download matches what you see.
+
+  Either way the `alert()` must go. If some interim messaging is wanted, use the inline pattern, never a native dialog.
+
+  ## Verification
+
+  - If removed: assert no Export control renders on `/admin/orders`.
+  - If implemented: API test for the CSV payload and header row; E2E asserting the download applies the active status/date filters.
+  - Grep guard: no `alert(` under `packages/web/app/routes/admin`.
+feature: admin-panel
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-16T19:08:58.141Z'
+last_updated: '2026-08-17T03:05:01.371Z'
+time_spent_minutes: 3
+labels:
+  - admin
+  - orders
+  - go-live
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-17T02:56:11.297Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-17T02:58:22.102Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-17T02:58:42.666Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f72c9b81` — fix(admin): drop the orders Export button that only opened an alert()
+
+      **Decision**: took the removal branch of the ticket's two options, not the CSV implementation. The button comes back when `GET /api/admin/orders/export` exists; the call site now carries a comment stating that contract (download must match the filters the list is showing) so the next person does not re-add a stub.
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/orders/index.tsx` — removed the Export button and its `alert('Export functionality coming soon')` handler; dropped the now-unused `Download` lucide import; left a comment recording why the control is absent and what brings it back.
+      - `packages/web/tests/routes/admin/orders-export-button.test.tsx` (new) — 3 tests.
+
+      **Tests**:
+      1. `/admin/orders` renders no Export control (renders the page with fetch stubbed, asserts no button named /export/i and no "export" text).
+      2. No native dialog opens on the way to a rendered orders list (`alert` stubbed, asserted uncalled).
+      3. Source guard: walks every `.ts`/`.tsx` under `app/routes/admin` and asserts none calls `alert(` — bare or `window.`-qualified, with `setAlert(`-style names excluded by lookbehind. This is the ticket's grep guard turned into a failing test, and it covers every admin screen, not just orders.
+
+      **Verification**:
+      - Command: `npx vitest run tests/routes/admin/orders-export-button.test.tsx` (cwd `packages/web`)
+      - Result: PASS — `Test Files 1 passed (1) | Tests 3 passed (3)`
+      - RED first: before the fix the suite failed 2/3 for the right reasons — Export button found in the DOM, and `app/routes/admin/orders/index.tsx` listed as an `alert(` offender.
+      - Typecheck: `npx tsc --noEmit -p packages/web` reports **one pre-existing** error in this file, `orders/index.tsx(272,15) TS2322` in the `updateSearch` navigate callback — present on `main`, untouched by this diff (the diff only removes an import line and the button JSX). No new type errors.
+
+      **Out of scope, worth a ticket**: the same file still calls blocking `prompt()` (status update at ~line 293, refund reason at ~line 341) and `confirm()` (cancel order at ~line 326). Identical harness-freezing hazard, but the ticket scoped the guard to `alert(`, so the source guard does not yet fail on them. Widening that regex is the natural follow-up once those three flows get inline UI.
+  - author: mcp-client
+    timestamp: '2026-08-17T03:05:01.371Z'
+    text: 'Follow-up filed: **#625** — "Admin screens open 16 blocking native prompt()/confirm() dialogs — replace with one shared dialog primitive". Covers the rest of the family this ticket''s guard does not catch (9 files, incl. the two `prompt()` calls on this very screen), and widens the `alert(`-only source guard added here to `alert|prompt|confirm` across `app/routes/admin` + `app/components/admin`.'
+work_sessions:
+  - start: '2026-08-17T02:56:12.409Z'
+    agent: claude-code
+    summary: 'Removed the placeholder Export button and its blocking alert() from /admin/orders; added a 3-test suite (no Export control renders, no alert fires, source guard: no alert( under app/routes/admin). RED verified before the fix, 3/3 green after. Committed f72c9b81.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-17T02:58:43.816Z'
+    duration: '00:02:31'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-17T02:56:11.297Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/routes/admin/orders-export-button.test.tsx (in packages/web)
+  test_output: Test Files 1 passed (1) | Tests 3 passed (3)
+  build_passed: true
+  build_command: npx tsc --noEmit -p packages/web
+  verified_at: '2026-08-17T02:58:22.028Z'
+completed: '2026-08-17T02:58:22.102Z'
