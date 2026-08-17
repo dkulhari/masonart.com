@@ -17,7 +17,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, inArray } from "drizzle-orm";
 
 import { db } from "../../database";
 import {
@@ -260,7 +260,12 @@ adminReturnsApp.get(
             email: users.email,
           })
           .from(users)
-          .where(sql`${users.id} = ANY(${userIds})`);
+          // Not `sql\`${users.id} = ANY(${userIds})\``: that interpolates one
+          // parameter per element, rendering `= ANY(($1, $2))` — ANY over a row
+          // expression, which Postgres refuses with "op ANY/ALL (array)
+          // requires array on right side". This list 500ed as soon as it
+          // contained a single return. Same fix as orders (#624).
+          .where(inArray(users.id, userIds));
 
         userMap = userList.reduce(
           (acc, user) => {

@@ -280,7 +280,9 @@ adminReviewsApp.get(
             slug: products.slug,
           })
           .from(products)
-          .where(sql`${products.id} = ANY(${productIds})`);
+          // `= ANY(${productIds})` renders `= ANY(($1))`, which Postgres
+          // rejects — see the same correction in returns and orders (#624).
+          .where(inArray(products.id, productIds));
 
         productMap = productList.reduce(
           (acc, product) => {

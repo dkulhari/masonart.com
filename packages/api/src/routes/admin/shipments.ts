@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, inArray } from "drizzle-orm";
 
 import { db } from "../../database";
 import {
@@ -207,7 +207,9 @@ adminShipmentsApp.get(
             email: users.email,
           })
           .from(users)
-          .where(sql`${users.id} = ANY(${userIds})`);
+          // `= ANY(${userIds})` renders `= ANY(($1, $2))`, which Postgres
+          // rejects — see the same correction in returns and orders (#624).
+          .where(inArray(users.id, userIds as string[]));
 
         userMap = userList.reduce(
           (acc, user) => {
