@@ -4,6 +4,7 @@
  * - GET   /api/vendor/jobs       my queue; what to work on next
  * - GET   /api/vendor/jobs/:id   one job, its items and its QC history
  * - PATCH /api/vendor/jobs/:id   the only write a vendor gets
+ * - GET   /api/vendor/jobs/:id/artwork/:itemId   a short-lived signed download
  * - GET   /api/vendor/rates      my rate card, read-only
  * - GET   /api/vendor/payments   my settlements and what is still owed
  *
@@ -39,6 +40,10 @@
  * person-linked order reference. Dispatch is in-house, so a vendor never needs
  * any of it. Every response here is built from the scoped module's explicit
  * column lists, which is what makes that an absolute rather than a habit.
+ *
+ * `tests/routes/vendor/isolation.test.ts` asserts all of that as PROPERTIES
+ * over a route table rather than per handler, so a route added below without a
+ * table entry fails that suite instead of quietly going uncovered.
  */
 
 import { Hono } from "hono";
@@ -56,7 +61,9 @@ import {
   listVendorRates,
   listVendorSettlements,
   getVendorPayableTotal,
+  getVendorJobArtwork,
 } from "../lib/vendor-scope";
+import { getPresignedDownloadUrl } from "../lib/storage";
 
 // ============================================================================
 // Constants
@@ -72,6 +79,18 @@ const MAX_PAGE_SIZE = 100;
  * they alone can report: received it, sent it back.
  */
 const VENDOR_SETTABLE_STATUSES = ["sent", "received"] as const;
+
+/**
+ * How long an artwork link lives. FIVE MINUTES — long enough to click, far too
+ * short to be worth pasting anywhere.
+ *
+ * This is a customer's commissioned artwork. A permanent public path would work
+ * just as well for the vendor and would stay readable by anyone who ever saw it
+ * — a chat log, a proxy log, a screenshot — forever. `getPublicUrl` is
+ * therefore never used on this route; the presigner is, every time, so a stale
+ * link is a dead link rather than an open one.
+ */
+const ARTWORK_URL_TTL_SECONDS = 300;
 
 // ============================================================================
 // Validation
@@ -90,6 +109,11 @@ const listQuerySchema = z.object({
 });
 
 const jobParamSchema = z.object({ id: z.string().uuid() });
+
+const artworkParamSchema = z.object({
+  id: z.string().uuid(),
+  itemId: z.string().uuid(),
+});
 
 /**
  * Status and the two date fields. Nothing else — in particular no amount field
@@ -158,6 +182,54 @@ vendorApp.get("/jobs/:id", zValidator("param", jobParamSchema), async (c) => {
     return c.json(failed("read job", error), 500);
   }
 });
+
+// ============================================================================
+// GET /api/vendor/jobs/:id/artwork/:itemId
+// ============================================================================
+
+/**
+ * A short-lived signed download for one item's print file.
+ *
+ * Job-scoped, not id-scoped: the scoped module resolves the key only when the
+ * item sits on a job this vendor owns, so a real item id from someone else's
+ * job is NOT FOUND — and, crucially, the presigner is never reached on that
+ * path. A signed URL that is generated and then withheld has still been
+ * generated, and lives in whatever log or trace saw it.
+ *
+ * The response carries the signed URL and its expiry, and nothing else. No
+ * public path, no key, no order reference.
+ */
+vendorApp.get(
+  "/jobs/:id/artwork/:itemId",
+  zValidator("param", artworkParamSchema),
+  async (c) => {
+    const vendorId = c.get("vendorId");
+    const { id, itemId } = c.req.valid("param");
+
+    try {
+      const artwork = await getVendorJobArtwork(vendorId, id, itemId);
+      // Covers all three of: no such job, not your job, no artwork on file.
+      // None of them is worth distinguishing to the caller.
+      if (!artwork) return c.json({ error: "Artwork not found" }, 404);
+
+      const url = await getPresignedDownloadUrl(
+        artwork.key,
+        ARTWORK_URL_TTL_SECONDS
+      );
+
+      return c.json({
+        itemId: artwork.itemId,
+        url,
+        expiresInSeconds: ARTWORK_URL_TTL_SECONDS,
+        expiresAt: new Date(
+          Date.now() + ARTWORK_URL_TTL_SECONDS * 1000
+        ).toISOString(),
+      });
+    } catch (error) {
+      return c.json(failed("sign artwork URL", error), 500);
+    }
+  }
+);
 
 // ============================================================================
 // PATCH /api/vendor/jobs/:id

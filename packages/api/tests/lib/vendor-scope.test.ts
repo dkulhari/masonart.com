@@ -19,6 +19,10 @@ describe('vendor-scope module contract', () => {
     'getVendorPayableTotal',
     'getVendorJobItems',
     'getVendorJobReviews',
+    // Artwork resolves to a storage KEY, never a URL, but it is a read of
+    // job-linked data like any other and refuses without a vendorId like any
+    // other.
+    'getVendorJobArtwork',
     // The one mutation. Enrolled here for the same reason as the reads: an
     // unscoped write is worse than an unscoped read, not exempt from the rule.
     'updateVendorJob',
