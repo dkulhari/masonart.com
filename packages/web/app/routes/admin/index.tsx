@@ -180,19 +180,21 @@ function AdminDashboard() {
     fetchDashboardData()
   }, [])
 
-  // Calculate derived stats
+  // Calculate derived stats. `null` — not 0 — when the call failed: every tile
+  // below turns that into an em dash rather than a number nobody measured
+  // (#606). Reducing an absent breakdown to 0 was the whole bug.
   const totalOrders = orderStats
     ? Object.values(orderStats.byStatus).reduce((a, b) => a + b, 0)
-    : 0
+    : null
 
   const pendingOrders = orderStats
     ? (orderStats.byStatus.pending || 0) +
       (orderStats.byStatus.pending_payment || 0) +
       (orderStats.byStatus.confirmed || 0) +
       (orderStats.byStatus.processing || 0)
-    : 0
+    : null
 
-  const paidOrders = orderStats?.byPaymentStatus.paid || 0
+  const paidOrders = orderStats ? orderStats.byPaymentStatus.paid || 0 : null
 
   return (
     <div className="space-y-6">
@@ -250,7 +252,11 @@ function AdminDashboard() {
             {/* Total Revenue */}
             <StatsCard
               title="Total Revenue"
-              value={formatPrice(parseFloat(orderStats?.totalRevenue || '0'))}
+              // An em dash, not ₹0.00. A money tile is the worst thing on this
+              // screen to be confidently wrong about: formatPrice(0) reads as a
+              // measured figure, and an operator cannot tell that apart from a
+              // dead endpoint (#606).
+              value={orderStats ? formatPrice(parseFloat(orderStats.totalRevenue)) : '—'}
               icon={IndianRupee}
               variant="success"
               description="All time paid orders"
@@ -261,19 +267,21 @@ function AdminDashboard() {
             {/* Month Revenue */}
             <StatsCard
               title="This Month"
-              value={formatPrice(parseFloat(orderStats?.monthRevenue || '0'))}
+              value={orderStats ? formatPrice(parseFloat(orderStats.monthRevenue)) : '—'}
               icon={TrendingUp}
               variant="info"
               description="Revenue this month"
-              trend="up"
-              trendValue="+12%"
-              trendLabel="vs last month"
+              // No stats, no trend — a comparison against a month we never
+              // fetched is a second fabricated number (#606).
+              trend={orderStats ? 'up' : undefined}
+              trendValue={orderStats ? '+12%' : undefined}
+              trendLabel={orderStats ? 'vs last month' : undefined}
             />
 
             {/* Today's Orders */}
             <StatsCard
               title="Today's Orders"
-              value={orderStats?.todayOrders || 0}
+              value={orderStats ? orderStats.todayOrders : '—'}
               icon={ShoppingCart}
               variant="default"
               description="Orders received today"
@@ -283,9 +291,9 @@ function AdminDashboard() {
             {/* Pending Orders */}
             <StatsCard
               title="Pending Orders"
-              value={pendingOrders}
+              value={pendingOrders ?? '—'}
               icon={Clock}
-              variant={pendingOrders > 10 ? 'warning' : 'default'}
+              variant={pendingOrders !== null && pendingOrders > 10 ? 'warning' : 'default'}
               description="Awaiting processing"
               href="/admin/orders?status=pending"
             />
@@ -307,7 +315,7 @@ function AdminDashboard() {
             {/* Total Orders */}
             <StatsCard
               title="Total Orders"
-              value={totalOrders}
+              value={totalOrders ?? '—'}
               icon={ShoppingCart}
               compact
               href="/admin/orders"
@@ -316,7 +324,7 @@ function AdminDashboard() {
             {/* Paid Orders */}
             <StatsCard
               title="Paid Orders"
-              value={paidOrders}
+              value={paidOrders ?? '—'}
               icon={IndianRupee}
               variant="success"
               compact
