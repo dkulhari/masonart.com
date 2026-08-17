@@ -1,0 +1,65 @@
+ticket_number: 646
+title: Web - /admin/audit-log viewer with filters and a before/after drawer
+description: |-
+  ## Task
+  Add the admin viewer route: filter bar (category, action, actor, date range, free text), a table (time, actor, action, entity, outcome), and a detail drawer rendering the before/after diff. Link it from the admin nav.
+
+  ## Context
+  Part of feature: admin-audit-log (Phase 6 - Read)
+  Spec: docs/plans/2026-08-17-logging-and-auditing.md section 3.7
+  CRITICAL: router.tsx overrides TanStack search serialisation, so `validateSearch` must coerce numbers and split comma-joined arrays or the route error-boundaries to a blank page. Reuse the shared query schema.
+  All client-side fetches go through app/lib/api.ts getApiUrl() - a relative '/api' fetch 404s in dev (no Vite proxy).
+  Reuse the extracted TablePagination component rather than a new pager.
+feature: admin-audit-log
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:21:38.582Z'
+last_updated: '2026-08-17T07:21:38.582Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 645
+    feature: admin-audit-log
+    description: Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing component tests: rows render, filter change refetches, drawer shows the diff'
+    file: packages/web/tests/routes/admin/audit-log.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin/audit-log.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && bunx vitest run tests/routes/admin/audit-log.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement the route and nav link
+    file: packages/web/app/routes/admin/audit-log/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm passing
+    command: cd packages/web && bunx vitest run tests/routes/admin/audit-log.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app packages/web/tests/routes/admin/audit-log.test.tsx && git commit -m "feat(admin): audit log viewer"'
+    status: pending
+current_step: 1

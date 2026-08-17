@@ -1,0 +1,61 @@
+ticket_number: 648
+title: E2E and runbook - an admin action appears in the viewer
+description: |-
+  ## Task
+  Add a Playwright spec: sign in as admin, perform an audited action, open /admin/audit-log, assert the entry is listed with the right actor and action, and that a filter narrows to it. Guard against a vacuous pass - assert a non-zero row count before asserting properties of it. Then document the trail in docs/OPERATIONS.md: what is captured, how to find an actor for a disputed refund, the retention window, and the fact that rows cannot be edited.
+
+  ## Context
+  Part of feature: admin-audit-log (Phase 7 - Ops)
+  Playwright config and specs live at the REPO ROOT (tests/e2e/), not packages/web. Run with `bunx playwright test tests/e2e/audit-log.spec.ts` from the root - never ./scripts/run-tests.sh e2e, which silently reseeds the live dev database.
+  Seeded admin: test-admin@chobii.art / TestPassword123!
+feature: admin-audit-log
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:21:38.674Z'
+last_updated: '2026-08-17T07:21:38.674Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+  - docs
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 646
+    feature: admin-audit-log
+    description: Web - /admin/audit-log viewer with filters and a before/after drawer
+  - ticket: 641
+    feature: admin-audit-log
+    description: Tier 1 - audit the returns money paths
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the E2E spec
+    file: tests/e2e/audit-log.spec.ts
+    command: bunx playwright test tests/e2e/audit-log.spec.ts --project=chromium
+    expected_result: FAIL until servers and feature are up
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Run the spec against local servers
+    command: bunx playwright test tests/e2e/audit-log.spec.ts --project=chromium
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: implement
+    description: Document the trail in the operations runbook
+    file: docs/OPERATIONS.md
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit
+    command: 'git add tests/e2e/audit-log.spec.ts docs/OPERATIONS.md && git commit -m "test(e2e): audit log viewer end to end"'
+    status: pending
+current_step: 1

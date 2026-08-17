@@ -1,0 +1,68 @@
+ticket_number: 640
+title: Capture - audit middleware floor over admin and vendor mutations
+description: |-
+  ## Task
+  Mount an audit middleware on `/api/admin/*` and `/api/vendor/*`. After `next()`: skip GET/HEAD/OPTIONS, skip when `c.get('audited')` is set (a handler already wrote a precise row), otherwise write one `admin.request` row with method, path, route params and status in metadata, `outcome` derived from the status code, and category `config`.
+
+  This is the floor: a route added next month is audited without its author doing anything.
+
+  ## Context
+  Part of feature: admin-audit-log (Phase 3 - Capture)
+  Spec: docs/plans/2026-08-17-logging-and-auditing.md D2 and section 3.5
+  The suppression handshake is the thing to test: a handler calling recordAudit must produce exactly one row, not two.
+feature: admin-audit-log
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:21:02.208Z'
+last_updated: '2026-08-17T07:21:02.208Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 638
+    feature: admin-audit-log
+    description: Core - recordAudit service that never throws and accepts a transaction
+  - ticket: 639
+    feature: admin-audit-log
+    description: Core - request id, bound child logger and pino redaction
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: POST writes one row, GET writes none, audited handler suppresses the floor row, 4xx records outcome failure'
+    file: packages/api/tests/middleware/audit.test.ts
+    command: cd packages/api && bunx vitest run tests/middleware/audit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && bunx vitest run tests/middleware/audit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement the middleware and mount it in index.ts ahead of the admin and vendor route trees
+    file: packages/api/src/middleware/audit.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/middleware/audit.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/middleware/audit.ts packages/api/src/index.ts packages/api/tests/middleware/audit.test.ts && git commit -m "feat(api): audit every admin and vendor mutation by default"'
+    status: pending
+current_step: 1

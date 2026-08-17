@@ -1,0 +1,64 @@
+ticket_number: 642
+title: Tier 1 - audit order status changes and cancellation
+description: |-
+  ## Task
+  Call `recordAudit` on the admin order status change and cancellation handlers. Category `money` for cancellation and refund-bearing transitions, `config` otherwise; entity `order`; before/after carrying the status pair; summary naming both statuses.
+
+  ## Context
+  Part of feature: admin-audit-log (Phase 4 - Tier 1)
+  File: packages/api/src/routes/admin/orders.ts
+  Spec: docs/plans/2026-08-17-logging-and-auditing.md D3
+feature: admin-audit-log
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:21:02.319Z'
+last_updated: '2026-08-17T07:21:02.319Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - money
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 640
+    feature: admin-audit-log
+    description: Capture - audit middleware floor over admin and vendor mutations
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing route tests for the status-change and cancel audit rows
+    file: packages/api/tests/routes/admin/orders-audit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/orders-audit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && bunx vitest run tests/routes/admin/orders-audit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Instrument the handlers
+    file: packages/api/src/routes/admin/orders.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm passing
+    command: cd packages/api && bunx vitest run tests/routes/admin/orders-audit.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/admin/orders.ts packages/api/tests/routes/admin/orders-audit.test.ts && git commit -m "feat(api): audit order status changes and cancellation"'
+    status: pending
+current_step: 1

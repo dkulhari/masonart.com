@@ -35,3 +35,7 @@ export * from './promotion';
 // Gift card schemas. A gift card is tender, not a discount — kept in its own
 // module rather than beside './promotion' so the two are never conflated.
 export * from './gift-card';
+
+// Audit log schemas. Who did what, to what, when — the contract shared by the
+// API writer, the read route and the admin viewer.
+export * from './audit-log';

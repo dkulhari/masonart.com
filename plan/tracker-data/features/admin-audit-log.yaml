@@ -1,34 +1,140 @@
 name: admin-audit-log
-title: Admin Audit Log
+title: Logging and Auditing
 priority: critical
-created: '2026-08-16T21:23:26.095Z'
+created: "2026-08-16T21:23:26.095Z"
 assignee: unassigned
 tags: []
 description: |-
   ## Overview
-  Cross-cutting audit trail for admin actions. Separate from the fulfilment decomposition; queued for its own brainstorming pass.
+  Cross-cutting logging and audit trail. Full spec: `docs/plans/2026-08-17-logging-and-auditing.md`.
 
-  PROBLEM: grepped the whole schema — there is no audit table. Actor is recorded only for gift cards (issued_by_user_id), promotions on create (created_by), approvals, AI moderation (ai_generation_reviews), and shipping config (created_by). Actor is NOT recorded for: refunds (routes/admin/returns.ts approve/reject/process-refund), order cancellation, order status changes, role changes (routes/admin/customers.ts:355 reads currentUser only to block self-demotion, never stores who promoted whom), or product price/stock edits. Money moves and privilege escalates with no record of who did it.
+  PROBLEM (re-verified 2026-08-17): there is still no audit table anywhere in `packages/api/src/database/schema/`. Actor is recorded only for gift cards (`issued_by_user_id`), promotions on create, approvals, AI moderation (`ai_generation_reviews`) and shipping config. Actor is NOT recorded for refunds (`routes/admin/returns.ts:460,536,606,671`), order cancellation or status changes, role assignment (`routes/admin/customers.ts:355` reads `currentUser` only to block self-demotion, never stores who promoted whom), or product price/stock edits. Money moves and privilege escalates with no record of who did it.
 
-  PROPOSED SPLIT (not yet approved): the WRITE path is a launch gate; the read UI is not. History cannot be backfilled — launching without the write path means the first disputed refund has no answer. A viewer can be added any time.
+  Logging exists but is thin: pino is configured (`lib/logger.ts`) and one global middleware logs method/path/status/duration (`index.ts:93-102`) — no request id, no actor, no client IP, no redaction config, no correlation to Sentry.
 
-  DESIGN FORK to settle in brainstorming: generic append-only admin_audit_log captured in middleware, versus more per-domain actor columns. Repo has precedent both ways. Claude's lean is generic — the gap is precisely the paths nobody remembered to add a column to, and per-domain columns need a migration per action forever, each one another chance to forget.
-
-  OPEN QUESTIONS: scope tiers (money / privilege / catalogue / config — all four or money+privilege first); payload (actor id+email+role, action, entity type+id, before/after delta, IP, request id); IP must come from cf-connecting-ip not the first x-forwarded-for entry, per #291; retention window and PII handling (entries carry customer emails — India DPDP Act applies); immutability (revoke UPDATE/DELETE grants, or app-level discipline).
+  ## Decisions (settled, see spec Part 2)
+  - **D1 Generic append-only `admin_audit_log`**, captured centrally — not per-domain actor columns. The gap is precisely the paths nobody remembered to add a column to. Existing per-domain trails (`ai_generation_reviews`, gift-card ledger) stay.
+  - **D2 Two capture layers**: a middleware floor over every non-GET `/api/admin/*` and `/api/vendor/*` request, plus an explicit `recordAudit()` in money/privilege handlers carrying the entity delta. A `c.set("audited", true)` handshake keeps one action to one row.
+  - **D3 Tiers**: tier 1 = money + privilege (launch gate, history cannot be backfilled); tier 2 = catalogue + config; the read UI is not a gate but ships here.
+  - **D4 Actor snapshotted** (`actor_email`, `actor_role`) as well as referenced — a deleted user must not erase history.
+  - **D5 Client IP** via the existing `getClientIp()` (cf-connecting-ip, then the LAST x-forwarded-for hop) — the first hop is client-forgeable (#291).
+  - **D6 Immutability in the database**: BEFORE UPDATE OR DELETE trigger. UPDATE always refused; DELETE refused unless the transaction sets `chobii.audit_purge = 'on'` (only the retention job does).
+  - **D7 Retention/PII**: 400 days (`AUDIT_RETENTION_DAYS`), daily purge worker, redactor drops `password|token|secret|otp|signature|cvv|card` keys and truncates >2KB strings. India DPDP Act applies.
+  - **D8 Failure policy**: `recordAudit()` never throws — an audit failure must not roll back a refund that already happened; it logs at error and alerts. Callers may pass a `tx` for atomicity by choice.
+  - **D9 Correlation**: one `request_id` (x-request-id, else cf-ray, else generated) binds the log line, the response header, the audit row and 5xx error bodies.
 
   ## Objectives
-  - TBD
+  - Every money and privilege action attributable to a named actor, with before/after, IP and request id
+  - No admin/vendor mutation can escape the trail by being forgotten
+  - Audit rows unmodifiable and undeletable outside the retention job
+  - Admin-only viewer with filters and an entity timeline
+  - Structured request logging that joins to audit rows by request id
+
+  ## Implementation Plan
+
+  ### Phase 1: Contract
+  Location: `packages/shared/src/schemas`, `packages/api/src/database`
+  - [ ] Shared action registry, category/outcome enums, query + entry schemas (+ tests)
+  - [ ] `admin_audit_log` table, indexes, migration, immutability trigger (+ DB tests)
+
+  ### Phase 2: Core
+  Location: `packages/api/src/lib`, `packages/api/src/middleware`
+  - [ ] Redactor + delta helpers (+ tests)
+  - [ ] `recordAudit()` service, never-throws, tx-aware (+ tests)
+  - [ ] Request-context middleware: request id, child logger, pino redaction (+ tests)
+
+  ### Phase 3: Capture
+  Location: `packages/api/src/middleware`
+  - [ ] Audit middleware floor over admin + vendor mutations with suppression handshake (+ tests)
+
+  ### Phase 4: Tier 1 — money and privilege
+  Location: `packages/api/src/routes/admin`
+  - [ ] Returns: approve, reject, refund, store credit
+  - [ ] Orders: status change and cancellation
+  - [ ] Privilege: role assignment, vendor invites; gift card issue/disable/enable
+
+  ### Phase 5: Tier 2 — catalogue and config
+  - [ ] Products, variants, frames, promotions, collections
+  - [ ] Shipping config/options, wallet config, vendor rates
+
+  ### Phase 6: Read
+  Location: `packages/api/src/routes/admin`, `packages/web/app/routes/admin`
+  - [ ] `GET /api/admin/audit-log` + entity timeline, admin-only, cursor paginated
+  - [ ] `/admin/audit-log` UI: filters, table, before/after drawer
+
+  ### Phase 7: Ops
+  - [ ] Retention purge worker + `AUDIT_RETENTION_DAYS`
+  - [ ] E2E spec + OPERATIONS.md runbook section
+
+  ## Technical Notes
+  - Project: bun + turbo monorepo; Hono API, Drizzle (migrations in `packages/api/src/database/migrations`), TanStack Router web, vitest + Playwright
+  - Test commands must be path-scoped — the machine is shared
+  - API tests need `DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev`
 objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
-  in_progress: {}
+  todo:
+    "636": Database - admin_audit_log table, indexes and the immutability trigger
+    "637": Core - payload redactor and before/after delta helpers
+    "638": Core - recordAudit service that never throws and accepts a transaction
+    "639": Core - request id, bound child logger and pino redaction
+    "640": Capture - audit middleware floor over admin and vendor mutations
+    "641": Tier 1 - audit the returns money paths
+    "642": Tier 1 - audit order status changes and cancellation
+    "643": Tier 1 - audit privilege changes and gift card tender
+    "644": Tier 2 - audit catalogue and config writes
+    "645": Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
+    "646": Web - /admin/audit-log viewer with filters and a before/after drawer
+    "647": Ops - retention purge worker behind the immutability guard
+    "648": E2E and runbook - an admin action appears in the viewer
+  in_progress:
+    "635": Contract - shared audit action registry and zod schemas
   done: {}
-total_tickets: 0
+total_tickets: 14
 completion_percentage: 0
 is_completed: false
+plan:
+  phases:
+    - name: Contract
+      location: packages/shared/src/schemas, packages/api/src/database
+      tickets:
+        - 635
+        - 636
+    - name: Core
+      location: packages/api/src/lib, packages/api/src/middleware
+      tickets:
+        - 637
+        - 638
+        - 639
+    - name: Capture
+      location: packages/api/src/middleware
+      tickets:
+        - 640
+    - name: Tier 1 money and privilege
+      location: packages/api/src/routes/admin
+      tickets:
+        - 641
+        - 642
+        - 643
+    - name: Tier 2 catalogue and config
+      location: packages/api/src/routes/admin
+      tickets:
+        - 644
+    - name: Read
+      location: packages/api/src/routes/admin, packages/web/app/routes/admin
+      tickets:
+        - 645
+        - 646
+    - name: Ops
+      location: packages/api/src/queues, tests/e2e
+      tickets:
+        - 647
+        - 648
+  generated_at: "2026-08-17T07:21:59.707Z"
+last_activity: "2026-08-17T07:22:12.112Z"
+started: "2026-08-17T07:22:12.112Z"

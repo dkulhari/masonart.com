@@ -1,0 +1,68 @@
+ticket_number: 636
+title: Database - admin_audit_log table, indexes and the immutability trigger
+description: |-
+  ## Task
+  Add the append-only `admin_audit_log` table with its six indexes, generate the migration, and hand-append the immutability trigger: UPDATE always refused; DELETE refused unless the transaction has set `chobii.audit_purge = 'on'`.
+
+  ## Context
+  Part of feature: admin-audit-log (Phase 1 - Contract)
+  Spec: docs/plans/2026-08-17-logging-and-auditing.md section 3.1
+  Follow packages/api/src/database/schema/ai-generation-reviews.ts for table style (uuid pk, index map in the third arg, relations block, $inferSelect/$inferInsert type exports). Export it from schema/index.ts.
+  Migrations live in packages/api/src/database/migrations; generate with `bunx drizzle-kit generate` then append the trigger SQL to the generated file with a `--> statement-breakpoint` separator.
+  Actor is referenced (users.id, onDelete set null) AND snapshotted (actor_email, actor_role).
+feature: admin-audit-log
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:20:13.641Z'
+last_updated: '2026-08-17T07:20:13.641Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing schema-shape test asserting the columns and enums exist
+    file: packages/api/tests/database/audit-log-schema.test.ts
+    command: cd packages/api && bunx vitest run tests/database/audit-log-schema.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails - table not defined
+    command: cd packages/api && bunx vitest run tests/database/audit-log-schema.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the table module and export it
+    file: packages/api/src/database/schema/audit-log.ts
+    status: pending
+  - id: 4
+    action: implement
+    description: Generate the migration and append the immutability trigger SQL
+    file: packages/api/src/database/migrations/
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx drizzle-kit generate
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Apply the migration to the dev DB and confirm the schema test passes
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx drizzle-kit migrate && bunx vitest run tests/database/audit-log-schema.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit schema and migration
+    command: 'git add packages/api/src/database packages/api/tests/database/audit-log-schema.test.ts && git commit -m "feat(api): append-only admin_audit_log table with immutability trigger"'
+    status: pending
+current_step: 1

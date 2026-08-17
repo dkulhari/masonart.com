@@ -1,0 +1,68 @@
+ticket_number: 645
+title: Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
+description: |-
+  ## Task
+  Add the read API: `GET /api/admin/audit-log` (filters: actor, action, category, entityType, entityId, from, to, free text; cursor pagination) and `GET /api/admin/audit-log/entity/:type/:id` for one entity's timeline.
+
+  RBAC: `admin` and `super-admin` only - explicitly NOT `content-manager`, because entries carry customer emails.
+
+  ## Context
+  Part of feature: admin-audit-log (Phase 6 - Read)
+  Spec: docs/plans/2026-08-17-logging-and-auditing.md section 3.6
+  Validate query params with `auditLogQuerySchema` from @chobii/shared via @hono/zod-validator. Follow routes/admin/gift-cards.ts for router shape and the admin guard. Mount in index.ts. Bind id arrays as arrays (see e3c2620d).
+feature: admin-audit-log
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-17T07:21:38.536Z'
+last_updated: '2026-08-17T07:21:38.536Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 636
+    feature: admin-audit-log
+    description: Database - admin_audit_log table, indexes and the immutability trigger
+  - ticket: 635
+    feature: admin-audit-log
+    description: Contract - shared audit action registry and zod schemas
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing route tests: filters narrow, cursor pages, content-manager gets 403'
+    file: packages/api/tests/routes/admin/audit-log.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/audit-log.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && bunx vitest run tests/routes/admin/audit-log.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement the router and mount it
+    file: packages/api/src/routes/admin/audit-log.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm passing
+    command: cd packages/api && bunx vitest run tests/routes/admin/audit-log.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/admin/audit-log.ts packages/api/src/index.ts packages/api/tests/routes/admin/audit-log.test.ts && git commit -m "feat(api): admin audit log read API"'
+    status: pending
+current_step: 1
