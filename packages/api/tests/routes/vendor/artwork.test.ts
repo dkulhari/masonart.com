@@ -29,10 +29,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
+import {
+  buildVendorApp,
+  vendorSessionFor,
+} from '../../helpers/vendor-session'
 import '../../setup'
 
 import { productionJobs, productionJobItems } from '../../../src/database/schema/production-jobs'
@@ -173,40 +175,8 @@ const ARTWORK_CDN_URL = 'https://cdn.example.com/products/abc.jpg'
 /** Fifteen minutes is already generous for "fetch a file you were just handed". */
 const MAX_REASONABLE_TTL_SECONDS = 15 * 60
 
-function sessionFor(role: string, id = 'vendor-user-1') {
-  const now = new Date()
-  return {
-    user: {
-      id,
-      name: 'Portal User',
-      email: 'portal@example.com',
-      emailVerified: true,
-      image: null,
-      createdAt: now,
-      updatedAt: now,
-      role,
-      status: 'active',
-    },
-    session: {
-      id: 'sess-1',
-      token: 'tok-1',
-      userId: id,
-      expiresAt: new Date(now.getTime() + 86_400_000),
-      createdAt: now,
-      updatedAt: now,
-    },
-  }
-}
-
-function buildApp(): Hono {
-  const app = new Hono()
-  app.route('/api/vendor', vendorApp)
-  app.onError((err, c) => {
-    if (err instanceof HTTPException) return err.getResponse()
-    return c.json({ error: err.message }, 500)
-  })
-  return app
-}
+const sessionFor = vendorSessionFor
+const buildApp = () => buildVendorApp(vendorApp)
 
 const PAST = new Date('2026-01-01T00:00:00Z')
 

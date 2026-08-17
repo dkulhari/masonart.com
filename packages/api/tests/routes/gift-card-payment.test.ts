@@ -27,6 +27,10 @@ import {
   liveDbUrl,
   assertLiveDbReachable,
 } from "../helpers/live-db";
+import {
+  purgeGiftCardFixtures,
+  resetRazorpayOrderMock,
+} from "../helpers/gift-card-fixtures";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/middleware/auth")>()),
@@ -90,32 +94,12 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  createRazorpayOrderMock.mockReset();
-  createRazorpayOrderMock.mockResolvedValue({
-    id: "order_test_razorpay",
-    amount: 0,
-    currency: "INR",
-  });
-
+  resetRazorpayOrderMock(createRazorpayOrderMock);
   if (!reachable) return;
-
-  if (createdOrderIds.length > 0) {
-    await db
-      .delete(orderGiftCards)
-      .where(inArray(orderGiftCards.orderId, createdOrderIds));
-  }
-  if (createdCardIds.length > 0) {
-    await db
-      .delete(giftCardTransactions)
-      .where(inArray(giftCardTransactions.giftCardId, createdCardIds));
-    await db.delete(giftCards).where(inArray(giftCards.id, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db.delete(orders).where(inArray(orders.id, createdOrderIds));
-  }
-
-  createdCardIds.length = 0;
-  createdOrderIds.length = 0;
+  await purgeGiftCardFixtures(db, {
+    cardIds: createdCardIds,
+    orderIds: createdOrderIds,
+  });
 });
 
 afterAll(async () => {
