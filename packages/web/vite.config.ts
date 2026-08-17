@@ -50,7 +50,13 @@ export default defineConfig({
      */
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        /**
+         * Overridable because several agents share this machine: a second web
+         * server started on a free port would otherwise proxy into whichever
+         * API happens to hold :3000, and the resulting failures look like
+         * application bugs rather than a crossed wire.
+         */
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
         changeOrigin: true,
       },
     },

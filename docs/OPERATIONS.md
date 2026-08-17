@@ -77,6 +77,46 @@ docker stats --no-stream
 - **Tunnel**: Cloudflare Zero Trust → Tunnels → the **platform tunnel** shows HEALTHY with **exactly one** connector replica (`linux_arm64`). Two replicas = intermittent 502s. Route debugging: traefik dashboard is loopback-only on the mini — `ssh -L 8080:localhost:8080 dhruv@<mini>` → http://localhost:8080.
 - **AI queue**: admin panel generation queue; failed BullMQ jobs are visible in api logs (`aiGenerationWorker` failed events).
 
+## 3b. The audit trail
+
+**Where to look first when someone asks "who did this".** `/admin/audit-log`, filtered by
+entity — `?entityType=order&entityId=<id>` answers a disputed order without scrolling.
+Admin and super-admin only; content-managers get a 403 (rows carry customer emails).
+
+**What is captured.** Every mutating request under `/api/admin/*` and `/api/vendor/*`
+lands a row, whether or not its handler opted in — the middleware floor records the
+coarse `admin.request` / `vendor.request` entry, and instrumented handlers upgrade it to a
+named action with a before/after delta. Money and privilege paths (refunds, order
+cancellation, gift cards, role changes) are all instrumented, and so are refusals: a
+rejected privilege change is recorded with `outcome: failure` rather than dropped.
+
+**Correlating with logs.** Every response carries `x-request-id` (from `x-request-id`,
+else `cf-ray`, else generated); the same id is on every log line for that request and in
+the audit row's `request_id`. A user reporting a 500 can quote the id from the error body.
+
+```bash
+# Every log line for one request
+docker compose -f ~/chobii-docker-compose.yml logs api | grep '<request-id>'
+```
+
+**Rows cannot be edited or deleted.** A database trigger refuses every `UPDATE` and every
+`DELETE` that has not set `chobii.audit_purge` inside its transaction — which only the
+retention job does. If a statement fails with `admin_audit_log is append-only`, that is
+the trigger working, not a bug. Note the corollary: a `DELETE FROM "user"` for someone who
+appears in the log is fine (there is no foreign key), but any attempt to "clean up" audit
+rows by hand will be refused.
+
+**Retention.** `AUDIT_RETENTION_DAYS`, default **400** — a financial year plus the disputes
+that trail it. The purge runs at startup and daily thereafter, inside the API process; a
+value below 1 or unparseable falls back to the default rather than deleting everything.
+DPDP applies to this table: rows carry customer emails, so shortening the window is a
+compliance decision, not a disk one.
+
+**If the trail goes quiet.** `alertCritical` fires on a failed audit write ("Audit write
+failed"). The business action still succeeded — by design, an audit failure never rolls
+back a refund — so the row is missing, not the money. Check the API logs for
+`audit write failed` and the database for connection saturation.
+
 ## 4. Do-not rules
 
 - **Payment state belongs to webhooks.** Never hand-edit order/payment status in the DB — redeliver the webhook from the Razorpay dashboard; idempotency makes duplicates safe.
