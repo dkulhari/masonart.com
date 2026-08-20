@@ -1,0 +1,39 @@
+ticket_number: 657
+title: Unit - GET /api/admin/products answers 500 in products-role-access, for both admin and content-manager
+description: |-
+  ## Finding
+  Baseline sweep 2026-08-17, present at `485fa949`:
+
+  ```
+  tests/routes/admin/products-role-access.test.ts
+    > allows admin to list admin products            expected 500 to be 200
+    > allows content-manager to list admin products  expected 500 to be 200
+  ```
+
+  Both cases reach the handler (so the RBAC half of the suite is working) and the handler then throws. The suite mocks `db`, so the likeliest cause is the list query touching something the mock does not answer — which would also mean the *shape* of that query is unasserted anywhere.
+
+  Worth taking seriously rather than deleting: the repo has a documented instance of exactly this class of bug (a route filtering on `products.isActive`, a column that does not exist on that table, passing 17/17 against a mocked `db`).
+
+  ## Steps
+  - Read the thrown error rather than the status — the handler swallows it into a 500
+  - If the mock is incomplete, complete it; if the query is wrong, fix the query and add a schema-assumption test
+  - Confirm against the real database once, since a mocked `db` cannot catch a bad column
+feature: qa-testing
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:39.040Z'
+last_updated: '2026-08-20T12:19:39.040Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

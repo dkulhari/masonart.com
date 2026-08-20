@@ -1,0 +1,33 @@
+ticket_number: 660
+title: E2E failing - a staged order does not reach the storefront intact
+description: |-
+  ## Finding
+  Workflow testing 2026-08-17: `tests/e2e/wishlist-staging.admin.spec.ts:88` — "the round trip > a staged order reaches the storefront intact" — fails **5 passed / 1 failed**.
+
+  Reproduced on a pre-work server against the same database, so it is not caused by the audit work. Unlike #651–#653 this one is NOT obviously a stale assertion: the other five tests in the same file pass, including the staging steps that precede it, so the failure is at the handover between the staged order and what the storefront renders.
+
+  That makes it the most interesting of the E2E failures found in the sweep — it may be a real defect in wishlist curation rather than test drift.
+
+  ## Steps
+  - Read `test-results/wishlist-staging.admin-*/test-failed-1.png` for what the storefront actually rendered
+  - Determine whether the staged order is wrong at the API or only at the page
+  - Pull the trail: `/admin/audit-log?entityType=collection` now records the staging writes, which is the fastest way to see what the admin half actually wrote
+feature: qa-e2e-testing
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:54.416Z'
+last_updated: '2026-08-20T12:19:54.416Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

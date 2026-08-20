@@ -1,0 +1,37 @@
+ticket_number: 656
+title: Unit - the redis and BullMQ runtime suites fail, and which tests fail shifts between runs
+description: |-
+  ## Finding
+  Baseline sweep 2026-08-17, present identically at `485fa949`:
+
+  ```
+  tests/lib/redis.test.ts    1 failure  (Cache Operations > should set and get string value)
+  tests/queues/ai.test.ts    5 failures (queue add, job status, waiting count,
+                                         concurrent jobs, add-jobs-quickly)
+  ```
+
+  **The set of failing tests in `queues/ai.test.ts` changes between identical runs** — two runs of the same command produced different members ('should handle complete job lifecycle' and 'should persist all job data fields' in one, 'Performance > should add multiple jobs quickly' and 'Queue operations > should add job to queue' in the other). That is the signature of a shared, stateful Redis rather than of a code defect: these suites talk to the real `poster-app-redis` and do not isolate their keyspace, so a concurrent agent's run is enough to move the failures.
+
+  ## Fix
+  Give them a namespace they own — a per-run key prefix and a BullMQ queue name suffixed with the pid, the way the live-database suites already scope themselves (`tests/helpers/live-db.ts`) — or skip loudly when Redis is unreachable rather than failing on shared state.
+
+  Whichever way: a test whose result depends on who else is on the machine trains everyone to ignore the suite, which is the actual cost here.
+feature: qa-testing
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:38.999Z'
+last_updated: '2026-08-20T12:19:38.999Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

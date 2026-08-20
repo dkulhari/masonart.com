@@ -23,11 +23,13 @@ tickets:
     "652": E2E stale - admin-products still expects native confirm() and an old edit flow
     "653": E2E stale - admin-orders expects the Export button that was deliberately removed
     "654": E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
+    "660": E2E failing - a staged order does not reach the storefront intact
+    "661": E2E flaky - paying entirely with a gift card fails then passes on retry
   in_progress: {}
   done:
     "184": "Bug: admin-approvals status transition tests timeout with networkidle"
     "185": "Bug: admin-reviews bulk actions beforeEach times out waiting for stats card"
     "186": "Bug: Replace networkidle with domcontentloaded in all admin E2E tests"
-total_tickets: 7
-completion_percentage: 43
+total_tickets: 9
+completion_percentage: 33
 is_completed: false

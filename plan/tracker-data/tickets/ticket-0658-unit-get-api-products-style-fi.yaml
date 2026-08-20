@@ -1,0 +1,35 @@
+ticket_number: 658
+title: Unit - GET /api/products style filtering fails against the seeded database
+description: |-
+  ## Finding
+  Baseline sweep 2026-08-17, present at `485fa949`:
+
+  ```
+  tests/routes/products.test.ts
+    > Products Runtime Tests (Database Required) > GET /api/products - List Products > should filter by styles
+  ```
+
+  A runtime test against the real database, so it is either a genuine filter defect or an assumption about seeded data that the current seed no longer satisfies. The seed has been reshaped several times since (art-box backfill, orientation correction, watermark work), so the second is likely — but it needs checking rather than assuming, because a broken `styles` filter is a customer-visible catalogue bug.
+
+  ## Steps
+  - Run the query the route builds against the dev database by hand and compare with what the test expects
+  - If the seed changed, re-derive the fixture from what the seed actually writes; if the filter is wrong, fix it and keep the test
+feature: qa-testing
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:39.087Z'
+last_updated: '2026-08-20T12:19:39.087Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

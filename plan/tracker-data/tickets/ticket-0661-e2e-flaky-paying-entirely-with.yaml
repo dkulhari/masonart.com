@@ -1,0 +1,33 @@
+ticket_number: 661
+title: E2E flaky - paying entirely with a gift card fails then passes on retry
+description: |-
+  ## Finding
+  Workflow testing 2026-08-17: `tests/e2e/gift-cards.spec.ts:201` — "paying entirely with a gift card > completes without the gateway and spends exactly the total" — failed on `expect(page).toHaveURL(...)` in a full-file run, then passed on its own on retry.
+
+  That shape matches the documented guest-cart race: `GET /api/cart` mints a cart AND sets a new `cart_session` cookie when the request arrives without one, so seeding into a still-loading page puts the item in cart A while the page reads cart B — and `/checkout` then renders empty with no failed request anywhere. The race is invisible on an idle machine and appears under load, which is exactly the difference between the two runs here.
+
+  `tests/e2e/helpers/cart.ts` already handles this for other specs (wait for network idle, POST and read the cart back in the same evaluate). This spec appears not to use it.
+
+  ## Steps
+  - Route this spec's cart seeding through the shared helper
+  - Assert the cart reads back with the item before navigating to checkout — a 201 proves nothing
+  - Re-run under concurrent load rather than alone, or the fix cannot be verified
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:54.457Z'
+last_updated: '2026-08-20T12:19:54.457Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

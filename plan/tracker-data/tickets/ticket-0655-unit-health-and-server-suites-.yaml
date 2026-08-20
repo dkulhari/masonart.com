@@ -1,0 +1,46 @@
+ticket_number: 655
+title: Unit - health and server suites assert a response contract the API does not serve (14 tests)
+description: |-
+  ## Finding
+  Baseline sweep 2026-08-17 (re-confirmed against `485fa949`, so this predates the audit work): **14 of the 24 API unit failures** are one disagreement about what `/api/health` and `/` return.
+
+  ```
+  tests/routes/health.test.ts   11 failures
+  tests/server.test.ts           3 failures
+  ```
+
+  The assertions expect `status: "ok"` and a `documentation` field on the root endpoint. The API answers `status: "healthy"` and its root payload has no `documentation` key. Sample:
+
+  ```
+  AssertionError: expected 'healthy' to be 'ok'
+  AssertionError: expected { name: 'chobii.art API', ...(2) } to have property "documentation"
+  ```
+
+  The suites also assert `/health` and `/api/health` differ in field count and that only `/api/health` carries `service` — all downstream of the same contract question.
+
+  ## Decide, then fix one side
+  Either the tests are stale and should be re-derived from the shipped payload, or the payload regressed and should serve `ok` again. **This is not a free choice**: `/api/health` is what UptimeRobot polls (OPERATIONS.md §3) and what a container healthcheck would parse. If anything external matches on `"ok"`, the payload is the bug; if nothing does, the tests are.
+
+  Check `deploy/` and the compose healthcheck before choosing.
+
+  ## Why it matters beyond the count
+  14 always-red tests in the two suites everyone runs first is how a real health regression gets waved through.
+feature: qa-testing
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:38.949Z'
+last_updated: '2026-08-20T12:19:38.949Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

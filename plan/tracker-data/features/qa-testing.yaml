@@ -18,7 +18,12 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "655": Unit - health and server suites assert a response contract the API does not serve (14 tests)
+    "656": Unit - the redis and BullMQ runtime suites fail, and which tests fail shifts between runs
+    "657": Unit - GET /api/admin/products answers 500 in products-role-access, for both admin and content-manager
+    "658": Unit - GET /api/products style filtering fails against the seeded database
+    "659": Unit - AI generator suite fails asserting the Gemini provider is used
   in_progress: {}
   done:
     "12": "Phase 1: Setup & Configuration"
@@ -44,6 +49,6 @@ tickets:
     "343": Escape user-controlled values in order/approval email templates (pre-existing pattern)
     "347": Add Content-Security-Policy header for SSR pages
     "459": Unscoped test runs from parallel agents saturate the 8-core box — cap workers and enforce scope
-total_tickets: 23
-completion_percentage: 100
-is_completed: true
+total_tickets: 28
+completion_percentage: 82
+is_completed: false

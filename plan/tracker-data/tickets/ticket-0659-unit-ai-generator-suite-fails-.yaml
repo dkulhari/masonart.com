@@ -1,0 +1,35 @@
+ticket_number: 659
+title: Unit - AI generator suite fails asserting the Gemini provider is used
+description: |-
+  ## Finding
+  Baseline sweep 2026-08-17, present at `485fa949`:
+
+  ```
+  tests/ai/generator.test.ts
+    > AI Generator - Gemini Provider > generateImages with Gemini > uses gemini provider a…
+  ```
+
+  One test, isolated from the rest of the suite's failures, about which provider `generateImages` selects. Provider selection is configuration-sensitive (`gemini-direct-provider` was a whole feature), so this is most likely an environment-dependent assertion — the test asserts a provider the local env does not select.
+
+  ## Steps
+  - Determine whether the selection is driven by env in a way the test does not pin
+  - Pin it in the test rather than in the developer's shell
+feature: qa-testing
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-20T12:19:39.132Z'
+last_updated: '2026-08-20T12:19:39.132Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
