@@ -15,16 +15,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
-import { eq, inArray } from "drizzle-orm";
 import postgres from "postgres";
 
-import {
-  giftCards,
-  giftCardTransactions,
-  orderGiftCards,
-} from "../../src/database/schema/gift-cards";
-import { orders } from "../../src/database/schema/orders";
-import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -32,11 +24,8 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
-import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
-
-/** Sequences orderNumber within this suite; codes get their own
-  * sequence from freshGiftCardCode. */
-let uniqueCounter = 0;
+import { purgeGiftCardFixtures } from "../helpers/gift-card-fixtures";
+import { createGiftCardServiceHarness } from "../helpers/gift-card-service-harness";
 
 const DATABASE_URL = liveDbUrl();
 
@@ -64,80 +53,20 @@ beforeAll(async () => {
 afterEach(async () => {
   if (!reachable) return;
 
-  if (createdCardIds.length > 0) {
-    await db
-      .delete(giftCardTransactions)
-      .where(inArray(giftCardTransactions.giftCardId, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db
-      .delete(orderGiftCards)
-      .where(inArray(orderGiftCards.orderId, createdOrderIds));
-  }
-  if (createdCardIds.length > 0) {
-    await db.delete(giftCards).where(inArray(giftCards.id, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db.delete(orders).where(inArray(orders.id, createdOrderIds));
-  }
-
-  createdCardIds.length = 0;
-  createdOrderIds.length = 0;
+  await purgeGiftCardFixtures(db, {
+    cardIds: createdCardIds,
+    orderIds: createdOrderIds,
+  });
 });
 
 afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(
-  balancePaise: number,
-  overrides: Partial<typeof giftCards.$inferInsert> = {},
-): Promise<{ id: string; code: string }> {
-  const code = freshGiftCardCode("TEST");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-      ...overrides,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
-
-async function makeOrder(totalRupees: string): Promise<string> {
-  const [order] = await db
-    .insert(orders)
-    .values({
-      orderNumber: `TEST-${Date.now()}-${uniqueCounter++}`,
-      shippingAddress: {
-        fullName: "Test",
-        addressLine1: "1 Test Road",
-        city: "Test",
-        state: "Test",
-        postalCode: "000000",
-        country: "IN",
-        phone: "0000000000",
-      } as never,
-      subtotal: totalRupees,
-      total: totalRupees,
-    })
-    .returning();
-
-  createdOrderIds.push(order!.id);
-  return order!.id;
-}
-
-async function balanceOf(cardId: string): Promise<number> {
-  const row = await db.query.giftCards.findFirst({
-    where: eq(giftCards.id, cardId),
-  });
-  return row!.balancePaise;
-}
+const { makeCard, makeOrder, balanceOf, ledgerOf } = createGiftCardServiceHarness(
+  () => db,
+  { prefix: "TEST", cardIds: createdCardIds, orderIds: createdOrderIds },
+);
 
 // ============================================================================
 // Tests
@@ -252,9 +181,7 @@ describe.skipIf(!DATABASE_URL)("redeemGiftCards", () => {
     expect(totalApplied).toBe(50_000);
     expect(await balanceOf(id)).toBe(0);
 
-    const ledger = await db.query.giftCardTransactions.findMany({
-      where: eq(giftCardTransactions.giftCardId, id),
-    });
+    const ledger = await ledgerOf(id);
     expect(ledger.filter((entry) => entry.type === "redeem")).toHaveLength(1);
   });
 
@@ -274,9 +201,7 @@ describe.skipIf(!DATABASE_URL)("redeemGiftCards", () => {
     expect(second.reduce((sum, a) => sum + a.amountPaise, 0)).toBe(20_000);
     expect(await balanceOf(id)).toBe(30_000);
 
-    const ledger = await db.query.giftCardTransactions.findMany({
-      where: eq(giftCardTransactions.giftCardId, id),
-    });
+    const ledger = await ledgerOf(id);
     expect(ledger.filter((entry) => entry.type === "redeem")).toHaveLength(1);
   });
 
@@ -288,9 +213,7 @@ describe.skipIf(!DATABASE_URL)("redeemGiftCards", () => {
 
     await db.transaction((tx) => redeemGiftCards(tx, orderId, [code], 20_000, null));
 
-    const ledger = await db.query.giftCardTransactions.findMany({
-      where: eq(giftCardTransactions.giftCardId, id),
-    });
+    const ledger = await ledgerOf(id);
     const redeem = ledger.find((entry) => entry.type === "redeem");
 
     expect(redeem?.orderId).toBe(orderId);

@@ -18,15 +18,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import {
   giftCards,
-  giftCardTransactions,
   orderGiftCards,
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
-import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -34,11 +32,8 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
-import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
-
-/** Sequences orderNumber within this suite; codes get their own
-  * sequence from freshGiftCardCode. */
-let uniqueCounter = 0;
+import { purgeGiftCardFixtures } from "../helpers/gift-card-fixtures";
+import { createGiftCardServiceHarness } from "../helpers/gift-card-service-harness";
 
 const DATABASE_URL = liveDbUrl();
 
@@ -65,86 +60,20 @@ beforeAll(async () => {
 afterEach(async () => {
   if (!reachable) return;
 
-  if (createdCardIds.length > 0) {
-    await db
-      .delete(giftCardTransactions)
-      .where(inArray(giftCardTransactions.giftCardId, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db
-      .delete(orderGiftCards)
-      .where(inArray(orderGiftCards.orderId, createdOrderIds));
-  }
-  if (createdCardIds.length > 0) {
-    await db.delete(giftCards).where(inArray(giftCards.id, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db.delete(orders).where(inArray(orders.id, createdOrderIds));
-  }
-
-  createdCardIds.length = 0;
-  createdOrderIds.length = 0;
+  await purgeGiftCardFixtures(db, {
+    cardIds: createdCardIds,
+    orderIds: createdOrderIds,
+  });
 });
 
 afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(
-  balancePaise: number,
-  overrides: Partial<typeof giftCards.$inferInsert> = {},
-): Promise<{ id: string; code: string }> {
-  const code = freshGiftCardCode("RFND");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-      ...overrides,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
-
-async function makeOrder(totalRupees: string): Promise<string> {
-  const [order] = await db
-    .insert(orders)
-    .values({
-      orderNumber: `RFND-${Date.now()}-${uniqueCounter++}`,
-      shippingAddress: {
-        fullName: "Test",
-        addressLine1: "1 Test Road",
-        city: "Test",
-        state: "Test",
-        postalCode: "000000",
-        country: "IN",
-        phone: "0000000000",
-      } as never,
-      subtotal: totalRupees,
-      total: totalRupees,
-    })
-    .returning();
-
-  createdOrderIds.push(order!.id);
-  return order!.id;
-}
-
-async function balanceOf(cardId: string): Promise<number> {
-  const row = await db.query.giftCards.findFirst({
-    where: eq(giftCards.id, cardId),
-  });
-  return row!.balancePaise;
-}
-
-async function ledgerOf(cardId: string) {
-  return db.query.giftCardTransactions.findMany({
-    where: eq(giftCardTransactions.giftCardId, cardId),
-  });
-}
+const { makeCard, makeOrder, balanceOf, ledgerOf } = createGiftCardServiceHarness(
+  () => db,
+  { prefix: "RFND", cardIds: createdCardIds, orderIds: createdOrderIds },
+);
 
 /** Redeem a card against an order, the way payment initiation would. */
 async function applyCard(orderId: string, codes: string[], duePaise: number) {
