@@ -31,13 +31,8 @@ import {
 
 // Only auth is mocked. The database is real, because the assertions that
 // matter here are about what actually landed in `orders.giftCardPurchase`.
-vi.mock("../../src/middleware/auth", () => ({
-  requireAuth: vi.fn((c: any, next: any) => {
-    const header = c.req.header("X-Test-User");
-    if (!header) return c.json({ error: "Unauthorized" }, 401);
-    c.set("user", JSON.parse(header));
-    return next();
-  }),
+vi.mock("../../src/middleware/auth", async () => ({
+  requireAuth: (await import("../helpers/admin-route-harness")).headerRequireAuth(),
 }));
 
 const DATABASE_URL = liveDbUrl();

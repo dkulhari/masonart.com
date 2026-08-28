@@ -105,3 +105,30 @@ export function freshGiftCardCode(prefix: string): string {
     counter,
   ).padStart(counterWidth, "0")}`.slice(0, GIFT_CARD_CODE_LENGTH);
 }
+
+/**
+ * The `src/lib/razorpay` partial mock the gift-card payment suites share.
+ *
+ * Every one of them starts from the same premise — Razorpay is configured, so
+ * the handler takes the live-payment path rather than the "not set up" branch
+ * — and then stubs whichever calls that particular suite exercises. Only the
+ * shared premise lives here; the per-suite stubs stay at the call site, where
+ * the test that depends on them can be read next to them.
+ *
+ * Spread it after the original module, so the real exports remain for
+ * everything a suite does not override:
+ *
+ * ```ts
+ * vi.mock("../../src/lib/razorpay", async (importOriginal) => ({
+ *   ...(await importOriginal<typeof import("../../src/lib/razorpay")>()),
+ *   ...(await import("../helpers/gift-card-fixtures")).razorpayMocks({
+ *     createRefund: (...args: unknown[]) => createRefundMock(...args),
+ *   }),
+ * }));
+ * ```
+ */
+export function razorpayMocks<T extends Record<string, unknown>>(
+  overrides: T = {} as T,
+): { isRazorpayConfigured: () => boolean } & T {
+  return { isRazorpayConfigured: () => true, ...overrides };
+}

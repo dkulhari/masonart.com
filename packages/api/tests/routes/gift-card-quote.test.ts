@@ -32,12 +32,7 @@ import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
 // the rest of the real middleware. Only the session check is swapped out.
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/middleware/auth")>()),
-  requireAuth: vi.fn((c: any, next: any) => {
-    const header = c.req.header("X-Test-User");
-    if (!header) return c.json({ error: "Unauthorized" }, 401);
-    c.set("user", JSON.parse(header));
-    return next();
-  }),
+  requireAuth: (await import("../helpers/admin-route-harness")).headerRequireAuth(),
 }));
 
 /** Sequences orderNumber within this suite; codes get their own

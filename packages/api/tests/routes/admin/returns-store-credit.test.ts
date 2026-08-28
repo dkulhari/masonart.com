@@ -55,13 +55,7 @@ vi.mock("../../../src/services/email", () => ({
 
 vi.mock("../../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../src/middleware/auth")>()),
-  requireAuth: vi.fn((c: any, next: any) => {
-    const header = c.req.header("X-Test-User");
-    if (!header) return c.json({ error: "Unauthorized" }, 401);
-    c.set("user", JSON.parse(header));
-    return next();
-  }),
-  requireAdmin: vi.fn((c: any, next: any) => next()),
+  ...(await import("../../helpers/admin-route-harness")).headerAdminMocks(),
 }));
 
 let client: LiveDbConnection["client"];

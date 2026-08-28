@@ -58,12 +58,7 @@ export function chainReturning(rows: unknown[]): Record<string, unknown> {
  */
 export function headerAuthMocks() {
   return {
-    requireAuth: vi.fn((c: Context, next: Next) => {
-      const header = c.req.header('X-Test-User');
-      if (!header) return c.json({ error: 'Unauthorized' }, 401);
-      c.set('user', JSON.parse(header));
-      return next();
-    }),
+    requireAuth: headerRequireAuth(),
     requireContentManager: vi.fn((c: Context, next: Next) => {
       const user = c.get('user') as { role?: string } | undefined;
       const allowed = ['content-manager', 'admin', 'super-admin'];
@@ -72,6 +67,56 @@ export function headerAuthMocks() {
       }
       return next();
     }),
+  };
+}
+
+/**
+ * The `requireAuth` stand-in every header-driven suite installs: read the
+ * caller out of `X-Test-User`, 401 when it is absent.
+ *
+ * A fresh `vi.fn` per call, so one suite's call count cannot leak into
+ * another's assertions.
+ */
+export function headerRequireAuth() {
+  return vi.fn((c: Context, next: Next) => {
+    const header = c.req.header('X-Test-User');
+    if (!header) return c.json({ error: 'Unauthorized' }, 401);
+    c.set('user', JSON.parse(header));
+    return next();
+  });
+}
+
+/**
+ * `requireAuth` / `requireAdmin` for the admin suites that assert on responses
+ * rather than on who is allowed through (#633).
+ *
+ * Seven gift-card suites carried a byte-identical copy of the `requireAuth`
+ * half. The `requireAdmin` half is the part that actually varied: most let
+ * every caller through because the suite is testing the handler rather than
+ * the gate, while one flips a module-level flag mid-suite to check the 403
+ * path. `isAllowed` covers both — omit it to let everyone through, or pass a
+ * predicate read at request time.
+ *
+ * Install with an async factory, so nothing is referenced before `vi.mock`
+ * hoists:
+ *
+ * ```ts
+ * vi.mock('../../src/middleware/auth', async (importOriginal) => ({
+ *   ...(await importOriginal<typeof import('../../src/middleware/auth')>()),
+ *   ...(await import('../helpers/admin-route-harness')).headerAdminMocks(),
+ * }));
+ * ```
+ *
+ * Passing a predicate rather than a boolean is what makes the flag case work:
+ * the factory runs before the suite's `let` bindings are initialised, so the
+ * value has to be read when the request arrives, not when the mock is built.
+ */
+export function headerAdminMocks(isAllowed?: () => boolean) {
+  return {
+    requireAuth: headerRequireAuth(),
+    requireAdmin: vi.fn((c: Context, next: Next) =>
+      !isAllowed || isAllowed() ? next() : c.json({ error: 'Forbidden' }, 403),
+    ),
   };
 }
 

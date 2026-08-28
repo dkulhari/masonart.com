@@ -35,13 +35,7 @@ import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/middleware/auth")>()),
-  requireAuth: vi.fn((c: any, next: any) => {
-    const header = c.req.header("X-Test-User");
-    if (!header) return c.json({ error: "Unauthorized" }, 401);
-    c.set("user", JSON.parse(header));
-    return next();
-  }),
-  requireAdmin: vi.fn((_c: any, next: any) => next()),
+  ...(await import("../helpers/admin-route-harness")).headerAdminMocks(),
 }));
 
 /** Sequences orderNumber within this suite; codes get their own
@@ -52,7 +46,7 @@ const createRefundMock = vi.fn();
 
 vi.mock("../../src/lib/razorpay", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/razorpay")>()),
-  isRazorpayConfigured: () => true,
+  ...(await import("../helpers/gift-card-fixtures")).razorpayMocks(),
   createRefund: (...args: unknown[]) => createRefundMock(...args),
 }));
 
