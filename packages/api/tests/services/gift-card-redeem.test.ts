@@ -15,7 +15,6 @@
  */
 
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
 import postgres from "postgres";
 
@@ -25,17 +24,19 @@ import {
   orderGiftCards,
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
-import * as schema from "../../src/database/schema";
 import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
+  connectLiveDb,
+  closeLiveDb,
   assertLiveDbReachable,
+  type LiveDbConnection,
 } from "../helpers/live-db";
 
 const DATABASE_URL = liveDbUrl();
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
+let client: LiveDbConnection["client"];
+let db: LiveDbConnection["db"];
 let reachable = false;
 
 /** Rows this suite created, torn down after each test. */
@@ -46,18 +47,9 @@ let redeemGiftCards: typeof import("../../src/services/gift-card").redeemGiftCar
 let quoteGiftCard: typeof import("../../src/services/gift-card").quoteGiftCard;
 
 beforeAll(async () => {
-  if (!DATABASE_URL) return;
-
-  try {
-    // A small pool, but more than one: the concurrency test needs two
-    // connections open at once or the second transaction can never start.
-    client = postgres(DATABASE_URL, { max: 5, onnotice: () => {} });
-    await client`SELECT 1`;
-    db = drizzle(client, { schema });
-    reachable = true;
-  } catch {
-    reachable = false;
-  }
+  // A small pool, but more than one: the concurrency test needs two
+  // connections open at once or the second transaction can never start.
+  ({ client, db, reachable } = await connectLiveDb({ max: 5 }));
 
   const service = await import("../../src/services/gift-card");
   redeemGiftCards = service.redeemGiftCards;
@@ -89,7 +81,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  if (client) await client.end();
+  await closeLiveDb(client);
 });
 
 // ============================================================================

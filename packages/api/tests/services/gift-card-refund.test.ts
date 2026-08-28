@@ -18,9 +18,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
-import postgres from "postgres";
 
 import {
   giftCards,
@@ -28,17 +26,19 @@ import {
   orderGiftCards,
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
-import * as schema from "../../src/database/schema";
 import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
+  connectLiveDb,
+  closeLiveDb,
   assertLiveDbReachable,
+  type LiveDbConnection,
 } from "../helpers/live-db";
 
 const DATABASE_URL = liveDbUrl();
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
+let client: LiveDbConnection["client"];
+let db: LiveDbConnection["db"];
 let reachable = false;
 
 const createdOrderIds: string[] = [];
@@ -49,16 +49,7 @@ let voidGiftCardHold: typeof import("../../src/services/gift-card").voidGiftCard
 let refundToGiftCards: typeof import("../../src/services/gift-card").refundToGiftCards;
 
 beforeAll(async () => {
-  if (!DATABASE_URL) return;
-
-  try {
-    client = postgres(DATABASE_URL, { max: 5, onnotice: () => {} });
-    await client`SELECT 1`;
-    db = drizzle(client, { schema });
-    reachable = true;
-  } catch {
-    reachable = false;
-  }
+  ({ client, db, reachable } = await connectLiveDb({ max: 5 }));
 
   const service = await import("../../src/services/gift-card");
   redeemGiftCards = service.redeemGiftCards;
@@ -91,7 +82,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  if (client) await client.end();
+  await closeLiveDb(client);
 });
 
 // ============================================================================

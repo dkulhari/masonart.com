@@ -16,17 +16,17 @@
 
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
-import postgres from "postgres";
 
 import { orders, orderItems } from "../../src/database/schema/orders";
 import { giftCards } from "../../src/database/schema/gift-cards";
 import { users } from "../../src/database/schema/users";
-import * as schema from "../../src/database/schema";
 import {
   liveDbUrl,
+  connectLiveDb,
+  closeLiveDb,
   assertLiveDbReachable,
+  type LiveDbConnection,
 } from "../helpers/live-db";
 
 // Only auth is mocked. The database is real, because the assertions that
@@ -42,8 +42,8 @@ vi.mock("../../src/middleware/auth", () => ({
 
 const DATABASE_URL = liveDbUrl();
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
+let client: LiveDbConnection["client"];
+let db: LiveDbConnection["db"];
 let reachable = false;
 
 const createdOrderIds: string[] = [];
@@ -58,16 +58,7 @@ const TEST_USER = JSON.stringify({
 });
 
 beforeAll(async () => {
-  if (!DATABASE_URL) return;
-
-  try {
-    client = postgres(DATABASE_URL, { max: 3, onnotice: () => {} });
-    await client`SELECT 1`;
-    db = drizzle(client, { schema });
-    reachable = true;
-  } catch {
-    reachable = false;
-  }
+  ({ client, db, reachable } = await connectLiveDb({ max: 3 }));
 
   // orders.userId is a real foreign key, so the mocked session needs a real
   // row behind it.
@@ -101,7 +92,7 @@ afterAll(async () => {
   if (reachable) {
     await db.delete(users).where(eq(users.id, TEST_USER_ID));
   }
-  if (client) await client.end();
+  await closeLiveDb(client);
 });
 
 // ============================================================================

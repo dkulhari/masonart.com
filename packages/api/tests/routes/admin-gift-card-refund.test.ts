@@ -14,9 +14,7 @@
 
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
-import postgres from "postgres";
 
 import {
   giftCards,
@@ -25,11 +23,13 @@ import {
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
 import { users } from "../../src/database/schema/users";
-import * as schema from "../../src/database/schema";
 import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
+  connectLiveDb,
+  closeLiveDb,
   assertLiveDbReachable,
+  type LiveDbConnection,
 } from "../helpers/live-db";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
@@ -53,8 +53,8 @@ vi.mock("../../src/lib/razorpay", async (importOriginal) => ({
 
 const DATABASE_URL = liveDbUrl();
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
+let client: LiveDbConnection["client"];
+let db: LiveDbConnection["db"];
 let reachable = false;
 let app: Hono;
 
@@ -65,16 +65,7 @@ const USER_ID = "test-user-gc-admin-refund";
 const USER = JSON.stringify({ id: USER_ID, email: "admin@example.com" });
 
 beforeAll(async () => {
-  if (!DATABASE_URL) return;
-
-  try {
-    client = postgres(DATABASE_URL, { max: 5, onnotice: () => {} });
-    await client`SELECT 1`;
-    db = drizzle(client, { schema });
-    reachable = true;
-  } catch {
-    reachable = false;
-  }
+  ({ client, db, reachable } = await connectLiveDb({ max: 5 }));
 
   if (reachable) {
     await db
@@ -120,7 +111,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   if (reachable) await db.delete(users).where(eq(users.id, USER_ID));
-  if (client) await client.end();
+  await closeLiveDb(client);
 });
 
 // ============================================================================

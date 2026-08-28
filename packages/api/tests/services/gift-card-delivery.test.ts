@@ -13,17 +13,17 @@
  */
 
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
-import postgres from "postgres";
 
 import { orders, orderItems } from "../../src/database/schema/orders";
 import { giftCards, giftCardTransactions } from "../../src/database/schema/gift-cards";
 import { users } from "../../src/database/schema/users";
-import * as schema from "../../src/database/schema";
 import {
   liveDbUrl,
+  connectLiveDb,
+  closeLiveDb,
   assertLiveDbReachable,
+  type LiveDbConnection,
 } from "../helpers/live-db";
 
 const sendTemplateEmailMock = vi.fn();
@@ -34,8 +34,8 @@ vi.mock("../../src/services/email", () => ({
 
 const DATABASE_URL = liveDbUrl();
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
+let client: LiveDbConnection["client"];
+let db: LiveDbConnection["db"];
 let reachable = false;
 
 const createdOrderIds: string[] = [];
@@ -45,16 +45,7 @@ let sweepScheduledGiftCards: typeof import("../../src/services/gift-card-deliver
 const TEST_USER_ID = "test-user-gift-delivery";
 
 beforeAll(async () => {
-  if (!DATABASE_URL) return;
-
-  try {
-    client = postgres(DATABASE_URL, { max: 5, onnotice: () => {} });
-    await client`SELECT 1`;
-    db = drizzle(client, { schema });
-    reachable = true;
-  } catch {
-    reachable = false;
-  }
+  ({ client, db, reachable } = await connectLiveDb({ max: 5 }));
 
   if (reachable) {
     await db
@@ -103,7 +94,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   if (reachable) await db.delete(users).where(eq(users.id, TEST_USER_ID));
-  if (client) await client.end();
+  await closeLiveDb(client);
 });
 
 // ============================================================================

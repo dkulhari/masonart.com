@@ -30,9 +30,7 @@ import {
   vi,
 } from "vitest";
 import { Hono } from "hono";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, inArray } from "drizzle-orm";
-import postgres from "postgres";
 
 import { returnRequests } from "../../../src/database/schema/returns";
 import { orders } from "../../../src/database/schema/orders";
@@ -41,10 +39,11 @@ import {
   giftCardTransactions,
 } from "../../../src/database/schema/gift-cards";
 import { users } from "../../../src/database/schema/users";
-import * as schema from "../../../src/database/schema";
 import {
-  liveDbUrl,
+  connectLiveDb,
+  closeLiveDb,
   assertLiveDbReachable,
+  type LiveDbConnection,
 } from "../../helpers/live-db";
 
 const sendTemplateEmailMock = vi.fn();
@@ -65,10 +64,8 @@ vi.mock("../../../src/middleware/auth", async (importOriginal) => ({
   requireAdmin: vi.fn((c: any, next: any) => next()),
 }));
 
-const DATABASE_URL = liveDbUrl();
-
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
+let client: LiveDbConnection["client"];
+let db: LiveDbConnection["db"];
 let reachable = false;
 let app: Hono;
 
@@ -81,16 +78,7 @@ const createdOrderIds: string[] = [];
 const createdCardIds: string[] = [];
 
 beforeAll(async () => {
-  if (!DATABASE_URL) return;
-
-  try {
-    client = postgres(DATABASE_URL, { max: 3, onnotice: () => {} });
-    await client`SELECT 1`;
-    db = drizzle(client, { schema });
-    reachable = true;
-  } catch {
-    reachable = false;
-  }
+  ({ client, db, reachable } = await connectLiveDb({ max: 3 }));
 
   if (reachable) {
     await db
@@ -140,7 +128,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  if (reachable) await client.end();
+  await closeLiveDb(client);
 });
 
 beforeEach(() => {

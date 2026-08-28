@@ -34,6 +34,10 @@
  * checking any of this — set `ALLOW_MISSING_DB=true`.
  */
 
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+
+import * as schema from "../../src/database/schema";
 import { isDisposableDbUrl } from "./destructive-db";
 
 /**
@@ -92,4 +96,78 @@ export function assertLiveDbReachable(reachable: boolean): void {
   if (reachable) return;
 
   throw new Error(liveDbMissingMessage());
+}
+
+/**
+ * One live-database connection, shared by every suite that needs one.
+ *
+ * Eleven suites each opened their own with the same twenty lines: guard on a
+ * missing URL, connect, `SELECT 1`, wrap in drizzle, set a `reachable` flag,
+ * swallow the failure. Eleven copies of a connect-and-probe is eleven places
+ * for the probe to quietly drift from the flag it sets (#633).
+ *
+ * The shape is deliberate. It returns the same three names the suites already
+ * hold at module scope, so a suite adopts it by assigning to its existing
+ * bindings and leaves every `db.` and `reachable` reference alone:
+ *
+ *   ({ client, db, reachable } = await connectLiveDb());
+ *
+ * `reachable` stays a plain boolean rather than a thrown error because that is
+ * the contract `assertLiveDbReachable` is built on: connection failure is not
+ * itself a test failure, it is a fact one real `it(...)` then asserts on, so
+ * the run fails with an explanation instead of skipping in silence.
+ */
+
+export interface LiveDbConnection {
+  client: ReturnType<typeof postgres>;
+  db: ReturnType<typeof drizzle<typeof schema>>;
+  reachable: boolean;
+}
+
+/**
+ * Connect to the live database, reporting reachability rather than throwing.
+ *
+ * `max` is the connection-pool size. Suites that run concurrent transactions
+ * against the same rows need more than one connection or they deadlock
+ * against themselves; the rest are happy with the default.
+ */
+export async function connectLiveDb({
+  max = 3,
+}: { max?: number } = {}): Promise<LiveDbConnection> {
+  const url = liveDbUrl();
+
+  // Cast: callers assign into `let client: ReturnType<typeof postgres>` and
+  // only ever touch it behind `reachable`, or via closeLiveDb's own guard.
+  if (!url) {
+    return {
+      client: undefined as unknown as ReturnType<typeof postgres>,
+      db: undefined as unknown as ReturnType<typeof drizzle<typeof schema>>,
+      reachable: false,
+    };
+  }
+
+  try {
+    const client = postgres(url, { max, onnotice: () => {} });
+    await client`SELECT 1`;
+    return { client, db: drizzle(client, { schema }), reachable: true };
+  } catch {
+    return {
+      client: undefined as unknown as ReturnType<typeof postgres>,
+      db: undefined as unknown as ReturnType<typeof drizzle<typeof schema>>,
+      reachable: false,
+    };
+  }
+}
+
+/**
+ * Release the pool in `afterAll`.
+ *
+ * Tolerates an undefined client so the teardown is safe on the run where the
+ * connection never opened — which is exactly the run where a suite is most
+ * likely to tear down twice.
+ */
+export async function closeLiveDb(
+  client: ReturnType<typeof postgres> | undefined,
+): Promise<void> {
+  if (client) await client.end();
 }
