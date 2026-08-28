@@ -32,6 +32,11 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
+
+/** Sequences orderNumber within this suite; codes get their own
+  * sequence from freshGiftCardCode. */
+let uniqueCounter = 0;
 
 const DATABASE_URL = liveDbUrl();
 
@@ -84,26 +89,11 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-// ============================================================================
-// Fixtures
-// ============================================================================
-
-let uniqueCounter = 0;
-
-/** A code unique to this run, so parallel suites cannot collide. */
-function freshCode(): string {
-  uniqueCounter += 1;
-  return `TEST${String(process.pid).padStart(6, "0")}${String(uniqueCounter).padStart(6, "0")}`.slice(
-    0,
-    16,
-  );
-}
-
 async function makeCard(
   balancePaise: number,
   overrides: Partial<typeof giftCards.$inferInsert> = {},
 ): Promise<{ id: string; code: string }> {
-  const code = freshCode();
+  const code = freshGiftCardCode("TEST");
   const [card] = await db
     .insert(giftCards)
     .values({
@@ -152,7 +142,6 @@ async function balanceOf(cardId: string): Promise<number> {
 // ============================================================================
 // Tests
 // ============================================================================
-
 
 /**
  * Loud, not silent (#580).

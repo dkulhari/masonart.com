@@ -21,6 +21,7 @@ import {
   orderGiftCards,
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
+import { GIFT_CARD_CODE_LENGTH } from "../../src/lib/gift-card-code";
 import type * as schema from "../../src/database/schema";
 
 type Db = ReturnType<typeof drizzle<typeof schema>>;
@@ -67,4 +68,40 @@ export async function purgeGiftCardFixtures(
 
   cardIds.length = 0;
   orderIds.length = 0;
+}
+
+let counter = 0;
+
+/**
+ * A gift card code unique to this run, so parallel suites cannot collide.
+ *
+ * Seven suites carried their own copy of this, each with a different prefix
+ * and — easy to miss — a different counter width (#633). The width was never
+ * arbitrary: every copy padded so that prefix + pid + counter came to exactly
+ * GIFT_CARD_CODE_LENGTH, which is why a 3-letter prefix padded the counter to
+ * 7 and a 4-letter one to 6. Deriving the width here keeps that true for any
+ * prefix instead of leaving it to be rediscovered at each call site.
+ *
+ * The process id is what separates concurrently running suites; the counter
+ * separates cards within one. Both are needed — vitest forks per file, so two
+ * suites can hold the same counter value at the same moment.
+ *
+ * @param prefix Short suite tag, so a stray row says which suite made it.
+ */
+export function freshGiftCardCode(prefix: string): string {
+  const PID_WIDTH = 6;
+  const counterWidth = GIFT_CARD_CODE_LENGTH - prefix.length - PID_WIDTH;
+
+  if (counterWidth < 1) {
+    throw new Error(
+      `Gift card code prefix "${prefix}" leaves no room for a counter in ` +
+        `${GIFT_CARD_CODE_LENGTH} characters. Use a shorter prefix.`,
+    );
+  }
+
+  counter += 1;
+
+  return `${prefix}${String(process.pid).padStart(PID_WIDTH, "0")}${String(
+    counter,
+  ).padStart(counterWidth, "0")}`.slice(0, GIFT_CARD_CODE_LENGTH);
 }

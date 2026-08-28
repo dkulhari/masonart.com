@@ -26,6 +26,7 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
 
 // Partial mock: the orders route pulls in cart, which needs optionalAuth and
 // the rest of the real middleware. Only the session check is swapped out.
@@ -38,6 +39,10 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
     return next();
   }),
 }));
+
+/** Sequences orderNumber within this suite; codes get their own
+  * sequence from freshGiftCardCode. */
+let counter = 0;
 
 const DATABASE_URL = liveDbUrl();
 
@@ -107,25 +112,11 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-// ============================================================================
-// Fixtures
-// ============================================================================
-
-let counter = 0;
-
-function freshCode(): string {
-  counter += 1;
-  return `QUOT${String(process.pid).padStart(6, "0")}${String(counter).padStart(6, "0")}`.slice(
-    0,
-    16,
-  );
-}
-
 async function makeCard(
   balancePaise: number,
   overrides: Partial<typeof giftCards.$inferInsert> = {},
 ) {
-  const code = freshCode();
+  const code = freshGiftCardCode("QUOT");
   const [card] = await db
     .insert(giftCards)
     .values({
@@ -187,7 +178,6 @@ function balance(code: string) {
 // ============================================================================
 // Quote against an order
 // ============================================================================
-
 
 /**
  * Loud, not silent (#580).

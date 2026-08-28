@@ -30,6 +30,7 @@ import {
 import {
   purgeGiftCardFixtures,
   resetRazorpayOrderMock,
+  freshGiftCardCode,
 } from "../helpers/gift-card-fixtures";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
@@ -41,6 +42,10 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
     return next();
   }),
 }));
+
+/** Sequences orderNumber within this suite; codes get their own
+  * sequence from freshGiftCardCode. */
+let counter = 0;
 
 const createRazorpayOrderMock = vi.fn();
 
@@ -98,22 +103,8 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-// ============================================================================
-// Fixtures
-// ============================================================================
-
-let counter = 0;
-
-function freshCode(): string {
-  counter += 1;
-  return `PAY${String(process.pid).padStart(6, "0")}${String(counter).padStart(7, "0")}`.slice(
-    0,
-    16,
-  );
-}
-
 async function makeCard(balancePaise: number) {
-  const code = freshCode();
+  const code = freshGiftCardCode("PAY");
   const [card] = await db
     .insert(giftCards)
     .values({
@@ -175,7 +166,6 @@ async function orderRow(orderId: string) {
 // ============================================================================
 // Tests
 // ============================================================================
-
 
 /**
  * Loud, not silent (#580).

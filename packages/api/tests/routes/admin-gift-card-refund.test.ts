@@ -31,6 +31,7 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/middleware/auth")>()),
@@ -42,6 +43,10 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   }),
   requireAdmin: vi.fn((_c: any, next: any) => next()),
 }));
+
+/** Sequences orderNumber within this suite; codes get their own
+  * sequence from freshGiftCardCode. */
+let counter = 0;
 
 const createRefundMock = vi.fn();
 
@@ -114,22 +119,8 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-// ============================================================================
-// Fixtures
-// ============================================================================
-
-let counter = 0;
-
-function freshCode(): string {
-  counter += 1;
-  return `RFA${String(process.pid).padStart(6, "0")}${String(counter).padStart(7, "0")}`.slice(
-    0,
-    16,
-  );
-}
-
 async function makeCard(balancePaise: number) {
-  const code = freshCode();
+  const code = freshGiftCardCode("RFA");
   const [card] = await db
     .insert(giftCards)
     .values({
@@ -210,7 +201,6 @@ async function balanceOf(cardId: string) {
 // ============================================================================
 // Tests
 // ============================================================================
-
 
 /**
  * Loud, not silent (#580).

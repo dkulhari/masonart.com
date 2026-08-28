@@ -22,6 +22,7 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../../helpers/live-db";
+import { freshGiftCardCode } from "../../helpers/gift-card-fixtures";
 
 let adminAllowed = true;
 
@@ -86,25 +87,11 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-// ============================================================================
-// Fixtures
-// ============================================================================
-
-let counter = 0;
-
-function freshCode(): string {
-  counter += 1;
-  return `ADM${String(process.pid).padStart(6, "0")}${String(counter).padStart(7, "0")}`.slice(
-    0,
-    16,
-  );
-}
-
 async function makeCard(
   balancePaise: number,
   overrides: Partial<typeof giftCards.$inferInsert> = {},
 ) {
-  const code = freshCode();
+  const code = freshGiftCardCode("ADM");
   const [card] = await db
     .insert(giftCards)
     .values({
@@ -148,7 +135,6 @@ const FULL_CODE = /[0-9A-Z]{16}/;
 // ============================================================================
 // Tests
 // ============================================================================
-
 
 /**
  * Loud, not silent (#580).
