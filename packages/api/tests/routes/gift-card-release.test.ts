@@ -12,16 +12,13 @@
 
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Hono } from "hono";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import {
-  giftCards,
   giftCardTransactions,
-  orderGiftCards,
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
 import { users } from "../../src/database/schema/users";
-import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -29,10 +26,10 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { createGiftCardRowFactories } from "../helpers/gift-card-row-factories";
 import {
   purgeGiftCardFixtures,
   resetRazorpayOrderMock,
-  freshGiftCardCode,
 } from "../helpers/gift-card-fixtures";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
@@ -103,45 +100,12 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(balancePaise: number) {
-  const code = freshGiftCardCode("REL");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
-
-async function makeOrder(totalRupees: string) {
-  const [order] = await db
-    .insert(orders)
-    .values({
-      orderNumber: `REL-${Date.now()}-${counter++}`,
-      userId: USER_ID,
-      shippingAddress: {
-        fullName: "Test",
-        addressLine1: "1 Road",
-        city: "Test",
-        state: "Test",
-        postalCode: "000000",
-        country: "IN",
-        phone: "0000000000",
-      } as never,
-      subtotal: totalRupees,
-      total: totalRupees,
-    })
-    .returning();
-
-  createdOrderIds.push(order!.id);
-  return order!.id;
-}
+const { makeCard, makeOrder, balanceOf } = createGiftCardRowFactories(() => db, {
+  prefix: "REL",
+  userId: USER_ID,
+  cardIds: createdCardIds,
+  orderIds: createdOrderIds,
+});
 
 /** Applies a card the way payment initiation does. */
 async function holdCard(orderId: string, code: string) {
@@ -179,13 +143,6 @@ function failVerification(orderId: string) {
       razorpaySignature: "bad-signature",
     }),
   });
-}
-
-async function balanceOf(cardId: string) {
-  const row = await db.query.giftCards.findFirst({
-    where: eq(giftCards.id, cardId),
-  });
-  return row!.balancePaise;
 }
 
 async function ledgerOf(cardId: string) {

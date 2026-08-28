@@ -15,10 +15,8 @@ import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 
-import { giftCards, giftCardTransactions } from "../../src/database/schema/gift-cards";
-import { orders } from "../../src/database/schema/orders";
+import { giftCards } from "../../src/database/schema/gift-cards";
 import { users } from "../../src/database/schema/users";
-import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -26,7 +24,8 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
-import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
+import { purgeGiftCardFixtures } from "../helpers/gift-card-fixtures";
+import { createGiftCardRowFactories } from "../helpers/gift-card-row-factories";
 
 // Partial mock: the orders route pulls in cart, which needs optionalAuth and
 // the rest of the real middleware. Only the session check is swapped out.
@@ -87,17 +86,10 @@ beforeAll(async () => {
 afterEach(async () => {
   if (!reachable) return;
 
-  if (createdCardIds.length > 0) {
-    await db
-      .delete(giftCardTransactions)
-      .where(inArray(giftCardTransactions.giftCardId, createdCardIds));
-    await db.delete(giftCards).where(inArray(giftCards.id, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db.delete(orders).where(inArray(orders.id, createdOrderIds));
-  }
-  createdCardIds.length = 0;
-  createdOrderIds.length = 0;
+  await purgeGiftCardFixtures(db, {
+    cardIds: createdCardIds,
+    orderIds: createdOrderIds,
+  });
 });
 
 afterAll(async () => {
@@ -107,49 +99,13 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(
-  balancePaise: number,
-  overrides: Partial<typeof giftCards.$inferInsert> = {},
-) {
-  const code = freshGiftCardCode("QUOT");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-      ...overrides,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
-
-async function makeOrder(totalRupees: string, userId = OWNER_ID) {
-  const [order] = await db
-    .insert(orders)
-    .values({
-      orderNumber: `QT-${Date.now()}-${counter++}`,
-      userId,
-      shippingAddress: {
-        fullName: "Test",
-        addressLine1: "1 Road",
-        city: "Test",
-        state: "Test",
-        postalCode: "000000",
-        country: "IN",
-        phone: "0000000000",
-      } as never,
-      subtotal: totalRupees,
-      total: totalRupees,
-    })
-    .returning();
-
-  createdOrderIds.push(order!.id);
-  return order!.id;
-}
+const { makeCard, makeOrder } = createGiftCardRowFactories(() => db, {
+  prefix: "QUOT",
+  orderPrefix: "QT",
+  userId: OWNER_ID,
+  cardIds: createdCardIds,
+  orderIds: createdOrderIds,
+});
 
 function quote(orderId: string, code: string, user: string | null = OWNER) {
   return app.request(`/api/orders/${orderId}/gift-card`, {
@@ -228,7 +184,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/gift-card", () => {
     if (!reachable) return;
 
     const { code } = await makeCard(50_000);
-    const orderId = await makeOrder("2000.00", OTHER_ID);
+    const orderId = await makeOrder("2000.00", { userId: OTHER_ID });
 
     const response = await quote(orderId, code, OWNER);
     // 404, not 403: whether that order exists is not the caller's business.

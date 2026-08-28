@@ -1,12 +1,13 @@
 /**
- * Row factories shared by the gift-card service suites (#633).
+ * Row factories shared by every live-database gift-card suite (#633).
  *
- * `gift-card-redeem` and `gift-card-refund` both drive the real service
- * against a real database — a balance debit and its ledger row have to be one
- * transaction, and a mock cannot hold the row lock that makes that true — so
- * both need the same three fixtures: a card with a known balance, an order to
+ * Seven suites — the two service ones and five route ones — drive real code
+ * against a real database, because a balance debit and its ledger row have to
+ * be one transaction and a mock cannot hold the row lock that makes that true.
+ * All of them need the same fixtures: a card with a known balance, an order to
  * spend it against, and a way to read the balance back. They had grown
- * identical copies of all three, differing only in a prefix string.
+ * identical copies, differing only in a prefix and which columns the order
+ * happened to set.
  *
  * The factory takes a `getDb` accessor rather than a database, because the
  * connection is not open at module scope: it is assigned in `beforeAll`, after
@@ -15,7 +16,7 @@
  * spelled the way it already was.
  *
  * @see packages/api/tests/services/gift-card-redeem.test.ts
- * @see packages/api/tests/services/gift-card-refund.test.ts
+ * @see packages/api/tests/routes/gift-card-payment.test.ts
  */
 
 import { eq } from "drizzle-orm";
@@ -31,9 +32,17 @@ import type { LiveDbConnection } from "./live-db";
 
 type Db = LiveDbConnection["db"];
 
-export interface GiftCardServiceHarnessOptions {
-  /** Suite tag for generated codes and order numbers, e.g. "RFND". */
+export interface GiftCardRowFactoryOptions {
+  /** Suite tag for generated codes, e.g. "RFND". Must fit in a 16-char code. */
   prefix: string;
+  /**
+   * Tag for order numbers, when it differs from the code prefix — the quote
+   * suite writes "QUOT" codes but "QT" order numbers, and order numbers have
+   * no length limit to respect. Defaults to `prefix`.
+   */
+  orderPrefix?: string;
+  /** Owner for created orders. Omitted entirely when not given, not set null. */
+  userId?: string;
   /** The suite's own id lists, so its existing teardown still sees the rows. */
   cardIds: string[];
   orderIds: string[];
@@ -53,9 +62,9 @@ const PLACEHOLDER_ADDRESS = {
   phone: "0000000000",
 } as never;
 
-export function createGiftCardServiceHarness(
+export function createGiftCardRowFactories(
   getDb: () => Db,
-  { prefix, cardIds, orderIds }: GiftCardServiceHarnessOptions,
+  { prefix, orderPrefix, userId, cardIds, orderIds }: GiftCardRowFactoryOptions,
 ) {
   // Sequences order numbers within one suite. Codes get their own sequence
   // from freshGiftCardCode; keeping them separate means neither is perturbed
@@ -83,15 +92,28 @@ export function createGiftCardServiceHarness(
     return { id: card!.id, code };
   }
 
-  /** An order to spend a card against, recorded for teardown. */
-  async function makeOrder(totalRupees: string): Promise<string> {
+  /**
+   * An order to spend a card against, recorded for teardown.
+   *
+   * `overrides` is how a suite sets the columns only it cares about — an
+   * orderType of "gift_card", or a different owner to prove a card cannot be
+   * spent on someone else's order.
+   */
+  async function makeOrder(
+    totalRupees: string,
+    overrides: Partial<typeof orders.$inferInsert> = {},
+  ): Promise<string> {
     const [order] = await getDb()
       .insert(orders)
       .values({
-        orderNumber: `${prefix}-${Date.now()}-${orderCounter++}`,
+        orderNumber: `${orderPrefix ?? prefix}-${Date.now()}-${orderCounter++}`,
+        // Spread rather than `userId: userId` so an unset owner stays absent
+        // from the insert instead of being written as an explicit null.
+        ...(userId ? { userId } : {}),
         shippingAddress: PLACEHOLDER_ADDRESS,
         subtotal: totalRupees,
         total: totalRupees,
+        ...overrides,
       })
       .returning();
 

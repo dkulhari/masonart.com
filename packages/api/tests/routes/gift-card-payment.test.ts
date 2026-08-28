@@ -14,12 +14,11 @@
 
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Hono } from "hono";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
-import { giftCards, giftCardTransactions, orderGiftCards } from "../../src/database/schema/gift-cards";
+import { giftCardTransactions, orderGiftCards } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
 import { users } from "../../src/database/schema/users";
-import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -27,10 +26,10 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { createGiftCardRowFactories } from "../helpers/gift-card-row-factories";
 import {
   purgeGiftCardFixtures,
   resetRazorpayOrderMock,
-  freshGiftCardCode,
 } from "../helpers/gift-card-fixtures";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
@@ -98,46 +97,12 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(balancePaise: number) {
-  const code = freshGiftCardCode("PAY");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
-
-async function makeOrder(totalRupees: string, orderType = "regular") {
-  const [order] = await db
-    .insert(orders)
-    .values({
-      orderNumber: `PAY-${Date.now()}-${counter++}`,
-      userId: USER_ID,
-      orderType: orderType as never,
-      shippingAddress: {
-        fullName: "Test",
-        addressLine1: "1 Road",
-        city: "Test",
-        state: "Test",
-        postalCode: "000000",
-        country: "IN",
-        phone: "0000000000",
-      } as never,
-      subtotal: totalRupees,
-      total: totalRupees,
-    })
-    .returning();
-
-  createdOrderIds.push(order!.id);
-  return order!.id;
-}
+const { makeCard, makeOrder, balanceOf } = createGiftCardRowFactories(() => db, {
+  prefix: "PAY",
+  userId: USER_ID,
+  cardIds: createdCardIds,
+  orderIds: createdOrderIds,
+});
 
 function pay(orderId: string, codes: string[] = []) {
   return app.request(`/api/orders/${orderId}/payment`, {
@@ -145,13 +110,6 @@ function pay(orderId: string, codes: string[] = []) {
     headers: { "Content-Type": "application/json", "X-Test-User": USER },
     body: JSON.stringify({ giftCardCodes: codes }),
   });
-}
-
-async function balanceOf(cardId: string) {
-  const row = await db.query.giftCards.findFirst({
-    where: eq(giftCards.id, cardId),
-  });
-  return row!.balancePaise;
 }
 
 async function orderRow(orderId: string) {
@@ -268,7 +226,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/payment with gift cards", (
     if (!reachable) return;
 
     const { id, code } = await makeCard(50_000);
-    const orderId = await makeOrder("2000.00", "gift_card");
+    const orderId = await makeOrder("2000.00", { orderType: "gift_card" as never });
 
     const response = await pay(orderId, [code]);
 

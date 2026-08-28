@@ -14,7 +14,6 @@ import { eq, inArray } from "drizzle-orm";
 
 import { giftCards, giftCardTransactions } from "../../../src/database/schema/gift-cards";
 import { users } from "../../../src/database/schema/users";
-import { hashGiftCardCode } from "../../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -22,7 +21,7 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../../helpers/live-db";
-import { freshGiftCardCode } from "../../helpers/gift-card-fixtures";
+import { createGiftCardRowFactories } from "../../helpers/gift-card-row-factories";
 
 let adminAllowed = true;
 
@@ -81,25 +80,11 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(
-  balancePaise: number,
-  overrides: Partial<typeof giftCards.$inferInsert> = {},
-) {
-  const code = freshGiftCardCode("ADM");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-      ...overrides,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
+const { makeCard } = createGiftCardRowFactories(() => db, {
+  prefix: "ADM",
+  cardIds: createdCardIds,
+  orderIds: [],
+});
 
 /**
  * The app is mounted at /api/admin/gift-cards, and the collection route is

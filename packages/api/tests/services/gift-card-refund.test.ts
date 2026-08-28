@@ -33,7 +33,7 @@ import {
   type LiveDbConnection,
 } from "../helpers/live-db";
 import { purgeGiftCardFixtures } from "../helpers/gift-card-fixtures";
-import { createGiftCardServiceHarness } from "../helpers/gift-card-service-harness";
+import { createGiftCardRowFactories } from "../helpers/gift-card-row-factories";
 
 const DATABASE_URL = liveDbUrl();
 
@@ -70,7 +70,7 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-const { makeCard, makeOrder, balanceOf, ledgerOf } = createGiftCardServiceHarness(
+const { makeCard, makeOrder, balanceOf, ledgerOf } = createGiftCardRowFactories(
   () => db,
   { prefix: "RFND", cardIds: createdCardIds, orderIds: createdOrderIds },
 );

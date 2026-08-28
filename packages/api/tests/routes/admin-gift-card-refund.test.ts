@@ -17,13 +17,10 @@ import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 
 import {
-  giftCards,
-  giftCardTransactions,
   orderGiftCards,
 } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
 import { users } from "../../src/database/schema/users";
-import { hashGiftCardCode } from "../../src/lib/gift-card-code";
 import {
   liveDbUrl,
   connectLiveDb,
@@ -31,7 +28,8 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
-import { freshGiftCardCode } from "../helpers/gift-card-fixtures";
+import { purgeGiftCardFixtures } from "../helpers/gift-card-fixtures";
+import { createGiftCardRowFactories } from "../helpers/gift-card-row-factories";
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/middleware/auth")>()),
@@ -94,18 +92,10 @@ afterEach(async () => {
       .delete(orderGiftCards)
       .where(inArray(orderGiftCards.orderId, createdOrderIds));
   }
-  if (createdCardIds.length > 0) {
-    await db
-      .delete(giftCardTransactions)
-      .where(inArray(giftCardTransactions.giftCardId, createdCardIds));
-    await db.delete(giftCards).where(inArray(giftCards.id, createdCardIds));
-  }
-  if (createdOrderIds.length > 0) {
-    await db.delete(orders).where(inArray(orders.id, createdOrderIds));
-  }
-
-  createdCardIds.length = 0;
-  createdOrderIds.length = 0;
+  await purgeGiftCardFixtures(db, {
+    cardIds: createdCardIds,
+    orderIds: createdOrderIds,
+  });
 });
 
 afterAll(async () => {
@@ -113,21 +103,11 @@ afterAll(async () => {
   await closeLiveDb(client);
 });
 
-async function makeCard(balancePaise: number) {
-  const code = freshGiftCardCode("RFA");
-  const [card] = await db
-    .insert(giftCards)
-    .values({
-      codeHash: hashGiftCardCode(code),
-      codeLast4: code.slice(-4),
-      initialBalancePaise: balancePaise,
-      balancePaise,
-    })
-    .returning();
-
-  createdCardIds.push(card!.id);
-  return { id: card!.id, code };
-}
+const { makeCard, balanceOf } = createGiftCardRowFactories(() => db, {
+  prefix: "RFA",
+  cardIds: createdCardIds,
+  orderIds: [],
+});
 
 /**
  * A paid order that gift cards contributed to, wired up directly rather than
@@ -183,13 +163,6 @@ function refund(orderId: string, amount?: number) {
     headers: { "Content-Type": "application/json", "X-Test-User": USER },
     body: JSON.stringify({ reason: "test refund", ...(amount ? { amount } : {}) }),
   });
-}
-
-async function balanceOf(cardId: string) {
-  const row = await db.query.giftCards.findFirst({
-    where: eq(giftCards.id, cardId),
-  });
-  return row!.balancePaise;
 }
 
 // ============================================================================
