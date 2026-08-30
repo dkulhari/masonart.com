@@ -1,5 +1,5 @@
 /**
- * Admin production API — job creation, assignment pricing, QC reviews.
+ * Admin production API — job creation, assignment pricing, QC verdicts.
  *
  * Same harness as `tests/routes/admin/vendors.test.ts`: `src/database` is a
  * recording query builder, `src/auth` is mocked so each test picks the caller's
@@ -27,9 +27,12 @@ import { adminSessionFor } from '../../helpers/admin-session'
 import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
 
+import { QC_SHOT_LIST, requiredQcSlots } from '@chobii/shared'
+
 import {
   productionJobs,
   productionJobItems,
+  productionJobPhotos,
   productionJobReviews,
 } from '../../../src/database/schema/production-jobs'
 import { adminAuditLog } from '../../../src/database/schema/audit-log'
@@ -52,6 +55,21 @@ vi.mock('../../../src/auth', () => ({
       getSession: (...args: unknown[]) => mockGetSession(...args),
     },
   },
+}))
+
+const SIGNED_URL =
+  'https://r2.example.com/poster-app-dev/signed.jpg?X-Amz-Signature=deadbeef&X-Amz-Expires=300'
+
+const mockPresign = vi.fn(async (_key: string, _expiresInSeconds?: number) => SIGNED_URL)
+
+/**
+ * Only the presigner is faked. Everything that decides WHETHER to sign — the
+ * 404 that must be answered before a URL exists at all, and the live-photo
+ * predicate — is the real code path.
+ */
+vi.mock('../../../src/lib/storage', () => ({
+  getPresignedDownloadUrl: (...args: unknown[]) =>
+    mockPresign(...(args as [string, number?])),
 }))
 
 import { adminProductionApp } from '../../../src/routes/admin/production-jobs'
@@ -150,6 +168,7 @@ beforeEach(() => {
   recorder.reset()
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('admin'))
+  mockPresign.mockClear()
 })
 
 // ============================================================================
@@ -1055,18 +1074,384 @@ describe('PATCH /api/admin/production/:jobId', () => {
 })
 
 // ============================================================================
-// QC reviews — append-only
+// QC reviews — the verdict IS the transition
 // ============================================================================
 
+/**
+ * A verdict is meaningless on work that was never submitted, so the matrix in
+ * `lib/production-transitions.ts` gives `qc_passed` and `qc_failed` exactly one
+ * in-edge each from `qc_submitted` — plus one deliberate exception, `qc_passed
+ * -> qc_failed`, so a supervisor re-inspecting and overturning leaves a SECOND
+ * review row while the first survives. This route asks the matrix rather than
+ * repeating a status literal beside it: a hardcoded `from === 'qc_submitted'`
+ * would make that overturn edge unreachable from anywhere, and the matrix
+ * documents it as reachable only through here.
+ */
+const NON_SUBMITTED_STATUSES = [
+  'draft',
+  'assigned',
+  'sent',
+  'received',
+  'qc_failed',
+  'dispatched',
+  'cancelled',
+] as const
+
+const REVIEW_ID = '66666666-6666-4666-8666-666666666666'
+const REVIEW_ID_2 = '6666666b-6666-4666-8666-666666666666'
+
+function reviewRow(over: Record<string, unknown> = {}) {
+  return {
+    id: REVIEW_ID,
+    jobId: JOB_ID,
+    reviewerId: 'admin-user-1',
+    verdict: 'pass',
+    defects: null,
+    notes: null,
+    createdAt: PAST,
+    ...over,
+  }
+}
+
+function photoRow(slot: string, over: Record<string, unknown> = {}) {
+  return {
+    id: `photo-${slot}`,
+    jobId: JOB_ID,
+    slot,
+    objectKey: `production-qc/${JOB_ID}/${slot}/shot.jpg`,
+    contentType: 'image/jpeg',
+    sizeBytes: 2048,
+    uploadedBy: 'vendor-user-1',
+    uploadedAt: PAST,
+    supersededAt: null,
+    reviewId: null,
+    ...over,
+  }
+}
+
+const reviewsPath = `/api/admin/production/${JOB_ID}/reviews`
+
 describe('POST /api/admin/production/:jobId/reviews', () => {
-  it('appends three rows across fail -> rework -> pass and mutates none', async () => {
+  it('passes a qc_submitted job in ONE transaction and moves it to qc_passed', async () => {
     queueRows({
-      'select:production_jobs': [[jobRow()], [jobRow()], [jobRow()], [jobRow()]],
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
+      'insert:production_job_reviews': [[reviewRow({ verdict: 'pass' })]],
+      'update:production_jobs': [[jobRow({ status: 'qc_passed' })]],
+      'update:production_job_photos': [[photoRow('print_full', { reviewId: REVIEW_ID })]],
+    })
+
+    const res = await buildApp().request(
+      reviewsPath,
+      json({ verdict: 'pass', notes: 'clean' })
+    )
+    expect(res.status).toBe(201)
+
+    const body = await readJson(res)
+    expect(body.review.id).toBe(REVIEW_ID)
+    expect(body.job.status).toBe('qc_passed')
+
+    // The verdict and the move are one fact, so they are one transaction. The
+    // queue showing `received` for a job that failed inspection an hour ago is
+    // exactly what this closes.
+    expect(inserts(productionJobReviews)[0]?.inTx).toBe(true)
+    expect(updates(productionJobs)[0]?.inTx).toBe(true)
+    expect(tx.commits).toBe(1)
+    expect(tx.rollbacks).toBe(0)
+
+    const written = updates(productionJobs)[0]
+    expect((written?.values as Record<string, unknown>).status).toBe('qc_passed')
+    // The from-status is REPEATED in the UPDATE's WHERE, not trusted from the
+    // read: an admin who moved the job between the two statements wins.
+    expect(render(written?.where).params).toEqual(
+      expect.arrayContaining([JOB_ID, 'qc_submitted'])
+    )
+
+    // reviewerId comes from the session, never from the body: who signed off is
+    // not the caller's to assert.
+    expect(inserts(productionJobReviews)[0]?.values).toMatchObject({
+      jobId: JOB_ID,
+      reviewerId: 'admin-user-1',
+      verdict: 'pass',
+    })
+
+    const rows = audits()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      action: 'production_job.qc_approved',
+      outcome: 'success',
+      entityType: 'production_job',
+      entityId: JOB_ID,
+      // Shares the transaction: a row saying the job passed, beside a job still
+      // sitting in qc_submitted, is worse than no row.
+      inTx: true,
+    })
+    expect(rows[0]?.metadata?.reviewId).toBe(REVIEW_ID)
+    expect(rows[0]?.before?.status).toBe('qc_submitted')
+    expect(rows[0]?.after?.status).toBe('qc_passed')
+    // The verdict and the status move are the SAME act. A `transitioned` row
+    // beside this one counts one act twice.
+    expect(rows.some((row) => row.action === 'production_job.transitioned')).toBe(false)
+  })
+
+  it('fails a qc_submitted job and carries the defects on the one audit row', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
       'insert:production_job_reviews': [
-        [{ id: 'rev-1', jobId: JOB_ID, verdict: 'fail', createdAt: new Date('2026-08-01') }],
-        [{ id: 'rev-2', jobId: JOB_ID, verdict: 'fail', createdAt: new Date('2026-08-02') }],
-        [{ id: 'rev-3', jobId: JOB_ID, verdict: 'pass', createdAt: new Date('2026-08-03') }],
+        [reviewRow({ id: REVIEW_ID_2, verdict: 'fail', defects: ['banding', 'scuff'] })],
       ],
+      'update:production_jobs': [[jobRow({ status: 'qc_failed' })]],
+      'update:production_job_photos': [[]],
+    })
+
+    const res = await buildApp().request(
+      reviewsPath,
+      json({ verdict: 'fail', defects: ['banding', 'scuff'] })
+    )
+    expect(res.status).toBe(201)
+    expect((await readJson(res)).job.status).toBe('qc_failed')
+
+    expect((inserts(productionJobReviews)[0]?.values as Record<string, unknown>).defects).toEqual([
+      'banding',
+      'scuff',
+    ])
+
+    const rows = audits()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      action: 'production_job.qc_rejected',
+      outcome: 'success',
+      entityId: JOB_ID,
+      inTx: true,
+    })
+    expect(rows[0]?.metadata?.reviewId).toBe(REVIEW_ID_2)
+    expect(rows[0]?.metadata?.defects).toEqual(['banding', 'scuff'])
+    expect(rows[0]?.after?.status).toBe('qc_failed')
+    expect(rows.some((row) => row.action === 'production_job.transitioned')).toBe(false)
+  })
+
+  it.each([
+    ['omitted', {}],
+    ['null', { defects: null }],
+    ['empty', { defects: [] }],
+  ])('refuses a fail whose defects are %s, and writes nothing at all', async (_label, over) => {
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'fail', ...over }))
+
+    // A fail with no defect is unactionable: the vendor cannot know what to
+    // redo. Refused at the body, so not one query is issued.
+    expect(res.status).toBe(400)
+    expect(queries).toHaveLength(0)
+  })
+
+  it('still accepts a PASS with no defects — nothing was wrong with it', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
+      'insert:production_job_reviews': [[reviewRow({ verdict: 'pass' })]],
+      'update:production_jobs': [[jobRow({ status: 'qc_passed' })]],
+      'update:production_job_photos': [[]],
+    })
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(res.status).toBe(201)
+  })
+
+  it('stamps review_id onto every LIVE photo the verdict judged', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
+      'insert:production_job_reviews': [[reviewRow({ verdict: 'pass' })]],
+      'update:production_jobs': [[jobRow({ status: 'qc_passed' })]],
+      'update:production_job_photos': [
+        [
+          photoRow('print_full', { reviewId: REVIEW_ID }),
+          photoRow('print_raking_light', { reviewId: REVIEW_ID }),
+        ],
+      ],
+    })
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(res.status).toBe(201)
+
+    // What the verdict judged, named back to the caller — this is what lets a
+    // dispute a year later say WHICH shots were approved.
+    expect((await readJson(res)).judgedSlots).toEqual(['print_full', 'print_raking_light'])
+
+    const stamp = updates(productionJobPhotos)[0]
+    expect(stamp?.inTx).toBe(true)
+    expect((stamp?.values as Record<string, unknown>).reviewId).toBe(REVIEW_ID)
+
+    // LIVE photos only. A superseded shot was judged by an earlier review and
+    // re-stamping it would rewrite that history.
+    const { sql, params } = render(stamp?.where)
+    expect(params).toContain(JOB_ID)
+    expect(sql.toLowerCase()).toContain('superseded_at')
+    expect(sql.toLowerCase()).toContain('is null')
+  })
+
+  it.each(NON_SUBMITTED_STATUSES)(
+    'refuses a verdict on a %s job, writes no review row, and keeps the refusal row',
+    async (status) => {
+      queueRows({ 'select:production_jobs': [[jobRow({ status })]] })
+
+      const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+      expect(res.status).toBe(409)
+
+      const body = await readJson(res)
+      expect(body.from).toBe(status)
+      expect(body.to).toBe('qc_passed')
+
+      // Nothing is written, so production_job_reviews' append-only guarantee is
+      // untouched: there is no row to be sorry about.
+      expect(inserts(productionJobReviews)).toHaveLength(0)
+      expect(updates(productionJobs)).toHaveLength(0)
+      expect(updates(productionJobPhotos)).toHaveLength(0)
+      expect(tx.rollbacks).toBe(1)
+      expect(tx.commits).toBe(0)
+
+      const rows = audits()
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({
+        action: 'production_job.transition_refused',
+        outcome: 'failure',
+        entityId: JOB_ID,
+        // Written OUTSIDE the transaction that rolled back. Inside it, the row
+        // recording the rollback is rolled back with it — the one row that has
+        // to survive, erased by the thing it exists to record.
+        inTx: false,
+      })
+    }
+  )
+
+  it('refuses a second PASS on an already-passed job — the matrix has no such edge', async () => {
+    queueRows({ 'select:production_jobs': [[jobRow({ status: 'qc_passed' })]] })
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(res.status).toBe(409)
+    expect((await readJson(res)).code).toBe('ILLEGAL_TRANSITION')
+    expect(inserts(productionJobReviews)).toHaveLength(0)
+  })
+
+  it('lets a supervisor overturn a pass, and BOTH review rows survive', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [jobRow({ status: 'qc_submitted' })],
+        [jobRow({ status: 'qc_passed' })],
+      ],
+      'insert:production_job_reviews': [
+        [reviewRow({ id: REVIEW_ID, verdict: 'pass' })],
+        [reviewRow({ id: REVIEW_ID_2, verdict: 'fail', defects: ['mitre gap'] })],
+      ],
+      'update:production_jobs': [
+        [jobRow({ status: 'qc_passed' })],
+        [jobRow({ status: 'qc_failed' })],
+      ],
+      'update:production_job_photos': [[], []],
+    })
+
+    const app = buildApp()
+
+    const passed = await app.request(reviewsPath, json({ verdict: 'pass' }))
+    expect(passed.status).toBe(201)
+
+    // qc_passed -> qc_failed exists precisely for this: a supervisor
+    // re-inspecting before the piece leaves.
+    const overturned = await app.request(
+      reviewsPath,
+      json({ verdict: 'fail', defects: ['mitre gap'] })
+    )
+    expect(overturned.status).toBe(201)
+
+    const appended = inserts(productionJobReviews)
+    expect(appended).toHaveLength(2)
+    expect(appended.map((q) => (q.values as Record<string, unknown>).verdict)).toEqual([
+      'pass',
+      'fail',
+    ])
+
+    // APPEND ONLY. One UPDATE here and the QC history is gone.
+    expect(updates(productionJobReviews)).toHaveLength(0)
+    expect(queries.some((q) => q.op === 'delete' && q.table === 'production_job_reviews')).toBe(
+      false
+    )
+
+    expect(audits().map((row) => row.action)).toEqual([
+      'production_job.qc_approved',
+      'production_job.qc_rejected',
+    ])
+  })
+
+  it('rolls back — rather than returning a 201 — when the guarded UPDATE matches no row', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
+      'insert:production_job_reviews': [[reviewRow()]],
+      // Someone else moved the job between the read and the write, so the
+      // repeated predicate matches nothing.
+      'update:production_jobs': [[]],
+    })
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(res.status).toBe(409)
+    expect((await readJson(res)).code).toBe('CONCURRENT_MODIFICATION')
+
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+    // The insert happened inside the transaction that rolled back, so it never
+    // becomes a row.
+    expect(inserts(productionJobReviews)[0]?.inTx).toBe(true)
+    expect(audits()).toMatchObject([
+      { action: 'production_job.transition_refused', outcome: 'failure', inTx: false },
+    ])
+  })
+
+  it('refuses a verdict on a settled job and writes nothing', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [jobRow({ status: 'qc_submitted', settlementId: 'settle-1' })],
+      ],
+    })
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(res.status).toBe(409)
+    expect((await readJson(res)).code).toBe('JOB_SETTLED')
+
+    expect(inserts(productionJobReviews)).toHaveLength(0)
+    expect(updates(productionJobs)).toHaveLength(0)
+    expect(audits()).toMatchObject([{ outcome: 'failure', inTx: false }])
+  })
+
+  it('locks the job row it read, and reads it before it writes', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
+      'insert:production_job_reviews': [[reviewRow()]],
+      'update:production_jobs': [[jobRow({ status: 'qc_passed' })]],
+      'update:production_job_photos': [[]],
+    })
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(res.status).toBe(201)
+
+    const readIndex = queries.findIndex((q) => q.op === 'select' && q.table === 'production_jobs')
+    const writeIndex = queries.findIndex((q) => q.op === 'update' && q.table === 'production_jobs')
+    expect(readIndex).toBeGreaterThanOrEqual(0)
+    expect(readIndex).toBeLessThan(writeIndex)
+    expect(queries[readIndex]?.inTx).toBe(true)
+  })
+
+  it('rejects an unknown verdict and 404s an unknown job', async () => {
+    const bad = await buildApp().request(reviewsPath, json({ verdict: 'maybe' }))
+    expect(bad.status).toBe(400)
+    expect(queries).toHaveLength(0)
+
+    queries.length = 0
+    rowQueues.clear()
+    queueRows({ 'select:production_jobs': [[]] })
+
+    const missing = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+    expect(missing.status).toBe(404)
+    expect(inserts(productionJobReviews)).toHaveLength(0)
+  })
+
+  it('lists the reviews newest first on the job detail — the latest verdict is the current one', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_failed' })]],
       'select:production_job_items': [[]],
       'select:production_job_reviews': [
         [
@@ -1077,67 +1462,133 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
       ],
     })
 
-    const app = buildApp()
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}`)
+    expect(res.status).toBe(200)
 
-    for (const verdict of ['fail', 'fail', 'pass'] as const) {
-      const res = await app.request(
-        `/api/admin/production/${JOB_ID}/reviews`,
-        json({ verdict, defects: ['banding'], notes: `${verdict} pass` })
-      )
-      expect(res.status).toBe(201)
-    }
-
-    const appended = inserts(productionJobReviews)
-    expect(appended).toHaveLength(3)
-    expect(appended.map((q) => (q.values as Record<string, unknown>).verdict)).toEqual([
-      'fail',
-      'fail',
-      'pass',
-    ])
-    // Append-only. One UPDATE here and the rework history is gone.
-    expect(updates(productionJobReviews)).toHaveLength(0)
-    expect(queries.some((q) => q.op === 'delete' && q.table === 'production_job_reviews')).toBe(
-      false
-    )
-
-    // reviewerId comes from the session, not the body.
-    expect(appended[0]?.values).toMatchObject({
-      jobId: JOB_ID,
-      reviewerId: 'admin-user-1',
-      defects: ['banding'],
-    })
-
-    const detail = await app.request(`/api/admin/production/${JOB_ID}`)
-    expect(detail.status).toBe(200)
-
-    const body = await readJson(detail)
-    expect(body.reviews).toHaveLength(3)
+    const body = await readJson(res)
     expect(body.reviews.map((r: { id: string }) => r.id)).toEqual(['rev-3', 'rev-2', 'rev-1'])
 
     // Newest first is an ORDER BY, not the insertion order of a mock.
-    const reviewSelect = selects(productionJobReviews)[0]
-    expect(render(reviewSelect?.orderBy).sql.toLowerCase()).toContain('desc')
+    expect(render(selects(productionJobReviews)[0]?.orderBy).sql.toLowerCase()).toContain('desc')
+  })
+})
+
+// ============================================================================
+// GET /:jobId/photos — the shot list the admin judges
+// ============================================================================
+
+describe('GET /api/admin/production/:jobId/photos', () => {
+  it('lays the live photos out against the shot list and signs a download url for each', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted', stage: 'print' })]],
+      'select:production_job_photos': [
+        [photoRow('print_full'), photoRow('print_raking_light')],
+      ],
+    })
+
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}/photos`)
+    expect(res.status).toBe(200)
+
+    const body = await readJson(res)
+    expect(body.stage).toBe('print')
+
+    // The WHOLE shot list, not only what was uploaded: an empty slot is the
+    // point of the screen.
+    expect(body.shots.map((s: { slot: string }) => s.slot)).toEqual(
+      QC_SHOT_LIST.print.map((shot) => shot.slot)
+    )
+
+    const full = body.shots.find((s: { slot: string }) => s.slot === 'print_full')
+    expect(full.required).toBe(true)
+    expect(full.photo.url).toBe(SIGNED_URL)
+    expect(full.photo.contentType).toBe('image/jpeg')
+
+    const optional = body.shots.find((s: { slot: string }) => s.slot === 'print_detail')
+    expect(optional.photo).toBeNull()
+    expect(optional.required).toBe(false)
+
+    // One signature per live photo and none for the empty slots — a signed URL
+    // that is generated and then withheld has still been generated.
+    expect(mockPresign).toHaveBeenCalledTimes(2)
+    expect(mockPresign).toHaveBeenCalledWith(
+      `production-qc/${JOB_ID}/print_full/shot.jpg`,
+      expect.any(Number)
+    )
+
+    // What the vendor still has to shoot, which is the one thing the reviewer
+    // has to act on.
+    expect(body.missingRequiredSlots).toEqual(['print_colour_reference'])
+    expect(body.expiresInSeconds).toBeGreaterThan(0)
   })
 
-  it('rejects an unknown verdict and 404s an unknown job', async () => {
-    queueRows({ 'select:production_jobs': [[jobRow()]] })
+  it('never returns the object key — a key that leaves is a capability that leaves', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted', stage: 'print' })]],
+      'select:production_job_photos': [[photoRow('print_full')]],
+    })
 
-    const bad = await buildApp().request(
-      `/api/admin/production/${JOB_ID}/reviews`,
-      json({ verdict: 'maybe' })
-    )
-    expect(bad.status).toBe(400)
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}/photos`)
+    const serialised = JSON.stringify(await readJson(res))
 
-    queries.length = 0
-    rowQueues.clear()
+    expect(serialised).not.toContain('objectKey')
+    expect(serialised).not.toContain('production-qc/')
+  })
+
+  it('reads LIVE photos only, scoped to this job', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted', stage: 'print' })]],
+      'select:production_job_photos': [[]],
+    })
+
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}/photos`)
+    expect(res.status).toBe(200)
+
+    const { sql, params } = render(selects(productionJobPhotos)[0]?.where)
+    expect(params).toContain(JOB_ID)
+    expect(sql.toLowerCase()).toContain('superseded_at')
+    expect(sql.toLowerCase()).toContain('is null')
+  })
+
+  it('renders the frame shot list for a frame job', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'received', stage: 'frame' })]],
+      'select:production_job_photos': [[]],
+    })
+
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}/photos`)
+    expect(res.status).toBe(200)
+
+    const body = await readJson(res)
+    expect(body.shots).toHaveLength(QC_SHOT_LIST.frame.length)
+    // Each corner is its own slot: one entry would be one photograph asserting
+    // four mitre joins are clean.
+    expect(body.missingRequiredSlots).toEqual(requiredQcSlots('frame'))
+    expect(mockPresign).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a live photo whose slot is not on this stage list rather than hiding it', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted', stage: 'print' })]],
+      'select:production_job_photos': [[photoRow('frame_back')]],
+    })
+
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}/photos`)
+    expect(res.status).toBe(200)
+
+    const body = await readJson(res)
+    const stray = body.shots.find((s: { slot: string }) => s.slot === 'frame_back')
+    expect(stray).toBeDefined()
+    expect(stray.onShotList).toBe(false)
+    expect(stray.photo.url).toBe(SIGNED_URL)
+  })
+
+  it('404s an unknown job and never reaches the presigner', async () => {
     queueRows({ 'select:production_jobs': [[]] })
 
-    const missing = await buildApp().request(
-      `/api/admin/production/${JOB_ID}/reviews`,
-      json({ verdict: 'pass' })
-    )
-    expect(missing.status).toBe(404)
-    expect(inserts(productionJobReviews)).toHaveLength(0)
+    const res = await buildApp().request(`/api/admin/production/${JOB_ID}/photos`)
+    expect(res.status).toBe(404)
+    expect(selects(productionJobPhotos)).toHaveLength(0)
+    expect(mockPresign).not.toHaveBeenCalled()
   })
 })
 
@@ -1217,6 +1668,7 @@ describe('role gating', () => {
     [`/api/admin/production/${JOB_ID}`, json({ amountActual: '1.00' }, 'PATCH')],
     [`/api/admin/production/${JOB_ID}/assign`, json({ vendorId: VENDOR_ID })],
     [`/api/admin/production/${JOB_ID}/reviews`, json({ verdict: 'pass' })],
+    [`/api/admin/production/${JOB_ID}/photos`, {}],
   ]
 
   it.each(routes)('403s a content-manager on %s %#', async (path, init) => {

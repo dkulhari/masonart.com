@@ -6,7 +6,8 @@
  * - GET   /api/admin/production/:jobId          job + items + reviews + payable
  * - PATCH /api/admin/production/:jobId          amountActual override, dates, status
  * - POST  /api/admin/production/:jobId/assign   price against the live rate card and assign
- * - POST  /api/admin/production/:jobId/reviews  append a QC review
+ * - POST  /api/admin/production/:jobId/reviews  the QC verdict, and the move it IS
+ * - GET   /api/admin/production/:jobId/photos   the shot list, signed for review
  *
  * File shape follows `routes/admin/vendors.ts` — `new Hono<{ Variables:
  * AuthVariables }>()`, zod schemas at the top, one `use('*')` gate, a bounded
@@ -16,10 +17,10 @@
  * **This module defines the job RECORD; `lib/production-transitions.ts` holds
  * the WORKFLOW.** `production_job_status` is a vocabulary; the grammar over it
  * is that module's matrix, and every write path here asks it rather than
- * deciding for itself. Both writers — PATCH and assign — take a job by its
- * from-status and refuse anything the matrix does not allow.
+ * deciding for itself. All three writers — PATCH, assign and the QC verdict —
+ * take a job by its from-status and refuse anything the matrix does not allow.
  *
- * Six decisions worth the ink:
+ * Seven decisions worth the ink:
  *
  * 1. **Jobs join to `order_items`, never to the order.** A basket holding a
  *    poster and a frame splits into two jobs against two vendors. POST checks
@@ -39,10 +40,20 @@
  *    silently unbillable with no record of why, which is discovered at
  *    settlement time by an argument with the vendor.
  *
- * 4. **Reviews are INSERT-only.** There is no PATCH or DELETE on a review, by
- *    construction rather than by convention: fail -> rework -> pass has to
- *    leave three rows, because that sequence IS the QC history. The table has
- *    no `updated_at` for the same reason.
+ * 4. **Reviews are INSERT-only, and a verdict MOVES the job.** There is no
+ *    PATCH or DELETE on a review, by construction rather than by convention:
+ *    fail -> rework -> pass has to leave three rows, because that sequence IS
+ *    the QC history. The table has no `updated_at` for the same reason. The
+ *    verdict and the status move are one fact and share one transaction — if
+ *    the move is refused the review is not inserted either, so nothing is
+ *    written and the append-only guarantee is untouched.
+ *
+ * 7. **A key never leaves; a signed URL does.** GET /:jobId/photos answers with
+ *    presigned DOWNLOAD urls from `lib/storage` and never the object key, and
+ *    signs nothing until after the 404 — a signed URL that is generated and
+ *    then withheld has still been generated. `lib/vendor-scope`'s signers are
+ *    deliberately not used: they are scoped to one shop's own objects, which is
+ *    the wrong question for an admin who oversees every shop.
  *
  * 5. **A refusal is 409, never 422.** In this router 422 already means "your
  *    payload names things that do not line up" — `missingOrderItemIds`,
@@ -74,12 +85,14 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { qcShotsForStage, requiredQcSlots } from "@chobii/shared";
 
 import { db } from "../../database";
 import {
   productionJobs,
   productionJobItems,
+  productionJobPhotos,
   productionJobReviews,
   productionJobStageEnum,
   productionJobStatusEnum,
@@ -109,6 +122,7 @@ import {
   type ProductionJobStatus,
 } from "../../lib/production-transitions";
 import { recordAudit, diffRecords } from "../../lib/audit";
+import { getPresignedDownloadUrl } from "../../lib/storage";
 
 // ============================================================================
 // Constants
@@ -116,6 +130,14 @@ import { recordAudit, diffRecords } from "../../lib/audit";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+
+/**
+ * How long a QC photo URL stays valid. Five minutes, matching
+ * `routes/vendor.ts`' artwork TTL: long enough to open a shot list and look at
+ * every frame in it, short enough that a URL copied out of a browser's history
+ * has expired by the time anyone else finds it.
+ */
+const QC_PHOTO_URL_TTL_SECONDS = 300;
 
 /**
  * decimal(10,2) as a string, the shape the whole vendor stack passes money in.
@@ -197,11 +219,28 @@ const updateJobSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, "No fields to update");
 
-const createReviewSchema = z.object({
-  verdict: z.enum(productionJobVerdictEnum.enumValues),
-  defects: z.array(z.string().min(1).max(120)).max(50).nullish(),
-  notes: z.string().max(2000).nullish(),
-});
+/**
+ * `defects` is optional on a pass and REQUIRED on a fail.
+ *
+ * It used to be `nullish` either way, which let a reviewer reject a job and
+ * tell the vendor nothing: a fail with no defect is unactionable, because the
+ * vendor cannot know what to redo. `production-transitions.ts` names the same
+ * rule on the edge itself — `review-verdict-fail` "additionally requires >= 1
+ * defect" — and this is where that is enforced.
+ *
+ * A 400, not a 422: the body is malformed on its own terms, exactly like an
+ * unknown verdict, and nothing has to be read from the database to know it.
+ */
+const createReviewSchema = z
+  .object({
+    verdict: z.enum(productionJobVerdictEnum.enumValues),
+    defects: z.array(z.string().min(1).max(120)).max(50).nullish(),
+    notes: z.string().max(2000).nullish(),
+  })
+  .refine((body) => body.verdict !== "fail" || (body.defects?.length ?? 0) > 0, {
+    message: "A failing verdict must name at least one defect",
+    path: ["defects"],
+  });
 
 // ============================================================================
 // Route Handler
@@ -887,9 +926,28 @@ adminProductionApp.patch(
 // ============================================================================
 
 /**
- * APPEND ONLY. There is deliberately no PATCH or DELETE beside this route:
- * fail -> rework -> pass must leave three rows, because that sequence is the
- * QC history and overwriting the verdict destroys it.
+ * The QC verdict, and the transition it IS.
+ *
+ * This route used to insert a row and touch nothing else, so the queue could
+ * show `received` for a job that failed inspection an hour ago. The verdict and
+ * the status move are one fact and are now one transaction: guard, insert the
+ * review, move the job, stamp the photos it judged, audit it once.
+ *
+ * **APPEND ONLY.** There is deliberately no PATCH or DELETE beside this route:
+ * fail -> rework -> pass must leave three rows, because that sequence is the QC
+ * history and overwriting the verdict destroys it. `qc_passed -> qc_failed`
+ * exists for the same reason at the other end — a supervisor re-inspecting and
+ * overturning leaves a SECOND row while the first survives.
+ *
+ * **The `qc_submitted` guard is `assertTransition`, not a literal.** The matrix
+ * gives `qc_passed` and `qc_failed` exactly one in-edge each from
+ * `qc_submitted`, plus that overturn edge, which it documents as reachable only
+ * through here. Repeating `from === 'qc_submitted'` beside the matrix would
+ * refuse the overturn and leave an edge nothing in the codebase can take.
+ *
+ * If the transition is refused NOTHING is written — not the review either — so
+ * `production_job_reviews`' append-only guarantee is untouched: there is no row
+ * to be sorry about.
  */
 adminProductionApp.post(
   "/:jobId/reviews",
@@ -900,31 +958,300 @@ adminProductionApp.post(
     const { verdict, defects, notes } = c.req.valid("json");
     const user = c.get("user");
 
+    const to: ProductionJobStatus = verdict === "pass" ? "qc_passed" : "qc_failed";
+
+    try {
+      const result = await db.transaction(async (tx) => {
+        // FOR UPDATE, like every other writer here: the row read is the row the
+        // write is guarded against, and two reviewers on one job serialise.
+        const [job] = await tx
+          .select()
+          .from(productionJobs)
+          .where(eq(productionJobs.id, jobId))
+          .limit(1)
+          .for("update");
+
+        if (!job) throw new JobNotFound("Production job not found");
+
+        const from = job.status;
+
+        // A settled job is frozen, as everywhere else in this router: payables
+        // are DERIVED with no stored total, and a job that moves after
+        // settlement makes the settlement disagree with the sum of its jobs.
+        if (job.settlementId !== null) {
+          throw new JobWriteRefused(409, {
+            error: "This job is already settled and can no longer be inspected here.",
+            code: "JOB_SETTLED",
+            from,
+            to,
+            allowed: [],
+            settlementId: job.settlementId,
+          });
+        }
+
+        // The guard. A verdict on work that was never submitted is meaningless,
+        // and the matrix is where that is written down.
+        assertTransition(from, to, "admin");
+
+        const [review] = await tx
+          .insert(productionJobReviews)
+          .values({
+            jobId,
+            // From the session, never from the body: who signed off is not the
+            // caller's to assert.
+            reviewerId: user.id,
+            verdict,
+            defects: defects ?? null,
+            notes: notes ?? null,
+          })
+          .returning();
+
+        if (!review) throw new Error("Review insert returned no row");
+
+        const at = new Date();
+
+        // The predicate is repeated rather than trusted from the read, and the
+        // row count below turns a lost race into a rollback rather than a 201
+        // over a write that matched nothing.
+        const written = await tx
+          .update(productionJobs)
+          .set({ status: to, updatedAt: at })
+          .where(
+            and(
+              eq(productionJobs.id, jobId),
+              eq(productionJobs.status, from),
+              isNull(productionJobs.settlementId)
+            )
+          )
+          .returning();
+
+        const [updated] = written;
+
+        if (written.length !== 1 || !updated) {
+          throw new JobWriteRefused(409, {
+            error: `Expected to move 1 job but matched ${written.length}; nothing was recorded`,
+            code: "CONCURRENT_MODIFICATION",
+            from,
+            to,
+            allowed: [],
+          });
+        }
+
+        // Stamp the verdict onto the shots it actually saw. LIVE photos only:
+        // a superseded shot was judged by an earlier review, and re-stamping it
+        // would rewrite that history. This is what lets a dispute a year later
+        // say WHICH photographs were approved rather than merely that the job
+        // was.
+        const judged = await tx
+          .update(productionJobPhotos)
+          .set({ reviewId: review.id })
+          .where(
+            and(
+              eq(productionJobPhotos.jobId, jobId),
+              isNull(productionJobPhotos.supersededAt)
+            )
+          )
+          .returning({ id: productionJobPhotos.id, slot: productionJobPhotos.slot });
+
+        const judgedSlots = judged.map((photo) => photo.slot);
+
+        // ONE row for one act. The verdict and the status move are the same
+        // fact, so there is deliberately no `transitioned` row beside this one:
+        // two rows for one act breaks the "one row per transition" property the
+        // timeline is read through.
+        await recordAudit(
+          c,
+          {
+            action:
+              verdict === "pass"
+                ? "production_job.qc_approved"
+                : "production_job.qc_rejected",
+            entityType: "production_job",
+            entityId: jobId,
+            summary:
+              verdict === "pass"
+                ? `QC passed on ${judgedSlots.length} photo(s)`
+                : `QC failed on ${judgedSlots.length} photo(s): ${(defects ?? []).join(", ")}`,
+            ...diffRecords(job, updated, ["status"]),
+            metadata: {
+              from,
+              to,
+              // The evidence this row rests on. Without it the verdict and the
+              // review that justifies it are two rows nobody can join.
+              reviewId: review.id,
+              verdict,
+              defects: defects ?? [],
+              judgedSlots,
+              judgedPhotoIds: judged.map((photo) => photo.id),
+            },
+          },
+          // Shares the transaction: a row saying the job passed QC, beside a
+          // job still sitting in qc_submitted, is worse than no row.
+          tx
+        );
+
+        return { review, job: updated, judgedSlots };
+      });
+
+      return c.json(
+        {
+          message: `Review recorded and job moved to ${to}`,
+          review: result.review,
+          job: result.job,
+          judgedSlots: result.judgedSlots,
+        },
+        201
+      );
+    } catch (error) {
+      const refused = await refusedResponse(c, jobId, error);
+      if (refused) return refused;
+      return c.json(failed("record review", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/admin/production/:jobId/photos
+// ============================================================================
+
+/**
+ * The shot list an admin judges, laid out slot by slot.
+ *
+ * The whole list comes back, not only what was uploaded: an EMPTY slot is the
+ * point of the screen, and `missingRequiredSlots` names what still has to be
+ * reshot. `QC_SHOT_LIST` in `@chobii/shared` is the one copy of that list, read
+ * here and by the vendor portal.
+ *
+ * **Live photos only.** `superseded_at IS NULL` is the definition of live, and
+ * a superseded shot belongs to the review that judged it rather than to this
+ * screen.
+ *
+ * **The object key never leaves.** Each live photo is answered with a presigned
+ * DOWNLOAD url and nothing else — `approval_photos.url` is the counter-example
+ * this deliberately does not copy, because a stored URL cannot be re-signed
+ * when it expires and the URL itself becomes the capability. The signing helper
+ * is `lib/storage`'s, NOT `lib/vendor-scope`'s: those are scope-limited to one
+ * shop's own objects, which is the wrong question for an admin who oversees
+ * every shop.
+ *
+ * The 404 is answered BEFORE anything is signed. A signed URL that is generated
+ * and then withheld has still been generated, and lives in whatever log or
+ * trace saw it.
+ */
+adminProductionApp.get(
+  "/:jobId/photos",
+  zValidator("param", jobParamSchema),
+  async (c) => {
+    const { jobId } = c.req.valid("param");
+
     try {
       const [job] = await db
-        .select({ id: productionJobs.id })
+        .select({
+          id: productionJobs.id,
+          stage: productionJobs.stage,
+          status: productionJobs.status,
+        })
         .from(productionJobs)
         .where(eq(productionJobs.id, jobId))
         .limit(1);
 
       if (!job) return c.json({ error: "Production job not found" }, 404);
 
-      const [review] = await db
-        .insert(productionJobReviews)
-        .values({
-          jobId,
-          // From the session, never from the body: who signed off is not the
-          // caller's to assert.
-          reviewerId: user.id,
-          verdict,
-          defects: defects ?? null,
-          notes: notes ?? null,
+      const live = await db
+        .select({
+          id: productionJobPhotos.id,
+          slot: productionJobPhotos.slot,
+          objectKey: productionJobPhotos.objectKey,
+          contentType: productionJobPhotos.contentType,
+          sizeBytes: productionJobPhotos.sizeBytes,
+          uploadedBy: productionJobPhotos.uploadedBy,
+          uploadedAt: productionJobPhotos.uploadedAt,
+          reviewId: productionJobPhotos.reviewId,
         })
-        .returning();
+        .from(productionJobPhotos)
+        .where(
+          and(
+            eq(productionJobPhotos.jobId, jobId),
+            isNull(productionJobPhotos.supersededAt)
+          )
+        )
+        .orderBy(asc(productionJobPhotos.uploadedAt));
 
-      return c.json({ message: "Review recorded", review }, 201);
+      type LivePhoto = (typeof live)[number];
+
+      const bySlot = new Map<string, LivePhoto>(live.map((photo) => [photo.slot, photo]));
+
+      const shotList = qcShotsForStage(job.stage);
+      const listedSlots = new Set(shotList.map((shot) => shot.slot));
+
+      const entries: Array<{
+        slot: string;
+        label: string;
+        required: boolean;
+        onShotList: boolean;
+        photo: LivePhoto | null;
+      }> = shotList.map((shot) => ({
+        slot: shot.slot,
+        label: shot.label,
+        required: shot.required,
+        onShotList: true,
+        photo: bySlot.get(shot.slot) ?? null,
+      }));
+
+      // A live photo in a slot this stage does not ask for — a job whose stage
+      // was edited after the upload, or a portal sending the other list's key.
+      // Surfaced rather than dropped: `slot` is `text` with no enum under it,
+      // so a photograph nobody can find is a real failure mode, and hiding it
+      // here is how it stays invisible.
+      for (const photo of live) {
+        if (listedSlots.has(photo.slot)) continue;
+        entries.push({
+          slot: photo.slot,
+          label: `Uploaded outside the ${job.stage} shot list`,
+          required: false,
+          onShotList: false,
+          photo,
+        });
+      }
+
+      const signedAt = Date.now();
+
+      const shots = await Promise.all(
+        entries.map(async (entry) => ({
+          slot: entry.slot,
+          label: entry.label,
+          required: entry.required,
+          onShotList: entry.onShotList,
+          photo: entry.photo
+            ? {
+                id: entry.photo.id,
+                contentType: entry.photo.contentType,
+                sizeBytes: entry.photo.sizeBytes,
+                uploadedBy: entry.photo.uploadedBy,
+                uploadedAt: entry.photo.uploadedAt,
+                /** The review that judged this shot, once one has. */
+                reviewId: entry.photo.reviewId,
+                url: await getPresignedDownloadUrl(
+                  entry.photo.objectKey,
+                  QC_PHOTO_URL_TTL_SECONDS
+                ),
+              }
+            : null,
+        }))
+      );
+
+      return c.json({
+        jobId,
+        stage: job.stage,
+        status: job.status,
+        shots,
+        /** What the vendor still has to shoot — the reviewer's one action. */
+        missingRequiredSlots: requiredQcSlots(job.stage).filter((slot) => !bySlot.has(slot)),
+        expiresInSeconds: QC_PHOTO_URL_TTL_SECONDS,
+        expiresAt: new Date(signedAt + QC_PHOTO_URL_TTL_SECONDS * 1000).toISOString(),
+      });
     } catch (error) {
-      return c.json(failed("record review", error), 500);
+      return c.json(failed("list production job photos", error), 500);
     }
   }
 );
