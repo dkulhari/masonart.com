@@ -302,8 +302,12 @@ default":
    — making it a *confirmed* proposal keeps an arbitrary choice visible and auditable
    instead of silently arbitrary.
 
-Overridable until the first transfer on the order dispatches; after that, 409 — the
-goods are already moving.
+Overridable until a transfer on the order is actually in flight; after that, 409 — the
+goods are already moving. "In flight" means dispatched **and neither arrived nor
+declared lost**: a lost parcel is precisely when re-routing the replacement work to a
+different consolidator is the right call, so freezing the choice then would be backwards.
+Review found the first cut testing `dispatched_at` alone, which froze the consolidator
+permanently after any loss.
 
 ### The seam: `isOrderReadyToLabel`
 
