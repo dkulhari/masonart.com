@@ -19,6 +19,15 @@
  * 3. **The lookup is job-scoped, not id-scoped.** A real itemId on someone
  *    else's job is the interesting attack, not a made-up uuid.
  *
+ * 4. **The scope is not substitutable.** Artwork is signed under ONE named
+ *    scope out of `VENDOR_SIGNING_SCOPES`, and this route may sign only within
+ *    it. Since vendors now despatch directly, one of the sibling scopes —
+ *    `label` — deliberately carries the customer's name and address on a
+ *    carrier PDF. If the artwork path would sign a `fulfilment/labels/...` key,
+ *    that one narrow exception has quietly become a general PII signer. So the
+ *    disjointness is asserted here in BOTH directions, over every pair of
+ *    scopes, and again through the route itself.
+ *
  * The harness is the recording query builder from `jobs.test.ts`: `src/database`
  * records the WHERE that actually reached the driver, `src/auth` is mocked so
  * each test picks the caller, and the REAL `requireVendor` / `lib/vendor-scope`
@@ -141,6 +150,11 @@ vi.mock('../../../src/lib/storage', () => ({
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'
+import {
+  VENDOR_SIGNING_SCOPES,
+  objectKeyForScope,
+  type VendorSigningScope,
+} from '../../../src/lib/vendor-scope'
 import { readJson } from '../../helpers/json'
 
 // ============================================================================
@@ -371,6 +385,146 @@ describe('artwork URLs are job-scoped', () => {
 
     const res = await buildApp().request(artworkPath())
     expect(res.status).toBe(401)
+    expect(mockPresign).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================================
+// The scopes are disjoint, and this route may sign only inside its own
+// ============================================================================
+
+/**
+ * Why this lives beside the artwork tests rather than in a unit file of its own.
+ *
+ * `objectKeyForScope` is the single choke point every vendor-facing signature
+ * passes through, and this route is its oldest caller. Vendors now despatch
+ * directly, so a sibling scope — `label` — resolves to a carrier PDF that
+ * carries the customer's name, address and phone. That document is the ONE
+ * deliberate exception to "a vendor never receives customer data", and the
+ * exception is only as narrow as the allow-list that contains it.
+ *
+ * Which makes substitutability the whole ballgame. If the artwork path would
+ * sign a `fulfilment/labels/...` key — reachable, because the key is whatever
+ * `snapshot.imageUrl` decodes to — then a route with no consolidator check has
+ * become a signer for the one object that holds PII. The property is therefore
+ * asserted as a property: over EVERY ordered pair of scopes, in both
+ * directions, so a fourth scope added later cannot quietly overlap a third.
+ */
+describe('vendor signing scopes are pairwise disjoint and non-substitutable', () => {
+  const KEY_FOR_SCOPE: Record<VendorSigningScope, string> = {
+    artwork: 'products/originals/abc.jpg',
+    qcPhoto: 'production-qc/job-1/front_full/shot.jpg',
+    label: 'fulfilment/labels/9f3c1b7a5e2d4c8b1f0a6d3e7c2b8a45.pdf',
+  }
+
+  const SCOPES = Object.keys(VENDOR_SIGNING_SCOPES) as VendorSigningScope[]
+
+  it('the artwork scope REFUSES a carrier-label key', () => {
+    // The named direction that matters most: artwork is signed on a route with
+    // no consolidator check, and the label is the only object holding PII.
+    expect(objectKeyForScope('artwork', KEY_FOR_SCOPE.label)).toBeNull()
+  })
+
+  it('the label scope REFUSES a catalogue-artwork key', () => {
+    // The reverse direction, so neither scope can stand in for the other and
+    // "it only ever gets artwork keys" cannot become an argument for widening.
+    expect(objectKeyForScope('label', KEY_FOR_SCOPE.artwork)).toBeNull()
+  })
+
+  it('accepts a key under its own scope and no other — every ordered pair', () => {
+    for (const scope of SCOPES) {
+      for (const other of SCOPES) {
+        const got = objectKeyForScope(scope, KEY_FOR_SCOPE[other])
+        if (scope === other) {
+          expect(got, `${scope} refused its own key`).toBe(KEY_FOR_SCOPE[other])
+        } else {
+          expect(got, `${scope} signed a ${other} key`).toBeNull()
+        }
+      }
+    }
+  })
+
+  it('has no prefix that is a prefix of another scope', () => {
+    // Disjointness of the ALLOW-LIST itself, not merely of today's sample keys:
+    // `fulfilment/` and `fulfilment/labels/` would both accept the label PDF.
+    const all = (
+      Object.entries(VENDOR_SIGNING_SCOPES) as [VendorSigningScope, readonly string[]][]
+    ).flatMap(([scope, prefixes]) => prefixes.map((prefix) => [scope, prefix] as const))
+
+    for (const [a, prefixA] of all) {
+      for (const [b, prefixB] of all) {
+        if (a === b) continue
+        expect(
+          prefixA.startsWith(prefixB) || prefixB.startsWith(prefixA),
+          `scope ${a} prefix "${prefixA}" overlaps scope ${b} prefix "${prefixB}"`
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('every scope is non-empty, so none of them fails OPEN', () => {
+    // An empty prefix list would make `some()` false for everything, which
+    // fails closed — but an accidental `['']` would make it true for
+    // everything, which is the bucket root.
+    for (const scope of SCOPES) {
+      const prefixes = VENDOR_SIGNING_SCOPES[scope]
+      expect(prefixes.length, `${scope} has no prefixes`).toBeGreaterThan(0)
+      for (const prefix of prefixes) {
+        expect(prefix, `${scope} has an empty prefix — that is the bucket root`).not.toBe('')
+        expect(prefix.endsWith('/'), `${scope} prefix "${prefix}" is not a directory`).toBe(true)
+      }
+    }
+  })
+
+  it('keeps the fail-closed logic the artwork prefix list already had', () => {
+    // Byte-for-byte the same behaviour, now parameterised by scope.
+    expect(objectKeyForScope('artwork', null)).toBeNull()
+    expect(objectKeyForScope('artwork', undefined)).toBeNull()
+    expect(objectKeyForScope('artwork', '   ')).toBeNull()
+    expect(objectKeyForScope('artwork', 'not-a-scope/abc.jpg')).toBeNull()
+    // Traversal, in every scope, however the reference was stored.
+    expect(objectKeyForScope('artwork', 'products/../avatars/user-9/avatar.jpg')).toBeNull()
+    expect(objectKeyForScope('label', 'fulfilment/labels/../../avatars/user-9/a.pdf')).toBeNull()
+    // An unrecognised scope name fails closed rather than throwing or signing.
+    expect(objectKeyForScope('bucketRoot' as VendorSigningScope, 'products/abc.jpg')).toBeNull()
+  })
+
+  it('still collapses a CDN URL, a path-style URL and a bare key to one key', () => {
+    const bucket = process.env.R2_BUCKET || 'poster-app-dev'
+    expect(objectKeyForScope('artwork', 'https://cdn.example.com/products/abc.jpg')).toBe(
+      'products/abc.jpg'
+    )
+    expect(
+      objectKeyForScope('artwork', `https://r2.example.com/${bucket}/products/abc.jpg`)
+    ).toBe('products/abc.jpg')
+    expect(objectKeyForScope('artwork', '/products/abc.jpg')).toBe('products/abc.jpg')
+    expect(
+      objectKeyForScope('label', `https://r2.example.com/${bucket}/${KEY_FOR_SCOPE.label}`)
+    ).toBe(KEY_FOR_SCOPE.label)
+  })
+
+  it('404s and NEVER signs when an item points at a carrier label instead of artwork', async () => {
+    // The route-level half of the same property. `snapshot.imageUrl` is data;
+    // the day one holds a label key, this route must refuse it rather than hand
+    // a vendor a URL to the customer's address.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_items': [[artworkRow({ imageUrl: KEY_FOR_SCOPE.label })]],
+    })
+
+    const res = await buildApp().request(artworkPath())
+    expect(res.status).toBe(404)
+    expect(mockPresign, 'the artwork route signed a carrier label').not.toHaveBeenCalled()
+  })
+
+  it('404s and never signs a QC photo through the artwork route either', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_items': [[artworkRow({ imageUrl: KEY_FOR_SCOPE.qcPhoto })]],
+    })
+
+    const res = await buildApp().request(artworkPath())
+    expect(res.status).toBe(404)
     expect(mockPresign).not.toHaveBeenCalled()
   })
 })

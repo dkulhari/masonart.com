@@ -1,13 +1,16 @@
 /**
- * Vendor portal — the three security properties, asserted AS properties.
+ * Vendor portal — the security properties, asserted AS properties.
  *
  * This is the suite that decides whether the portal is safe to expose. It does
- * not test handlers one at a time; it tests three statements that must hold for
+ * not test handlers one at a time; it tests statements that must hold for
  * EVERY vendor-facing route, including the ones that do not exist yet:
  *
  *   1. Vendor A cannot read or write vendor B's data.
- *   2. No vendor-facing payload contains customer data.
- *   3. Artwork URLs are signed, expiring and job-scoped.
+ *   2. No customer data crosses the vendor boundary AS DATA.
+ *   3. Every vendor-facing signature is short-lived, and lands in exactly one
+ *      named scope; the scopes are disjoint and non-substitutable.
+ *   4. The carrier label — the ONE document that does carry customer data —
+ *      reaches only the order's consolidator, or is never signed at all.
  *
  * **Driven from a route table.** `ROUTE_TABLE` below is compared against the
  * routes Hono actually has registered on `vendorApp`. A route added later
@@ -26,9 +29,46 @@
  * the same vocabulary, so a convenience field invented in a handler is caught
  * too.
  *
- * A blanket rule is only assertable because dispatch is IN-HOUSE: the piece
- * comes back to us before it ships, so a vendor needs no name, no address, no
- * phone, no email and no order reference. Not "needs little" — needs none.
+ * ## The rule this suite enforces, and why it is three clauses now
+ *
+ * It used to be one sentence. `lib/vendor-scope.ts` said "no return value here
+ * contains customer data", and that was assertable as a BLANKET rule for
+ * exactly one reason: dispatch was in-house. The piece came back to us before
+ * it shipped, so a vendor needed no name, no address, no phone — not "needed
+ * little", needed none.
+ *
+ * That premise is dead. Vendors despatch directly and the courier collects from
+ * their own facility, so a carrier's shipping label necessarily carries the
+ * customer's name, address and phone. The absolute cannot survive, and softening
+ * it into a guideline would delete the only thing that made it worth anything —
+ * that a machine could check it. So it is replaced by three clauses, each
+ * mechanically checkable, two of which are checked here:
+ *
+ * **R1 — the JSON stays clean, absolutely.** No JSON body on any
+ * `/api/vendor/*` route contains a customer name, address, phone, email or
+ * person-linked order reference, at any depth, in any casing. NO EXCEPTION,
+ * EVER. The forbidden-key vocabulary, the recursive body walker, the
+ * wholesale-`select()` ban and the SELECT-projection assertion below are
+ * unchanged in mechanism, and the route table makes them cover every new route.
+ * Property 2 is R1.
+ *
+ * **R2 — customer data reaches a vendor only as opaque rendered bytes, behind a
+ * short-lived signature.** Only as a rendered document fetched from a signed,
+ * expiring URL, and only by handing that file to the operating system. Never as
+ * fields, never composed by our API, never rendered into the vendor portal's own
+ * DOM. Exactly one such document exists: the carrier's label PDF. The DOM half
+ * of R2 belongs to `packages/web/tests/routes/vendor/no-customer-data.test.tsx`;
+ * the "behind a signature, and only for the consolidator" half is Property 4.
+ *
+ * **R3 — the allow-list is the enforcement, and the scopes are disjoint.** Every
+ * vendor-facing signature is produced through one named scope of
+ * `VENDOR_SIGNING_SCOPES`, and a route may sign only within its own. Property 3
+ * asserts every presign call lands in EXACTLY ONE scope, and that the scopes are
+ * pairwise disjoint and non-substitutable in both directions. That last part is
+ * the load-bearing one: the label is the single deliberate exception to R1's
+ * spirit, and an exception is only as narrow as the allow-list containing it. An
+ * artwork route that would sign a `fulfilment/labels/...` key is no longer an
+ * exception — it is a general PII signer.
  *
  * @see packages/api/src/routes/vendor.ts
  * @see packages/api/src/lib/vendor-scope.ts
@@ -144,6 +184,12 @@ vi.mock('../../../src/lib/storage', () => ({
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'
+import {
+  VENDOR_SIGNING_SCOPES,
+  getVendorJobLabelKey,
+  objectKeyForScope,
+  type VendorSigningScope,
+} from '../../../src/lib/vendor-scope'
 import { readJson } from '../../helpers/json'
 
 // ============================================================================
@@ -158,6 +204,24 @@ function params(condition: unknown): unknown[] {
     return dialect.sqlToQuery(condition as SQL).params as unknown[]
   } catch {
     return []
+  }
+}
+
+/**
+ * The WHERE as SQL TEXT, not just its bound parameters.
+ *
+ * Property 4 has to distinguish "the vendor id appears somewhere in this
+ * predicate" from "the vendor id is compared against BOTH
+ * `production_jobs.vendor_id` and `order_consolidation.vendor_id`". Both bind
+ * the same uuid, so `params()` cannot tell them apart — only the column names
+ * can, and they live in the rendered SQL.
+ */
+function sqlText(condition: unknown): string {
+  if (condition === undefined || condition === null) return ''
+  try {
+    return dialect.sqlToQuery(condition as SQL).sql
+  } catch {
+    return ''
   }
 }
 
@@ -343,11 +407,19 @@ const label = (r: RouteCase) => `${r.method} ${r.pattern}`
 /**
  * Keys a vendor-facing payload may never contain, at any depth, in any case.
  *
- * Dispatch is in-house, so this is a blanket rule rather than a judgement call
- * per field. The order references are here for the same reason as the names and
- * addresses: `orderId` / `orderItemId` are direct handles into a customer's
- * order, and a vendor addresses their work by JOB, never by order — the artwork
- * route keys on `production_job_items.id`, not on the order item behind it.
+ * This is R1, and R1 is the clause that took NO exception when dispatch moved
+ * out of house. The vocabulary is therefore unchanged, and stays a blanket rule
+ * rather than a judgement call per field. The order references are here for the
+ * same reason as the names and addresses: `orderId` / `orderItemId` are direct
+ * handles into a customer's order, and a vendor addresses their work by JOB,
+ * never by order — the artwork route keys on `production_job_items.id`, not on
+ * the order item behind it.
+ *
+ * The carrier label does not weaken this. It is delivered as RENDERED BYTES
+ * behind a signature (R2), and its object key is identity-free by construction
+ * (`fulfilment/labels/<token>.pdf`, never `<orderId>`), so nothing about it
+ * arrives as a field for this walker to find — which is precisely why it is
+ * allowed to exist at all.
  */
 const FORBIDDEN_KEYS = [
   'customer',
@@ -587,10 +659,10 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
 })
 
 // ============================================================================
-// PROPERTY 3 — artwork URLs are signed, expiring and job-scoped
+// PROPERTY 3 — every signature is short-lived, and lands in exactly one scope
 // ============================================================================
 
-describe('property 3: artwork is delivered by short-lived signature only', () => {
+describe('property 3: every vendor signature is short-lived and single-scoped', () => {
   const ARTWORK = ROUTE_TABLE.find((r) => r.pattern === '/jobs/:id/artwork/:itemId')!
 
   it('signs with a presigned URL and never a public path', async () => {
@@ -663,9 +735,16 @@ describe('property 3: artwork is delivered by short-lived signature only', () =>
     'ai-reference-images/user-9/1-abc.png',
     'user-uploads/user-9/thing.png',
     'reviews/rev-9/media/clip.mp4',
+    // The two sibling SCOPES. `production-qc/` and `fulfilment/labels/` are
+    // legitimate keys for other routes and refused here, which is R3: a route
+    // signs inside its own scope or not at all. The label one is the case that
+    // matters — it is the only object in the bucket that holds a customer's
+    // name and address, and this route performs no consolidator check.
+    'production-qc/job-1/front_full/shot.jpg',
+    'fulfilment/labels/9f3c1b7a5e2d4c8b1f0a6d3e7c2b8a45.pdf',
   ]
 
-  it.each(OFF_LIMITS_KEYS)('refuses to sign %s — not artwork, and often user-partitioned', async (key) => {
+  it.each(OFF_LIMITS_KEYS)('refuses to sign %s — outside the artwork scope, and often person-linked', async (key) => {
     queueRows({
       'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]],
       ...OWNED_ROWS,
@@ -712,5 +791,265 @@ describe('property 3: artwork is delivered by short-lived signature only', () =>
       expect(mockPresign, `${label(route)} signed something`).not.toHaveBeenCalled()
       expect(mockPublicUrl, `${label(route)} built a public URL`).not.toHaveBeenCalled()
     }
+  })
+
+  // --------------------------------------------------------------------------
+  // R3: the allow-list is the enforcement, and the scopes are disjoint
+  // --------------------------------------------------------------------------
+
+  const SCOPES = Object.keys(VENDOR_SIGNING_SCOPES) as VendorSigningScope[]
+
+  function scopesMatching(key: string): VendorSigningScope[] {
+    return SCOPES.filter((scope) =>
+      VENDOR_SIGNING_SCOPES[scope].some((prefix) => key.startsWith(prefix))
+    )
+  }
+
+  it('every key ever handed to the presigner falls in EXACTLY ONE scope', async () => {
+    // Not "in some scope". Exactly one — because a key matching two scopes
+    // means the prefixes overlap, and an overlap is how the label scope's
+    // consolidator check gets bypassed by asking the artwork route instead.
+    for (const route of ROUTE_TABLE) {
+      queries.length = 0
+      rowQueues.clear()
+      mockPresign.mockClear()
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      queueRows(OWNED_ROWS)
+
+      const [path, init] = route.mine()
+      await run(path, init)
+
+      for (const call of mockPresign.mock.calls) {
+        const key = call[0] as string
+        expect(
+          scopesMatching(key),
+          `${label(route)} signed "${key}", which matches ${scopesMatching(key).length} scopes`
+        ).toHaveLength(1)
+      }
+    }
+  })
+
+  it('the scopes are pairwise disjoint and non-substitutable, both directions', () => {
+    const SAMPLE: Record<VendorSigningScope, string> = {
+      artwork: 'products/originals/abc.jpg',
+      qcPhoto: 'production-qc/job-1/front_full/shot.jpg',
+      label: 'fulfilment/labels/9f3c1b7a5e2d4c8b1f0a6d3e7c2b8a45.pdf',
+    }
+
+    for (const scope of SCOPES) {
+      for (const other of SCOPES) {
+        const got = objectKeyForScope(scope, SAMPLE[other])
+        if (scope === other) {
+          expect(got, `${scope} refused its own key`).toBe(SAMPLE[other])
+        } else {
+          expect(got, `${scope} accepted a ${other} key — the scopes are substitutable`).toBeNull()
+        }
+      }
+    }
+
+    // Named explicitly, because these two are the pair that matters: the label
+    // is the only PII carrier, and artwork is the route with no consolidator
+    // check. Either substitution turns one narrow exception into a wide hole.
+    expect(objectKeyForScope('artwork', SAMPLE.label)).toBeNull()
+    expect(objectKeyForScope('label', SAMPLE.artwork)).toBeNull()
+  })
+
+  it('the scope matcher actually finds a match — this property is not vacuous', () => {
+    // Same guard as the body walker has. `scopesMatching` returning [] for
+    // everything would make the "exactly one scope" test above pass by
+    // examining nothing at all.
+    expect(scopesMatching('products/abc.jpg')).toEqual(['artwork'])
+    expect(scopesMatching('fulfilment/labels/tok.pdf')).toEqual(['label'])
+    expect(scopesMatching('avatars/user-9/avatar.jpg')).toEqual([])
+  })
+})
+
+// ============================================================================
+// PROPERTY 4 — the carrier label, the one document that carries customer data
+// ============================================================================
+
+/**
+ * R2 in full: customer data reaches a vendor ONLY as opaque rendered bytes,
+ * behind a short-lived signature, and only for the vendor who is actually
+ * despatching the parcel.
+ *
+ * `getVendorJobLabelKey` is where that is decided, and it has to decide it in
+ * ONE query. All three conditions live in the WHERE — the job is this vendor's,
+ * the order's consolidator is this vendor, a label token exists — so a
+ * non-consolidator's request resolves to `null` before any key is built, which
+ * means the presigner is NEVER REACHED. That distinction is the whole point:
+ * a signed URL that is generated and then withheld has still been generated,
+ * and lives in whatever log, trace or crash dump saw it. "The response was a
+ * 404" is not the property. "No signature exists" is.
+ *
+ * There is no route here yet — `GET /api/vendor/jobs/:id/label` is #687 — so
+ * this asserts the scoped module directly. The route-table property above will
+ * pick the route up the moment it is registered.
+ */
+describe('property 4: the carrier label reaches only the consolidator, or is never signed', () => {
+  /** Never appears in a label key. Present so the test can prove that. */
+  const ORDER_ID = '55555555-5555-4555-8555-555555555555'
+  const LABEL_TOKEN = '9f3c1b7a5e2d4c8b1f0a6d3e7c2b8a45'
+  const LABEL_KEY = `fulfilment/labels/${LABEL_TOKEN}.pdf`
+
+  /** The row the seam's narrow select returns: the token, and nothing else. */
+  const tokenRow = (token: unknown = LABEL_TOKEN) => ({ token })
+
+  it('puts all THREE conditions in one WHERE — job, consolidator, token', async () => {
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+
+    const got = await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+    expect(got).toEqual({ jobId: B_JOB_ID, key: LABEL_KEY })
+
+    // ONE query. Three separate reads with the checks in application code is
+    // the shape that grows a branch where one check is skipped.
+    const reads = queries.filter((q) => q.op === 'select')
+    expect(reads.map((q) => q.table)).toEqual(['production_jobs'])
+
+    const where = sqlText(reads[0].where)
+    expect(where, 'the job is not scoped to this vendor').toContain(
+      '"production_jobs"."vendor_id"'
+    )
+    expect(where, 'the consolidator is not checked in the WHERE').toContain(
+      '"order_consolidation"."vendor_id"'
+    )
+    expect(where.toLowerCase(), 'the label token is not required in the WHERE').toContain(
+      'label_object_token'
+    )
+    expect(where.toLowerCase()).toContain('is not null')
+
+    const bound = params(reads[0].where)
+    expect(bound).toContain(B_JOB_ID)
+    expect(bound).toContain(VENDOR_B)
+    expect(bound).not.toContain(VENDOR_A)
+  })
+
+  it('returns null for a NON-CONSOLIDATOR and the presigner is never called', async () => {
+    // The consolidator predicate in the WHERE excluded the row, so the read
+    // comes back empty and nothing downstream of it ever runs.
+    queueRows({ 'select:production_jobs': [[]] })
+
+    expect(await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)).toBeNull()
+    expect(
+      mockPresign,
+      'a label URL was signed for a vendor who is not the consolidator'
+    ).not.toHaveBeenCalled()
+    expect(mockPublicUrl).not.toHaveBeenCalled()
+  })
+
+  it("returns null for another vendor's job, and signs nothing", async () => {
+    queueRows({ 'select:production_jobs': [[]] })
+
+    expect(await getVendorJobLabelKey(VENDOR_B, A_JOB_ID)).toBeNull()
+    expect(mockPresign).not.toHaveBeenCalled()
+    expect(params(queries[0]?.where)).toContain(VENDOR_B)
+    expect(params(queries[0]?.where)).not.toContain(VENDOR_A)
+  })
+
+  it('returns null when no label has been issued yet, rather than signing nothing', async () => {
+    // Belt and braces: the WHERE already excludes a null token, but a row that
+    // arrives with one anyway must not become `fulfilment/labels/null.pdf`.
+    queueRows({ 'select:production_jobs': [[tokenRow(null)]] })
+
+    expect(await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)).toBeNull()
+    expect(mockPresign).not.toHaveBeenCalled()
+  })
+
+  it('throws rather than reading anything when the vendorId is missing', async () => {
+    await expect(getVendorJobLabelKey(null, B_JOB_ID)).rejects.toThrow(/vendorId is required/)
+    await expect(getVendorJobLabelKey(undefined, B_JOB_ID)).rejects.toThrow(/vendorId is required/)
+    expect(queries).toEqual([])
+    expect(mockPresign).not.toHaveBeenCalled()
+  })
+
+  it('returns null for a missing jobId without building a query', async () => {
+    expect(await getVendorJobLabelKey(VENDOR_B, undefined)).toBeNull()
+    expect(queries).toEqual([])
+    expect(mockPresign).not.toHaveBeenCalled()
+  })
+
+  // --------------------------------------------------------------------------
+  // The key is identity-free BY CONSTRUCTION
+  // --------------------------------------------------------------------------
+
+  it('builds a key that embeds no order, job or vendor identifier', async () => {
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+
+    const got = await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+    const key = got!.key
+
+    // An order id in a URL path is a stable person-linked handle, and it lives
+    // where no assertion about JSON *keys* can ever see it — the signed URL
+    // carries the object key in its path. So it is excluded by construction,
+    // not filtered out afterwards.
+    expect(key.startsWith('fulfilment/labels/')).toBe(true)
+    expect(key.endsWith('.pdf')).toBe(true)
+    for (const id of [ORDER_ID, B_JOB_ID, A_JOB_ID, VENDOR_A, VENDOR_B, B_ITEM_ID]) {
+      expect(key, `the label key embeds ${id}`).not.toContain(id)
+    }
+    // What is left is the random token and nothing else.
+    expect(key).toBe(`fulfilment/labels/${LABEL_TOKEN}.pdf`)
+  })
+
+  it('refuses a token that would escape the label prefix', async () => {
+    // The token is DATA, read from a table another sub-project writes. A token
+    // of `../../avatars/user-9/avatar` would otherwise resolve to a key outside
+    // the scope entirely, which is the general-signer bug in a new costume.
+    for (const bad of [
+      '../../avatars/user-9/avatar',
+      'a/../../../products/secret',
+      '..',
+      '',
+      '   ',
+    ]) {
+      queries.length = 0
+      rowQueues.clear()
+      mockPresign.mockClear()
+      queueRows({ 'select:production_jobs': [[tokenRow(bad)]] })
+
+      expect(
+        await getVendorJobLabelKey(VENDOR_B, B_JOB_ID),
+        `accepted an escaping token: ${JSON.stringify(bad)}`
+      ).toBeNull()
+      expect(mockPresign).not.toHaveBeenCalled()
+    }
+  })
+
+  it('resolves the key through the LABEL scope, so an artwork key cannot arrive', async () => {
+    // The final key goes through the same allow-list every other signature
+    // does, under its own scope. That is what makes R3 an enforcement rather
+    // than a naming convention.
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+    const got = await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+
+    expect(objectKeyForScope('label', got!.key)).toBe(got!.key)
+    expect(objectKeyForScope('artwork', got!.key)).toBeNull()
+    expect(objectKeyForScope('qcPhoto', got!.key)).toBeNull()
+  })
+
+  // --------------------------------------------------------------------------
+  // R1 is untouched by the exception
+  // --------------------------------------------------------------------------
+
+  it('selects nothing wholesale and no forbidden column', async () => {
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+    await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+
+    const read = queries.find((q) => q.op === 'select')!
+    expect(read.fields, 'the label read selected a table wholesale').not.toBeNull()
+    expect(
+      (read.fields ?? []).filter((f) => FORBIDDEN_KEYS.includes(f.toLowerCase()))
+    ).toEqual([])
+  })
+
+  it('returns no customer data as DATA — only a job id and an opaque key', async () => {
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+    const got = await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+
+    // R1 holds over the return value the same way it holds over every route
+    // body: the label's PII is inside the rendered PDF, never in a field.
+    expect(Object.keys(got!).sort()).toEqual(['jobId', 'key'])
+    expect(forbiddenKeysIn(got)).toEqual([])
+    expect(JSON.stringify(got)).not.toContain(ORDER_ID)
   })
 })

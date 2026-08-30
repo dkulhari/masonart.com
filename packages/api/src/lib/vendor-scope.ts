@@ -12,12 +12,49 @@
  * isolation guarantee ONE testable home instead of an audit across every route
  * that will ever be added.
  *
- * Second rule, equally absolute: **no return value here contains customer
- * data.** Not a name, not an address, not a phone, not a person-linked order
- * reference. Dispatch is in-house — the piece comes back to us before it ships
- * — so a vendor never needs any of it. Stated as an absolute so it can be
- * tested as one. Every read below uses an explicit `.select({...})` column
- * list, or reads a table that holds no customer columns at all.
+ * ## The customer-data rule
+ *
+ * This module used to state a second absolute: *no return value here contains
+ * customer data*. It was assertable as a blanket rule for exactly one reason —
+ * dispatch was in-house, the piece came back to us before it shipped, so a
+ * vendor needed no name, no address, no phone. Not "needed little". Needed none.
+ *
+ * **That premise is dead.** Vendors despatch directly now and the courier
+ * collects from their facility, so a carrier's shipping label necessarily
+ * carries the customer's name, address and phone. The absolute cannot survive
+ * contact with that. What must survive is the part that made it worth stating:
+ * that a machine, not a reviewer, decides whether it holds. So it is replaced
+ * by three clauses, each mechanically checkable, NOT by a guideline:
+ *
+ * **R1 — the JSON stays clean, absolutely.** No JSON body on any
+ * `/api/vendor/*` route contains a customer name, address, phone, email or
+ * person-linked order reference, at any depth, in any casing. NO EXCEPTION,
+ * EVER. Every read below uses an explicit `.select({...})` column list, or reads
+ * a table that holds no customer columns at all; `tests/routes/vendor/
+ * isolation.test.ts` enforces it with an unchanged forbidden-key vocabulary, a
+ * recursive body walker, a ban on wholesale `select()` and an assertion over the
+ * SELECT projection itself.
+ *
+ * **R2 — customer data reaches a vendor only as opaque rendered bytes, behind a
+ * short-lived signature.** Only as a rendered document fetched from a signed,
+ * expiring URL, and only by handing that file to the operating system. Never as
+ * fields, never composed by our API, never rendered into the vendor portal's own
+ * DOM. Exactly one such document exists: the carrier's label PDF, reached
+ * through `getVendorJobLabelKey` below.
+ *
+ * **R3 — the allow-list is the enforcement, and the scopes are disjoint.** Every
+ * vendor-facing signature is produced through one named scope of
+ * `VENDOR_SIGNING_SCOPES`, and a caller may sign only within its own. The scopes
+ * are pairwise disjoint and non-substitutable, in both directions, which is what
+ * keeps the single label exception from widening into a general PII signer.
+ *
+ * **Vendors need no pickup address and no delivery pincode.** Do not add one.
+ * The courier collects from the vendor's OWN facility, which is already in
+ * `vendors.address_*` — theirs, not a customer's — and we choose the courier, so
+ * the destination is never the vendor's business either. Every field a vendor
+ * could plausibly want "for shipping" is already on the label, inside the PDF,
+ * where R2 puts it. Adding one to a JSON body breaks R1, which takes no
+ * exceptions.
  */
 
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
@@ -29,6 +66,8 @@ import {
   vendorSettlements,
 } from '../database/schema/production-jobs'
 import { orderItems } from '../database/schema/orders'
+import { orderConsolidation } from '../database/schema/production-transfers'
+import { orderShipments } from '../database/schema/shipping'
 import { vendorRates } from '../database/schema/vendors'
 
 /**
@@ -174,7 +213,8 @@ export async function getVendorJobItems(vendorId: string | null | undefined, job
 }
 
 /**
- * The only prefixes a vendor artwork URL may ever be signed for.
+ * R3. The ONLY prefixes a vendor-facing signature may ever be produced for,
+ * grouped into named, DISJOINT scopes.
  *
  * An ALLOW-list, and it fails closed, for two reasons the isolation suite made
  * concrete:
@@ -184,31 +224,69 @@ export async function getVendorJobItems(vendorId: string | null | undefined, job
  *    `ai-reference-images/<userId>/…` — so signing one of those hands a vendor
  *    a stable person-linked identifier in the URL path, where no assertion
  *    about JSON *keys* can see it.
- * 2. **The key is data.** It is whatever `snapshot.imageUrl` decodes to. Without
- *    a bound, this route is a general-purpose signer for the whole bucket, and
- *    the day a snapshot holds an unexpected path it will happily sign it.
+ * 2. **The key is data.** It is whatever a stored reference decodes to. Without
+ *    a bound, a signing route is a general-purpose signer for the whole bucket,
+ *    and the day a stored value holds an unexpected path it will happily sign it.
  *
- * Catalogue artwork lives under `products/` (`uploadImage` /
- * `uploadOptimizedImage` default to `StoragePaths.PRODUCTS`, originals under
- * `products/originals/`). If custom, per-customer artwork ever needs to reach a
- * vendor, the answer is to copy it to an identity-free job-scoped key and add
- * that prefix here — not to widen this to the bucket root.
+ * **Why SCOPES and not one flat list.** The three prefixes are not
+ * interchangeable, and one of them is dangerous:
+ *
+ * - `artwork` — catalogue print files (`uploadImage` / `uploadOptimizedImage`
+ *   default to `StoragePaths.PRODUCTS`, originals under `products/originals/`).
+ *   Signed on a route with no consolidator check.
+ * - `qcPhoto` — photographs the vendor took and uploaded THEMSELVES. Nothing of
+ *   ours, and nothing of a customer's, is in them.
+ * - `label` — the carrier PDF. **The only object in this bucket a vendor may
+ *   receive that contains customer data**, and it contains all of it: name,
+ *   address, phone.
+ *
+ * A single flat list would let the artwork route sign a label, and the artwork
+ * route does not — cannot — check who is consolidating the order. The narrow
+ * exception R2 grants would become a wide hole in R1 with no code change at all.
+ * So the scopes are pairwise disjoint (no prefix is a prefix of another) and
+ * non-substitutable (a caller passes its own scope, never a key's), and
+ * `isolation.test.ts` asserts both directions of every pair.
+ *
+ * If custom, per-customer artwork ever needs to reach a vendor, the answer is to
+ * copy it to an identity-free job-scoped key and add that prefix to the scope
+ * that needs it — not to widen a scope to the bucket root, and not to merge two.
  */
-const VENDOR_ARTWORK_PREFIXES = ['products/'] as const
+export const VENDOR_SIGNING_SCOPES = {
+  /** Catalogue print files. Unchanged from `VENDOR_ARTWORK_PREFIXES`. */
+  artwork: ['products/'],
+  /** Photos the vendor uploaded themselves. */
+  qcPhoto: ['production-qc/'],
+  /** The carrier PDF — the ONLY PII carrier on this boundary. */
+  label: ['fulfilment/labels/'],
+} as const
+
+export type VendorSigningScope = keyof typeof VENDOR_SIGNING_SCOPES
 
 /**
- * Reduce a stored image reference to a bare object key.
+ * Reduce a stored object reference to a bare key, ADMISSIBLE IN ONE SCOPE.
  *
- * `order_items.snapshot.imageUrl` is written as whatever `getPublicUrl` produced
- * at purchase time: a CDN URL when `CDN_URL` is set, a path-style S3 URL when it
- * is not. The presigner needs the KEY, so both forms collapse to the same thing
+ * A stored reference is written as whatever `getPublicUrl` produced at the time:
+ * a CDN URL when `CDN_URL` is set, a path-style S3 URL when it is not, or a bare
+ * key. The presigner needs the KEY, so every form collapses to the same thing
  * here. Returns null rather than a guess when there is nothing usable — the
  * caller turns that into a 404, because signing an empty key would produce a
  * perfectly valid-looking URL to nothing.
+ *
+ * The scope is the CALLER's, passed in, never inferred from the key. Inferring
+ * it would mean the data decides which rules apply to itself, which is the
+ * general-signer bug wearing a scope's clothes.
  */
-function objectKeyFromImageRef(imageRef: string | null | undefined): string | null {
-  if (typeof imageRef !== 'string') return null
-  let key = imageRef.trim()
+export function objectKeyForScope(
+  scope: VendorSigningScope,
+  ref: string | null | undefined
+): string | null {
+  // An unrecognised scope name fails closed rather than throwing or, worse,
+  // matching nothing and being read as "no prefix restriction".
+  const prefixes: readonly string[] | undefined = VENDOR_SIGNING_SCOPES[scope]
+  if (!prefixes || prefixes.length === 0) return null
+
+  if (typeof ref !== 'string') return null
+  let key = ref.trim()
   if (!key) return null
 
   if (/^https?:\/\//i.test(key)) {
@@ -228,9 +306,9 @@ function objectKeyFromImageRef(imageRef: string | null | undefined): string | nu
   // No traversal out of the bucket, whatever was stored.
   if (!key || key.includes('..')) return null
 
-  // Fail closed: an unrecognised prefix is a bug, and signing it first and
+  // Fail closed: a prefix outside this scope is a bug, and signing it first and
   // asking later is how that bug becomes an incident.
-  if (!VENDOR_ARTWORK_PREFIXES.some((prefix) => key.startsWith(prefix))) return null
+  if (!prefixes.some((prefix) => key.startsWith(prefix))) return null
 
   return key
 }
@@ -275,10 +353,118 @@ export async function getVendorJobArtwork(
 
   if (!row) return null
 
-  const key = objectKeyFromImageRef(row.imageUrl)
+  const key = objectKeyForScope('artwork', row.imageUrl)
   if (!key) return null
 
   return { itemId: row.id, key }
+}
+
+// ============================================================================
+// The carrier label — R2's single exception, and the narrowest one available
+// ============================================================================
+
+/**
+ * `order_shipments.label_object_token`, referenced as a SEAM.
+ *
+ * **This column does not exist yet.** It belongs to `order-dispatch-tracking`,
+ * which owns every `order_shipments` schema change; the production-pipeline
+ * design declares it here and only here, as the join this feature consumes.
+ * Written as a SQL fragment rather than a drizzle column for exactly that
+ * reason — inventing the column in `schema/shipping.ts` would put this feature's
+ * name on another sub-project's table and produce a migration nobody owns.
+ * Until that column lands, this query throws; nothing calls it yet (the route is
+ * #687), and throwing is the correct failure for a missing seam. Replace this
+ * fragment with `orderShipments.labelObjectToken` the day it exists.
+ *
+ * A random token, following the `production_approvals.approval_token`
+ * precedent, and NOT the order id. See `getVendorJobLabelKey`.
+ */
+const LABEL_OBJECT_TOKEN = sql`"order_shipments"."label_object_token"`
+
+/**
+ * A token is DATA, read from a table this feature does not write. It becomes a
+ * path segment, so it is constrained to characters that cannot leave the
+ * segment: no slash, no dot, no whitespace. `objectKeyForScope` would catch a
+ * traversal afterwards; this catches the whole class beforehand, and keeps
+ * `fulfilment/labels/<token>.pdf` meaning one file rather than a subtree.
+ */
+const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
+
+/**
+ * The object key for the carrier label on an order this vendor is consolidating.
+ *
+ * ## The key is identity-free BY CONSTRUCTION
+ *
+ * `fulfilment/labels/<random token>.pdf`. **Never** `<orderId>`. An order id in
+ * a URL path is a stable, person-linked handle — precisely the sin the isolation
+ * suite punishes in `ai-generations/<userId>/…` — and it lives in the one place
+ * no assertion about JSON *keys* can ever reach: the path of the signed URL,
+ * which is a value, not a field. R1 would report the payload clean while the
+ * URL beside it carried the handle. So the identifier is not filtered out of the
+ * key; it is never in it. The token follows the
+ * `production_approvals.approval_token` precedent.
+ *
+ * ## All three conditions live in the WHERE
+ *
+ * The job is this vendor's; the order's consolidator (`order_consolidation`) is
+ * this vendor; a label token exists. One query, three predicates, no branch in
+ * application code where one of them can be skipped. A vendor who holds a job on
+ * the order but is NOT the consolidator gets `null` — a 404 at the route — and
+ * the presigner is **never reached**. That is the actual requirement: a signed
+ * URL that is generated and then withheld has still been generated, and lives in
+ * whatever log, trace or crash dump saw it. Checking ownership after signing
+ * gives the same answer on the happy path and the wrong one every other time.
+ *
+ * Only the consolidator, because only they hold the parcel. Everyone else on the
+ * order shipped their piece onward by inter-vendor transfer and has no business
+ * with the customer's address.
+ *
+ * ## What it returns
+ *
+ * The KEY, not a URL — this module can never accidentally emit a permanent
+ * public path — and the job id, which is the vendor's own handle on their own
+ * work. Nothing else: R1 is untouched by this exception, because the customer
+ * data is inside the PDF the caller will sign, never in a field beside it.
+ */
+export async function getVendorJobLabelKey(
+  vendorId: string | null | undefined,
+  jobId?: string
+): Promise<{ jobId: string; key: string } | null> {
+  assertVendorId(vendorId)
+  if (!jobId) return null
+
+  const [row] = await db
+    // Narrow on purpose, like every read above: the token and nothing else.
+    // `orders`, `order_shipments` and `order_consolidation` all hold or point
+    // at customer data, and a wholesale select of any of them would drag it
+    // across a boundary R1 says it may never cross.
+    .select({ token: sql<string | null>`${LABEL_OBJECT_TOKEN}` })
+    .from(productionJobs)
+    .innerJoin(orderConsolidation, eq(orderConsolidation.orderId, productionJobs.orderId))
+    .innerJoin(orderShipments, eq(orderShipments.orderId, productionJobs.orderId))
+    .where(
+      and(
+        eq(productionJobs.id, jobId),
+        // The job is theirs...
+        eq(productionJobs.vendorId, vendorId),
+        // ...AND they are the one despatching the order...
+        eq(orderConsolidation.vendorId, vendorId),
+        // ...AND a label actually exists. All three, or no row.
+        sql`${LABEL_OBJECT_TOKEN} is not null`
+      )
+    )
+    .limit(1)
+
+  const token = row?.token
+  if (typeof token !== 'string' || !LABEL_TOKEN_PATTERN.test(token)) return null
+
+  // Through the same allow-list every other signature passes, under its OWN
+  // scope. R3 is an enforcement here, not a naming convention: a token that
+  // somehow escaped the prefix resolves to null rather than to a signable key.
+  const key = objectKeyForScope('label', `${VENDOR_SIGNING_SCOPES.label[0]}${token}.pdf`)
+  if (!key) return null
+
+  return { jobId, key }
 }
 
 /**
