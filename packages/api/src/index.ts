@@ -52,7 +52,10 @@ import { adminVendorsApp } from "./routes/admin/vendors";
 import { adminVendorRatesApp } from "./routes/admin/vendor-rates";
 import { adminVendorPayablesApp } from "./routes/admin/vendor-payables";
 import { adminVendorInviteApp } from "./routes/admin/vendor-invite";
-import { adminProductionApp } from "./routes/admin/production-jobs";
+import {
+  adminProductionApp,
+  adminOrderProductionApp,
+} from "./routes/admin/production-jobs";
 import { adminTransfersApp } from "./routes/admin/transfers";
 import { vendorApp } from "./routes/vendor";
 import { sitemapApp } from "./routes/sitemap";
@@ -305,6 +308,12 @@ app.route("/api/admin/vendors", adminVendorInviteApp);
 // Admin Production API - job queue, assignment pricing and QC reviews.
 // Admin-only: assignment writes what we will owe the vendor.
 app.route("/api/admin/production", adminProductionApp);
+
+// The order-scoped half of the production API - which vendor consolidates the
+// order, and why it cannot be labelled yet. Mounted beside adminOrdersApp on
+// the same prefix; Hono merges routers additively, and both new routes are two
+// segments deep so neither can shadow that router's `GET /:id`.
+app.route("/api/admin/orders", adminOrderProductionApp);
 
 // Admin Transfers API - inter-vendor legs, and declaring a parcel lost.
 // A separate router from the production queue above, on its own prefix: this is

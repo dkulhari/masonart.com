@@ -23,6 +23,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { getTableConfig } from 'drizzle-orm/pg-core'
 import { adminSessionFor } from '../../helpers/admin-session'
 import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
@@ -35,6 +36,8 @@ import {
   productionJobPhotos,
   productionJobReviews,
 } from '../../../src/database/schema/production-jobs'
+import { orderConsolidation } from '../../../src/database/schema/production-transfers'
+import { orders } from '../../../src/database/schema/orders'
 import { adminAuditLog } from '../../../src/database/schema/audit-log'
 
 // ============================================================================
@@ -72,7 +75,10 @@ vi.mock('../../../src/lib/storage', () => ({
     mockPresign(...(args as [string, number?])),
 }))
 
-import { adminProductionApp } from '../../../src/routes/admin/production-jobs'
+import {
+  adminProductionApp,
+  adminOrderProductionApp,
+} from '../../../src/routes/admin/production-jobs'
 import { readJson } from '../../helpers/json'
 
 // ============================================================================
@@ -93,6 +99,7 @@ const VENDOR_ID = '33333333-3333-4333-8333-333333333333'
 const VENDOR_ID_2 = '3333333b-3333-4333-8333-333333333333'
 const ITEM_A = '44444444-4444-4444-8444-444444444444'
 const ITEM_B = '55555555-5555-4555-8555-555555555555'
+const ITEM_C = '5555555c-5555-4555-8555-555555555555'
 
 const json = (body: unknown, method = 'POST') => ({
   method,
@@ -1650,9 +1657,698 @@ describe('GET /api/admin/production', () => {
     expect(params).toContain(VENDOR_ID)
   })
 
+  it('filters by orderId, and does it in SQL rather than by scanning', async () => {
+    // The filter `OrderProductionPanel.tsx` has been waiting for. Without it
+    // the panel pages the whole queue and matches client-side under
+    // MAX_SCAN_PAGES, so a queue longer than the bound makes its coverage
+    // verdict a guess it has to withhold.
+    queueRows({ 'select:production_jobs': [[{ value: 0 }], []] })
+
+    const res = await buildApp().request(`/api/admin/production?orderId=${ORDER_ID}`)
+    expect(res.status).toBe(200)
+
+    const page = selects(productionJobs).find((q) => q.limit !== undefined)
+    const { sql, params } = render(page?.where)
+    expect(sql).toContain('"order_id"')
+    expect(params).toContain(ORDER_ID)
+
+    // The COUNT is filtered too, or `total` describes a different set than
+    // `items` and the panel pages through a queue that is not the one it counted.
+    const total = selects(productionJobs).find((q) => q.limit === undefined)
+    expect(render(total?.where).params).toContain(ORDER_ID)
+  })
+
+  it('filters on the column production_jobs_order_id_idx covers', () => {
+    // The eq() above is only cheap if it lands on the index. Read off the
+    // schema rather than asserted as a string: a rename that moved the index to
+    // another column would leave the route doing a sequential scan of every job
+    // ever created, and nothing else in the suite would notice.
+    const { indexes } = getTableConfig(productionJobs)
+    const byOrderId = indexes.find((i) => i.config.name === 'production_jobs_order_id_idx')
+
+    expect(byOrderId).toBeDefined()
+    expect(byOrderId?.config.columns.map((c) => (c as { name: string }).name)).toEqual([
+      'order_id',
+    ])
+  })
+
+  it('rejects an orderId that is not a uuid with 400', async () => {
+    expect((await buildApp().request('/api/admin/production?orderId=42')).status).toBe(400)
+  })
+
   it('rejects an unknown stage or status with 400', async () => {
     expect((await buildApp().request('/api/admin/production?stage=laminate')).status).toBe(400)
     expect((await buildApp().request('/api/admin/production?status=nonsense')).status).toBe(400)
+  })
+})
+
+// ============================================================================
+// The order-scoped half: who consolidates, and why it cannot ship yet
+// ============================================================================
+
+/**
+ * `POST /api/admin/orders/:orderId/consolidator` and
+ * `GET /api/admin/orders/:orderId/production-readiness`, mounted on a second
+ * router in the same module.
+ *
+ * The RULES live in `lib/production-readiness.ts` and are unit-tested there
+ * over plain rows. What is tested here is that the ROUTE asks them the right
+ * question and records the answer honestly: which vendor comes back for each of
+ * the three cases, that a system default writes `decided_by = NULL` while an
+ * admin's choice writes the actor, that an override after the goods are moving
+ * is refused, and that the audit row lands inside or outside the transaction
+ * depending on whether it describes a write or a rollback.
+ */
+describe('POST /api/admin/orders/:orderId/consolidator', () => {
+  const ordersApp = () => buildRouteApp('/api/admin/orders', adminOrderProductionApp)
+
+  const setConsolidator = (body: Record<string, unknown> = {}, orderId = ORDER_ID) =>
+    ordersApp().request(`/api/admin/orders/${orderId}/consolidator`, json(body))
+
+  /** A job row in the shape `loadOrderProductionSnapshot` selects it. */
+  const snapshotJob = (over: Record<string, unknown> = {}) => ({
+    id: JOB_ID,
+    stage: 'print',
+    status: 'assigned',
+    vendorId: VENDOR_ID,
+    assignedAt: PAST,
+    orderItemId: ITEM_A,
+    ...over,
+  })
+
+  interface ConsolidatorSeed {
+    orderExists?: boolean
+    existing?: { vendorId: string; decidedBy: string | null } | null
+    jobs?: Array<Record<string, unknown>>
+    items?: Array<Record<string, unknown>>
+    transfers?: Array<Record<string, unknown>>
+    vendor?: { id: string; name: string } | null
+    inserted?: Array<Record<string, unknown>>
+    updated?: Array<Record<string, unknown>>
+  }
+
+  function seed(over: ConsolidatorSeed = {}) {
+    const {
+      orderExists = true,
+      existing = null,
+      jobs = [snapshotJob()],
+      items = [{ id: ITEM_A, frameId: null, giftCardPurchase: null }],
+      transfers = [],
+      vendor = { id: VENDOR_ID, name: 'Print Shop A' },
+      inserted,
+      updated,
+    } = over
+
+    const existingRows = existing ? [existing] : []
+    const written = [
+      {
+        orderId: ORDER_ID,
+        vendorId: vendor?.id ?? VENDOR_ID,
+        decidedBy: null,
+        decidedAt: PAST,
+      },
+    ]
+
+    queueRows({
+      // The locked read first, then the snapshot loader's own read of the same row.
+      'select:orders': [orderExists ? [{ id: ORDER_ID }] : [], [{ orderType: 'regular' }]],
+      'select:order_consolidation': [existingRows, existingRows],
+      'select:order_items': [items],
+      'select:production_jobs': [jobs],
+      'select:production_transfers': [transfers],
+      'select:vendors': [vendor ? [vendor] : []],
+      'insert:order_consolidation': [inserted ?? written],
+      'update:order_consolidation': [updated ?? written],
+    })
+  }
+
+  const consolidationRows = () =>
+    [...inserts(orderConsolidation), ...updates(orderConsolidation)]
+
+  // --------------------------------------------------------------------
+  // Rule 1 — one vendor holds everything
+  // --------------------------------------------------------------------
+
+  it('writes the sole vendor automatically, with decided_by NULL for "system default"', async () => {
+    seed({
+      jobs: [
+        snapshotJob({ orderItemId: ITEM_A }),
+        snapshotJob({ id: JOB_ID_2, orderItemId: ITEM_B }),
+      ],
+      items: [
+        { id: ITEM_A, frameId: null, giftCardPurchase: null },
+        { id: ITEM_B, frameId: null, giftCardPurchase: null },
+      ],
+    })
+
+    const res = await setConsolidator()
+    const body = await readJson<{
+      basis: string
+      systemDefault: boolean
+      consolidation: { vendorId: string; decidedBy: string | null }
+    }>(res)
+
+    expect(res.status).toBe(200)
+    expect(body.basis).toBe('sole_vendor')
+    expect(body.systemDefault).toBe(true)
+
+    const [write] = inserts(orderConsolidation)
+    expect(write?.inTx).toBe(true)
+    expect(write?.values).toMatchObject({ orderId: ORDER_ID, vendorId: VENDOR_ID })
+    // NULL is the record of "nobody decided this; one vendor already held it all".
+    expect((write?.values as { decidedBy: string | null }).decidedBy).toBeNull()
+  })
+
+  // --------------------------------------------------------------------
+  // Rule 2 — the frame vendor, proposed
+  // --------------------------------------------------------------------
+
+  it('proposes the frame vendor and refuses to write it without an admin', async () => {
+    seed({
+      jobs: [
+        snapshotJob({ vendorId: VENDOR_ID }),
+        snapshotJob({ id: JOB_ID_2, stage: 'frame', vendorId: VENDOR_ID_2 }),
+      ],
+    })
+
+    const res = await setConsolidator()
+    const body = await readJson<{
+      code: string
+      proposal: { vendorId: string; basis: string; needsConfirmation: boolean }
+    }>(res)
+
+    expect(res.status).toBe(422)
+    expect(body.code).toBe('CONFIRMATION_REQUIRED')
+    // A finished framed piece is bulky, fragile and glazed; you never courier
+    // it TO a poster shop.
+    expect(body.proposal).toEqual({
+      vendorId: VENDOR_ID_2,
+      basis: 'frame_vendor',
+      needsConfirmation: true,
+    })
+    // A proposal is not a decision. Nothing may reach the table unconfirmed —
+    // that is exactly what `decided_by IS NULL` would then misreport.
+    expect(consolidationRows()).toHaveLength(0)
+  })
+
+  it('records the actor when an admin confirms the frame proposal', async () => {
+    seed({
+      jobs: [
+        snapshotJob({ vendorId: VENDOR_ID }),
+        snapshotJob({ id: JOB_ID_2, stage: 'frame', vendorId: VENDOR_ID_2 }),
+      ],
+      vendor: { id: VENDOR_ID_2, name: 'Frame Shop B' },
+    })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID_2 })
+    const body = await readJson<{ basis: string; systemDefault: boolean }>(res)
+
+    expect(res.status).toBe(200)
+    expect(body.systemDefault).toBe(false)
+    expect(body.basis).toBe('confirmed_proposal')
+
+    const [write] = inserts(orderConsolidation)
+    expect(write?.values).toMatchObject({
+      vendorId: VENDOR_ID_2,
+      decidedBy: 'admin-user-1',
+    })
+  })
+
+  // --------------------------------------------------------------------
+  // Rule 3 — most items, ties by earliest assignment
+  // --------------------------------------------------------------------
+
+  it('proposes the vendor holding the most order items across two print shops', async () => {
+    seed({
+      jobs: [
+        snapshotJob({ orderItemId: ITEM_A }),
+        snapshotJob({ orderItemId: ITEM_B }),
+        snapshotJob({ id: JOB_ID_2, vendorId: VENDOR_ID_2, orderItemId: ITEM_C }),
+      ],
+      items: [
+        { id: ITEM_A, frameId: null, giftCardPurchase: null },
+        { id: ITEM_B, frameId: null, giftCardPurchase: null },
+        { id: ITEM_C, frameId: null, giftCardPurchase: null },
+      ],
+    })
+
+    const res = await setConsolidator()
+    const body = await readJson<{
+      proposal: { vendorId: string; basis: string; needsConfirmation: boolean }
+    }>(res)
+
+    expect(res.status).toBe(422)
+    expect(body.proposal).toEqual({
+      vendorId: VENDOR_ID,
+      basis: 'most_items',
+      needsConfirmation: true,
+    })
+  })
+
+  it('breaks a tie on the most-items rule by earliest assignment', async () => {
+    const EARLIER = new Date('2025-12-01T00:00:00Z')
+
+    seed({
+      jobs: [
+        snapshotJob({ orderItemId: ITEM_A, assignedAt: PAST }),
+        snapshotJob({
+          id: JOB_ID_2,
+          vendorId: VENDOR_ID_2,
+          orderItemId: ITEM_B,
+          assignedAt: EARLIER,
+        }),
+      ],
+      items: [
+        { id: ITEM_A, frameId: null, giftCardPurchase: null },
+        { id: ITEM_B, frameId: null, giftCardPurchase: null },
+      ],
+    })
+
+    const body = await readJson<{ proposal: { vendorId: string } }>(await setConsolidator())
+
+    expect(body.proposal.vendorId).toBe(VENDOR_ID_2)
+  })
+
+  it('has nothing to propose before anything is assigned', async () => {
+    seed({ jobs: [snapshotJob({ vendorId: null, status: 'draft', assignedAt: null })] })
+
+    const res = await setConsolidator()
+    const body = await readJson<{ code: string; proposal: { basis: string } }>(res)
+
+    expect(res.status).toBe(422)
+    expect(body.code).toBe('NOTHING_TO_PROPOSE')
+    expect(body.proposal.basis).toBe('none')
+    expect(consolidationRows()).toHaveLength(0)
+  })
+
+  // --------------------------------------------------------------------
+  // Override, and the point at which it stops being allowed
+  // --------------------------------------------------------------------
+
+  it('overrides an existing consolidator while nothing has dispatched', async () => {
+    seed({
+      existing: { vendorId: VENDOR_ID, decidedBy: null },
+      transfers: [
+        {
+          id: 'transfer-1',
+          toVendorId: VENDOR_ID,
+          dispatchedAt: null,
+          receivedAt: null,
+          lostAt: null,
+          jobId: JOB_ID,
+        },
+      ],
+      vendor: { id: VENDOR_ID_2, name: 'Frame Shop B' },
+    })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID_2 })
+    expect(res.status).toBe(200)
+
+    const [write] = updates(orderConsolidation)
+    expect(write?.inTx).toBe(true)
+    expect(write?.values).toMatchObject({ vendorId: VENDOR_ID_2, decidedBy: 'admin-user-1' })
+
+    // The predicate is repeated in the WHERE rather than trusted from the read,
+    // so a second admin who moved it in between matches nothing.
+    const { sql, params } = render(write?.where)
+    expect(sql).toContain('"order_id"')
+    expect(sql).toContain('"vendor_id"')
+    expect(params).toContain(ORDER_ID)
+    expect(params).toContain(VENDOR_ID)
+  })
+
+  it('refuses the override with 409 once the first transfer has dispatched', async () => {
+    seed({
+      existing: { vendorId: VENDOR_ID, decidedBy: null },
+      transfers: [
+        {
+          id: 'transfer-1',
+          toVendorId: VENDOR_ID,
+          dispatchedAt: new Date('2026-08-29T10:00:00Z'),
+          receivedAt: null,
+          lostAt: null,
+          jobId: JOB_ID,
+        },
+      ],
+      vendor: { id: VENDOR_ID_2, name: 'Frame Shop B' },
+    })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID_2 })
+    const body = await readJson<{ code: string; error: string }>(res)
+
+    // The goods are already moving. Re-routing them is a phone call to a
+    // courier, not a database write.
+    expect(res.status).toBe(409)
+    expect(body.code).toBe('TRANSFER_DISPATCHED')
+    expect(consolidationRows()).toHaveLength(0)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+  })
+
+  it('still lets an admin confirm the SAME vendor after a transfer dispatched', async () => {
+    // Not an override: nothing is re-routed, only `decided_by` stops saying
+    // "the system chose this" about a decision an admin has now stood behind.
+    seed({
+      existing: { vendorId: VENDOR_ID, decidedBy: null },
+      transfers: [
+        {
+          id: 'transfer-1',
+          toVendorId: VENDOR_ID,
+          dispatchedAt: new Date('2026-08-29T10:00:00Z'),
+          receivedAt: null,
+          lostAt: null,
+          jobId: JOB_ID,
+        },
+      ],
+    })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID })
+
+    expect(res.status).toBe(200)
+    expect((updates(orderConsolidation)[0]?.values as { decidedBy: string }).decidedBy).toBe(
+      'admin-user-1'
+    )
+  })
+
+  it('writes nothing when the request changes nothing', async () => {
+    seed({ existing: { vendorId: VENDOR_ID, decidedBy: null } })
+
+    const res = await setConsolidator()
+    const body = await readJson<{ changed: boolean }>(res)
+
+    expect(res.status).toBe(200)
+    expect(body.changed).toBe(false)
+    expect(consolidationRows()).toHaveLength(0)
+    // One row per ACT. Re-confirming what already stands is not an act.
+    expect(audits()).toHaveLength(0)
+  })
+
+  // --------------------------------------------------------------------
+  // Concurrency — two admins must not set two consolidators
+  // --------------------------------------------------------------------
+
+  it('locks the order row inside the transaction before deciding anything', async () => {
+    seed()
+
+    await setConsolidator()
+
+    const [lock] = selects(orders)
+    expect(lock?.inTx).toBe(true)
+    expect(queries.indexOf(lock!)).toBeLessThan(
+      queries.indexOf(inserts(orderConsolidation)[0]!)
+    )
+  })
+
+  it('rolls back when the guarded update matches no row — the concurrent case', async () => {
+    seed({
+      existing: { vendorId: VENDOR_ID, decidedBy: null },
+      vendor: { id: VENDOR_ID_2, name: 'Frame Shop B' },
+      updated: [],
+    })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID_2 })
+    const body = await readJson<{ code: string }>(res)
+
+    expect(res.status).toBe(409)
+    expect(body.code).toBe('CONCURRENT_MODIFICATION')
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+  })
+
+  it('rolls back when the insert returns no row', async () => {
+    seed({ inserted: [] })
+
+    const res = await setConsolidator()
+
+    expect(res.status).toBe(409)
+    expect(tx.rollbacks).toBe(1)
+  })
+
+  it('leaves one consolidator per order to the database, not to the route', () => {
+    // A mock cannot serialise anything, and neither can a route: what actually
+    // makes two racing writers produce one row is the primary key on order_id.
+    const { columns } = getTableConfig(orderConsolidation)
+    const pk = columns.filter((c) => c.primary).map((c) => c.name)
+
+    expect(pk).toEqual(['order_id'])
+  })
+
+  // --------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------
+
+  it('audits the set inside the transaction, naming which of the two it was', async () => {
+    seed()
+
+    await setConsolidator()
+
+    const [row] = audits()
+    expect(row).toMatchObject({
+      action: 'order.consolidator_set',
+      outcome: 'success',
+      entityType: 'order',
+      entityId: ORDER_ID,
+      // A row saying an order routes through this vendor, beside an order that
+      // routes through nobody, is worse than no row.
+      inTx: true,
+    })
+    expect(row?.metadata).toMatchObject({
+      decision: 'system_default',
+      basis: 'sole_vendor',
+      consolidatorVendorId: VENDOR_ID,
+      previousConsolidatorVendorId: null,
+    })
+    // `vendorId` is reserved by recordAudit for the shop a VENDOR request was
+    // written for, and an admin acts for nobody.
+    expect(row?.metadata).not.toHaveProperty('vendorId')
+  })
+
+  it('audits an admin choice as an admin choice', async () => {
+    seed({ vendor: { id: VENDOR_ID_2, name: 'Frame Shop B' } })
+
+    await setConsolidator({ vendorId: VENDOR_ID_2 })
+
+    expect(audits()[0]?.metadata).toMatchObject({
+      decision: 'admin_confirmed',
+      basis: 'admin_override',
+      consolidatorVendorId: VENDOR_ID_2,
+    })
+  })
+
+  it('records a refusal OUTSIDE the transaction, or the refusal erases itself', async () => {
+    seed({
+      existing: { vendorId: VENDOR_ID, decidedBy: null },
+      transfers: [
+        {
+          id: 'transfer-1',
+          toVendorId: VENDOR_ID,
+          dispatchedAt: new Date('2026-08-29T10:00:00Z'),
+          receivedAt: null,
+          lostAt: null,
+          jobId: JOB_ID,
+        },
+      ],
+      vendor: { id: VENDOR_ID_2, name: 'Frame Shop B' },
+    })
+
+    await setConsolidator({ vendorId: VENDOR_ID_2 })
+
+    const [row] = audits()
+    expect(row).toMatchObject({
+      action: 'order.consolidator_set',
+      outcome: 'failure',
+      entityId: ORDER_ID,
+    })
+    // A refusal row records that a transaction was ROLLED BACK. Written inside
+    // it, the row rolls back too and the evidence is gone.
+    expect(row?.inTx).toBe(false)
+  })
+
+  // --------------------------------------------------------------------
+  // The 404s and the bad payloads
+  // --------------------------------------------------------------------
+
+  it('404s an order that does not exist', async () => {
+    seed({ orderExists: false })
+
+    const res = await setConsolidator()
+
+    expect(res.status).toBe(404)
+    expect(consolidationRows()).toHaveLength(0)
+  })
+
+  it('404s a vendor that does not exist', async () => {
+    seed({ vendor: null })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID_2 })
+
+    expect(res.status).toBe(404)
+    expect(consolidationRows()).toHaveLength(0)
+  })
+
+  it('400s an orderId or vendorId that is not a uuid', async () => {
+    expect((await setConsolidator({}, 'not-a-uuid')).status).toBe(400)
+    expect((await setConsolidator({ vendorId: 'nope' })).status).toBe(400)
+  })
+})
+
+// ============================================================================
+// GET /api/admin/orders/:orderId/production-readiness
+// ============================================================================
+
+/**
+ * The blocker LIST, not a boolean.
+ *
+ * `isOrderReadyToLabel` is `blockers.length === 0` over the very same call this
+ * route makes, so the gate that refuses to buy a courier label and the screen
+ * that explains why cannot disagree. A "not ready" with no reason is the class
+ * of bug `OrderProductionPanel.tsx` already guards against.
+ */
+describe('GET /api/admin/orders/:orderId/production-readiness', () => {
+  const readiness = (orderId = ORDER_ID) =>
+    buildRouteApp('/api/admin/orders', adminOrderProductionApp).request(
+      `/api/admin/orders/${orderId}/production-readiness`
+    )
+
+  function seedReadiness(over: {
+    orderExists?: boolean
+    items?: Array<Record<string, unknown>>
+    jobs?: Array<Record<string, unknown>>
+    consolidator?: string | null
+    transfers?: Array<Record<string, unknown>>
+  } = {}) {
+    const {
+      orderExists = true,
+      items = [{ id: ITEM_A, frameId: null, giftCardPurchase: null }],
+      jobs = [
+        {
+          id: JOB_ID,
+          stage: 'print',
+          status: 'qc_passed',
+          vendorId: VENDOR_ID,
+          assignedAt: PAST,
+          orderItemId: ITEM_A,
+        },
+      ],
+      consolidator = VENDOR_ID,
+      transfers = [],
+    } = over
+
+    queueRows({
+      'select:orders': [orderExists ? [{ orderType: 'regular' }] : []],
+      'select:order_items': [items],
+      'select:production_jobs': [jobs],
+      'select:order_consolidation': [consolidator ? [{ vendorId: consolidator }] : []],
+      'select:production_transfers': [transfers],
+    })
+  }
+
+  it('answers ready with an empty blocker list when everything is at the consolidator', async () => {
+    seedReadiness()
+
+    const res = await readiness()
+    const body = await readJson<{
+      ready: boolean
+      consolidatorVendorId: string
+      blockers: unknown[]
+    }>(res)
+
+    expect(res.status).toBe(200)
+    expect(body).toEqual({
+      orderId: ORDER_ID,
+      ready: true,
+      consolidatorVendorId: VENDOR_ID,
+      blockers: [],
+      blockerCodes: [],
+    })
+  })
+
+  it('surfaces the blocker CODES rather than a bare false', async () => {
+    seedReadiness({
+      jobs: [
+        {
+          id: JOB_ID,
+          stage: 'print',
+          status: 'assigned',
+          vendorId: VENDOR_ID,
+          assignedAt: PAST,
+          orderItemId: ITEM_A,
+        },
+      ],
+      consolidator: null,
+    })
+
+    const body = await readJson<{
+      ready: boolean
+      blockers: Array<{ code: string; message: string; jobId?: string }>
+      blockerCodes: string[]
+    }>(await readiness())
+
+    expect(body.ready).toBe(false)
+    // Every reason at once, so the screen renders the whole story rather than
+    // one line per refresh.
+    expect(body.blockerCodes.sort()).toEqual(['job_not_qc_passed', 'no_consolidator'])
+    for (const blocker of body.blockers) {
+      expect(blocker.message.length).toBeGreaterThan(0)
+    }
+    expect(body.blockers.find((b) => b.code === 'job_not_qc_passed')?.jobId).toBe(JOB_ID)
+  })
+
+  it('answers order_not_found rather than a ready gift-card-shaped nothing', async () => {
+    // A missing order reads back as zero items and zero jobs, which is the
+    // gift-card READY path. The blocker is what keeps a mistyped id out of it.
+    seedReadiness({ orderExists: false, items: [], jobs: [], consolidator: null })
+
+    const body = await readJson<{ ready: boolean; blockerCodes: string[] }>(await readiness())
+
+    expect(body.ready).toBe(false)
+    expect(body.blockerCodes).toEqual(['order_not_found'])
+  })
+
+  it('names the consolidator holding no live job of its own', async () => {
+    seedReadiness({ consolidator: VENDOR_ID_2 })
+
+    const body = await readJson<{ blockerCodes: string[] }>(await readiness())
+
+    expect(body.blockerCodes).toContain('consolidator_holds_no_job')
+  })
+
+  it('400s an orderId that is not a uuid', async () => {
+    expect((await readiness('not-a-uuid')).status).toBe(400)
+  })
+})
+
+// ============================================================================
+// Role gating on the order-scoped routes
+// ============================================================================
+
+describe('role gating: /api/admin/orders', () => {
+  const routes: Array<[string, RequestInit]> = [
+    [`/api/admin/orders/${ORDER_ID}/consolidator`, json({})],
+    [`/api/admin/orders/${ORDER_ID}/production-readiness`, {}],
+  ]
+
+  it.each(routes)('403s a content-manager on %s %#', async (path, init) => {
+    mockGetSession.mockResolvedValue(sessionFor('content-manager'))
+
+    const res = await buildRouteApp('/api/admin/orders', adminOrderProductionApp).request(
+      path,
+      init
+    )
+
+    expect(res.status).toBe(403)
+    expect(queries).toHaveLength(0)
+  })
+
+  it.each(routes)('401s an unauthenticated caller on %s %#', async (path, init) => {
+    mockGetSession.mockResolvedValue(null)
+
+    const res = await buildRouteApp('/api/admin/orders', adminOrderProductionApp).request(
+      path,
+      init
+    )
+
+    expect(res.status).toBe(401)
   })
 })
 
@@ -1716,5 +2412,37 @@ describe('module exports', () => {
       fs.readFileSync(new URL('../../../src/index.ts', import.meta.url), 'utf8')
     )
     expect(source).toContain('app.route("/api/admin/production", adminProductionApp)')
+  })
+
+  it('mounts the order-scoped router on /api/admin/orders', async () => {
+    const source = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../../../src/index.ts', import.meta.url), 'utf8')
+    )
+    expect(source).toContain('app.route("/api/admin/orders", adminOrderProductionApp)')
+  })
+
+  /**
+   * A recording builder cannot serialise anything, so `FOR UPDATE` is the one
+   * part of the concurrency recipe no assertion in this file can reach — the
+   * mock answers a `.for('update')` chain exactly as it answers a plain read.
+   * Scanned from the source instead, over the consolidator handler alone:
+   * a lock silently dropped in a refactor is what lets two admins route one
+   * order to two vendors.
+   */
+  it('reads the order and its decision FOR UPDATE before writing a consolidator', async () => {
+    const source = await import('node:fs').then((fs) =>
+      fs.readFileSync(
+        new URL('../../../src/routes/admin/production-jobs.ts', import.meta.url),
+        'utf8'
+      )
+    )
+
+    const start = source.indexOf('adminOrderProductionApp.post(')
+    const end = source.indexOf('adminOrderProductionApp.get(')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+
+    const handler = source.slice(start, end)
+    expect(handler.match(/\.for\(["']update["']\)/g) ?? []).toHaveLength(2)
   })
 })

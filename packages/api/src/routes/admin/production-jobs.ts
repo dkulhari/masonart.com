@@ -1,13 +1,19 @@
 /**
  * Admin Production Job Routes
  *
- * - GET   /api/admin/production                 paginated queue; stage/status/vendor filters
+ * - GET   /api/admin/production                 paginated queue; stage/status/vendor/order filters
  * - POST  /api/admin/production                 create a job + its items in ONE transaction
  * - GET   /api/admin/production/:jobId          job + items + reviews + payable
  * - PATCH /api/admin/production/:jobId          amountActual override, dates, status
  * - POST  /api/admin/production/:jobId/assign   price against the live rate card and assign
  * - POST  /api/admin/production/:jobId/reviews  the QC verdict, and the move it IS
  * - GET   /api/admin/production/:jobId/photos   the shot list, signed for review
+ *
+ * A second router in the same file answers the two ORDER-scoped questions, and
+ * is mounted on `/api/admin/orders`:
+ *
+ * - POST  /api/admin/orders/:orderId/consolidator          who assembles and ships it
+ * - GET   /api/admin/orders/:orderId/production-readiness  why it cannot ship yet
  *
  * File shape follows `routes/admin/vendors.ts` — `new Hono<{ Variables:
  * AuthVariables }>()`, zod schemas at the top, one `use('*')` gate, a bounded
@@ -99,6 +105,7 @@ import {
   productionJobVerdictEnum,
 } from "../../database/schema/production-jobs";
 import { orders, orderItems } from "../../database/schema/orders";
+import { orderConsolidation } from "../../database/schema/production-transfers";
 import { productVariants } from "../../database/schema/products";
 import { vendors, vendorRates } from "../../database/schema/vendors";
 import {
@@ -121,6 +128,12 @@ import {
   ProductionTransitionError,
   type ProductionJobStatus,
 } from "../../lib/production-transitions";
+import {
+  loadOrderProductionSnapshot,
+  proposeConsolidator,
+  consolidatorOverrideAllowed,
+  getOrderLabelReadiness,
+} from "../../lib/production-readiness";
 import { recordAudit, diffRecords } from "../../lib/audit";
 import { getPresignedDownloadUrl } from "../../lib/storage";
 
@@ -169,6 +182,15 @@ const listQuerySchema = z.object({
   stage: z.enum(productionJobStageEnum.enumValues).optional(),
   status: z.enum(productionJobStatusEnum.enumValues).optional(),
   vendorId: z.string().uuid().optional(),
+  /**
+   * One order's jobs. `production_jobs_order_id_idx` already covers it.
+   *
+   * `OrderProductionPanel.tsx` pages the whole queue and matches client-side
+   * under a page bound because this did not exist, and withholds its coverage
+   * verdict whenever that bound is hit — "these items are on no job" read off a
+   * truncated scan is a guess. This narrows that scan to one query.
+   */
+  orderId: z.string().uuid().optional(),
 });
 
 const jobParamSchema = z.object({ jobId: z.string().uuid() });
@@ -388,7 +410,7 @@ function priceItems(
 // ============================================================================
 
 adminProductionApp.get("/", zValidator("query", listQuerySchema), async (c) => {
-  const { page, pageSize, stage, status, vendorId } = c.req.valid("query");
+  const { page, pageSize, stage, status, vendorId, orderId } = c.req.valid("query");
   const offset = (page - 1) * pageSize;
 
   try {
@@ -396,6 +418,7 @@ adminProductionApp.get("/", zValidator("query", listQuerySchema), async (c) => {
     if (stage) conditions.push(eq(productionJobs.stage, stage));
     if (status) conditions.push(eq(productionJobs.status, status));
     if (vendorId) conditions.push(eq(productionJobs.vendorId, vendorId));
+    if (orderId) conditions.push(eq(productionJobs.orderId, orderId));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const totalRows = await db
@@ -1256,5 +1279,382 @@ adminProductionApp.get(
   }
 );
 
-export { adminProductionApp };
+// ============================================================================
+// The order-scoped half of the production API
+// ============================================================================
+
+/**
+ * `POST /api/admin/orders/:orderId/consolidator`
+ * `GET  /api/admin/orders/:orderId/production-readiness`
+ *
+ * A second router in the same module, mounted on `/api/admin/orders`. Both
+ * questions are asked about an ORDER rather than about a job — which vendor
+ * assembles it, and whether it can be labelled — so a job id in the path would
+ * be a lie. The module stays one file because both answers are computed from
+ * the production rows this file already owns.
+ *
+ * **The rules are not here.** `lib/production-readiness.ts` holds every one of
+ * them: `proposeConsolidator` decides which vendor, `consolidatorOverrideAllowed`
+ * decides whether the decision may still change, and `getOrderLabelReadiness`
+ * decides whether the goods are assembled. This router reads rows, asks those
+ * functions, writes the answer and audits it. A second copy of any of those
+ * rules living in a route is how a gate and a screen start disagreeing about
+ * the same order.
+ *
+ * ## The system proposes, an admin confirms
+ *
+ * `decided_by IS NULL` means the SYSTEM chose, and it is written only for the
+ * one case where there is nothing to choose: a single vendor already holds every
+ * job on the order. The other two cases — a frame job, or rolled posters split
+ * across two print shops — come back as a 422 carrying the proposal, because the
+ * real criterion (who is nearest the customer, which leg is cheapest) is not
+ * modelled. An arbitrary choice an admin confirmed is visible and auditable; the
+ * same choice written silently is not, and `decided_by` is where that difference
+ * is kept.
+ *
+ * ## Concurrency
+ *
+ * `routes/admin/vendor-payables.ts:242-317`, the same shape as the writers
+ * above: the ORDER row is read `FOR UPDATE` first — two admins choosing a
+ * consolidator serialise on it — the existing decision is read under the same
+ * lock, the predicate is repeated in the UPDATE's `WHERE`, and a row-count
+ * mismatch rolls the transaction back rather than answering 200 over a write
+ * that matched nothing. `order_consolidation.order_id` is the PRIMARY KEY, so
+ * the database is what ultimately leaves one row; the lock is what keeps the
+ * loser from seeing a constraint violation instead of an answer.
+ *
+ * ## Auth
+ *
+ * Gated per PATH rather than with `use('*')`. This router shares its mount with
+ * `routes/admin/orders.ts`, and a `*` middleware here would also match every
+ * route in that file — running the session lookup twice for the whole admin
+ * orders tree. The gate is still this router's own: authorisation that depends
+ * on another file being mounted first is authorisation nobody can see.
+ */
+
+const orderParamSchema = z.object({ orderId: z.string().uuid() });
+
+/**
+ * `vendorId` absent means "write the system default", which succeeds only when
+ * there is nothing to decide. Naming a vendor is the admin CONFIRMING, and that
+ * is the only way a row gets a `decided_by`.
+ */
+const setConsolidatorSchema = z.object({
+  vendorId: z.string().uuid().optional(),
+});
+
+const adminOrderProductionApp = new Hono<{ Variables: AuthVariables }>();
+
+// Per path, not `*` — see the note above. requireAdmin, like the job router:
+// the consolidator decides which supplier handles the goods.
+adminOrderProductionApp.use("/:orderId/consolidator", requireAuth, requireAdmin);
+adminOrderProductionApp.use("/:orderId/production-readiness", requireAuth, requireAdmin);
+
+/** Thrown out of the transaction so the read that found nothing still rolls back. */
+class OrderNotFound extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OrderNotFound";
+  }
+}
+
+/**
+ * The refusal response, and the audit row that has to outlive the rollback.
+ *
+ * Mirrors `refusedResponse` above and differs where it must: the action is
+ * `order.consolidator_set` with `outcome: 'failure'`, because what was refused
+ * was setting a consolidator. A 404 writes no row of its own — the audit
+ * middleware's floor row is the right level of detail for "no such entity".
+ */
+async function refusedConsolidator(
+  c: ProductionContext,
+  orderId: string,
+  error: unknown
+): Promise<Response | null> {
+  if (error instanceof OrderNotFound) return c.json({ error: error.message }, 404);
+  if (!(error instanceof JobWriteRefused)) return null;
+
+  // NO `tx`. The row records that a transaction was ROLLED BACK; writing it
+  // inside that transaction rolls the evidence back with it. See `lib/audit.ts`.
+  await recordAudit(c, {
+    action: "order.consolidator_set",
+    entityType: "order",
+    entityId: orderId,
+    summary: `Refused to set the consolidator: ${error.message}`,
+    outcome: "failure",
+    metadata: error.body,
+  });
+
+  return c.json(error.body, error.httpStatus);
+}
+
+// ============================================================================
+// POST /api/admin/orders/:orderId/consolidator
+// ============================================================================
+
+adminOrderProductionApp.post(
+  "/:orderId/consolidator",
+  zValidator("param", orderParamSchema),
+  zValidator("json", setConsolidatorSchema),
+  async (c) => {
+    const { orderId } = c.req.valid("param");
+    const { vendorId: chosenVendorId } = c.req.valid("json");
+    const user = c.get("user");
+
+    try {
+      const result = await db.transaction(async (tx) => {
+        // The serialiser. Two admins choosing a consolidator for one order
+        // queue here rather than both reading "undecided" and both inserting,
+        // where the loser would meet a primary-key violation instead of an
+        // answer.
+        const [order] = await tx
+          .select({ id: orders.id })
+          .from(orders)
+          .where(eq(orders.id, orderId))
+          .limit(1)
+          .for("update");
+
+        if (!order) throw new OrderNotFound("Order not found");
+
+        // Under the same lock, and read for `decidedBy` as much as for the
+        // vendor: confirming a system default is a real change even when the
+        // vendor does not move.
+        const [existing] = await tx
+          .select({
+            vendorId: orderConsolidation.vendorId,
+            decidedBy: orderConsolidation.decidedBy,
+            decidedAt: orderConsolidation.decidedAt,
+          })
+          .from(orderConsolidation)
+          .where(eq(orderConsolidation.orderId, orderId))
+          .limit(1)
+          .for("update");
+
+        // The seam's own loader, inside this transaction. It reads more than the
+        // proposal strictly needs, and that is the point: the vendor proposed
+        // here is proposed from exactly the rows the label gate will later read,
+        // so the two cannot be looking at different orders.
+        const snapshot = await loadOrderProductionSnapshot(orderId, tx);
+        const proposal = proposeConsolidator(snapshot.jobs);
+
+        if (chosenVendorId === undefined && proposal.vendorId === null) {
+          throw new JobWriteRefused(422, {
+            error:
+              "No job on this order is assigned to a vendor yet, so there is nothing to " +
+              "consolidate. Assign a job first, or name the vendor explicitly.",
+            code: "NOTHING_TO_PROPOSE",
+            proposal,
+          });
+        }
+
+        if (chosenVendorId === undefined && proposal.needsConfirmation) {
+          // The system may propose this one; it may not write it. A proposal
+          // written with `decided_by = NULL` would claim there was nothing to
+          // decide, which is the one thing this case is not.
+          throw new JobWriteRefused(422, {
+            error:
+              "This order's jobs are split across vendors, so the consolidator is a " +
+              "judgement an admin has to confirm. Repost naming the vendorId.",
+            code: "CONFIRMATION_REQUIRED",
+            proposal,
+          });
+        }
+
+        const vendorId = chosenVendorId ?? (proposal.vendorId as string);
+        /** NULL is the record of "the system chose"; an id is an admin standing behind it. */
+        const decidedBy = chosenVendorId === undefined ? null : user.id;
+        const decision = decidedBy === null ? "system_default" : "admin_confirmed";
+        const basis =
+          chosenVendorId === undefined
+            ? proposal.basis
+            : chosenVendorId === proposal.vendorId
+              ? "confirmed_proposal"
+              : "admin_override";
+
+        const [vendor] = await tx
+          .select({ id: vendors.id, name: vendors.name })
+          .from(vendors)
+          .where(eq(vendors.id, vendorId))
+          .limit(1);
+
+        if (!vendor) throw new OrderNotFound("Vendor not found");
+
+        // Nothing moved and nobody changed their mind. One row per ACT, so
+        // there is no write and no audit row: re-confirming what already stands
+        // is not an act.
+        if (
+          existing &&
+          existing.vendorId === vendorId &&
+          (existing.decidedBy ?? null) === decidedBy
+        ) {
+          return {
+            changed: false as const,
+            consolidation: { orderId, ...existing },
+            vendor,
+            basis,
+            decision,
+            proposal,
+          };
+        }
+
+        // Only a re-ROUTING is refused. Confirming the vendor the goods are
+        // already travelling to changes no destination; it only stops the record
+        // saying the system picked it.
+        //
+        // A FIRST decision is never an override either. An order with goods in
+        // transit and no row at all is a repair, and refusing it would leave the
+        // order permanently unlabelable — `no_consolidator` is a blocker, and
+        // nothing else in the system can clear it.
+        if (
+          existing &&
+          existing.vendorId !== vendorId &&
+          !consolidatorOverrideAllowed(snapshot.transfers)
+        ) {
+          throw new JobWriteRefused(409, {
+            error:
+              "A transfer on this order has already dispatched, so the goods are moving " +
+              "to the current consolidator. Re-routing them is a call to the carrier, " +
+              "not a database write.",
+            code: "TRANSFER_DISPATCHED",
+            currentVendorId: existing.vendorId,
+            requestedVendorId: vendorId,
+          });
+        }
+
+        const decidedAt = new Date();
+
+        // The predicate is repeated rather than trusted from the read, and the
+        // row count below turns a lost race into a rollback rather than a 200
+        // over a write that matched nothing.
+        const written = existing
+          ? await tx
+              .update(orderConsolidation)
+              .set({ vendorId, decidedBy, decidedAt })
+              .where(
+                and(
+                  eq(orderConsolidation.orderId, orderId),
+                  eq(orderConsolidation.vendorId, existing.vendorId)
+                )
+              )
+              .returning()
+          : await tx
+              .insert(orderConsolidation)
+              .values({ orderId, vendorId, decidedBy, decidedAt })
+              .returning();
+
+        const [row] = written;
+
+        if (written.length !== 1 || !row) {
+          throw new JobWriteRefused(409, {
+            error: `Expected to write 1 consolidation row but matched ${written.length}; nothing was recorded`,
+            code: "CONCURRENT_MODIFICATION",
+            currentVendorId: existing?.vendorId ?? null,
+            requestedVendorId: vendorId,
+          });
+        }
+
+        await recordAudit(
+          c,
+          {
+            action: "order.consolidator_set",
+            entityType: "order",
+            entityId: orderId,
+            summary:
+              decidedBy === null
+                ? `Consolidator defaulted to ${vendor.name}: one vendor holds every job on the order`
+                : `Consolidator set to ${vendor.name} by an admin (${basis.replace("_", " ")})`,
+            ...diffRecords(existing ?? null, row, ["vendorId", "decidedBy"]),
+            metadata: {
+              // Which of the two it was, spelled out rather than inferred from a
+              // null: a reader of the trail must not have to know that
+              // `decided_by IS NULL` means the system.
+              decision,
+              basis,
+              // NOT `vendorId`: `recordAudit` reserves that key for the shop a
+              // VENDOR request was written for, and an admin acts for nobody.
+              consolidatorVendorId: vendorId,
+              previousConsolidatorVendorId: existing?.vendorId ?? null,
+              proposedVendorId: proposal.vendorId,
+              proposalBasis: proposal.basis,
+              needsConfirmation: proposal.needsConfirmation,
+            },
+          },
+          // Shares the transaction: a row saying this order routes through this
+          // vendor, beside an order that routes through nobody, is worse than
+          // no row.
+          tx
+        );
+
+        return {
+          changed: true as const,
+          consolidation: row,
+          vendor,
+          basis,
+          decision,
+          proposal,
+        };
+      });
+
+      return c.json({
+        message: result.changed ? "Consolidator set" : "Consolidator unchanged",
+        changed: result.changed,
+        consolidation: result.consolidation,
+        vendor: result.vendor,
+        basis: result.basis,
+        /** `decided_by IS NULL` — the system chose, because there was nothing to choose. */
+        systemDefault: result.decision === "system_default",
+        proposal: result.proposal,
+      });
+    } catch (error) {
+      const refused = await refusedConsolidator(c, orderId, error);
+      if (refused) return refused;
+      return c.json(failed("set the order consolidator", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/admin/orders/:orderId/production-readiness
+// ============================================================================
+
+/**
+ * Why this order cannot be labelled yet — the LIST, not a boolean.
+ *
+ * `getOrderLabelReadiness` is the same call `isOrderReadyToLabel` is
+ * `blockers.length === 0` over, so the gate that refuses to buy a courier label
+ * and the screen that explains the refusal cannot disagree. Nothing is
+ * re-derived here; the handler is the call, the codes and the envelope.
+ *
+ * `blockerCodes` is redundant with `blockers`, deliberately: the screen renders
+ * messages, and everything else — a test, a log line, a dashboard — wants to
+ * ask "is it THIS blocker" without pattern-matching English.
+ *
+ * A missing order answers 200 with the `order_not_found` blocker rather than a
+ * 404. The question this route answers is "is this order ready", and "no such
+ * order" is one of the answers — the one the readiness module added precisely
+ * because a missing order otherwise reads as the gift-card ready path.
+ */
+adminOrderProductionApp.get(
+  "/:orderId/production-readiness",
+  zValidator("param", orderParamSchema),
+  async (c) => {
+    const { orderId } = c.req.valid("param");
+
+    try {
+      const readiness = await getOrderLabelReadiness(orderId);
+
+      return c.json({
+        orderId,
+        ready: readiness.ready,
+        consolidatorVendorId: readiness.consolidatorVendorId,
+        blockers: readiness.blockers,
+        blockerCodes: readiness.blockers.map((blocker) => blocker.code),
+      });
+    } catch (error) {
+      return c.json(failed("read order production readiness", error), 500);
+    }
+  }
+);
+
+export { adminProductionApp, adminOrderProductionApp };
 export default adminProductionApp;
