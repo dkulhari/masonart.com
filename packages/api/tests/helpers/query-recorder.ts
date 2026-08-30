@@ -131,6 +131,14 @@ export function createQueryRecorder(options: QueryRecorderOptions = {}): QueryRe
       innerJoin: () => chain,
       groupBy: () => chain,
       returning: () => chain,
+      /**
+       * `FOR UPDATE`. Recorded as a no-op link rather than a flag: a mock
+       * cannot serialise anything, so a suite proves the lock the only way a
+       * mock can — the read happens inside the transaction, before the write,
+       * and the write repeats the predicate (see
+       * `tests/routes/admin/transfers.test.ts`).
+       */
+      for: () => chain,
       orderBy(o: unknown) {
         rec.orderBy = o
         return chain

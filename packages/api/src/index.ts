@@ -53,6 +53,7 @@ import { adminVendorRatesApp } from "./routes/admin/vendor-rates";
 import { adminVendorPayablesApp } from "./routes/admin/vendor-payables";
 import { adminVendorInviteApp } from "./routes/admin/vendor-invite";
 import { adminProductionApp } from "./routes/admin/production-jobs";
+import { adminTransfersApp } from "./routes/admin/transfers";
 import { vendorApp } from "./routes/vendor";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
@@ -304,6 +305,13 @@ app.route("/api/admin/vendors", adminVendorInviteApp);
 // Admin Production API - job queue, assignment pricing and QC reviews.
 // Admin-only: assignment writes what we will owe the vendor.
 app.route("/api/admin/production", adminProductionApp);
+
+// Admin Transfers API - inter-vendor legs, and declaring a parcel lost.
+// A separate router from the production queue above, on its own prefix: this is
+// the one route in the tree that creates work nobody has been paid for yet.
+// Admin-only and unreachable from /api/vendor by construction — a vendor
+// declaring a parcel lost is a vendor deciding who eats that cost.
+app.route("/api/admin/transfers", adminTransfersApp);
 
 // Vendor Portal API - a supplier's own jobs, rates and payments. Every read is
 // row-scoped in lib/vendor-scope, not by role: this tree carries no admin grant.
