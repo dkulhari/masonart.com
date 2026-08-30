@@ -33,6 +33,21 @@
  * statuses a vendor actually produces. A vendor could not filter to their own
  * finished work.
  *
+ * ## Parcels, above the queue
+ *
+ * `VendorTransferStrip` is the vendor's own legs at either end, from
+ * `GET /api/vendor/transfers`. It lives on this screen rather than on a job,
+ * because a parcel is a fact about the VENDOR: the API withholds the order a
+ * parcel belongs to (R1), and in the consolidation case the receiving vendor has
+ * no job for the piece at all. Confirming an arrival is therefore only reachable
+ * from here, which is also the screen a vendor lands on.
+ *
+ * What the strip says about the other end is **the direction and nothing else**.
+ * No vendor name, no vendor id, no order, no cost — `lib/vendor-scope.ts`
+ * computes `direction` as a SQL `case` over the caller's own id precisely so
+ * that neither vendor column is ever selected, and this screen must not put the
+ * difference back.
+ *
  * ## Three states, and no invented numbers
  *
  * Skeleton, empty and error, mutually exclusive, error winning over both. A
@@ -41,7 +56,7 @@
  * a surface where it would read as "we owe you nothing".
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
 import { AlertCircle, RefreshCw } from 'lucide-react'
@@ -182,6 +197,371 @@ export function DueCell({ dueAt }: { dueAt: string | null }) {
         {formatVendorDate(dueAt)}
       </span>
     </span>
+  )
+}
+
+// ============================================================================
+// Two-step confirm — no native dialogs anywhere in this tree
+// ============================================================================
+
+/**
+ * Asks before acting, inline.
+ *
+ * The pattern is `ReviewMediaStrip`'s and `routes/admin/vendors/$id.tsx`'s, for
+ * the reason documented in both: a native `confirm()` blocks the automation
+ * harness, so any path guarded by one can never be covered end to end.
+ *
+ * It lives HERE rather than on the job screen because both screens now need it
+ * — the job screen for its status moves, this one for confirming a parcel
+ * arrived — and `jobs/$id.tsx` already imports from this module. Putting it the
+ * other way round would make the two route files import each other, and
+ * `tests/routes/vendor/vendor-screens.test.tsx` forbids a fifth file to hold it
+ * in ("exactly four screens under one layout"). `jobs/$id.tsx` re-exports it, so
+ * every existing importer is unaffected.
+ */
+export function InlineConfirm({
+  label,
+  question,
+  onConfirm,
+  busy = false,
+  testId,
+  icon,
+}: {
+  label: string
+  question: string
+  onConfirm: () => void | Promise<void>
+  busy?: boolean
+  testId: string
+  icon?: ReactNode
+}) {
+  const [armed, setArmed] = useState(false)
+
+  if (!armed) {
+    return (
+      <Button type="button" variant="outline" data-testid={testId} onClick={() => setArmed(true)}>
+        {icon}
+        {label}
+      </Button>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">{question}</span>
+      <button
+        type="button"
+        data-testid={`${testId}-confirm`}
+        disabled={busy}
+        onClick={async () => {
+          await onConfirm()
+          setArmed(false)
+        }}
+        className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+      >
+        {busy ? 'Working…' : 'Confirm'}
+      </button>
+      <button
+        type="button"
+        data-testid={`${testId}-cancel`}
+        disabled={busy}
+        onClick={() => setArmed(false)}
+        className="rounded px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+      >
+        Cancel
+      </button>
+    </span>
+  )
+}
+
+// ============================================================================
+// Parcels between benches — and the seven fields a vendor is told about one
+// ============================================================================
+
+/**
+ * A parcel, exactly as `GET /api/vendor/transfers` answers it.
+ *
+ * Seven fields, plus `direction`. What is ABSENT is the design (§5) rather than
+ * an omission for brevity, and none of it can be added here because none of it
+ * is sent: no `fromVendorId`/`toVendorId`, no vendor NAME, no `orderId`, no
+ * `costAmount`, no `lostAt`. **Vendor B does not learn the parcel came from
+ * vendor A.** `lib/vendor-scope.ts` computes `direction` as a SQL `case` over
+ * the caller's own vendor id precisely so that neither vendor column is ever
+ * selected — the answer is "is this coming to me", never "who is at the other
+ * end" — and this screen must not reconstruct the difference. If a vendor needs
+ * to chase a carrier, an admin chases it; the admin sees both ends.
+ *
+ * The dates are ISO strings here and `Date`s in the API: they cross as JSON.
+ */
+export interface VendorTransfer {
+  id: string
+  /** The A→B docket. Null until a carrier issues one. */
+  reference: string | null
+  carrier: string | null
+  pieceCount: number
+  dispatchedAt: string | null
+  /** The carrier's promise, off the docket. The one date that is not ours. */
+  expectedBy: string | null
+  receivedAt: string | null
+  /** Relative to the CALLER, and the only thing they learn about the other end. */
+  direction: 'inbound' | 'outbound'
+}
+
+export interface VendorTransfersResponse {
+  items: VendorTransfer[]
+  limit: number
+  offset: number
+}
+
+/**
+ * Everything the parcel strip needs, in one prop.
+ *
+ * One object rather than seven flat props, following the shot-list panel added
+ * in #692 and for the same reason: every prop on the screens that host this is
+ * a thing the next ticket has to read past.
+ */
+export interface VendorTransferPanelState {
+  data: VendorTransfer[] | null
+  isLoading: boolean
+  /** A failed READ. It replaces the list, because there is no list. */
+  error: string | null
+  onRetry: () => void
+  /** Absent on a screen that only reports parcels rather than acting on them. */
+  onReceived?: (id: string) => void | Promise<void>
+  /** The parcel with a write in flight. Locks that row, not the page. */
+  busyId?: string | null
+  /** A failed WRITE, keyed by the parcel that caused it. */
+  rowErrors?: Record<string, string>
+}
+
+/**
+ * The parcels still on their way TO this vendor.
+ *
+ * `null`/`undefined` — the parcels have not been read — is deliberately EMPTY
+ * rather than "waiting". The screens use this to decide whether to say a job is
+ * blocked on a parcel, and a page that announces an inbound parcel because a
+ * request has not come back yet is inventing one.
+ */
+export function unreceivedInboundTransfers(
+  transfers: VendorTransfer[] | null | undefined
+): VendorTransfer[] {
+  if (!transfers) return []
+  return transfers.filter(
+    (transfer) => transfer.direction === 'inbound' && transfer.receivedAt === null
+  )
+}
+
+/** `3 pieces`, `1 piece`. A count nobody has to decode. */
+function piecesLabel(count: number): string {
+  return `${count} ${count === 1 ? 'piece' : 'pieces'}`
+}
+
+export async function fetchVendorTransfers(
+  opts: { direction?: 'inbound' | 'outbound'; limit?: number } = {}
+): Promise<VendorTransfersResponse> {
+  const query = new URLSearchParams()
+  if (opts.direction) query.set('direction', opts.direction)
+  if (opts.limit) query.set('limit', String(opts.limit))
+
+  const response = await fetch(
+    `${getApiUrl()}/api/vendor/transfers${query.toString() ? `?${query.toString()}` : ''}`,
+    { credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to load your parcels')
+  }
+
+  return (await response.json()) as VendorTransfersResponse
+}
+
+/**
+ * Confirm a parcel arrived. **There is no body**, and that is the API's design:
+ * `received_at` is stamped from our clock, and the only other thing a vendor
+ * could put in one is `cost_amount`, which is not theirs to set. A request with
+ * no payload cannot be talked into carrying a field it does not have.
+ */
+export async function markVendorTransferReceived(id: string): Promise<void> {
+  const response = await fetch(`${getApiUrl()}/api/vendor/transfers/${id}/received`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    // Passed through as written. A 404 covers "no such parcel" and "neither end
+    // is yours" alike, and the API refuses to distinguish them on purpose.
+    throw new Error(body.error ?? 'Failed to confirm this parcel')
+  }
+}
+
+// ============================================================================
+// The parcel strip
+// ============================================================================
+
+function TransfersSkeleton() {
+  return (
+    <div
+      data-testid="vendor-transfers-skeleton"
+      className="space-y-2 rounded-lg border border-border p-4"
+      aria-busy="true"
+      aria-label="Loading parcels"
+    >
+      {['a', 'b'].map((key) => (
+        <div key={key} className="h-10 animate-pulse rounded bg-muted" aria-hidden="true" />
+      ))}
+    </div>
+  )
+}
+
+/** Digit-free, for the same reason every error block on this surface is. */
+function TransfersError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div
+      data-testid="vendor-transfers-error"
+      role="alert"
+      className="rounded-lg border border-destructive/40 bg-destructive/10 px-6 py-8 text-center"
+    >
+      <AlertCircle className="mx-auto mb-3 h-6 w-6 text-destructive" aria-hidden="true" />
+      <p className="mb-1 font-medium">{message}</p>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Nothing is listed below because nothing was read — that is not the same
+        as there being no parcels.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        data-testid="vendor-transfers-retry"
+        onClick={onRetry}
+      >
+        Try again
+      </Button>
+    </div>
+  )
+}
+
+function TransfersEmpty() {
+  return (
+    <div
+      data-testid="vendor-transfers-empty"
+      className="rounded-lg border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground"
+    >
+      No parcels are on their way to you or away from you.
+    </div>
+  )
+}
+
+/**
+ * Parcels at either end of this vendor, and the one act they have on them.
+ *
+ * BOTH directions, because the API answers both by default and each is
+ * load-bearing: a list showing only outbound legs leaves a vendor unable to
+ * confirm anything they were sent, and one showing only inbound legs hides the
+ * legs they are still on the hook for. `direction` is how the strip tells them
+ * apart, and it is the ONLY thing said about the other end — never a name,
+ * never an id, never which order the parcel belongs to.
+ *
+ * "Confirm arrival" is offered on an inbound parcel that has not arrived and
+ * nowhere else. `received_at` is settable only by the receiving end — the API
+ * answers the sending vendor with a 404, not a 403, so as not to confirm the
+ * row — and a control whose only possible outcome is a refusal is a support
+ * ticket rather than an affordance.
+ *
+ * Skeleton, error and empty are mutually exclusive with error winning, and the
+ * error block carries no digits: an empty state after a failed read says "no
+ * parcels are coming", which is a different fact from "we did not find out" and
+ * the only one of the two a vendor would act on.
+ */
+export function VendorTransferStrip({
+  transfers,
+}: {
+  transfers: VendorTransferPanelState
+}) {
+  const { data, isLoading, error, onRetry, onReceived, busyId, rowErrors } = transfers
+
+  if (error) return <TransfersError message={error} onRetry={onRetry} />
+  if (isLoading) return <TransfersSkeleton />
+  if (!data || data.length === 0) return <TransfersEmpty />
+
+  return (
+    <ul
+      data-testid="vendor-transfers"
+      className="divide-y divide-border rounded-lg border border-border"
+    >
+      {data.map((transfer) => {
+        const inbound = transfer.direction === 'inbound'
+        const arrived = transfer.receivedAt !== null
+        const rowError = rowErrors?.[transfer.id]
+
+        return (
+          <li
+            key={transfer.id}
+            data-testid={`vendor-transfer-row-${transfer.id}`}
+            className="space-y-2 px-4 py-3"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm font-medium">
+                    {/* Never a blank cell: a parcel can genuinely leave before
+                        the carrier issues a docket. */}
+                    {transfer.reference ?? (
+                      <span className="font-sans text-muted-foreground">No docket reference</span>
+                    )}
+                  </span>
+                  <span
+                    data-testid={`vendor-transfer-direction-${transfer.id}`}
+                    className={cn(
+                      'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
+                      inbound
+                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        : 'border-border bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {/* The whole of what a vendor learns about the other end. */}
+                    {inbound ? 'Coming to you' : 'Sent by you'}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {transfer.carrier ?? 'Carrier not recorded'} · {piecesLabel(transfer.pieceCount)}
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground sm:text-right">
+                <div>Left on {formatVendorDate(transfer.dispatchedAt)}</div>
+                <div>
+                  {arrived
+                    ? `Arrived ${formatVendorDate(transfer.receivedAt)}`
+                    : `In transit, due ${formatVendorDate(transfer.expectedBy)}`}
+                </div>
+              </div>
+            </div>
+
+            {inbound && !arrived && onReceived && (
+              <InlineConfirm
+                testId={`vendor-transfer-received-${transfer.id}`}
+                label="Confirm arrival"
+                question="Confirm this parcel is on your bench?"
+                busy={busyId === transfer.id}
+                onConfirm={() => onReceived(transfer.id)}
+              />
+            )}
+
+            {rowError && (
+              <p
+                data-testid={`vendor-transfer-error-${transfer.id}`}
+                role="alert"
+                className="text-sm text-destructive"
+              >
+                {/* On the ROW. One refused confirmation must not take the rest
+                    of the strip down with it. */}
+                {rowError}
+              </p>
+            )}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
@@ -355,6 +735,15 @@ function VendorJobsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // The parcels are read SEPARATELY from the queue and their failures stay
+  // separate too: a transfer list that would not load must not blank a queue
+  // that did, and re-filtering the queue must not re-read the parcels.
+  const [transfers, setTransfers] = useState<VendorTransfer[] | null>(null)
+  const [transfersLoading, setTransfersLoading] = useState(true)
+  const [transfersError, setTransfersError] = useState<string | null>(null)
+  const [busyTransferId, setBusyTransferId] = useState<string | null>(null)
+  const [transferErrors, setTransferErrors] = useState<Record<string, string>>({})
+
   const load = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -371,9 +760,50 @@ function VendorJobsPage() {
     }
   }, [search])
 
+  const loadTransfers = useCallback(async () => {
+    setTransfersLoading(true)
+    try {
+      // No `direction`: both ends, which is the API's own default and the only
+      // one that shows a vendor all of their own legs.
+      const { items } = await fetchVendorTransfers()
+      setTransfers(items)
+      setTransfersError(null)
+    } catch (transfersLoadError) {
+      setTransfers(null)
+      setTransfersError((transfersLoadError as Error).message)
+    } finally {
+      setTransfersLoading(false)
+    }
+  }, [])
+
+  const confirmArrival = async (id: string) => {
+    setBusyTransferId(id)
+    setTransferErrors((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+
+    try {
+      await markVendorTransferReceived(id)
+      // Re-read rather than patch: the server stamps `received_at` from its own
+      // clock, and an optimistic row would print a time nothing recorded.
+      await loadTransfers()
+    } catch (receiveError) {
+      // Kept on the ROW. One refused confirmation must not take the strip down.
+      setTransferErrors((current) => ({ ...current, [id]: (receiveError as Error).message }))
+    } finally {
+      setBusyTransferId(null)
+    }
+  }
+
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    void loadTransfers()
+  }, [loadTransfers])
 
   const updateSearch = (updates: Partial<VendorJobsSearch>) => {
     void navigate({
@@ -441,6 +871,24 @@ function VendorJobsPage() {
           </Button>
         )}
       </div>
+
+      {/* Parcels, above the queue: a piece that has not landed is the reason a
+          job in the list below cannot be started, and it is vendor-level news
+          rather than job-level, so it belongs on the screen a vendor lands on. */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Parcels</h2>
+        <VendorTransferStrip
+          transfers={{
+            data: transfers,
+            isLoading: transfersLoading,
+            error: transfersError,
+            onRetry: () => void loadTransfers(),
+            onReceived: confirmArrival,
+            busyId: busyTransferId,
+            rowErrors: transferErrors,
+          }}
+        />
+      </section>
 
       <VendorJobsListBody
         jobs={jobs}

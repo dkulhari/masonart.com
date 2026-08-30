@@ -17,12 +17,17 @@
  * text alone: the whole innerHTML is checked, because a leak into a `title`, an
  * `href` or a `data-` attribute is still a leak.
  *
- * The second half of the file pins the artwork rule: a signed URL is requested
- * AT CLICK TIME and used immediately. Nothing is fetched at render.
+ * The second half of the file pins the signature rules — the artwork link, the
+ * QC photograph and the carrier label alike: a signed URL is requested AT CLICK
+ * TIME, used immediately, and never parked in the DOM. Nothing is fetched at
+ * render, and the label is handed to the operating system as bytes rather than
+ * rendered into this portal's own markup (§6, R2).
  */
 
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (config: unknown) => config,
@@ -41,10 +46,13 @@ vi.mock('@tanstack/react-router', () => ({
 
 import {
   VendorJobsListBody,
+  VendorTransferStrip,
   type VendorJobListItem,
+  type VendorTransfer,
 } from '~/routes/vendor/index'
 import {
   VendorJobDetailBody,
+  VendorLabelHandoverCard,
   VendorQcShotList,
   type VendorJobDetailResponse,
   type VendorQcPhotoSet,
@@ -252,43 +260,49 @@ describe('no customer data reaches the DOM', () => {
  *   the screen — so they are fetched as bytes and rendered from a local `blob:`
  *   URL. The signature stays in a variable.
  */
+const signed =
+  'https://r2.example.com/production-qc/j/frame_front/u.jpg?X-Amz-Signature=deadbeefcafe'
+
+/** The job's own stage, so the panel and the job cannot drift apart here. */
+const stage = pollutedDetail.job.stage
+const firstSlot = QC_SHOT_LIST[stage][0].slot
+
+/**
+ * A shot list carrying a signed URL and the pollution, as a leak would.
+ *
+ * At module scope rather than inside the block below because the label card's
+ * suite reuses it: "the whole job screen embeds nothing" is only worth
+ * asserting on a screen that has actually rendered media.
+ */
+const pollutedPhotos: VendorQcPhotoSet = {
+  jobId: pollutedDetail.job.id,
+  stage,
+  status: 'received',
+  shots: (qcShotsForStage(stage) ?? []).map((shot, index) => ({
+    slot: shot.slot,
+    label: shot.label,
+    required: shot.required,
+    onShotList: true,
+    photo:
+      index === 0
+        ? ({
+            id: '77777777-7777-4777-8777-777777777777',
+            contentType: 'image/jpeg',
+            sizeBytes: 1_048_576,
+            uploadedAt: '2026-08-14T09:00:00.000Z',
+            reviewId: null,
+            url: signed,
+            ...POLLUTION,
+          } as VendorQcPhotoSet['shots'][number]['photo'])
+        : null,
+  })),
+  missingRequiredSlots: [],
+  expiresInSeconds: 300,
+  expiresAt: '2026-08-14T09:05:00.000Z',
+  ...POLLUTION,
+} as VendorQcPhotoSet
+
 describe('the vendor portal embeds nothing and parks no signature', () => {
-  const signed =
-    'https://r2.example.com/production-qc/j/frame_front/u.jpg?X-Amz-Signature=deadbeefcafe'
-
-  /** The job's own stage, so the panel and the job cannot drift apart here. */
-  const stage = pollutedDetail.job.stage
-  const firstSlot = QC_SHOT_LIST[stage][0].slot
-
-  /** A shot list carrying a signed URL and the pollution, as a leak would. */
-  const pollutedPhotos: VendorQcPhotoSet = {
-    jobId: pollutedDetail.job.id,
-    stage,
-    status: 'received',
-    shots: (qcShotsForStage(stage) ?? []).map((shot, index) => ({
-      slot: shot.slot,
-      label: shot.label,
-      required: shot.required,
-      onShotList: true,
-      photo:
-        index === 0
-          ? ({
-              id: '77777777-7777-4777-8777-777777777777',
-              contentType: 'image/jpeg',
-              sizeBytes: 1_048_576,
-              uploadedAt: '2026-08-14T09:00:00.000Z',
-              reviewId: null,
-              url: signed,
-              ...POLLUTION,
-            } as VendorQcPhotoSet['shots'][number]['photo'])
-          : null,
-    })),
-    missingRequiredSlots: [],
-    expiresInSeconds: 300,
-    expiresAt: '2026-08-14T09:05:00.000Z',
-    ...POLLUTION,
-  } as VendorQcPhotoSet
-
   const fetchMock = vi.fn()
 
   beforeEach(() => {
@@ -355,6 +369,350 @@ describe('the vendor portal embeds nothing and parks no signature', () => {
     probe.innerHTML = `<iframe src="x"></iframe><a href="?X-Amz-Signature=z">y</a>`
     expect(probe.querySelectorAll('iframe, embed, object').length).toBe(1)
     expect(probe.innerHTML).toContain('X-Amz-Signature')
+  })
+})
+
+// ============================================================================
+// Parcels — the other end of the leg is not a thing a vendor learns
+// ============================================================================
+
+/**
+ * `GET /api/vendor/transfers` tells a vendor seven fields and a direction.
+ *
+ * What is missing is the design (§5): no `fromVendorId`/`toVendorId`, no vendor
+ * NAME, no `orderId`, no `costAmount`, no `lostAt`. Vendor B must not learn the
+ * parcel came from vendor A — surfacing another vendor's row would break the
+ * isolation suite's first property — so the fixture below carries every one of
+ * those as well as the customer pollution, and the strip is asserted to render
+ * a legible row containing none of it.
+ */
+describe('the parcel strip tells a vendor nothing about the other end', () => {
+  /** Everything a vendor must never learn about the vendor at the other end. */
+  const OTHER_END = {
+    fromVendorId: 'dddddddd-4444-4444-8444-dddddddddddd',
+    toVendorId: 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee',
+    fromVendorName: 'Sunrise Print Works',
+    toVendorName: 'Bandra Framing Co',
+    costAmount: '1450.75',
+    lostNote: 'Courier says it fell off the van',
+  }
+
+  const pollutedTransfer: VendorTransfer = {
+    id: '88888888-8888-4888-8888-888888888888',
+    reference: 'BLR-DKT-99120',
+    carrier: 'Delhivery',
+    pieceCount: 3,
+    dispatchedAt: '2026-08-20T06:00:00.000Z',
+    expectedBy: '2026-08-23T06:00:00.000Z',
+    receivedAt: null,
+    direction: 'inbound',
+    ...POLLUTION,
+    ...OTHER_END,
+  } as VendorTransfer
+
+  it('renders the docket and neither vendor, neither cost, nor any customer field', () => {
+    const { container } = render(
+      <VendorTransferStrip
+        transfers={{
+          data: [pollutedTransfer],
+          isLoading: false,
+          error: null,
+          onRetry: () => {},
+          onReceived: () => {},
+        }}
+      />
+    )
+
+    // Non-vacuous: the parcel IS on screen, with its docket and its count.
+    const row = screen.getByTestId(`vendor-transfer-row-${pollutedTransfer.id}`)
+    expect(row).toHaveTextContent('BLR-DKT-99120')
+    expect(row).toHaveTextContent('Delhivery')
+
+    expectNoCustomerData(container.innerHTML)
+    for (const leak of Object.values(OTHER_END)) {
+      expect(container.innerHTML).not.toContain(leak)
+    }
+  })
+
+  it('the direction badge says which way, never who', () => {
+    render(
+      <VendorTransferStrip
+        transfers={{
+          data: [pollutedTransfer],
+          isLoading: false,
+          error: null,
+          onRetry: () => {},
+        }}
+      />
+    )
+    const badge =
+      screen.getByTestId(`vendor-transfer-direction-${pollutedTransfer.id}`).textContent ?? ''
+    expect(badge).toMatch(/you/i)
+    expect(badge).not.toMatch(/sunrise|bandra|vendor/i)
+  })
+})
+
+// ============================================================================
+// The carrier label — the ONE document that carries a customer
+// ============================================================================
+
+/**
+ * R2, mechanically.
+ *
+ * The label PDF contains the customer's name, address and phone, because the
+ * courier prints it. It is allowed to reach a vendor for exactly one reason: it
+ * arrives as opaque rendered BYTES behind a short-lived signature and is handed
+ * to the operating system. Never composed by our API, never rendered into this
+ * portal's own DOM.
+ *
+ * Three things therefore have to hold, and each is a separate way the hole
+ * reopens: the control is a BUTTON rather than a viewer; the signature never
+ * lands in an attribute, not even as a fallback link when the byte fetch fails;
+ * and nothing is fetched at all until the click, because the API signs AND
+ * writes a `production_job.label_issued` audit row on every success.
+ */
+describe('the carrier label is handed to the OS, never rendered', () => {
+  const signedLabel =
+    'https://r2.example.com/fulfilment/labels/9f3c.pdf?X-Amz-Signature=deadbeefcafe'
+
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    // The default is the PHOTO fetch: the whole-screen case below renders a
+    // shot, and without this it would eat a response queued for the label.
+    fetchMock.mockResolvedValue({ ok: true, status: 200, blob: async () => new Blob(['x']) })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:vendor-label')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  /** A job at the one status the matrix gates on the label. */
+  const atHandover: VendorJobDetailResponse = {
+    ...pollutedDetail,
+    job: { ...pollutedDetail.job, status: 'qc_passed' },
+  }
+
+  it('the control is a BUTTON and the card embeds nothing', () => {
+    const { container } = render(
+      <VendorLabelHandoverCard jobId={pollutedDetail.job.id} />
+    )
+
+    const control = screen.getByTestId('vendor-job-label')
+    expect(control.tagName).toBe('BUTTON')
+    // An <iframe src={signedUrl}> would put the customer's address into this
+    // portal's own markup, which is precisely what R2 forbids.
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.querySelectorAll('a[href]').length).toBe(0)
+  })
+
+  it('fetches NOTHING while the handover card is merely on screen', () => {
+    render(
+      <VendorJobDetailBody
+        data={atHandover}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    // The card IS there — this does not pass by rendering nothing.
+    expect(screen.getByTestId('vendor-job-label-card')).toBeInTheDocument()
+    // A render that signed would spend a five-minute capability nobody asked
+    // for AND write an audit row claiming a disclosure that never happened.
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('parks no part of the signed URL in the DOM, before or after the click', async () => {
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobId: pollutedDetail.job.id,
+          url: signedLabel,
+          expiresInSeconds: 300,
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          ...POLLUTION,
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: async () => new Blob(['%PDF-1.4']) })
+
+    const { container } = render(
+      <VendorLabelHandoverCard jobId={pollutedDetail.job.id} />
+    )
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1))
+
+    // The bytes were fetched from the signature; the DOM got an object URL.
+    expect(fetchMock.mock.calls[1][0]).toBe(signedLabel)
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.innerHTML).not.toContain('r2.example.com')
+    expect(container.innerHTML).not.toContain('fulfilment/labels')
+    expect(document.body.querySelectorAll('a[href*="X-Amz-Signature"]').length).toBe(0)
+    expectNoCustomerData(container.innerHTML)
+  })
+
+  it('does not fall back to a link when the bytes cannot be fetched', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobId: pollutedDetail.job.id,
+          url: signedLabel,
+          expiresInSeconds: 300,
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+
+    const { container } = render(
+      <VendorLabelHandoverCard jobId={pollutedDetail.job.id} />
+    )
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('vendor-job-label-error')).toBeInTheDocument()
+    )
+    // "Here is the link instead" is the one tempting way to put the signature
+    // back into the markup, and it is not offered.
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.querySelectorAll('a[href]').length).toBe(0)
+  })
+
+  it('the 503 seam says the label is not here yet, and no more', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        error: 'column "label_object_token" of relation "order_shipments" does not exist',
+        code: 'LABEL_NOT_AVAILABLE',
+      }),
+    })
+
+    const { container } = render(
+      <VendorLabelHandoverCard jobId={pollutedDetail.job.id} />
+    )
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('vendor-job-label-unavailable')).toBeInTheDocument()
+    )
+    // The copy is ours, so the body cannot narrate our schema to a supplier
+    // through this card however the API's message changes.
+    for (const leak of ['label_object_token', 'order_shipments', 'relation', 'column']) {
+      expect(container.innerHTML).not.toContain(leak)
+    }
+    expectNoCustomerData(container.innerHTML)
+  })
+
+  it('embeds nothing on the WHOLE job screen once the handover card is on it', async () => {
+    const { container } = render(
+      <VendorJobDetailBody
+        data={atHandover}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        qc={{ data: pollutedPhotos, isLoading: false, error: null, onRetry: () => {} }}
+        transfers={{
+          data: [
+            {
+              id: '88888888-8888-4888-8888-888888888888',
+              reference: 'BLR-DKT-99120',
+              carrier: 'Delhivery',
+              pieceCount: 3,
+              dispatchedAt: '2026-08-20T06:00:00.000Z',
+              expectedBy: '2026-08-23T06:00:00.000Z',
+              receivedAt: null,
+              direction: 'inbound',
+              ...POLLUTION,
+            } as VendorTransfer,
+          ],
+          isLoading: false,
+          error: null,
+          onRetry: () => {},
+        }}
+      />
+    )
+
+    // Non-vacuous on both counts: a photograph has rendered AND the label card
+    // is present, so "no embeds" is a statement about the fully-populated
+    // screen rather than about an empty div.
+    await waitFor(() =>
+      expect(screen.getByTestId(`vendor-qc-photo-${firstSlot}`)).toBeInTheDocument()
+    )
+    expect(screen.getByTestId('vendor-job-label-card')).toBeInTheDocument()
+    expect(screen.getByTestId('vendor-job-awaiting-inbound')).toBeInTheDocument()
+
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expectNoCustomerData(container.innerHTML)
+  })
+})
+
+// ============================================================================
+// No embed element exists in this tree AT ALL — rendered or not
+// ============================================================================
+
+/**
+ * The source-level half of R2, and the reason it exists.
+ *
+ * Every assertion above is a statement about a screen a test chose to render.
+ * That is not enough here, and this suite found out the hard way: an
+ * `<iframe>` planted behind a prop nobody passes — a "label preview" panel, say
+ * — passes ALL of them, because no test renders the branch it lives in. The
+ * rule R2 states is not "no embed appears in the states we happen to check", it
+ * is that the vendor portal has no inline viewer for a customer document at
+ * all, and only a scan of the source says that.
+ *
+ * So: no `<iframe>`, `<embed>` or `<object>` anywhere in the four screens or
+ * their layout, in any branch, reachable or not. The same shape and the same
+ * five files as the native-dialog scan in `vendor-screens.test.tsx`, and
+ * comments are stripped first for the same reason — every one of these files
+ * explains why it embeds nothing, and an assertion that trips over its own
+ * rationale teaches the next person to delete the rationale.
+ */
+describe('the vendor tree contains no embed element in any branch', () => {
+  const files = [
+    'app/routes/vendor.tsx',
+    'app/routes/vendor/index.tsx',
+    'app/routes/vendor/jobs/$id.tsx',
+    'app/routes/vendor/rates.tsx',
+    'app/routes/vendor/payments.tsx',
+  ]
+
+  const EMBEDS = /<\s*(iframe|embed|object)\b/i
+
+  const codeOf = (file: string) =>
+    readFileSync(join(process.cwd(), file), 'utf-8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+
+  it.each(files)('%s embeds nothing, in any branch', (file) => {
+    // Rendering the carrier's label PDF inline would put a customer's name,
+    // address and phone into the vendor portal's own markup. The label is
+    // fetched as bytes and handed to the operating system instead.
+    expect(codeOf(file)).not.toMatch(EMBEDS)
+  })
+
+  it('the scan has teeth', () => {
+    // A guard on the guard: if the pattern ever stopped matching, every case
+    // above would pass by doing nothing.
+    expect('<iframe src="x" />').toMatch(EMBEDS)
+    expect('<object data="x" />').toMatch(EMBEDS)
+    expect('<embed src="x" />').toMatch(EMBEDS)
+    expect('<img src="x" /><button>Get the carrier label</button>').not.toMatch(EMBEDS)
   })
 })
 

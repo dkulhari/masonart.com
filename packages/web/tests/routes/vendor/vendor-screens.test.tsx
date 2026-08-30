@@ -69,10 +69,17 @@ import {
   vendorJobsSearchSchema,
   VendorJobsListBody,
   DueCell,
+  VendorTransferStrip,
+  fetchVendorTransfers,
+  markVendorTransferReceived,
+  unreceivedInboundTransfers,
   type VendorJobListItem,
+  type VendorTransfer,
+  type VendorTransferPanelState,
 } from '~/routes/vendor/index'
 import {
   VendorJobDetailBody,
+  VendorLabelHandoverCard,
   InlineConfirm,
   QcVerdictBanner,
   VendorJobWriteError,
@@ -1621,6 +1628,595 @@ describe('formatting never invents a number', () => {
 // ============================================================================
 // Exactly four screens, and no native dialogs
 // ============================================================================
+
+// ============================================================================
+// Inbound parcels — the strip, and the seven fields a vendor is told
+// ============================================================================
+
+/**
+ * A parcel, exactly as `GET /api/vendor/transfers` answers it.
+ *
+ * Seven fields plus `direction`, and the assertions below are written against
+ * THAT LIST rather than against the markup, because the whole point of the
+ * surface is subtraction: a `fromVendorName`, an `orderId` or a `costAmount`
+ * appearing here would be the isolation suite's first property breaking, and a
+ * test that only checked the fields it expected to see could never notice.
+ */
+const inboundParcel: VendorTransfer = {
+  id: '88888888-8888-4888-8888-888888888888',
+  reference: 'BLR-DKT-99120',
+  carrier: 'Delhivery',
+  pieceCount: 3,
+  dispatchedAt: '2026-08-20T06:00:00.000Z',
+  expectedBy: '2026-08-23T06:00:00.000Z',
+  receivedAt: null,
+  direction: 'inbound',
+}
+
+const outboundParcel: VendorTransfer = {
+  id: '99999999-9999-4999-8999-999999999999',
+  reference: 'BLR-DKT-99121',
+  carrier: null,
+  pieceCount: 1,
+  dispatchedAt: '2026-08-21T06:00:00.000Z',
+  expectedBy: null,
+  receivedAt: null,
+  direction: 'outbound',
+}
+
+const arrivedParcel: VendorTransfer = {
+  ...inboundParcel,
+  id: 'aaaaaaaa-8888-4888-8888-888888888888',
+  receivedAt: '2026-08-22T11:30:00.000Z',
+}
+
+const transferPanel = (
+  over: Partial<VendorTransferPanelState> = {}
+): VendorTransferPanelState => ({
+  data: [inboundParcel],
+  isLoading: false,
+  error: null,
+  onRetry: () => {},
+  ...over,
+})
+
+describe('the inbound parcel strip', () => {
+  it('shows the docket, the carrier and the piece count', () => {
+    render(<VendorTransferStrip transfers={transferPanel()} />)
+
+    const row = screen.getByTestId(`vendor-transfer-row-${inboundParcel.id}`)
+    expect(row).toHaveTextContent('BLR-DKT-99120')
+    expect(row).toHaveTextContent('Delhivery')
+    // The piece count is what a vendor counts against on arrival, so it is
+    // rendered as a number of pieces rather than as a bare digit.
+    expect(row.textContent ?? '').toMatch(/3\s*pieces/i)
+  })
+
+  it('names the direction, which is all a vendor learns about the other end', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [inboundParcel, outboundParcel] })}
+      />
+    )
+
+    expect(
+      screen.getByTestId(`vendor-transfer-direction-${inboundParcel.id}`)
+    ).toHaveTextContent(/coming to you/i)
+    expect(
+      screen.getByTestId(`vendor-transfer-direction-${outboundParcel.id}`)
+    ).toHaveTextContent(/sent by you/i)
+  })
+
+  it('says a parcel has no docket rather than printing a blank', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [{ ...inboundParcel, reference: null }] })}
+      />
+    )
+    expect(screen.getByTestId(`vendor-transfer-row-${inboundParcel.id}`)).toHaveTextContent(
+      /no docket/i
+    )
+  })
+
+  it('shows a skeleton while the parcels are loading', () => {
+    render(<VendorTransferStrip transfers={transferPanel({ data: null, isLoading: true })} />)
+    expect(screen.getByTestId('vendor-transfers-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('vendor-transfers-empty')).not.toBeInTheDocument()
+  })
+
+  it('shows the error INSTEAD of an empty state, with no numbers in it', () => {
+    const { container } = render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: null, error: 'Failed to list transfers' })}
+      />
+    )
+    // An empty state after a failed read is a lie: "no parcels" and "we did not
+    // find out" are different facts, and only one of them is safe to act on.
+    expect(screen.getByTestId('vendor-transfers-error')).toBeInTheDocument()
+    expect(screen.queryByTestId('vendor-transfers-empty')).not.toBeInTheDocument()
+    expectDigitFree(container.innerHTML)
+  })
+
+  it('retry is wired', () => {
+    const onRetry = vi.fn()
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: null, error: 'Failed to list transfers', onRetry })}
+      />
+    )
+    fireEvent.click(screen.getByTestId('vendor-transfers-retry'))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an empty state when there really are no parcels', () => {
+    render(<VendorTransferStrip transfers={transferPanel({ data: [] })} />)
+    expect(screen.getByTestId('vendor-transfers-empty')).toBeInTheDocument()
+  })
+
+  it('offers arrival confirmation on an inbound parcel that has not arrived', () => {
+    render(<VendorTransferStrip transfers={transferPanel({ onReceived: () => {} })} />)
+    expect(
+      screen.getByTestId(`vendor-transfer-received-${inboundParcel.id}`)
+    ).toBeInTheDocument()
+  })
+
+  it('offers it on NEITHER an outbound parcel nor one already arrived', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [outboundParcel, arrivedParcel], onReceived: () => {} })}
+      />
+    )
+    // `received_at` is settable only by the receiving end — the API answers the
+    // sender with a 404 — and a control whose only outcome is a refusal is a
+    // support ticket rather than an affordance.
+    expect(
+      screen.queryByTestId(`vendor-transfer-received-${outboundParcel.id}`)
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId(`vendor-transfer-received-${arrivedParcel.id}`)
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId(`vendor-transfer-row-${arrivedParcel.id}`)).toHaveTextContent(
+      /arrived/i
+    )
+  })
+
+  it('asks before confirming an arrival, and only then calls through', () => {
+    const onReceived = vi.fn()
+    render(<VendorTransferStrip transfers={transferPanel({ onReceived })} />)
+
+    fireEvent.click(screen.getByTestId(`vendor-transfer-received-${inboundParcel.id}`))
+    expect(onReceived).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId(`vendor-transfer-received-${inboundParcel.id}-confirm`))
+    expect(onReceived).toHaveBeenCalledWith(inboundParcel.id)
+  })
+
+  it('keeps a failed confirmation on its own row', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({
+          data: [inboundParcel, { ...outboundParcel, direction: 'inbound' }],
+          onReceived: () => {},
+          rowErrors: { [inboundParcel.id]: 'This parcel was already confirmed.' },
+        })}
+      />
+    )
+    expect(screen.getByTestId(`vendor-transfer-error-${inboundParcel.id}`)).toHaveTextContent(
+      /already confirmed/i
+    )
+    expect(
+      screen.queryByTestId(`vendor-transfer-error-${outboundParcel.id}`)
+    ).not.toBeInTheDocument()
+  })
+})
+
+describe('unreceivedInboundTransfers', () => {
+  it('is the inbound parcels with no arrival stamp, and nothing else', () => {
+    expect(
+      unreceivedInboundTransfers([inboundParcel, outboundParcel, arrivedParcel])
+    ).toEqual([inboundParcel])
+  })
+
+  it('is empty when the parcels have not been read — unknown is not waiting', () => {
+    expect(unreceivedInboundTransfers(null)).toEqual([])
+    expect(unreceivedInboundTransfers(undefined)).toEqual([])
+  })
+})
+
+// ============================================================================
+// Waiting on an inbound parcel
+// ============================================================================
+
+/**
+ * A frame job cannot start until the printed sheet reaches the bench, and the
+ * portal is the only place that says so.
+ *
+ * The link between a parcel and an ORDER is deliberately unavailable here: the
+ * API withholds `order_id` from every vendor-facing projection (R1), and
+ * `GET /transfers/:id` scopes `jobIds` to the CALLER's own jobs, so a receiving
+ * vendor gets an empty list rather than a handle on the sender's work. The
+ * strongest honest statement the screen can make is therefore about the vendor's
+ * own inbound parcels, and the wording says exactly that rather than claiming a
+ * link the response does not carry.
+ */
+describe('waiting on an inbound parcel', () => {
+  const frameAt = (status: ProductionJobStatus): VendorJobDetailResponse => ({
+    ...detail,
+    job: { ...detail.job, stage: 'frame', status },
+  })
+
+  it('says so on a frame job while a parcel is still in transit', () => {
+    render(
+      <VendorJobDetailBody
+        data={frameAt('assigned')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        transfers={transferPanel()}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-awaiting-inbound')).toHaveTextContent(
+      /waiting on an inbound parcel/i
+    )
+  })
+
+  it('stops saying it once the parcel has arrived', () => {
+    render(
+      <VendorJobDetailBody
+        data={frameAt('assigned')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        transfers={transferPanel({ data: [arrivedParcel] })}
+      />
+    )
+    expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
+  })
+
+  it('never says it on a print job — nothing is couriered TO a print shop', () => {
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, stage: 'print' } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        transfers={transferPanel()}
+      />
+    )
+    expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
+  })
+
+  it('does not claim a parcel is coming before the parcels have been read', () => {
+    render(
+      <VendorJobDetailBody
+        data={frameAt('assigned')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        transfers={transferPanel({ data: null, isLoading: true })}
+      />
+    )
+    expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
+  })
+
+  it('names no vendor, no order and no other end at all', () => {
+    const { container } = render(
+      <VendorJobDetailBody
+        data={frameAt('assigned')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        transfers={transferPanel()}
+      />
+    )
+    const note = screen.getByTestId('vendor-job-awaiting-inbound').textContent ?? ''
+    // Asserted on the note's TEXT rather than on the container: `border-border`
+    // contains the substring "order", and an assertion that trips over Tailwind
+    // teaches the next person to weaken it.
+    expect(note).not.toMatch(/\border\b/i)
+    expect(note).not.toMatch(/\bvendor\b|\bworkshop\b|\bfrom\b/i)
+    // Nor a docket, a carrier or a piece count: naming the parcel here would
+    // be the screen asserting a link between THIS job and THAT parcel, which
+    // is exactly the join the API refuses to make.
+    expect(note).not.toContain(String(inboundParcel.reference))
+    expect(note).not.toContain(String(inboundParcel.carrier))
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
+  })
+})
+
+// ============================================================================
+// The label handover card — a button, fetched at click, used in the same tick
+// ============================================================================
+
+/**
+ * The one document on this whole boundary that carries a customer.
+ *
+ * §6 (R2): customer data reaches a vendor ONLY as opaque rendered bytes behind a
+ * short-lived signature, handed to the operating system — never composed by our
+ * API, never rendered into the portal's own DOM. So the control is a BUTTON, the
+ * signed URL is fetched inside the click handler, and what the browser is handed
+ * is a local `blob:` URL. `no-customer-data.test.tsx` holds the mechanical half
+ * of that rule; this block holds the behaviour.
+ */
+describe('the label handover card', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:vendor-label')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  /** The API's two hops: the signature, then the bytes it signs. */
+  const respondWithLabel = () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobId: detail.job.id,
+          url: 'https://r2.example.com/fulfilment/labels/tok.pdf?X-Amz-Signature=deadbeef',
+          expiresInSeconds: 300,
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: async () => new Blob(['%PDF']) })
+  }
+
+  it('is a button, not an embed, and holds no URL before the click', () => {
+    const { container } = render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+
+    const control = screen.getByTestId('vendor-job-label')
+    expect(control.tagName).toBe('BUTTON')
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('fetches the signature at click and hands the BYTES to the operating system', async () => {
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
+    respondWithLabel()
+
+    const { container } = render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1))
+
+    // Two hops: our API for the signature, then R2 for the bytes.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const [labelUrl, labelInit] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(labelUrl).toContain(`/api/vendor/jobs/${detail.job.id}/label`)
+    expect(labelInit.credentials).toBe('include')
+    expect(fetchMock.mock.calls[1][0]).toContain('X-Amz-Signature')
+
+    // What the OS was handed is a local object URL. The signature never became
+    // an href, and nothing carrying it is left in the document.
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    expect(document.body.querySelectorAll('a[href*="X-Amz-Signature"]').length).toBe(0)
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
+  })
+
+  it('tells the page the guard is satisfied once a label has actually been issued', async () => {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const onIssued = vi.fn()
+    respondWithLabel()
+
+    render(<VendorLabelHandoverCard jobId={detail.job.id} onIssued={onIssued} />)
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() => expect(onIssued).toHaveBeenCalledTimes(1))
+  })
+
+  it('renders the 503 seam honestly, and repeats no database detail', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      // Deliberately hostile: a future regression that put the driver's own
+      // sentence in the body must not reach a supplier's screen through here.
+      json: async () => ({
+        error:
+          'column order_shipments.label_object_token does not exist — relation "order_shipments"',
+        code: 'LABEL_NOT_AVAILABLE',
+      }),
+    })
+
+    const { container } = render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('vendor-job-label-unavailable')).toBeInTheDocument()
+    )
+    const said = screen.getByTestId('vendor-job-label-unavailable').textContent ?? ''
+    // Honest: the label is not available here yet, and nothing is wrong with
+    // the order. The copy is OURS, so the body cannot leak through it.
+    expect(said).toMatch(/not available/i)
+    expect(said).toMatch(/office/i)
+    for (const leak of [
+      'order_shipments',
+      'label_object_token',
+      'column',
+      'relation',
+      'does not exist',
+    ]) {
+      expect(container.innerHTML).not.toContain(leak)
+    }
+  })
+
+  it('says there is no label rather than confirming whose order it is', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: 'Label not found' }),
+    })
+
+    render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() => expect(screen.getByTestId('vendor-job-label-error')).toBeInTheDocument())
+    const said = screen.getByTestId('vendor-job-label-error').textContent ?? ''
+    expect(said).toMatch(/no (courier )?label/i)
+    // A 404 covers "no such job", "not your job", "you are not the
+    // consolidator" and "no label bought yet" alike, and the screen must not
+    // put back the distinction the API withholds.
+    expect(said).not.toMatch(/consolidat|not yours|does not exist/i)
+  })
+
+  it('a failed byte fetch says so instead of falling back to a link', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobId: detail.job.id,
+          url: 'https://r2.example.com/fulfilment/labels/tok.pdf?X-Amz-Signature=deadbeef',
+          expiresInSeconds: 300,
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+
+    const { container } = render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() => expect(screen.getByTestId('vendor-job-label-error')).toBeInTheDocument())
+    // The tempting fallback — "here is the link instead" — is exactly what the
+    // whole component exists to avoid.
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.querySelectorAll('a[href]').length).toBe(0)
+  })
+})
+
+// ============================================================================
+// Handover is offered where the MATRIX says, and nowhere else
+// ============================================================================
+
+describe('the handover card follows the transition matrix', () => {
+  /** The statuses whose vendor edge the label actually gates. */
+  const handoverStatuses = [...VENDOR_JOB_STATUSES, 'sent' as ProductionJobStatus].filter(
+    (status) =>
+      nextVendorActions(status).some(
+        (action) => action.guard === 'open-transfer-or-order-label'
+      )
+  )
+
+  it('the matrix names at least one such status, or every case below is vacuous', () => {
+    expect(handoverStatuses.length).toBeGreaterThan(0)
+  })
+
+  it.each([...VENDOR_JOB_STATUSES, 'sent' as ProductionJobStatus])(
+    'shows the card in %s exactly when the matrix guards that edge on the label',
+    (status) => {
+      render(
+        <VendorJobDetailBody
+          data={{ ...detail, job: { ...detail.job, status } }}
+          isLoading={false}
+          error={null}
+          onRetry={() => {}}
+        />
+      )
+      const shown = screen.queryByTestId('vendor-job-label-card') !== null
+      expect(shown).toBe(handoverStatuses.includes(status))
+    }
+  )
+
+  it('disables the handover move when the screen knows the guard is unsatisfied', () => {
+    const [status] = handoverStatuses
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, status } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        guards={{ 'open-transfer-or-order-label': false }}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-mark-dispatched')).toBeDisabled()
+    expect(screen.getByTestId('vendor-job-guard-dispatched')).toBeInTheDocument()
+  })
+
+  it('leaves the move live while the guard is merely unknown', () => {
+    const [status] = handoverStatuses
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, status } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    // Absent means UNKNOWN, and the API evaluates the guard either way. Greying
+    // out a legal move because the evidence has not loaded is worse than a
+    // round trip.
+    expect(screen.getByTestId('vendor-job-mark-dispatched')).not.toBeDisabled()
+  })
+})
+
+describe('the parcel fetchers', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('asks for both ends by default and sends the session cookie', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ items: [], limit: 20, offset: 0 }) })
+    await fetchVendorTransfers()
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/api/vendor/transfers')
+    // No `direction`: both ends, which is the API's own default and the only
+    // one that shows a vendor all of their own legs.
+    expect(url).not.toContain('direction')
+    // `requireVendor` reads the session cookie and nothing else; without this
+    // every request is a 401.
+    expect(init.credentials).toBe('include')
+  })
+
+  it('narrows to one end when asked', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ items: [], limit: 20, offset: 0 }) })
+    await fetchVendorTransfers({ direction: 'inbound' })
+    expect(fetchMock.mock.calls[0][0]).toContain('direction=inbound')
+  })
+
+  it('confirms an arrival with NO body at all', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ message: 'Transfer received' }) })
+    await markVendorTransferReceived('88888888-8888-4888-8888-888888888888')
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/api/vendor/transfers/88888888-8888-4888-8888-888888888888/received')
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('include')
+    // `received_at` is stamped from OUR clock, and the only other thing a vendor
+    // could put in a body is `cost_amount`, which is not theirs to set in either
+    // direction. A request with no payload cannot be talked into carrying one.
+    expect(init.body).toBeUndefined()
+  })
+
+  it('carries the API\'s refusal through rather than inventing one', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: 'This parcel was already confirmed as arrived.' }),
+    })
+    await expect(
+      markVendorTransferReceived('88888888-8888-4888-8888-888888888888')
+    ).rejects.toThrow(/already confirmed/i)
+  })
+})
 
 describe('the shape of the portal', () => {
   const files = [

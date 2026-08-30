@@ -88,6 +88,44 @@
  * is the second one: a signed URL in the DOM is a capability sitting in every
  * screenshot and bug report the vendor ever files.
  *
+ * ## The carrier label is a BUTTON, and the bytes go to the operating system
+ *
+ * `VendorLabelHandoverCard` is the only place on this whole boundary where a
+ * customer's name, address and phone reach a vendor — and they reach them
+ * INSIDE A PDF, never as data. §6 (R2) allows that on three conditions: opaque
+ * rendered bytes, a short-lived signature, and the file handed to the OS. So the
+ * control is a button, `GET /api/vendor/jobs/:id/label` is called in the click
+ * handler, the bytes are fetched from the signature and saved through a local
+ * `blob:` URL, and nothing carrying the signature ever touches this document.
+ *
+ * **Never an `<iframe>`, `<embed>` or `<object>`.** An inline viewer would put
+ * the customer's address into the vendor portal's own markup, which is exactly
+ * what R2 forbids. `tests/routes/vendor/no-customer-data.test.tsx` asserts it
+ * twice over: on the rendered screen, and — because a rendered-state assertion
+ * can be reopened by a branch no test happens to enter — on the SOURCE of all
+ * five files in this tree.
+ *
+ * The card renders where `nextVendorActions` says the matrix gates that edge on
+ * `open-transfer-or-order-label`, not where this file remembers `qc_passed`.
+ * The API's own `LABEL_ACCESS_STATUSES` is derived the same way from the same
+ * shared table, so the card cannot appear on a job whose label the route would
+ * refuse. That route answers **503 `LABEL_NOT_AVAILABLE`** in every environment
+ * today, because `order_shipments.label_object_token` is a declared seam owned
+ * by `order-dispatch-tracking` and does not exist yet. The card says so
+ * honestly, in ITS OWN words rather than the body's, so our schema cannot be
+ * narrated to a supplier through it.
+ *
+ * ## Parcels are a fact about the VENDOR, not about this job
+ *
+ * A frame job cannot start until the printed sheet reaches the bench, so this
+ * screen says when something is still in transit. It says the vendor is
+ * waiting, not that THIS job's parcel is coming, because the link is genuinely
+ * unavailable here: `production_transfers.order_id` is withheld from every
+ * vendor-facing projection under R1, and `GET /transfers/:id` scopes `jobIds` to
+ * the caller's own jobs. The strip itself, and the arrival confirmation, live on
+ * `/vendor` — reconstructing the join here would mean asking the API to widen
+ * exactly what it narrows.
+ *
  * ## A failed write does not blank a good read
  *
  * `actionError` is separate from the page error and renders beside the buttons.
@@ -101,7 +139,7 @@
  * amount, no empty item list for a job that simply failed to fetch.
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AlertCircle, ArrowLeft, Download } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
@@ -124,7 +162,15 @@ import {
   type VendorJobStage,
   type VendorJobStatus,
 } from '~/lib/vendor-nav'
-import { DueCell, VendorJobStatusPill } from '~/routes/vendor/index'
+import {
+  DueCell,
+  InlineConfirm,
+  VendorJobStatusPill,
+  fetchVendorTransfers,
+  unreceivedInboundTransfers,
+  type VendorTransfer,
+  type VendorTransferPanelState,
+} from '~/routes/vendor/index'
 
 // ============================================================================
 // Route
@@ -292,65 +338,21 @@ export async function patchVendorJobStatus(
 // ============================================================================
 
 /**
- * Asks before acting, inline.
+ * Re-exported, not defined here.
  *
- * The pattern is `ReviewMediaStrip`'s and `routes/admin/vendors/$id.tsx`'s, for
- * the reason documented in both: a native `confirm()` blocks the automation
- * harness, so any path guarded by one can never be covered end to end.
+ * `InlineConfirm` moved to `routes/vendor/index.tsx` when the parcel strip
+ * (#693) needed the same two-step on the queue screen. It could not stay here:
+ * this file already imports from that one, so hosting it here and importing it
+ * there would make the two route files import each other, and the portal is
+ * asserted to be EXACTLY four screens under one layout — there is no fifth file
+ * to put it in. The re-export keeps every existing importer, including
+ * `tests/routes/vendor/vendor-screens.test.tsx`, pointing at this path.
+ *
+ * The rule it exists for is unchanged: a native `confirm()` blocks the browser
+ * automation harness, so any path guarded by one can never be covered end to
+ * end.
  */
-export function InlineConfirm({
-  label,
-  question,
-  onConfirm,
-  busy = false,
-  testId,
-  icon,
-}: {
-  label: string
-  question: string
-  onConfirm: () => void | Promise<void>
-  busy?: boolean
-  testId: string
-  icon?: ReactNode
-}) {
-  const [armed, setArmed] = useState(false)
-
-  if (!armed) {
-    return (
-      <Button type="button" variant="outline" data-testid={testId} onClick={() => setArmed(true)}>
-        {icon}
-        {label}
-      </Button>
-    )
-  }
-
-  return (
-    <span className="inline-flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">{question}</span>
-      <button
-        type="button"
-        data-testid={`${testId}-confirm`}
-        disabled={busy}
-        onClick={async () => {
-          await onConfirm()
-          setArmed(false)
-        }}
-        className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-      >
-        {busy ? 'Working…' : 'Confirm'}
-      </button>
-      <button
-        type="button"
-        data-testid={`${testId}-cancel`}
-        disabled={busy}
-        onClick={() => setArmed(false)}
-        className="rounded px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
-      >
-        Cancel
-      </button>
-    </span>
-  )
-}
+export { InlineConfirm } from '~/routes/vendor/index'
 
 // ============================================================================
 // Artwork
@@ -1173,6 +1175,218 @@ export function QcVerdictBanner({ reviews }: { reviews: VendorJobReview[] }) {
 }
 
 // ============================================================================
+// The carrier label — the one document on this boundary that carries a customer
+// ============================================================================
+
+/** `GET /api/vendor/jobs/:id/label`. The same shape as artwork, TTL 300s. */
+export interface VendorLabelResponse {
+  jobId: string
+  url: string
+  expiresInSeconds: number
+  expiresAt: string
+}
+
+/**
+ * A refused label request, with the status and the API's `code` intact.
+ *
+ * The code matters more than the message here: `LABEL_NOT_AVAILABLE` is the
+ * deliberate 503 for a seam that has not landed, and it needs different words
+ * from a 404. The message is carried but, on both of those paths, deliberately
+ * not shown — see `VendorLabelHandoverCard`.
+ */
+export class VendorLabelError extends Error {
+  readonly status: number
+  readonly code?: string
+
+  constructor(message: string, init: { status: number; code?: string }) {
+    super(message)
+    this.name = 'VendorLabelError'
+    this.status = init.status
+    this.code = init.code
+    Object.setPrototypeOf(this, VendorLabelError.prototype)
+  }
+}
+
+/**
+ * The signed label URL, requested at the moment it is wanted and never before.
+ *
+ * Exported so a test can assert both halves of the rule, exactly as
+ * `requestArtworkUrl` is: a click calls it, a render does not. The difference
+ * is what it signs — this is the ONLY object on the whole vendor boundary that
+ * contains a customer's name, address and phone, and the API writes a
+ * `production_job.label_issued` audit row every time it succeeds. Probing it on
+ * render would therefore both spend a signature and log a disclosure that never
+ * happened.
+ */
+export async function requestJobLabel(jobId: string): Promise<VendorLabelResponse> {
+  const response = await fetch(`${getApiUrl()}/api/vendor/jobs/${jobId}/label`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string
+      code?: string
+    }
+    throw new VendorLabelError(body.error ?? 'Failed to get the carrier label', {
+      status: response.status,
+      code: body.code,
+    })
+  }
+
+  return (await response.json()) as VendorLabelResponse
+}
+
+/**
+ * Fetch the bytes and hand the FILE to the operating system.
+ *
+ * Not `window.open(url)`, not an `<a href={url}>`, and above all not an
+ * `<iframe src={url}>`. §6 (R2) allows customer data to reach a vendor only as
+ * opaque rendered bytes behind a short-lived signature, handed to the OS —
+ * never composed by our API and never rendered into the portal's own DOM. An
+ * inline viewer would put the customer's name, address and phone straight into
+ * this page's markup, and a plain link would leave the signature sitting in an
+ * `href` where every screenshot, bug report and session replay picks it up.
+ *
+ * So: the signature stays in a local variable, the request goes straight to R2,
+ * and what touches the document is a `blob:` URL that means nothing outside
+ * this tab. Same technique as `QcPhotoImage` (#692), applied to a download
+ * rather than to an `<img>`.
+ */
+async function handLabelToOs(url: string, filename: string): Promise<void> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Label fetch failed (${response.status})`)
+  const blob = await response.blob()
+
+  if (typeof document === 'undefined') return
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = filename
+  anchor.rel = 'noopener noreferrer'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  // Revoked on the next tick rather than synchronously: revoking while the
+  // browser is still reading the blob for the save aborts the download.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+}
+
+/**
+ * The handover card: a BUTTON, fetched at click, used in the same tick.
+ *
+ * ## Why the copy on the two refusals is ours and not the API's
+ *
+ * A **503 `LABEL_NOT_AVAILABLE`** is the seam:
+ * `order_shipments.label_object_token` belongs to `order-dispatch-tracking` and
+ * does not exist yet, so this route answers 503 in every environment today.
+ * That is deliberate, and the card says so honestly — the label is not
+ * available here yet, nothing is wrong with the job, ask the office. The
+ * sentence is OURS rather than the body's, so a future regression that put a
+ * driver's message in the body cannot narrate our schema to a supplier through
+ * this card. `packages/api/tests/lib/vendor-label-seam.test.ts` goes red the day
+ * the column lands, and this card starts working with no change here.
+ *
+ * A **404** covers "no such job", "not your job", "you are not the
+ * consolidator" and "no label bought yet" all at once, and the API refuses to
+ * distinguish them on purpose. The card must not put the distinction back, so
+ * it says there is no label for this job and stops.
+ *
+ * ## What is never rendered
+ *
+ * No `iframe`, `embed` or `object`, and no signed URL in any attribute — not
+ * even as a "here is the link instead" fallback when the byte fetch fails,
+ * which is the one tempting way to reopen the hole this component exists to
+ * close. `tests/routes/vendor/no-customer-data.test.tsx` asserts both over the
+ * whole job screen.
+ */
+export function VendorLabelHandoverCard({
+  jobId,
+  onIssued,
+}: {
+  jobId: string
+  /** Called once a label has ACTUALLY been issued — the guard's only evidence. */
+  onIssued?: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [unavailable, setUnavailable] = useState<string | null>(null)
+
+  return (
+    <div
+      data-testid="vendor-job-label-card"
+      className="space-y-2 rounded-lg border border-border p-4"
+    >
+      <div>
+        <h3 className="font-medium">Carrier label</h3>
+        <p className="text-sm text-muted-foreground">
+          The courier's label for this parcel. It downloads as a file to print
+          and stick on the box — nothing about it is kept on this page.
+        </p>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        data-testid="vendor-job-label"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          setError(null)
+          setUnavailable(null)
+          try {
+            const label = await requestJobLabel(jobId)
+            // Same tick, and the URL is never stored in state or in an href.
+            await handLabelToOs(label.url, `label-${jobId.slice(0, 8)}.pdf`)
+            // Only now: a signature that was fetched and then failed to become
+            // a file is not evidence that a label is ready to hand over.
+            onIssued?.()
+          } catch (labelError) {
+            if (
+              labelError instanceof VendorLabelError &&
+              labelError.code === 'LABEL_NOT_AVAILABLE'
+            ) {
+              setUnavailable(
+                'Carrier labels are not available in the portal yet. Nothing is ' +
+                  'wrong with this job — ask the office for the label.'
+              )
+            } else if (labelError instanceof VendorLabelError && labelError.status === 404) {
+              setError(
+                'There is no courier label for you on this job. If you are ' +
+                  'holding the finished piece, tell us and we will sort it out.'
+              )
+            } else {
+              setError((labelError as Error).message)
+            }
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+        {busy ? 'Getting the label…' : 'Get the carrier label'}
+      </Button>
+
+      {unavailable && (
+        <p
+          data-testid="vendor-job-label-unavailable"
+          role="status"
+          className="text-sm text-muted-foreground"
+        >
+          {unavailable}
+        </p>
+      )}
+
+      {error && (
+        <p data-testid="vendor-job-label-error" role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
 // The action strip — the matrix, rendered
 // ============================================================================
 
@@ -1379,6 +1593,17 @@ export interface VendorJobDetailBodyProps {
    * is what every existing caller that passes nothing gets.
    */
   qc?: VendorQcPanelState
+  /**
+   * This vendor's parcels, used here for ONE sentence.
+   *
+   * The strip itself lives on `/vendor` — a parcel is a fact about the vendor,
+   * not about this job, and the API withholds the link on purpose (see the note
+   * on the waiting sentence below). All this screen takes from it is whether
+   * something is still in transit.
+   */
+  transfers?: VendorTransferPanelState
+  /** Raised when the handover card actually issued a label. */
+  onLabelIssued?: () => void
 }
 
 /**
@@ -1396,6 +1621,8 @@ export function VendorJobDetailBody({
   actionError = null,
   actionMissingSlots,
   qc,
+  transfers,
+  onLabelIssued,
 }: VendorJobDetailBodyProps) {
   if (error) return <JobError message={error} onRetry={onRetry} />
   if (isLoading) return <JobSkeleton />
@@ -1430,6 +1657,45 @@ export function VendorJobDetailBody({
             .length === 0,
       }
     : {}
+
+  /**
+   * The handover card renders exactly where the MATRIX gates that edge on a
+   * label, and nowhere else.
+   *
+   * Derived rather than written as `status === 'qc_passed'`, which is the same
+   * second copy of the state machine #691 deleted from this file. The API's own
+   * `LABEL_ACCESS_STATUSES` is computed the same way over the same shared table
+   * — the statuses a vendor can take the `open-transfer-or-order-label` edge
+   * from — so the card cannot appear on a job whose label request the route
+   * would refuse, and it follows the matrix if that edge ever moves.
+   */
+  const handoverAction = nextVendorActions(job.status).find(
+    (action) => action.guard === 'open-transfer-or-order-label'
+  )
+
+  /**
+   * A parcel is still on its way to this bench.
+   *
+   * Frame jobs only, because nothing is couriered TO a print shop: the printed
+   * sheet travels print -> frame, and a frame job that has not had its sheet
+   * cannot start.
+   *
+   * **It says the vendor is waiting, not that THIS job's parcel is coming**, and
+   * the difference is the API's, not a hedge. `production_transfers.order_id` is
+   * withheld from every vendor-facing projection under R1, and
+   * `GET /transfers/:id` scopes `jobIds` to the caller's OWN jobs so a receiving
+   * vendor gets an empty list rather than a handle on the sender's work. There
+   * is therefore no join from this job to that parcel on this side of the
+   * boundary, and reconstructing one would mean asking the API to widen exactly
+   * what it narrows. So the sentence names no docket, no carrier and no other
+   * end, and points at the queue, where the parcel can actually be confirmed.
+   *
+   * Not shown while the parcels are merely unread: `unreceivedInboundTransfers`
+   * answers empty for a null read, so "we have not looked" never renders as "a
+   * parcel is coming".
+   */
+  const awaitingInbound =
+    job.stage === 'frame' && unreceivedInboundTransfers(transfers?.data).length > 0
 
   return (
     <div className="space-y-6" data-testid="vendor-job-detail">
@@ -1467,6 +1733,18 @@ export function VendorJobDetailBody({
           to lead with what to redo. */}
       <QcVerdictBanner reviews={reviews} />
 
+      {/* Why this job cannot start yet, before the controls that cannot help */}
+      {awaitingInbound && (
+        <p
+          data-testid="vendor-job-awaiting-inbound"
+          className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800"
+        >
+          Waiting on an inbound parcel. Something is in transit to you and has
+          not been confirmed as arrived — confirm it on your job list when it
+          reaches your bench.
+        </p>
+      )}
+
       {/* What this vendor can do next, straight off the transition matrix */}
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
@@ -1482,6 +1760,12 @@ export function VendorJobDetailBody({
             actionMissingSlots ? missingShotsFor(job.stage, actionMissingSlots) : undefined
           }
         />
+
+        {/* The evidence for the button directly above it, and the only place a
+            customer's details ever reach a vendor — as a file, never as data. */}
+        {handoverAction && (
+          <VendorLabelHandoverCard jobId={job.id} onIssued={onLabelIssued} />
+        )}
       </div>
 
       {/* The shot list — what we judge the work on */}
@@ -1588,6 +1872,26 @@ function VendorJobDetailPage() {
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({})
   const [supersededSlots, setSupersededSlots] = useState<Record<string, string | null>>({})
 
+  // The parcels still coming TO this vendor, and nothing else: the outbound
+  // legs belong on `/vendor`, where they can be acted on. `?direction=inbound`
+  // rather than a client-side filter so the request asks for what it needs.
+  const [inbound, setInbound] = useState<VendorTransfer[] | null>(null)
+  const [inboundLoading, setInboundLoading] = useState(true)
+  const [inboundError, setInboundError] = useState<string | null>(null)
+
+  /**
+   * The one guard this screen can answer about the handover, and only upward.
+   *
+   * `true` once a label has actually been issued. It is never set to `false`:
+   * the edge is satisfied by an open transfer OR a label on the order, and the
+   * screen can see neither — the label route signs and audits, so probing it is
+   * out of the question, and `GET /transfers` withholds the order the parcel
+   * belongs to. Absent therefore means UNKNOWN, which `nextVendorActions` leaves
+   * live and the API answers itself. Greying out a legal handover because this
+   * page cannot see the evidence would strand a vendor holding a finished piece.
+   */
+  const [labelIssued, setLabelIssued] = useState(false)
+
   const load = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -1616,10 +1920,27 @@ function VendorJobDetailPage() {
     }
   }, [id])
 
+  const loadInbound = useCallback(async () => {
+    setInboundLoading(true)
+    try {
+      const { items } = await fetchVendorTransfers({ direction: 'inbound' })
+      setInbound(items)
+      setInboundError(null)
+    } catch (transfersError) {
+      // Its own failure, kept off the job. A parcel list that would not read
+      // must never blank a job that did.
+      setInbound(null)
+      setInboundError((transfersError as Error).message)
+    } finally {
+      setInboundLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void load()
     void loadPhotos()
-  }, [load, loadPhotos])
+    void loadInbound()
+  }, [load, loadPhotos, loadInbound])
 
   const uploadPhoto = async (slot: string, file: File) => {
     setBusySlot(slot)
@@ -1727,6 +2048,17 @@ function VendorJobDetailPage() {
           slotErrors,
           supersededSlots,
         }}
+        transfers={{
+          data: inbound,
+          isLoading: inboundLoading,
+          error: inboundError,
+          onRetry: () => void loadInbound(),
+          // No `onReceived`: a parcel is confirmed on the job list, where the
+          // strip that shows it lives. Offering the control here would imply a
+          // link between this job and that parcel which the API does not make.
+        }}
+        guards={labelIssued ? { 'open-transfer-or-order-label': true } : undefined}
+        onLabelIssued={() => setLabelIssued(true)}
       />
     </div>
   )
