@@ -71,6 +71,26 @@ async function stageThree(page: Page) {
   await page.waitForSelector('[data-testid="wishlist-item"]');
 }
 
+/**
+ * Open the staging bar's save flow and create a NEW collection from it.
+ *
+ * Two clicks, not one. The bar shipped with a single "Create collection from
+ * these" button; 29 minutes later `0f125f66` split it into a choice — "Save as
+ * collection" reveals a panel offering "New collection" or "Overwrite an
+ * existing one" — and this spec, written against the one-button version, was
+ * never updated. It has therefore been red since 2026-08-06 (#660).
+ *
+ * Worth noting how little that cost was visible: `mode: 'serial'` is configured
+ * file-wide, so the first failure SKIPPED the two tests below it. The file
+ * reported "1 failed, 5 passed" while three of its four tests were never
+ * exercised at all.
+ */
+async function createCollectionFromStaging(page: Page) {
+  await page.getByRole('button', { name: /Save as collection/i }).click();
+  await page.getByRole('button', { name: /^New collection$/i }).click();
+  await page.waitForURL('**/admin/collections/**', { timeout: 20000 });
+}
+
 test.describe('the staging bar', () => {
   test('is visible to staff and says how many are staged', async ({ page }) => {
     await stageThree(page);
@@ -120,10 +140,7 @@ test.describe('the round trip', () => {
     const staged = await wishlistOrder(page);
     expect(staged).not.toEqual(initial);
 
-    await page
-      .getByRole('button', { name: /Create collection from these/i })
-      .click();
-    await page.waitForURL('**/admin/collections/**', { timeout: 20000 });
+    await createCollectionFromStaging(page);
 
     await page.getByLabel('Title', { exact: true }).fill(`Staged ${slug}`);
     await page.getByLabel('Slug', { exact: true }).fill(slug);
@@ -160,10 +177,7 @@ test.describe('the round trip', () => {
     const slug = stamp();
 
     await stageThree(page);
-    await page
-      .getByRole('button', { name: /Create collection from these/i })
-      .click();
-    await page.waitForURL('**/admin/collections/**', { timeout: 20000 });
+    await createCollectionFromStaging(page);
 
     await page.getByLabel('Title', { exact: true }).fill(`Draft ${slug}`);
     await page.getByLabel('Slug', { exact: true }).fill(slug);
@@ -190,10 +204,7 @@ test.describe('editing does not destroy curation', () => {
     await stageThree(page);
     const staged = await wishlistOrder(page);
 
-    await page
-      .getByRole('button', { name: /Create collection from these/i })
-      .click();
-    await page.waitForURL('**/admin/collections/**', { timeout: 20000 });
+    await createCollectionFromStaging(page);
     const editUrl = page.url();
 
     await page.getByLabel('Title', { exact: true }).fill(`Keep ${slug}`);
