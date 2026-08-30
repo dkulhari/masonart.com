@@ -42,7 +42,7 @@ import {
   requireContentManager,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached, CacheKeys } from "../../lib/redis";
+import { purgeProductResponseCache } from "../../lib/redis";
 import { isUniqueViolation } from "../../lib/pg-errors";
 import { uploadOptimizedImage, StoragePaths } from "../../lib/storage";
 
@@ -52,13 +52,24 @@ adminFramesApp.use("*", requireAuth);
 adminFramesApp.use("*", requireContentManager);
 
 /**
- * Drop the cached public frames payload.
+ * Drop every cached payload a frame appears in.
  *
  * One helper rather than the key spelled at each call site, so a fourth write
  * added later cannot invent a near-miss key that busts nothing.
+ *
+ * It used to drop `product:frames` alone, and that was not enough: the product
+ * detail response EMBEDS the frame options (`routes/products.ts:957`) and is
+ * cached under its own key per slug and viewer. So an admin repriced a frame,
+ * the frames list updated, and every already-cached product page went on
+ * quoting the OLD uplift for the rest of its TTL — with the cart charging the
+ * new one. Archiving had the same shape: the panel kept offering a frame that
+ * no longer existed.
+ *
+ * `purgeProductResponseCache` covers the frames key too (it is under the same
+ * `product:` prefix), so this is one call rather than two.
  */
 export async function purgeFramesCache(): Promise<void> {
-  await deleteCached(`${CacheKeys.PRODUCT}frames`);
+  await purgeProductResponseCache();
 }
 
 /** The 409 body, so create and update phrase a taken slug identically. */

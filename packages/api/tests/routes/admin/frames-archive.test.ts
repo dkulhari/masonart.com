@@ -21,6 +21,13 @@ const insertMock = vi.fn();
 const updateMock = vi.fn();
 const deleteMock = vi.fn();
 const deleteCached = vi.fn();
+/**
+ * The frame writes purge the whole `product:` prefix now, not just
+ * `product:frames` — the product detail response embeds the frame options and
+ * is cached under its own key, so a reprice that dropped only the frames list
+ * left every product page quoting the old uplift (#651).
+ */
+const purgeProductResponseCache = vi.fn();
 
 vi.mock('../../../src/database', () => ({
   db: {
@@ -52,6 +59,8 @@ vi.mock('../../../src/lib/redis', () => ({
   getCached: vi.fn().mockResolvedValue(null),
   setCached: vi.fn().mockResolvedValue(undefined),
   deleteCached: (...args: unknown[]) => deleteCached(...args),
+  purgeProductResponseCache: (...args: unknown[]) =>
+    purgeProductResponseCache(...args),
   redis: { keys: vi.fn().mockResolvedValue([]), del: vi.fn() },
   CacheKeys: { PRODUCT: 'product:', COLLECTION: 'collection:' },
 }));
@@ -135,7 +144,7 @@ describe('DELETE /api/admin/frames/:id', () => {
 
     await asStaff('/api/admin/frames/f1', { method: 'DELETE' });
 
-    expect(deleteCached).toHaveBeenCalledWith('product:frames');
+    expect(purgeProductResponseCache).toHaveBeenCalled();
   });
 
   it('refuses the last active frame — a page with no format option is broken', async () => {
@@ -196,6 +205,6 @@ describe('unarchiving', () => {
 
     expect(res.status).toBe(200);
     expect(updateMock).toHaveBeenCalled();
-    expect(deleteCached).toHaveBeenCalledWith('product:frames');
+    expect(purgeProductResponseCache).toHaveBeenCalled();
   });
 });

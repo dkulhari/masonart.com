@@ -53,6 +53,32 @@ async function gotoAdminFrames(page: Page) {
   ).toBeVisible({ timeout: 10000 })
 }
 
+/**
+ * Put every frame back in the active state the seed ships.
+ *
+ * These tests archive frames, and an assertion that fails mid-test leaves them
+ * archived — which then breaks the NEXT run at a completely different step,
+ * because an archived frame never reaches the storefront buy panel. That is
+ * exactly how this suite was found: two frames ('Stretch + Gold Frame' and
+ * 'Rolled Canvas') sat archived in the shared dev database from earlier failed
+ * runs, and the storefront half of every test failed as a result.
+ *
+ * Cheap to run, and it makes each test independent of how the previous one
+ * ended rather than of how it was supposed to end.
+ */
+async function restoreAllFramesActive(page: Page) {
+  await gotoAdminFrames(page)
+
+  const rows = page.getByTestId('admin-frames-table').locator('tbody tr')
+  for (let i = 0; i < (await rows.count()); i += 1) {
+    const unarchive = rows.nth(i).getByRole('button', { name: /unarchive/i })
+    if ((await unarchive.count()) > 0) {
+      await unarchive.click()
+      await page.waitForTimeout(250)
+    }
+  }
+}
+
 /** The row for a frame, located by its name cell. */
 function frameRow(page: Page, name: string) {
   return page.getByTestId('admin-frames-table').locator('tr', { hasText: name })
@@ -102,19 +128,48 @@ async function selectFrameOnFirstProduct(page: Page, name: string) {
   await firstCard.click()
   await page.waitForLoadState('networkidle')
 
-  // Select first size variant (required before frame selector appears)
-  const firstSizeBtn = page.getByRole('button', { name: /\d+\s*×\s*\d+/ }).first()
-  await firstSizeBtn.waitFor({ state: 'visible', timeout: 10000 })
-  await firstSizeBtn.click()
+  /**
+   * Size is a native `<select>`, not a row of buttons.
+   *
+   * It shipped as buttons; `2f29ee65` rebuilt the poster page against the
+   * mesonart reference and `SizeSelector` (#515) became one `<select
+   * aria-label="Size">` — a keyboard-and-screen-reader control rather than a
+   * grid of tap targets. This helper kept clicking for a button matching
+   * `/\d+ × \d+/`, found nothing, and timed out; because the frame selector
+   * only appears once a size is chosen, all four tests in this file died here
+   * and the suite has been testing nothing since.
+   */
+  const sizeSelect = page.getByLabel('Size', { exact: true })
+  await sizeSelect.waitFor({ state: 'visible', timeout: 10000 })
 
-  // Frame selector now appears - find and click the frame button
-  const frameBtn = page.getByRole('button', { name: new RegExp(name, 'i') })
+  // The first option is a disabled "Select a Size" placeholder, so a product
+  // with no real variants would leave this select technically present and
+  // useless. Assert there is something to choose before choosing it.
+  const selectable = sizeSelect.locator('option:not([disabled])')
+  await expect(selectable.first()).toBeAttached({ timeout: 10000 })
+
+  const firstValue = await selectable.first().getAttribute('value')
+  await sizeSelect.selectOption(firstValue!)
+
+  /**
+   * Plain string, NOT `new RegExp(name)`.
+   *
+   * FRAME_NAME is 'Stretch + Gold Frame', and in a regex that `+` quantifies
+   * the space before it — so the pattern demands two spaces and matches the
+   * real button never. Playwright's string form is already substring and
+   * case-insensitive, which is all this wanted.
+   */
+  const frameBtn = page.getByRole('button', { name })
   await frameBtn.waitFor({ state: 'visible', timeout: 10000 })
   await frameBtn.click()
 }
 
 test.describe('admin frame pricing', () => {
   test.use({ storageState: ADMIN_AUTH })
+
+  test.beforeEach(async ({ page }) => {
+    await restoreAllFramesActive(page)
+  })
 
   test.afterEach(async ({ page }) => {
     await restorePricing(page)
@@ -145,8 +200,29 @@ test.describe('admin frame pricing', () => {
     // the write did not drop the cache key, this is where it shows.
     await selectFrameOnFirstProduct(page, FRAME_NAME)
 
-    const basis = await page.getByTestId('frame-price-basis').textContent()
-    expect(digits(basis)).toContain(quotedUplift)
+    /**
+     * Checked against THIS product's own price, not the admin preview's.
+     *
+     * The preview row quotes the uplift on a ₹4,999 print — a fixed example on
+     * the admin form — and the assertion here used to look for that same number
+     * in the storefront's basis line. That only holds while the first product
+     * on /posters happens to cost ₹4,999; the catalogue moved and it stopped
+     * being true, so the test failed on arithmetic rather than on the thing it
+     * guards.
+     *
+     * The basis line states both figures ("… adds ₹X to the ₹Y size price"), so
+     * the uplift is checked against the base the page itself is quoting.
+     */
+    const basis = (await page.getByTestId('frame-price-basis').textContent()) ?? ''
+    const amounts = basis.match(/₹([\d,]+(?:\.\d{2})?)/g) ?? []
+    expect(amounts.length, `no prices in basis line: "${basis}"`).toBeGreaterThanOrEqual(2)
+
+    const [uplift, sizePrice] = amounts.map((a) => Number(a.replace(/[₹,]/g, '')))
+    const expected =
+      sizePrice! * (Number(EDITED.priceModifier) - 1) + Number(EDITED.priceAddition)
+
+    // Within a rupee: the page rounds for display, the formula does not.
+    expect(Math.abs(uplift! - expected)).toBeLessThan(1)
   })
 
   test('the price edit is visible immediately, not after the cache expires', async ({
@@ -158,7 +234,7 @@ test.describe('admin frame pricing', () => {
 
     await selectFrameOnFirstProduct(page, FRAME_NAME)
     await page.reload({ waitUntil: 'networkidle' })
-    await page.getByRole('button', { name: new RegExp(FRAME_NAME, 'i') }).click()
+    await page.getByRole('button', { name: FRAME_NAME }).click()
 
     // The old modifier was 1.40 with nothing flat. The new one adds 250 on top
     // of a steeper proportion, so the two can never coincide.
@@ -179,16 +255,28 @@ test.describe('admin frame pricing', () => {
     await expect(frameRow(page, FRAME_NAME)).toContainText(/archived/i)
 
     await page.goto('/posters', { waitUntil: 'networkidle' })
+    /**
+     * The same card locator the helper uses.
+     *
+     * `div.hidden.lg\\:block` was a desktop-tree wrapper that the rebuilt grid
+     * no longer has, so this matched nothing and timed out mid-navigation —
+     * which reads like "the click did not work" rather than "the selector is
+     * gone".
+     */
     const firstCard = page
-      .locator('div.hidden.lg\\:block')
-      .getByRole('link')
-      .filter({ hasText: /./ })
+      .locator('a[href*="/posters/"]')
+      .filter({ hasText: /.+/ })
       .first()
+    await firstCard.waitFor({ state: 'visible', timeout: 10000 })
     await firstCard.click()
     await page.waitForLoadState('networkidle')
 
+    // Same escaping trap as the helper above, and worse here: a pattern that
+    // matches nothing satisfies toHaveCount(0) whatever the page shows, so
+    // this assertion passed for the wrong reason even while the feature was
+    // untested.
     await expect(
-      page.getByRole('button', { name: new RegExp(FRAME_NAME, 'i') })
+      page.getByRole('button', { name: FRAME_NAME })
     ).toHaveCount(0)
 
     // And back again.
@@ -205,24 +293,45 @@ test.describe('admin frame pricing', () => {
     const rows = page.getByTestId('admin-frames-table').locator('tbody tr')
     const total = await rows.count()
 
-    // Archive every frame but the last, then expect the guard on that one.
-    for (let i = 0; i < total; i += 1) {
-      const archive = rows.nth(0).getByRole('button', { name: /^archive$/i })
-      if ((await archive.count()) === 0) break
-      await archive.click()
-      await page.waitForTimeout(250)
+    /**
+     * Driven off the live Archive buttons, not off a row index.
+     *
+     * The old loop clicked `rows.nth(0)` and stopped as soon as THAT row had no
+     * Archive button — but an archived row stays in the table wearing an
+     * Unarchive button instead, so it stopped after the first frame and the
+     * guard it meant to provoke never fired. It then failed looking for an
+     * alert nothing had asked for.
+     */
+    const archiveButtons = () =>
+      page
+        .getByTestId('admin-frames-table')
+        .getByRole('button', { name: /^archive$/i })
+
+    while ((await archiveButtons().count()) > 1) {
+      await archiveButtons().first().click()
+      await page.waitForTimeout(300)
     }
 
-    await expect(page.getByRole('alert')).toContainText(
-      /last active frame/i
-    )
+    // One active frame left, and archiving it is what the API refuses.
+    await archiveButtons().first().click()
 
-    // Put every archived frame back before the suite moves on.
-    for (let i = 0; i < total; i += 1) {
-      const unarchive = rows.nth(i).getByRole('button', { name: /unarchive/i })
-      if ((await unarchive.count()) > 0) {
-        await unarchive.click()
-        await page.waitForTimeout(250)
+    /**
+     * `finally`, because the restore is the important half.
+     *
+     * This test archives the entire catalogue on purpose. When the assertion
+     * below failed, the restore that followed it never ran — leaving frames
+     * archived in the shared dev database and breaking later runs at unrelated
+     * steps. That is not hypothetical: it is how this suite was found broken.
+     */
+    try {
+      await expect(page.getByRole('alert')).toContainText(/last active frame/i)
+    } finally {
+      for (let i = 0; i < total; i += 1) {
+        const unarchive = rows.nth(i).getByRole('button', { name: /unarchive/i })
+        if ((await unarchive.count()) > 0) {
+          await unarchive.click()
+          await page.waitForTimeout(250)
+        }
       }
     }
   })

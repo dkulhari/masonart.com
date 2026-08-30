@@ -27,6 +27,13 @@ const insertMock = vi.fn();
 const updateMock = vi.fn();
 const deleteMock = vi.fn();
 const deleteCached = vi.fn();
+/**
+ * The frame writes purge the whole `product:` prefix now, not just
+ * `product:frames` — the product detail response embeds the frame options and
+ * is cached under its own key, so a reprice that dropped only the frames list
+ * left every product page quoting the old uplift (#651).
+ */
+const purgeProductResponseCache = vi.fn();
 
 vi.mock('../../../src/database', () => ({
   db: {
@@ -45,6 +52,8 @@ vi.mock('../../../src/lib/redis', () => ({
   getCached: vi.fn().mockResolvedValue(null),
   setCached: vi.fn().mockResolvedValue(undefined),
   deleteCached: (...args: unknown[]) => deleteCached(...args),
+  purgeProductResponseCache: (...args: unknown[]) =>
+    purgeProductResponseCache(...args),
   redis: { keys: vi.fn().mockResolvedValue([]), del: vi.fn() },
   CacheKeys: { PRODUCT: 'product:', COLLECTION: 'collection:' },
 }));
@@ -159,7 +168,7 @@ describe('POST /api/admin/frames', () => {
     });
 
     expect(res.status).toBe(201);
-    expect(deleteCached).toHaveBeenCalledWith('product:frames');
+    expect(purgeProductResponseCache).toHaveBeenCalled();
   });
 
   it('rejects a modifier the pricing formula would silently ignore', async () => {
@@ -216,7 +225,7 @@ describe('PATCH /api/admin/frames/:id', () => {
       body: JSON.stringify({ priceModifier: '1.60' }),
     });
 
-    expect(deleteCached).toHaveBeenCalledWith('product:frames');
+    expect(purgeProductResponseCache).toHaveBeenCalled();
   });
 
   it('404s an unknown id rather than silently updating nothing', async () => {
