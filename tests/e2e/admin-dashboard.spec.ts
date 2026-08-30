@@ -634,7 +634,23 @@ test.describe('Empty Orders State', () => {
       });
     });
 
-    await page.route('**/api/admin/orders', async (route) => {
+    /**
+     * `orders*`, with the star — the dashboard asks for
+     * `/api/admin/orders?pageSize=5&sortBy=createdAt&sortOrder=desc`
+     * (`routes/admin/index.tsx:113`), and a pattern without it matches neither
+     * that URL nor anything else the page requests.
+     *
+     * That single missing character is why these three tests failed: the mock
+     * never engaged, the real API answered with the real orders, and the
+     * dashboard correctly rendered a list instead of an empty state. It looked
+     * like the tests needed a freshly wiped database — they never did.
+     * `setupDashboardMocks` above has always had the star, which is why every
+     * other block in this file works.
+     */
+    await page.route('**/api/admin/orders*', async (route) => {
+      if (route.request().url().includes('/stats')) {
+        return; // handled by the stats route registered above
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -657,9 +673,20 @@ test.describe('Empty Orders State', () => {
   });
 
   test('should display shopping cart icon in empty state', async ({ page }) => {
-    const emptyContainer = page.locator(':has-text("No orders yet")');
-    const icon = emptyContainer.locator('svg').first();
-    await expect(icon).toBeVisible();
+    /**
+     * Anchored on the message's own parent, not on `:has-text(...)`.
+     *
+     * `:has-text` matches every ANCESTOR that contains the string — `html` and
+     * `body` included — so `.locator('svg').first()` under it returned the
+     * first icon anywhere on the page, which is in the sidebar and has nothing
+     * to do with the empty state. The assertion neither proved the cart icon
+     * was there nor failed when it wasn't; it just reported on whatever chrome
+     * happened to render first.
+     */
+    const emptyState = page
+      .getByText(/No orders yet\. When customers place orders/)
+      .locator('xpath=..');
+    await expect(emptyState.locator('svg')).toBeVisible();
   });
 });
 
