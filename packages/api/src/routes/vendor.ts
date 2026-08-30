@@ -27,14 +27,27 @@
  * 2. **PATCH loads the job FIRST.** `getVendorJob(vendorId, id)` runs before any
  *    write is built, and a miss ends the request. Updating by id and checking
  *    ownership afterwards behaves identically on the happy path and disastrously
- *    the day the check is wrong.
+ *    the day the check is wrong. The scoped module then re-reads the row under
+ *    `FOR UPDATE` inside its transaction, because this answer is a round trip
+ *    old by the time the write is built.
  *
- * 3. **The PATCH body schema has no amount fields at all.** Not rejected —
- *    absent, so `amountExpected` and `amountActual` cannot arrive by accident
- *    and are stripped by zod before the handler sees the body. Amounts come from
- *    the rate card at assignment; a vendor may not price their own job. Status
- *    is likewise a subset: `sent` and `received` are the vendor's own two
- *    events. Passing QC is ours to record, not theirs to claim.
+ * 3. **The PATCH body is ONE field, and it names a transition.** Not a patch:
+ *    `status`, and nothing else. No amount field exists in the schema, so
+ *    `amountExpected` and `amountActual` cannot arrive by accident — amounts
+ *    come from the rate card at assignment, and a vendor may not price their own
+ *    job. No date field exists either, so the SERVER stamps `receivedAt`,
+ *    `qcSubmittedAt` and `dispatchedAt`: a vendor back-dating receipt is a lie
+ *    about an SLA clock, and the only way to make it unsayable is to give it no
+ *    field to say it in.
+ *
+ *    The status vocabulary is IMPORTED from `lib/production-transitions.ts`,
+ *    where it is a `filter` over the transition matrix. It used to be a literal
+ *    here — `["sent", "received"]` — which is how the RETIRED `sent` stayed in a
+ *    vendor's public vocabulary for two phases after #675 erased it from the
+ *    rows, and how `qc_submitted` and `dispatched` stayed out of it long after
+ *    the matrix gave a vendor both. Passing QC is still ours to record, not
+ *    theirs to claim: `qc_passed` and `qc_failed` have no vendor edge, so they
+ *    are not in the derived tuple and cannot be named here.
  *
  * Zero customer data crosses this boundary — no name, address, phone, email or
  * person-linked order reference. Dispatch is in-house, so a vendor never needs
@@ -52,6 +65,8 @@ import { z } from "zod";
 
 import { requireAuth } from "../middleware/auth";
 import { requireVendor, type VendorVariables } from "../middleware/vendor";
+import { recordAudit } from "../lib/audit";
+import { VENDOR_SETTABLE_STATUSES } from "../lib/production-transitions";
 import {
   listVendorJobs,
   getVendorJob,
@@ -71,14 +86,6 @@ import { getPresignedDownloadUrl } from "../lib/storage";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
-
-/**
- * The statuses a vendor may set on their own job. `qc_passed` / `qc_failed` are
- * our verdict on their work, `assigned` and `cancelled` are our decisions, and
- * `draft` is a job that has not reached them. What is left is the two events
- * they alone can report: received it, sent it back.
- */
-const VENDOR_SETTABLE_STATUSES = ["sent", "received"] as const;
 
 /**
  * How long an artwork link lives. FIVE MINUTES — long enough to click, far too
@@ -116,16 +123,27 @@ const artworkParamSchema = z.object({
 });
 
 /**
- * Status and the two date fields. Nothing else — in particular no amount field
- * exists in this schema, so no amount can reach the update path.
+ * ONE field: the status to move to.
+ *
+ * The vocabulary is `lib/production-transitions.ts`'s, imported — a `filter`
+ * over the transition matrix rather than a list anybody maintains. This file
+ * used to hold its own `["sent", "received"]` literal, which is how the RETIRED
+ * `sent` stayed in a vendor's public vocabulary for two phases after #675
+ * erased it from the rows.
+ *
+ * No amount field exists here, so no amount can reach the update path: amounts
+ * are what we owe, priced from the rate card at assignment, and a vendor may
+ * not price their own job.
+ *
+ * **And no date field exists here either.** `sentAt` and `receivedAt` used to
+ * be settable; the server now stamps `receivedAt`, `qcSubmittedAt` and
+ * `dispatchedAt` from its own clock. A vendor back-dating "I received it three
+ * days ago" is not a data-entry convenience, it is a lie about an SLA clock —
+ * and the only way to make it unsayable is to give it no field to say it in.
  */
-const updateJobSchema = z
-  .object({
-    status: z.enum(VENDOR_SETTABLE_STATUSES).optional(),
-    sentAt: z.coerce.date().nullable().optional(),
-    receivedAt: z.coerce.date().nullable().optional(),
-  })
-  .refine((v) => Object.keys(v).length > 0, "No updatable fields were supplied");
+const updateJobSchema = z.object({
+  status: z.enum(VENDOR_SETTABLE_STATUSES),
+});
 
 // ============================================================================
 // Route Handler
@@ -235,6 +253,34 @@ vendorApp.get(
 // PATCH /api/vendor/jobs/:id
 // ============================================================================
 
+/**
+ * The one write a vendor gets, and it is a TRANSITION rather than a patch.
+ *
+ * Three things happen here and nowhere else in this file:
+ *
+ * 1. **The decision is not taken here.** `updateVendorJob` re-reads under a
+ *    lock, asks `lib/production-transitions.ts` whether this actor may take
+ *    this edge, evaluates the guard the matrix NAMES on it, stamps the clock
+ *    itself and writes with the predicate repeated — all in one transaction.
+ *    This handler translates its answer into a status code.
+ *
+ * 2. **404, 409 and 422 are three different answers.** The scoped module used
+ *    to answer `null` for everything, so a vendor whose job was cancelled under
+ *    them got the same reply as a vendor guessing at somebody else's id. 409 is
+ *    "the world moved" — cancelled, settled, illegal edge, lost race — and 422
+ *    is the one refusal the caller can fix, an incomplete QC shot list.
+ *
+ * 3. **The audit rows go on opposite sides of the transaction.** The success row
+ *    SHARES it, because a row saying "the job moved" beside a job that did not
+ *    is worse than no row. The refusal row must NOT: a refusal records that a
+ *    transaction was rolled back, so writing it inside that transaction rolls
+ *    the evidence back too. `updateVendorJob` has already returned by then, so
+ *    the refusal below is written outside every transaction by construction.
+ *
+ * A 404 gets no refusal row at all. There is no entity to refuse, and a row
+ * confirming one exists is the fact the 404 is there to withhold; the audit
+ * middleware's floor row is the right level of detail.
+ */
 vendorApp.patch(
   "/jobs/:id",
   zValidator("param", jobParamSchema),
@@ -246,20 +292,54 @@ vendorApp.patch(
 
     try {
       // LOAD FIRST. The 404 below happens before any write exists, which is the
-      // whole difference between this and update-then-check.
+      // whole difference between this and update-then-check. The locked re-read
+      // inside the transaction repeats the same scoped predicate, because this
+      // answer is a round trip old by the time the write is built.
       const existing = await getVendorJob(vendorId, id);
       if (!existing) return c.json({ error: "Job not found" }, 404);
 
-      const job = await updateVendorJob(vendorId, id, {
-        status: body.status,
-        sentAt: body.sentAt,
-        receivedAt: body.receivedAt,
+      const result = await updateVendorJob(
+        vendorId,
+        id,
+        { status: body.status },
+        {
+          onTransition: (tx, move) =>
+            recordAudit(
+              c,
+              {
+                action: "production_job.transitioned",
+                entityType: "production_job",
+                entityId: id,
+                summary: `Production job moved from ${move.from} to ${move.to} by the vendor`,
+                before: move.before,
+                after: move.after,
+                metadata: { from: move.from, to: move.to },
+              },
+              // Shares the transaction. See point 3 above.
+              tx
+            ),
+        }
+      );
+
+      if (result.ok) {
+        return c.json({ message: "Job updated", job: result.job });
+      }
+
+      // No entity, so nothing to refuse.
+      if (result.status === 404) return c.json(result.body, 404);
+
+      await recordAudit(c, {
+        action: "production_job.transition_refused",
+        entityType: "production_job",
+        entityId: id,
+        summary: result.body.error,
+        outcome: "failure",
+        metadata: result.body,
+        // NO `tx`, deliberately, and there is none to pass: the transaction
+        // this row is ABOUT has already rolled back.
       });
 
-      // Lost a race with an admin reassigning the job: still not ours to touch.
-      if (!job) return c.json({ error: "Job not found" }, 404);
-
-      return c.json({ message: "Job updated", job });
+      return c.json(result.body, result.status);
     } catch (error) {
       return c.json(failed("update job", error), 500);
     }

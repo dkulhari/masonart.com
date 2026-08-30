@@ -319,10 +319,10 @@ function nonEmpty(
 /**
  * The statuses a vendor may set, derived from the vendor edges.
  *
- * `routes/vendor.ts` holds this as a hardcoded `['sent', 'received']` literal —
- * wrong on both counts, since `sent` is retired and a vendor also submits QC
- * and despatches. #684 deletes that literal in favour of this. Typed as a
- * non-empty tuple so it drops straight into `z.enum`.
+ * `routes/vendor.ts` used to hold this as a hardcoded `['sent', 'received']`
+ * literal — wrong on both counts, since `sent` is retired and a vendor also
+ * submits QC and despatches. #684 deleted that literal; the route's `z.enum`
+ * now reads THIS, which is why the tuple is typed non-empty.
  */
 export const VENDOR_SETTABLE_STATUSES = nonEmpty(
   STATUS_VALUES.filter((to) => STATUS_VALUES.some((from) => edgeFor(from, to)?.actors.includes('vendor') ?? false)),

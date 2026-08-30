@@ -58,19 +58,28 @@
  */
 
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { requiredQcSlots, type QcStage } from '@chobii/shared'
 import { db } from '../database'
 import {
   productionJobs,
   productionJobItems,
+  productionJobPhotos,
   productionJobReviews,
   vendorSettlements,
 } from '../database/schema/production-jobs'
-import { orderItems } from '../database/schema/orders'
-import { orderConsolidation } from '../database/schema/production-transfers'
+import { orderItems, orders } from '../database/schema/orders'
+import {
+  orderConsolidation,
+  productionTransfers,
+  productionTransferJobs,
+} from '../database/schema/production-transfers'
 import { orderShipments } from '../database/schema/shipping'
 import { vendorRates } from '../database/schema/vendors'
 import {
+  ProductionTransitionError,
   VENDOR_SETTABLE_STATUSES,
+  assertTransition,
+  guardFor,
   type ProductionJobStatus,
 } from './production-transitions'
 
@@ -121,24 +130,11 @@ export async function getVendorJob(vendorId: string | null | undefined, jobId?: 
   assertVendorId(vendorId)
   if (!jobId) return null
 
-  const [job] = await db
-    .select({
-      id: productionJobs.id,
-      stage: productionJobs.stage,
-      status: productionJobs.status,
-      dueAt: productionJobs.dueAt,
-      sentAt: productionJobs.sentAt,
-      receivedAt: productionJobs.receivedAt,
-      amountExpected: productionJobs.amountExpected,
-      amountActual: productionJobs.amountActual,
-    })
-    .from(productionJobs)
-    // vendorId in the WHERE, not checked afterwards: a wrong-vendor job is
-    // NOT FOUND, which is also the right thing to leak (nothing).
-    .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
-    .limit(1)
-
-  return job ?? null
+  // vendorId in the WHERE, not checked afterwards: a wrong-vendor job is NOT
+  // FOUND, which is also the right thing to leak (nothing). The column list is
+  // shared with the post-write re-read, so the two cannot drift apart and start
+  // answering the same question with different shapes.
+  return readVendorJob(db, vendorId, jobId)
 }
 
 export async function listVendorRates(vendorId: string | null | undefined) {
@@ -522,19 +518,51 @@ export async function getVendorJobLabelKey(
 
 /**
  * The ONE write a vendor gets, and the only mutation this module will ever
- * expose. Scoped exactly like the reads, twice over:
+ * expose.
  *
- * 1. The row is loaded through `getVendorJob` FIRST, so a job belonging to
- *    another vendor is NOT FOUND before an UPDATE is ever built. Updating by id
- *    and checking ownership afterwards gives the same answer on the happy path
- *    and the wrong one whenever the check is wrong.
- * 2. `vendorId` is in the UPDATE's own WHERE as well, so even a bug that skipped
- *    the pre-read could not touch another vendor's row.
+ * ## What it stopped being
  *
- * The patch is a WHITELIST, not a spread: `status`, `sentAt` and `receivedAt`
- * are copied field by field. Amounts are what we owe, priced from the rate card
- * at assignment — a vendor may not price their own job, so no amount can arrive
- * here even if a caller puts one in the object.
+ * A blind whitelist patch: copy `status`, `sentAt` and `receivedAt` across if
+ * they were present, UPDATE, re-read. It asked no question except "is this
+ * status in a list", which meant a vendor could
+ *
+ * - move a **cancelled** job to `received` and go on working on a piece nobody
+ *   would pay for, walking straight around the freeze the admin side installed
+ *   — through a different door;
+ * - move a **settled** job, which makes the settlement's stored `amount`
+ *   disagree with the derived sum of its jobs, silently and forever;
+ * - back-date `receivedAt` to three days ago, which is not a data-entry
+ *   convenience but a lie about an SLA clock.
+ *
+ * ## What it is now
+ *
+ * Read under a lock, ask the matrix, evaluate the guard the matrix NAMES,
+ * stamp the clock ourselves, write with the predicate repeated, audit inside
+ * the transaction, re-read. All of it in ONE transaction, because every one of
+ * those steps reads a fact the next one depends on.
+ *
+ * `assertTransition` is only half the answer and `lib/production-transitions.ts`
+ * says so in as many words: the `guard` on an edge "*names* the circumstance a
+ * route still has to check". Both vendor-guarded edges are checked below —
+ * `received -> qc_submitted` against the shot list, `qc_passed -> dispatched`
+ * against the despatch evidence — because an edge whose guard nobody evaluates
+ * is an unguarded edge with a comment.
+ *
+ * ## Why a discriminated result and not `null`
+ *
+ * It used to answer `null` for "not yours", `null` for "no such job" and
+ * `throw` for "not a status you may set", so the route could only ever say 404.
+ * A vendor whose job was cancelled under them got the same answer as a vendor
+ * guessing at somebody else's id. The four outcomes are genuinely different
+ * — 404, 409, 422 and success — so the return type says which.
+ *
+ * ## The timestamps are ours
+ *
+ * `sentAt` and `receivedAt` are gone from the patch surface entirely; the
+ * server stamps `receivedAt`, `qcSubmittedAt` and `dispatchedAt` from its own
+ * clock at the instant of the write. Note that `qc_failed -> received`
+ * re-stamps `receivedAt`: rework is a second attempt at the piece and its clock
+ * restarts, rather than being back-dated to the first attempt.
  *
  * Returns the re-read row (the same customer-free column list as every other
  * read), never the raw `.returning()` row, which would carry `orderId`.
@@ -566,62 +594,440 @@ function isVendorSettableStatus(status: unknown): status is VendorSettableStatus
   )
 }
 
+/** The columns this module is allowed to stamp. Not `sentAt`: see below. */
+type VendorStampColumn = 'receivedAt' | 'qcSubmittedAt' | 'dispatchedAt'
+
+/**
+ * The clock each vendor-settable status stamps, checked TOTAL at module load.
+ *
+ * A vendor edge added to the matrix without a clock behind it would move a job
+ * and record nothing about when — a gap nobody notices until an SLA argument,
+ * by which time the only evidence is an `updated_at` that has been overwritten
+ * a dozen times. So the completeness is enforced rather than trusted.
+ *
+ * **Enforced at load and not by the type checker, on purpose.**
+ * `VENDOR_SETTABLE_STATUSES` is derived by a runtime `filter` over the matrix,
+ * so its element type is the whole enum and `Record<VendorSettableStatus, …>`
+ * would demand a clock for `draft` and `cancelled` too. A type that has to be
+ * satisfied with lies is worse than a check that runs: this one throws before
+ * the process serves a request, which no cast can silence.
+ *
+ * `sentAt` is deliberately absent from the vocabulary. `sent` is retired and
+ * has no edge in either direction, and `retire-sent-status.ts` LEAVES `sent_at`
+ * alone precisely because the date the material went out is evidence — evidence
+ * this module must not be able to overwrite.
+ */
+function stampColumnsForVendorEdges(): Record<VendorSettableStatus, VendorStampColumn> {
+  const declared: Partial<Record<ProductionJobStatus, VendorStampColumn>> = {
+    received: 'receivedAt',
+    qc_submitted: 'qcSubmittedAt',
+    dispatched: 'dispatchedAt',
+  }
+
+  const missing = VENDOR_SETTABLE_STATUSES.filter((status) => declared[status] === undefined)
+  if (missing.length > 0) {
+    throw new Error(
+      `vendor-scope: the transition matrix gives a vendor an edge into ` +
+        `${missing.join(', ')}, but no server-side timestamp is declared for it.`
+    )
+  }
+
+  // Sound for every status this map is ever READ with: the only lookups below
+  // are statuses `isVendorSettableStatus` and `assertTransition` have both
+  // already passed, and the check above proves each of those has an entry.
+  return declared as Record<VendorSettableStatus, VendorStampColumn>
+}
+
+export const VENDOR_STATUS_STAMP = stampColumnsForVendorEdges()
+
+/** Every refusal this module can answer with, named rather than inferred. */
+export type VendorJobRefusalCode =
+  | 'JOB_NOT_FOUND'
+  | 'JOB_CANCELLED'
+  | 'JOB_SETTLED'
+  | 'ILLEGAL_TRANSITION'
+  | 'SHOT_LIST_INCOMPLETE'
+  | 'GUARD_UNSATISFIED'
+  | 'CONCURRENT_MODIFICATION'
+
+export interface VendorJobRefusal {
+  ok: false
+  /**
+   * 404 the job is not theirs (or is gone), 409 the world moved, 422 the caller
+   * can fix it. The split matters: 422 in this router means "your payload names
+   * things that do not line up", which a client retries by CHANGING something.
+   * A transition conflict is not that, and conflating them teaches clients to
+   * retry the wrong thing.
+   */
+  status: 404 | 409 | 422
+  body: { error: string; code: VendorJobRefusalCode } & Record<string, unknown>
+}
+
+export interface VendorJobAccepted {
+  ok: true
+  job: NonNullable<Awaited<ReturnType<typeof getVendorJob>>>
+  from: ProductionJobStatus
+  to: VendorSettableStatus
+}
+
+export type VendorJobUpdateResult = VendorJobAccepted | VendorJobRefusal
+
+/** Thrown inside the transaction so a refusal ROLLS BACK rather than returns. */
+class VendorWriteRefused extends Error {
+  readonly refusal: VendorJobRefusal
+
+  constructor(status: VendorJobRefusal['status'], body: VendorJobRefusal['body']) {
+    super(body.error)
+    this.name = 'VendorWriteRefused'
+    this.refusal = { ok: false, status, body }
+  }
+}
+
+/** The reader half of `db` and of a transaction handle alike. */
+type VendorReader = { select: typeof db.select }
+
+/** The handle `db.transaction` hands its callback — it reads AND writes. */
+type VendorTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
+ * The insert surface `recordAudit` needs, named here so `routes/vendor.ts` can
+ * hand the transaction straight to it WITHOUT importing `db`, a table or a
+ * query builder. The route's zero-database-import invariant is the reason this
+ * type exists rather than the route simply taking a `PgTransaction`.
+ */
+export type VendorAuditWriter = { insert: typeof db.insert }
+
+export interface VendorTransitionRecord {
+  from: ProductionJobStatus
+  to: VendorSettableStatus
+  before: Record<string, unknown>
+  after: Record<string, unknown>
+}
+
+/**
+ * Called INSIDE the transaction, after the write and before the commit.
+ *
+ * The audit vocabulary stays in the route (which holds the request context);
+ * the transaction stays here (which holds the data access). A row saying "the
+ * job moved" beside a job that did not move is worse than no row, so this one
+ * shares the transaction — and shares its failures, which is the point: an
+ * audit write that throws must abort the move rather than be swallowed.
+ */
+export type VendorTransitionAudit = (
+  tx: VendorAuditWriter,
+  move: VendorTransitionRecord
+) => Promise<void>
+
+/** The one column list every vendor-facing job read uses. */
+const VENDOR_JOB_COLUMNS = {
+  id: productionJobs.id,
+  stage: productionJobs.stage,
+  status: productionJobs.status,
+  dueAt: productionJobs.dueAt,
+  sentAt: productionJobs.sentAt,
+  receivedAt: productionJobs.receivedAt,
+  amountExpected: productionJobs.amountExpected,
+  amountActual: productionJobs.amountActual,
+}
+
+/**
+ * Does the order carry a shipping label?
+ *
+ * The same three fields `routes/admin/production-jobs.ts` reads for the same
+ * guard, asked as a BOOLEAN rather than fetched: the AWB is a courier's handle
+ * on a customer's parcel, and R1 says no vendor-facing projection names it. The
+ * vendor needs the answer, never the value.
+ */
+const ORDER_HAS_LABEL = sql<boolean>`coalesce(
+  ${orders.shippingDetails} ->> 'awbNumber',
+  ${orders.shippingDetails} ->> 'trackingNumber',
+  ${orders.shippingDetails} ->> 'shipmentId'
+) is not null`
+
+/**
+ * The guard the matrix NAMES on this edge, evaluated or refused.
+ *
+ * Until Phase 3 nothing in `src/` called `guardFor` at all, so every guarded
+ * edge was taken unchecked. Both edges a vendor can reach are guarded, so for
+ * this module "evaluate the guard" is not an extra — it is most of the job.
+ */
+async function assertVendorGuardSatisfied(
+  tx: VendorTx,
+  job: { jobId: string; vendorId: string; stage: string },
+  from: ProductionJobStatus,
+  to: VendorSettableStatus
+): Promise<void> {
+  const guard = guardFor(from, to)
+  if (!guard) return
+
+  if (guard === 'shot-list-complete') {
+    // LIVE photos only. A superseded row is one the vendor REPLACED, and
+    // counting it would let a reshoot that never happened satisfy the list.
+    const live = await tx
+      .select({ slot: productionJobPhotos.slot })
+      .from(productionJobPhotos)
+      .where(
+        and(
+          eq(productionJobPhotos.jobId, job.jobId),
+          isNull(productionJobPhotos.supersededAt)
+        )
+      )
+
+    const uploaded = new Set(live.map((row) => row.slot))
+    const missing = requiredQcSlots(job.stage as QcStage).filter((slot) => !uploaded.has(slot))
+    if (missing.length === 0) return
+
+    // 422, not 409: this refusal IS fixable by the caller — upload the photos —
+    // which is exactly what separates the two codes in this router.
+    throw new VendorWriteRefused(422, {
+      error:
+        `This job cannot go to QC until every required photograph is uploaded. ` +
+        `Still missing: ${missing.join(', ')}.`,
+      code: 'SHOT_LIST_INCOMPLETE',
+      guard,
+      from,
+      to,
+      missingSlots: missing,
+      allowed: [],
+    })
+  }
+
+  if (guard === 'open-transfer-or-order-label') {
+    // ONE scoped query, shaped like `getVendorJobLabelKey`: FROM the vendor's
+    // own job, out to the order-keyed rows, selecting an opaque transfer id and
+    // a boolean. `orders` holds customer data in every direction; nothing about
+    // it comes back as a field.
+    const [evidence] = await tx
+      .select({ transferId: productionTransfers.id, hasOrderLabel: ORDER_HAS_LABEL })
+      .from(productionJobs)
+      .leftJoin(productionTransferJobs, eq(productionTransferJobs.jobId, productionJobs.id))
+      .leftJoin(
+        productionTransfers,
+        and(
+          eq(productionTransfers.id, productionTransferJobs.transferId),
+          // A LOST parcel is not an open one: the replacement job carries the
+          // work, and this job must not report itself despatched on a parcel
+          // that is gone.
+          isNull(productionTransfers.lostAt)
+        )
+      )
+      .innerJoin(orders, eq(orders.id, productionJobs.orderId))
+      .where(and(eq(productionJobs.id, job.jobId), eq(productionJobs.vendorId, job.vendorId)))
+      .limit(1)
+
+    if (evidence?.transferId || evidence?.hasOrderLabel) return
+
+    throw new VendorWriteRefused(409, {
+      error:
+        "This job is on no open transfer and its order carries no shipping label, " +
+        "so nothing has moved the goods anywhere. 'dispatched' is terminal: " +
+        'marking it now would leave this order permanently unlabelable.',
+      code: 'GUARD_UNSATISFIED',
+      guard,
+      from,
+      to,
+      allowed: [],
+    })
+  }
+
+  // Unreachable through today's matrix — the vendor's two guarded edges are
+  // both handled above. Refused rather than ignored, because a guard nobody
+  // evaluates is the exact defect this function exists to close, and a new
+  // guarded vendor edge must land here deliberately.
+  throw new VendorWriteRefused(409, {
+    error:
+      `Moving a job from '${from}' to '${to}' has to satisfy the '${guard}' guard, ` +
+      `which the vendor portal cannot evaluate.`,
+    code: 'GUARD_UNSATISFIED',
+    guard,
+    from,
+    to,
+    allowed: [],
+  })
+}
+
+/** One job through the customer-free column list, from `db` or from a `tx`. */
+async function readVendorJob(reader: VendorReader, vendorId: string, jobId: string) {
+  const [job] = await reader
+    .select(VENDOR_JOB_COLUMNS)
+    .from(productionJobs)
+    .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+    .limit(1)
+
+  return job ?? null
+}
+
 export async function updateVendorJob(
   vendorId: string | null | undefined,
-  jobId?: string,
-  patch: {
-    /**
-     * Typed as the whole enum and narrowed at RUNTIME below, deliberately, and
-     * only until #684. `routes/vendor.ts` still holds its own
-     * `['sent','received']` literal and #684 owns replacing it; narrowing this
-     * parameter to `VendorSettableStatus` today would break that route's
-     * COMPILE rather than its behaviour, which is the wrong thing to fix from
-     * here. The refusal below is the enforcement either way — a status outside
-     * the matrix's vendor edges never reaches the UPDATE.
-     */
-    status?: ProductionJobStatus
-    /**
-     * #684 deletes both of these from the vendor patch surface: a vendor
-     * back-dating receipt is a lie about an SLA clock, and the server stamps
-     * them. They survive here only because `routes/vendor.ts` still passes them
-     * and this ticket does not own that route. Note that neither is what the
-     * `sent` retirement was about — `retire-sent-status.ts` deliberately LEAVES
-     * `sent_at` alone, because the date the material went out is evidence.
-     */
-    sentAt?: Date | null
-    receivedAt?: Date | null
-  } = {}
-) {
+  jobId: string | undefined,
+  patch: { status: VendorSettableStatus },
+  hooks: { onTransition?: VendorTransitionAudit } = {}
+): Promise<VendorJobUpdateResult> {
   assertVendorId(vendorId)
 
-  const existing = await getVendorJob(vendorId, jobId)
-  if (!existing || !jobId) return null
-
-  const fields: Record<string, unknown> = {}
-  if (patch.status !== undefined) {
-    // Throws rather than dropping the field. Silently ignoring a status the
-    // caller asked for reads as success and leaves the job where it was, which
-    // is the failure mode that hides longest. #684 replaces this with
-    // `assertTransition`, which answers 409 and names the moves this vendor
-    // actually has from here.
-    if (!isVendorSettableStatus(patch.status)) {
-      throw new Error(
-        `vendor-scope: '${patch.status}' is not a vendor-settable status. ` +
-          `A vendor may set: ${VENDOR_SETTABLE_STATUSES.join(', ')}.`
-      )
-    }
-    fields.status = patch.status
+  const notFound: VendorJobRefusal = {
+    ok: false,
+    status: 404,
+    body: { error: 'Job not found', code: 'JOB_NOT_FOUND' },
   }
-  if (patch.sentAt !== undefined) fields.sentAt = patch.sentAt
-  if (patch.receivedAt !== undefined) fields.receivedAt = patch.receivedAt
-  if (Object.keys(fields).length === 0) return existing
 
-  await db
-    .update(productionJobs)
-    .set({ ...fields, updatedAt: new Date() })
-    .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+  if (!jobId) return notFound
 
-  return getVendorJob(vendorId, jobId)
+  const to = patch.status
+
+  // Defence in depth. `routes/vendor.ts` narrows this at the schema from the
+  // same derived tuple, so this is unreachable through the router — but this
+  // module is the boundary, and a boundary that trusts its only caller is a
+  // boundary that stops being one the day a second caller appears.
+  if (!isVendorSettableStatus(to)) {
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        error:
+          `'${to}' is not a status a vendor may set. ` +
+          `A vendor may set: ${VENDOR_SETTABLE_STATUSES.join(', ')}.`,
+        code: 'ILLEGAL_TRANSITION',
+        to,
+        allowed: [...VENDOR_SETTABLE_STATUSES],
+      },
+    }
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      // FOR UPDATE, and a RE-READ: the route's load-first check answered the
+      // 404 before any write was built, but it answered it a round trip ago.
+      // Two vendors' tabs, or a vendor and an admin, serialise here instead.
+      const [before] = await tx
+        .select({
+          id: productionJobs.id,
+          stage: productionJobs.stage,
+          status: productionJobs.status,
+          // Not in any response projection, and never will be. The freeze is
+          // about this column; the vendor is told what it means, not its value.
+          settlementId: productionJobs.settlementId,
+        })
+        .from(productionJobs)
+        // Scoped again, not trusted from the pre-read: an admin who reassigned
+        // the job in between must win, and this must find nothing.
+        .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+        .limit(1)
+        .for('update')
+
+      if (!before) throw new VendorWriteRefused(404, notFound.body)
+
+      const from = before.status
+
+      // A DELIBERATE exception to the portal's 404-not-403 rule, and it is
+      // checked FIRST because it is the one refusal that changes what the
+      // vendor should do next. They already know this job exists — it is theirs
+      // and it is in their queue — so naming its fate leaks nothing, and
+      // withholding it means they keep working on something nobody will pay
+      // for. Cancellation wins every race by having no out-edge at all.
+      if (from === 'cancelled') {
+        throw new VendorWriteRefused(409, {
+          error:
+            'This job was cancelled, so there is nothing left to do on it. ' +
+            'Stop work on this piece and check your queue for the current one.',
+          code: 'JOB_CANCELLED',
+          from,
+          to,
+          allowed: [],
+        })
+      }
+
+      // Frozen, not merely protected from amount edits: payables are DERIVED
+      // with no stored total, so a move after settlement makes the settlement
+      // disagree with the sum of its jobs silently — and the
+      // `settlement_id IS NULL` that keeps the write honest would match no row
+      // anyway.
+      if (before.settlementId !== null) {
+        throw new VendorWriteRefused(409, {
+          error:
+            'This job has already been settled and can no longer be moved. ' +
+            'Raise it with us rather than re-opening a paid job.',
+          code: 'JOB_SETTLED',
+          from,
+          to,
+          allowed: [],
+        })
+      }
+
+      // The matrix decides; this module only asks. There is no vendor self-edge
+      // anywhere in it, so a repeated PATCH is a refusal with the remedy
+      // attached rather than a silent no-op.
+      try {
+        assertTransition(from, to, 'vendor')
+      } catch (error) {
+        if (error instanceof ProductionTransitionError) {
+          throw new VendorWriteRefused(409, {
+            ...error.toResponseBody(),
+            code: 'ILLEGAL_TRANSITION',
+          })
+        }
+        throw error
+      }
+
+      // ...and then the circumstance the edge NAMES, which `assertTransition`
+      // deliberately does not answer.
+      await assertVendorGuardSatisfied(tx, { jobId, vendorId, stage: before.stage }, from, to)
+
+      // OUR clock, at the instant of the write. A vendor cannot say "I received
+      // it three days ago", because there is no field in which to say it.
+      const stampedAt = new Date()
+      const stamp = VENDOR_STATUS_STAMP[to]
+
+      const written = await tx
+        .update(productionJobs)
+        .set({ status: to, [stamp]: stampedAt, updatedAt: stampedAt })
+        .where(
+          and(
+            eq(productionJobs.id, jobId),
+            eq(productionJobs.vendorId, vendorId),
+            // The predicate REPEATED rather than trusted from the read: anybody
+            // who moved or settled the job in between wins, and we match
+            // nothing.
+            eq(productionJobs.status, from),
+            isNull(productionJobs.settlementId)
+          )
+        )
+        // Narrow on purpose: the raw row carries `orderId`.
+        .returning({ id: productionJobs.id })
+
+      if (written.length !== 1) {
+        throw new VendorWriteRefused(409, {
+          error: `Expected to update 1 job but matched ${written.length}; nothing was recorded`,
+          code: 'CONCURRENT_MODIFICATION',
+          from,
+          to,
+          allowed: [],
+        })
+      }
+
+      // Inside the transaction, and its failure aborts the move. Catching it
+      // here to "keep going" would answer 200 over a write about to roll back.
+      await hooks.onTransition?.(tx, {
+        from,
+        to,
+        before: { status: from },
+        after: { status: to, [stamp]: stampedAt },
+      })
+
+      // Re-read through the same customer-free column list every other read
+      // uses, from the TRANSACTION — a read outside it could not see the write.
+      const job = await readVendorJob(tx, vendorId, jobId)
+      if (!job) throw new VendorWriteRefused(404, notFound.body)
+
+      return { ok: true as const, job, from, to }
+    })
+  } catch (error) {
+    // The refusal already rolled its transaction back; the ROUTE writes the
+    // audit row for it, outside any transaction, because a refusal row records
+    // that a transaction was rolled back and writing it inside erases it.
+    if (error instanceof VendorWriteRefused) return error.refusal
+    throw error
+  }
 }
 
 /** QC history for a job the caller owns. */

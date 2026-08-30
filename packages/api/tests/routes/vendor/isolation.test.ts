@@ -149,6 +149,12 @@ function builder(op: RecordedQuery['op'], table?: unknown, fields?: unknown) {
       rec.orderBy = exprs
       return chain
     },
+    /**
+     * `FOR UPDATE`. A no-op link: a mock cannot serialise anything, so the lock
+     * itself is proved by a source scan in `jobs.test.ts`. What matters here is
+     * that chaining it does not break the recorder.
+     */
+    for: () => chain,
     returning: () => chain,
     where(w: unknown) {
       rec.where = w
@@ -313,6 +319,7 @@ const OWNED_ROWS: Record<string, unknown[][]> = {
         id: B_JOB_ID,
         stage: 'print',
         status: 'assigned',
+        settlementId: null,
         dueAt: PAST,
         sentAt: null,
         receivedAt: null,
@@ -322,6 +329,12 @@ const OWNED_ROWS: Record<string, unknown[][]> = {
       },
     ],
   ],
+  /**
+   * The guarded PATCH writes with `.returning({ id })` and refuses on a
+   * row-count mismatch, so "no rows queued" is now a 409 rather than a silent
+   * success. One row, matching the one job.
+   */
+  'update:production_jobs': [[{ id: B_JOB_ID }]],
   'select:production_job_items': [[{ id: B_ITEM_ID, imageUrl: 'products/abc.jpg' }]],
   'select:production_job_reviews': [
     [{ id: 'rev-1', verdict: 'fail', defects: ['scuff'], notes: null, createdAt: PAST }],
@@ -504,8 +517,20 @@ const ORDER_KEYED_TABLES = ['order_consolidation', 'order_shipments']
 /** Every table a vendor-facing query must name the caller's vendor id in. */
 const SCOPED_TABLES = [...VENDOR_OWNED_TABLES, ...ORDER_KEYED_TABLES]
 
-/** Reachable only through a job, which is itself scoped before they are read. */
-const JOB_KEYED_TABLES = ['production_job_items', 'production_job_reviews']
+/**
+ * Reachable only through a job, which is itself scoped before they are read.
+ *
+ * `production_job_photos` joined this list with #684's shot-list guard. Adding
+ * it is not bookkeeping: this vocabulary is an ALLOW-LIST, so a table nobody
+ * listed is not judged unscoped — it is not examined at all. That silence is
+ * exactly what let #678 bring two tables across with no coverage while every
+ * assertion here went on passing.
+ */
+const JOB_KEYED_TABLES = [
+  'production_job_items',
+  'production_job_reviews',
+  'production_job_photos',
+]
 
 /** Every scoped table one query touches, in its FROM or in any of its JOINs. */
 function scopedTablesTouched(q: RecordedQuery): string[] {
