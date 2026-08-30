@@ -26,7 +26,7 @@
  * deciding for itself. All three writers — PATCH, assign and the QC verdict —
  * take a job by its from-status and refuse anything the matrix does not allow.
  *
- * Seven decisions worth the ink:
+ * Nine decisions worth the ink:
  *
  * 1. **Jobs join to `order_items`, never to the order.** A basket holding a
  *    poster and a frame splits into two jobs against two vendors. POST checks
@@ -37,7 +37,12 @@
  *    and passed to `lib/vendor-rates.selectRateInForce` for every item, so a
  *    price rise scheduled for next month is not charged today and a long loop
  *    cannot straddle midnight. Band selection and effective-dating live in that
- *    module; nothing here re-implements them.
+ *    module; nothing here re-implements them. A job carrying an
+ *    `amount_actual` — a price negotiated with the vendor that HOLDS it —
+ *    cannot be reassigned without the caller saying what the new price is:
+ *    `jobPayableAmount` is `COALESCE(actual, expected)`, so a negotiated number
+ *    left in place is the old vendor's discount charged against the new
+ *    vendor's work.
  *
  * 3. **An unpriced item is a 422, never a zero.** If any item's longest edge
  *    falls outside the vendor's bands — or its variant has no dimensions at all
@@ -77,6 +82,22 @@
  *    `transitioned` row beside it — two rows for one act would break the "one
  *    row per transition" property the timeline is read through.
  *
+ * 8. **`assertTransition` is half the answer; the guard is the other half.**
+ *    Every edge the matrix marks with a `guard` has that circumstance evaluated
+ *    before the write — or, where the guard belongs to another route, the edge
+ *    is refused here and that route is named. PATCH used to take all three of
+ *    its guarded edges blind. `qc_passed -> dispatched` on goods that had not
+ *    moved is the unrecoverable one: `dispatched` is terminal, so
+ *    `evaluateLabelReadiness` reports `goods_not_at_consolidator` forever and
+ *    the order can never be labelled again.
+ *
+ * 9. **The consolidator nobody had to choose is written at first assignment.**
+ *    Design §5 rule 1 — one vendor holding every job on the order is the
+ *    overwhelming majority and needs no admin action.
+ *    `lib/production-readiness.proposeConsolidator` decides it; the assign route
+ *    only writes it, with `decided_by = NULL`, and only once every live job on
+ *    the order is assigned to that one vendor.
+ *
  * Money arithmetic is `lib/vendor-payables`' throughout — `sumPayable` adds the
  * matched rates in integer paise and `jobPayableAmount` answers
  * `COALESCE(actual, expected)`. A second money implementation in a router is
@@ -104,8 +125,16 @@ import {
   productionJobStatusEnum,
   productionJobVerdictEnum,
 } from "../../database/schema/production-jobs";
-import { orders, orderItems } from "../../database/schema/orders";
-import { orderConsolidation } from "../../database/schema/production-transfers";
+import {
+  orders,
+  orderItems,
+  type OrderShippingDetails,
+} from "../../database/schema/orders";
+import {
+  orderConsolidation,
+  productionTransfers,
+  productionTransferJobs,
+} from "../../database/schema/production-transfers";
 import { productVariants } from "../../database/schema/products";
 import { vendors, vendorRates } from "../../database/schema/vendors";
 import {
@@ -125,14 +154,17 @@ import {
 } from "../../lib/vendor-payables";
 import {
   assertTransition,
+  guardFor,
   ProductionTransitionError,
   type ProductionJobStatus,
+  type TransitionGuard,
 } from "../../lib/production-transitions";
 import {
   loadOrderProductionSnapshot,
   proposeConsolidator,
   consolidatorOverrideAllowed,
   getOrderLabelReadiness,
+  type ConsolidatorBasis,
 } from "../../lib/production-readiness";
 import { recordAudit, diffRecords } from "../../lib/audit";
 import { getPresignedDownloadUrl } from "../../lib/storage";
@@ -212,6 +244,15 @@ const assignJobSchema = z.object({
    * mismatch".
    */
   expectedVendorId: z.string().uuid().nullable().optional(),
+  /**
+   * The price negotiated with the vendor this request is assigning TO.
+   *
+   * Carried explicitly or not at all. A job that already has an `amount_actual`
+   * and a request that says nothing about it is refused rather than
+   * silently re-pointed — see the handler. `null` drops the old negotiation, so
+   * the job is payable at the new vendor's own rate card.
+   */
+  amountActual: decimalString.nullable().optional(),
 });
 
 /**
@@ -306,6 +347,9 @@ class JobWriteRefused extends Error {
 }
 
 type ProductionContext = Context<{ Variables: AuthVariables }>;
+
+/** The handle `db.transaction` hands its callback — it reads AND writes. */
+type ProductionTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * The response for a refused write, and the audit row that outlives it.
@@ -530,6 +574,36 @@ adminProductionApp.post("/", zValidator("json", createJobSchema), async (c) => {
         .values(orderItemIds.map((orderItemId) => ({ jobId: job.id, orderItemId })))
         .returning();
 
+      // `production_job.created` is registered at
+      // `packages/shared/src/schemas/audit-log.ts:136` and, until now, was never
+      // emitted by anything: the job appeared in the trail for the first time
+      // when somebody assigned it. The rule is "an action is declared in the
+      // same phase as its emitter, or not at all", and #671 adds a build guard
+      // that fails on any declared-but-dead action.
+      //
+      // Inside the transaction, like every other row that describes a write:
+      // a row announcing a job whose insert rolled back would be a lie.
+      await recordAudit(
+        c,
+        {
+          action: "production_job.created",
+          entityType: "production_job",
+          entityId: job.id,
+          summary:
+            `Production job created for order ${orderId}: ${stage} stage, ` +
+            `${items.length} item(s)`,
+          ...diffRecords(null, job),
+          metadata: {
+            orderId,
+            stage,
+            status: "draft",
+            orderItemIds,
+            dueAt: dueAt ? dueAt.toISOString() : null,
+          },
+        },
+        tx
+      );
+
       return { job, items };
     });
 
@@ -589,6 +663,281 @@ adminProductionApp.get("/:jobId", zValidator("param", jobParamSchema), async (c)
 });
 
 // ============================================================================
+// The guard on an edge — the half `assertTransition` deliberately leaves open
+// ============================================================================
+
+/**
+ * `assertTransition` answers *may this actor take this edge*. It does not answer
+ * the CIRCUMSTANCE the edge names, and `lib/production-transitions.ts` says so
+ * in as many words: the `guard` "*names* the circumstance a route still has to
+ * check". Until this existed nothing in `src/` called `guardFor` at all, so
+ * PATCH took every one of its guarded edges without evaluating anything:
+ *
+ * - `qc_passed -> dispatched` on a job at a vendor holding no transfer. This one
+ *   is unrecoverable — `dispatched` is terminal with zero out-edges,
+ *   `evaluateLabelReadiness` then reports `goods_not_at_consolidator` forever,
+ *   cancelling is illegal and a fresh job does not remove the old one from the
+ *   order. The order can never be labelled again.
+ * - `draft -> assigned` and `qc_failed -> assigned`, which answered 200 with a
+ *   NULL vendor, a NULL amount and a NULL `assigned_at` — the unbillable job the
+ *   assign route's 422 exists to prevent.
+ *
+ * Two kinds of guard, and they get different answers.
+ */
+
+/**
+ * A guard this route cannot evaluate, and the route that owns it.
+ *
+ * Not squeamishness. PATCH takes no `vendorId`, so `priced-from-rate-card` has
+ * no rate card to price against and no 422 to raise for an uncovered size, and
+ * the verdict guards need the review row only `POST /:jobId/reviews` writes.
+ * The secondary effect is worth as much as the primary one: reaching `assigned`
+ * through PATCH emitted `production_job.transitioned` (category **fulfilment**)
+ * while the assign route emits `production_job.assigned` (**money**), so an
+ * auditor filtering `money` for "who committed us to this vendor" saw nothing.
+ */
+const GUARD_OWNER: Record<
+  Exclude<TransitionGuard, "open-transfer-or-order-label">,
+  string
+> = {
+  "priced-from-rate-card": "POST /api/admin/production/:jobId/assign",
+  "review-verdict-pass": "POST /api/admin/production/:jobId/reviews",
+  "review-verdict-fail": "POST /api/admin/production/:jobId/reviews",
+  "shot-list-complete": "the vendor portal's QC submission",
+};
+
+/** An AWB, a tracking number or a shipment id — any one of them is a label. */
+function orderShippingLabel(details: OrderShippingDetails | null): string | null {
+  return details
+    ? (details.awbNumber ?? details.trackingNumber ?? details.shipmentId ?? null)
+    : null;
+}
+
+/**
+ * `open-transfer-or-order-label` — the two ways a piece may legitimately leave.
+ *
+ * Either it is on a parcel to the next vendor that has not been declared lost,
+ * or the order already carries a shipping label, which is the consolidator
+ * handing the goods to the courier — the case `evaluateLabelReadiness` reads as
+ * "dispatched and on no inter-vendor transfer".
+ *
+ * Evaluated here rather than refused, because nothing else in the codebase takes
+ * this edge: refusing it would leave a pipeline with no way to despatch at all,
+ * which is the failure `lib/production-transitions.ts` calls "an edge nothing in
+ * the codebase can take".
+ */
+async function despatchEvidence(
+  tx: ProductionTx,
+  job: { id: string; orderId: string }
+): Promise<{ satisfied: boolean; detail: Record<string, unknown> }> {
+  const [transfer] = await tx
+    .select({
+      id: productionTransfers.id,
+      toVendorId: productionTransfers.toVendorId,
+      dispatchedAt: productionTransfers.dispatchedAt,
+      receivedAt: productionTransfers.receivedAt,
+    })
+    .from(productionTransferJobs)
+    .innerJoin(
+      productionTransfers,
+      eq(productionTransfers.id, productionTransferJobs.transferId)
+    )
+    .where(
+      and(
+        eq(productionTransferJobs.jobId, job.id),
+        // A LOST parcel is not an open one. The original job keeps its status
+        // and its payable, and a REPLACEMENT job carries the work — see
+        // `routes/admin/transfers.ts`.
+        isNull(productionTransfers.lostAt)
+      )
+    )
+    .limit(1);
+
+  if (transfer) {
+    return {
+      satisfied: true,
+      detail: { basis: "open_transfer", transferId: transfer.id },
+    };
+  }
+
+  const [order] = await tx
+    .select({ shippingDetails: orders.shippingDetails })
+    .from(orders)
+    .where(eq(orders.id, job.orderId))
+    .limit(1);
+
+  const label = orderShippingLabel(order?.shippingDetails ?? null);
+
+  return label
+    ? { satisfied: true, detail: { basis: "order_label", orderLabel: label } }
+    : { satisfied: false, detail: { transferId: null, orderLabel: null } };
+}
+
+/**
+ * Evaluate the guard the matrix names on this edge, or refuse the edge.
+ *
+ * Called only when the job actually MOVES: a self-edge is not a transition, and
+ * `assigned -> assigned` through PATCH changes neither vendor nor amount, so
+ * there is no circumstance for a guard to be about.
+ */
+async function assertGuardSatisfied(
+  tx: ProductionTx,
+  job: { id: string; orderId: string },
+  from: ProductionJobStatus,
+  to: ProductionJobStatus
+): Promise<void> {
+  const guard = guardFor(from, to);
+  if (!guard) return;
+
+  if (guard === "open-transfer-or-order-label") {
+    const evidence = await despatchEvidence(tx, job);
+    if (evidence.satisfied) return;
+
+    throw new JobWriteRefused(409, {
+      error:
+        "This job is on no open transfer and its order carries no shipping label, " +
+        "so nothing has moved the goods anywhere. 'dispatched' is terminal: " +
+        "marking it now would leave this order permanently unlabelable.",
+      code: "GUARD_UNSATISFIED",
+      guard,
+      from,
+      to,
+      allowed: [],
+      ...evidence.detail,
+    });
+  }
+
+  throw new JobWriteRefused(409, {
+    error:
+      `Moving a job from '${from}' to '${to}' has to satisfy the '${guard}' guard, ` +
+      `which this route cannot evaluate. Use ${GUARD_OWNER[guard]} instead.`,
+    code: "GUARD_NOT_EVALUABLE_HERE",
+    guard,
+    route: GUARD_OWNER[guard],
+    from,
+    to,
+    allowed: [],
+  });
+}
+
+// ============================================================================
+// The consolidator nobody had to choose
+// ============================================================================
+
+/**
+ * Design §5 rule 1: "One vendor holds every job on the order → that vendor,
+ * written automatically at first assignment. The overwhelming majority; no admin
+ * action."
+ *
+ * Nothing wrote it. `POST /:orderId/consolidator` was the only writer, so the
+ * majority path needed an explicit admin call, and until somebody made it
+ * `no_consolidator` blocked the order out of fulfilment.
+ *
+ * **The rules are not re-derived here.** `proposeConsolidator` decides which
+ * vendor and whether the choice needs confirming. This function decides only
+ * whether there is anything to write, and writes it.
+ *
+ * One precondition sits on top of the proposal, and it is the one the reviewer
+ * asked about: `proposeConsolidator` filters to jobs with a truthy `vendorId`,
+ * so ONE assigned job beside an unassigned `draft` reads as `sole_vendor`. That
+ * is a proposal, not a fact — the draft may yet go to another shop, and
+ * `decided_by = NULL` claims there was nothing to decide. So the system default
+ * is written only once every LIVE job on the order is assigned. An order split
+ * across vendors still comes back `needsConfirmation` and still waits for an
+ * admin, exactly as `POST /:orderId/consolidator` documents.
+ */
+async function writeSystemDefaultConsolidator(
+  c: ProductionContext,
+  tx: ProductionTx,
+  job: { id: string; orderId: string },
+  vendor: { id: string; name: string }
+): Promise<{ vendorId: string; basis: ConsolidatorBasis } | null> {
+  // The serialiser, and the same row `POST /:orderId/consolidator` locks: two
+  // admins assigning two jobs of one order queue here rather than both reading
+  // "undecided" and both inserting, where the loser would meet a primary-key
+  // violation instead of an assignment.
+  const [order] = await tx
+    .select({ id: orders.id })
+    .from(orders)
+    .where(eq(orders.id, job.orderId))
+    .limit(1)
+    .for("update");
+
+  if (!order) return null;
+
+  // The seam's own loader, inside this transaction — the same rows the label
+  // gate will later read, so the two cannot be looking at different orders.
+  const snapshot = await loadOrderProductionSnapshot(job.orderId, tx);
+
+  // Somebody has already decided. Re-deciding is `POST /:orderId/consolidator`'s
+  // act, never a side effect of an assignment.
+  if (snapshot.consolidatorVendorId !== null) return null;
+
+  const live = snapshot.jobs.filter((row) => row.status !== "cancelled");
+  if (live.length === 0 || live.some((row) => row.vendorId === null)) return null;
+
+  const proposal = proposeConsolidator(snapshot.jobs);
+
+  // `needsConfirmation` is the system saying it may propose but not write. The
+  // vendor check is belt and braces: with one holder it IS the vendor this
+  // request just assigned, and if it somehow is not, this is not the sole-vendor
+  // case and there is nothing automatic to write.
+  if (proposal.needsConfirmation || proposal.vendorId !== vendor.id) return null;
+
+  const decidedAt = new Date();
+
+  const written = await tx
+    .insert(orderConsolidation)
+    .values({ orderId: job.orderId, vendorId: vendor.id, decidedBy: null, decidedAt })
+    .returning();
+
+  const [row] = written;
+
+  if (written.length !== 1 || !row) {
+    throw new JobWriteRefused(409, {
+      error: `Expected to write 1 consolidation row but matched ${written.length}; nothing was recorded`,
+      code: "CONCURRENT_MODIFICATION",
+      from: "assigned",
+      to: "assigned",
+      allowed: [],
+      orderId: job.orderId,
+    });
+  }
+
+  await recordAudit(
+    c,
+    {
+      action: "order.consolidator_set",
+      entityType: "order",
+      entityId: job.orderId,
+      summary: `Consolidator defaulted to ${vendor.name}: one vendor holds every job on the order`,
+      ...diffRecords(null, row, ["vendorId", "decidedBy"]),
+      metadata: {
+        // Which of the two it was, spelled out rather than inferred from a null:
+        // a reader of the trail must not have to know that `decided_by IS NULL`
+        // means the system.
+        decision: "system_default",
+        basis: proposal.basis,
+        // NOT `vendorId`: `recordAudit` reserves that key for the shop a VENDOR
+        // request was written for, and an admin acts for nobody.
+        consolidatorVendorId: vendor.id,
+        previousConsolidatorVendorId: null,
+        proposedVendorId: proposal.vendorId,
+        proposalBasis: proposal.basis,
+        needsConfirmation: proposal.needsConfirmation,
+        // The assignment this row is a consequence of.
+        viaJobId: job.id,
+      },
+    },
+    // Shares the transaction: a row saying this order routes through this
+    // vendor, beside an order that routes through nobody, is worse than no row.
+    tx
+  );
+
+  return { vendorId: vendor.id, basis: proposal.basis };
+}
+
+// ============================================================================
 // POST /api/admin/production/:jobId/assign
 // ============================================================================
 
@@ -598,7 +947,7 @@ adminProductionApp.post(
   zValidator("json", assignJobSchema),
   async (c) => {
     const { jobId } = c.req.valid("param");
-    const { vendorId, expectedVendorId } = c.req.valid("json");
+    const { vendorId, expectedVendorId, amountActual } = c.req.valid("json");
 
     try {
       const result = await db.transaction(async (tx) => {
@@ -657,6 +1006,34 @@ adminProductionApp.post(
             allowed: [],
             currentVendorId: job.vendorId,
             currentStatus: job.status,
+          });
+        }
+
+        // Design §10.6: "reassignment with `amount_actual` set is refused."
+        //
+        // `amount_actual` is a price NEGOTIATED with the vendor that holds the
+        // job. `amount_expected` is about to be recomputed from the new vendor's
+        // card and `jobPayableAmount` is COALESCE(actual, expected), so leaving
+        // a negotiated number in place pays the new vendor the old one's
+        // discount — 350 against 900 of work — and nothing surfaces it.
+        //
+        // Refused rather than cleared: dropping it silently is the same class of
+        // mistake in the other direction, and only a human knows what was agreed
+        // with the vendor being assigned to. `null` is how that human says
+        // "nothing was; pay the rate card".
+        if (job.amountActual !== null && amountActual === undefined) {
+          throw new JobWriteRefused(409, {
+            error:
+              `This job carries a negotiated amount of ${job.amountActual}, agreed with ` +
+              `the vendor that holds it. Re-pricing it would pay ${vendor.name} that ` +
+              `number instead of their own rate. Send amountActual with the price agreed ` +
+              `with ${vendor.name}, or null to drop it and pay the rate card.`,
+            code: "NEGOTIATED_AMOUNT_PRESENT",
+            from,
+            to: "assigned",
+            allowed: [],
+            amountActual: job.amountActual,
+            currentVendorId: job.vendorId,
           });
         }
 
@@ -730,6 +1107,9 @@ adminProductionApp.post(
           .set({
             vendorId,
             amountExpected,
+            // Explicitly, or not at all. `undefined` never reaches here on a job
+            // that already carries one — the refusal above got there first.
+            ...(amountActual !== undefined ? { amountActual } : {}),
             assignedAt: at,
             status: "assigned",
             updatedAt: at,
@@ -776,6 +1156,9 @@ adminProductionApp.post(
               "status",
               "vendorId",
               "amountExpected",
+              // The column the diff used to omit, which is how a negotiated
+              // price could follow a job to another vendor unremarked.
+              "amountActual",
               "assignedAt",
             ]),
             metadata: {
@@ -785,6 +1168,8 @@ adminProductionApp.post(
               // VENDOR request was written for, and an admin acts for nobody.
               assignedVendorId: vendorId,
               previousVendorId: job.vendorId,
+              previousAmountActual: job.amountActual,
+              amountActual: amountActual === undefined ? job.amountActual : amountActual,
               pricedAt: at.toISOString(),
             },
           },
@@ -793,7 +1178,14 @@ adminProductionApp.post(
           tx
         );
 
-        return { job: updated, amountExpected, at };
+        // Design §5 rule 1, and the majority path: one vendor now holds every
+        // job on this order, so the consolidator is not a judgement anybody has
+        // to make. Written with `decided_by = NULL` inside this transaction —
+        // a row routing an order through a vendor it was never assigned to is
+        // exactly the lie the shared transaction exists to prevent.
+        const consolidator = await writeSystemDefaultConsolidator(c, tx, updated, vendor);
+
+        return { job: updated, amountExpected, at, consolidator };
       });
 
       return c.json({
@@ -801,6 +1193,8 @@ adminProductionApp.post(
         job: result.job,
         amountExpected: result.amountExpected,
         pricedAt: result.at.toISOString(),
+        /** Non-null only when this assignment settled it — see §5 rule 1. */
+        consolidator: result.consolidator,
       });
     } catch (error) {
       const refused = await refusedResponse(c, jobId, error);
@@ -858,6 +1252,11 @@ adminProductionApp.patch(
         // The matrix decides; this route only asks. A self-edge is legal and
         // lands below as a no-op with no audit row.
         if (body.status !== undefined) assertTransition(from, body.status, "admin");
+
+        // ...and then the guard the matrix NAMES on that edge, which
+        // `assertTransition` deliberately does not answer. Only on a real move:
+        // a self-edge changes nothing a guard could be about.
+        if (to !== from) await assertGuardSatisfied(tx, before, from, to);
 
         const written = await tx
           .update(productionJobs)
@@ -971,6 +1370,11 @@ adminProductionApp.patch(
  * If the transition is refused NOTHING is written — not the review either — so
  * `production_job_reviews`' append-only guarantee is untouched: there is no row
  * to be sorry about.
+ *
+ * **A photo stamp is a claim, not an overwrite.** `production_job_photos.
+ * review_id` is set only where it is still NULL, so the shots an approving
+ * review saw go on pointing at that review after a later one overturns it. The
+ * full set each verdict judged is on that verdict's own audit row.
  */
 adminProductionApp.post(
   "/:jobId/reviews",
@@ -1060,23 +1464,45 @@ adminProductionApp.post(
           });
         }
 
-        // Stamp the verdict onto the shots it actually saw. LIVE photos only:
-        // a superseded shot was judged by an earlier review, and re-stamping it
-        // would rewrite that history. This is what lets a dispute a year later
-        // say WHICH photographs were approved rather than merely that the job
-        // was.
+        // The shots this verdict actually saw. LIVE photos only: a superseded
+        // shot was judged by an earlier review and belongs to that one.
         const judged = await tx
-          .update(productionJobPhotos)
-          .set({ reviewId: review.id })
+          .select({
+            id: productionJobPhotos.id,
+            slot: productionJobPhotos.slot,
+          })
+          .from(productionJobPhotos)
           .where(
             and(
               eq(productionJobPhotos.jobId, jobId),
               isNull(productionJobPhotos.supersededAt)
             )
-          )
-          .returning({ id: productionJobPhotos.id, slot: productionJobPhotos.slot });
+          );
 
         const judgedSlots = judged.map((photo) => photo.slot);
+
+        // The stamp CLAIMS an unclaimed shot. It never re-stamps one.
+        //
+        // `review_id` is a single column and this route deliberately supports
+        // the `qc_passed -> qc_failed` overturn — a supervisor re-inspecting the
+        // SAME live photographs. Without `review_id IS NULL` that second opinion
+        // re-stamped every one of them, so no photograph pointed at the
+        // approving review any more and §7's whole purpose — a dispute saying
+        // WHICH shots were approved — was destroyed by the act of disagreeing.
+        // First claim wins; every later verdict's full judged set is on its own
+        // audit row below, which is where a second opinion is legible without
+        // overwriting the first.
+        const stamped = await tx
+          .update(productionJobPhotos)
+          .set({ reviewId: review.id })
+          .where(
+            and(
+              eq(productionJobPhotos.jobId, jobId),
+              isNull(productionJobPhotos.supersededAt),
+              isNull(productionJobPhotos.reviewId)
+            )
+          )
+          .returning({ id: productionJobPhotos.id, slot: productionJobPhotos.slot });
 
         // ONE row for one act. The verdict and the status move are the same
         // fact, so there is deliberately no `transitioned` row beside this one:
@@ -1106,6 +1532,9 @@ adminProductionApp.post(
               defects: defects ?? [],
               judgedSlots,
               judgedPhotoIds: judged.map((photo) => photo.id),
+              // The subset this verdict is the FIRST to judge. The rest already
+              // point at an earlier review and go on pointing at it.
+              stampedPhotoIds: stamped.map((photo) => photo.id),
             },
           },
           // Shares the transaction: a row saying the job passed QC, beside a

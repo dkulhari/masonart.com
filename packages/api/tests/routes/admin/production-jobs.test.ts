@@ -36,7 +36,10 @@ import {
   productionJobPhotos,
   productionJobReviews,
 } from '../../../src/database/schema/production-jobs'
-import { orderConsolidation } from '../../../src/database/schema/production-transfers'
+import {
+  orderConsolidation,
+  productionTransferJobs,
+} from '../../../src/database/schema/production-transfers'
 import { orders } from '../../../src/database/schema/orders'
 import { adminAuditLog } from '../../../src/database/schema/audit-log'
 
@@ -100,6 +103,7 @@ const VENDOR_ID_2 = '3333333b-3333-4333-8333-333333333333'
 const ITEM_A = '44444444-4444-4444-8444-444444444444'
 const ITEM_B = '55555555-5555-4555-8555-555555555555'
 const ITEM_C = '5555555c-5555-4555-8555-555555555555'
+const TRANSFER_ID = '77777777-7777-4777-8777-777777777777'
 
 const json = (body: unknown, method = 'POST') => ({
   method,
@@ -225,6 +229,60 @@ describe('POST /api/admin/production', () => {
       { jobId: JOB_ID, orderItemId: ITEM_A },
       { jobId: JOB_ID, orderItemId: ITEM_B },
     ])
+  })
+
+  it('records production_job.created inside that transaction', async () => {
+    queueRows({
+      'select:orders': [[{ id: ORDER_ID }]],
+      'select:order_items': [[{ id: ITEM_A, orderId: ORDER_ID }]],
+      'insert:production_jobs': [[jobRow()]],
+      'insert:production_job_items': [[{ id: 'pji-1', jobId: JOB_ID, orderItemId: ITEM_A }]],
+    })
+
+    const res = await buildApp().request(
+      '/api/admin/production',
+      json({ orderId: ORDER_ID, stage: 'print', orderItemIds: [ITEM_A] })
+    )
+    expect(res.status).toBe(201)
+
+    // The action is registered in `schemas/audit-log.ts` and nothing emitted
+    // it: a job appeared in the trail for the first time when somebody assigned
+    // it. An action is declared in the same phase as its emitter, or not at all.
+    const rows = audits()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      action: 'production_job.created',
+      outcome: 'success',
+      entityType: 'production_job',
+      entityId: JOB_ID,
+      // A row announcing a job whose insert rolled back would be a lie.
+      inTx: true,
+    })
+    expect(rows[0]?.before).toBeNull()
+    expect(rows[0]?.after).toMatchObject({ id: JOB_ID, status: 'draft' })
+    expect(rows[0]?.metadata?.orderItemIds).toEqual([ITEM_A])
+    expect(rows[0]?.metadata?.stage).toBe('print')
+  })
+
+  it('lets an audit write that fails inside the transaction leave no job behind', async () => {
+    queueRows({
+      'select:orders': [[{ id: ORDER_ID }]],
+      'select:order_items': [[{ id: ITEM_A, orderId: ORDER_ID }]],
+      'insert:production_jobs': [[jobRow()]],
+      'insert:production_job_items': [[{ id: 'pji-1', jobId: JOB_ID, orderItemId: ITEM_A }]],
+    })
+    failNext('insert:admin_audit_log')
+
+    const res = await buildApp().request(
+      '/api/admin/production',
+      json({ orderId: ORDER_ID, stage: 'print', orderItemIds: [ITEM_A] })
+    )
+
+    expect(res.status).toBe(500)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+    expect(inserts(productionJobs)[0]?.inTx).toBe(true)
+    expect(audits().filter((row) => !row.inTx)).toHaveLength(0)
   })
 
   it('rolls back — leaving no orphan job — when the item insert fails partway', async () => {
@@ -771,6 +829,344 @@ describe('POST /api/admin/production/:jobId/assign', () => {
     )
     expect(res.status).toBe(200)
   })
+
+  // ------------------------------------------------------------------
+  // Reassignment and the price somebody negotiated with the OLD vendor
+  // ------------------------------------------------------------------
+
+  it('refuses to reassign a job carrying a negotiated amount', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [jobRow({
+          status: 'qc_failed',
+          vendorId: VENDOR_ID_2,
+          amountExpected: '400.00',
+          amountActual: '350.00',
+        })],
+      ],
+      'select:vendors': [[{ id: VENDOR_ID, name: 'Print Co' }]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+
+    // Design §10.6. `amount_actual` is a price negotiated with the vendor that
+    // HOLDS the job; `amount_expected` is about to be recomputed from the new
+    // vendor's card, and `jobPayableAmount` is COALESCE(actual, expected). Left
+    // in place it pays the new vendor 350 for 900 of work, and the audit diff
+    // never listed the column so nothing surfaced it.
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    expect(body).toMatchObject({
+      code: 'NEGOTIATED_AMOUNT_PRESENT',
+      amountActual: '350.00',
+      currentVendorId: VENDOR_ID_2,
+    })
+
+    expect(updates(productionJobs)).toHaveLength(0)
+    expect(tx.rollbacks).toBe(1)
+    expect(audits()).toMatchObject([
+      { action: 'production_job.transition_refused', outcome: 'failure', inTx: false },
+    ])
+  })
+
+  it('reassigns when the caller names the price agreed with the NEW vendor', async () => {
+    queueAssign({
+      items: [{ orderItemId: ITEM_A, widthInches: 24, heightInches: 36 }],
+      rates: [rate({ amount: '900.00' })],
+      job: { status: 'qc_failed', vendorId: VENDOR_ID_2, amountActual: '350.00' },
+      updated: { amountExpected: '900.00', amountActual: '800.00' },
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID, amountActual: '800.00' })
+    )
+    expect(res.status).toBe(200)
+
+    const written = updates(productionJobs)[0]?.values as Record<string, unknown>
+    expect(written.amountExpected).toBe('900.00')
+    expect(written.amountActual).toBe('800.00')
+
+    // The column the diff used to omit. A negotiated price moving between
+    // vendors is now visible in the trail rather than inferable from nothing.
+    const rows = audits()
+    expect(rows[0]?.before?.amountActual).toBe('350.00')
+    expect(rows[0]?.after?.amountActual).toBe('800.00')
+  })
+
+  it('reassigns when the caller drops the old negotiation with null', async () => {
+    queueAssign({
+      items: [{ orderItemId: ITEM_A, widthInches: 24, heightInches: 36 }],
+      rates: [rate({ amount: '900.00' })],
+      job: { status: 'qc_failed', vendorId: VENDOR_ID_2, amountActual: '350.00' },
+      updated: { amountExpected: '900.00', amountActual: null },
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID, amountActual: null })
+    )
+    expect(res.status).toBe(200)
+
+    const written = updates(productionJobs)[0]?.values as Record<string, unknown>
+    expect(written.amountActual).toBeNull()
+    // COALESCE(actual, expected) — the new vendor's own rate, which is the
+    // point of dropping it.
+    expect((await readJson(res)).job.amountExpected).toBe('900.00')
+  })
+
+  it('leaves amount_actual alone on a job that never had one', async () => {
+    queueAssign({
+      items: [{ orderItemId: ITEM_A, widthInches: 24, heightInches: 36 }],
+      rates: [rate()],
+      updated: { amountExpected: '100.00' },
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+    expect(res.status).toBe(200)
+
+    // Not written at all, rather than written as null: a first assignment has
+    // no negotiation to have an opinion about.
+    expect(updates(productionJobs)[0]?.values).not.toHaveProperty('amountActual')
+  })
+
+  // ------------------------------------------------------------------
+  // The consolidator nobody had to choose — design §5 rule 1
+  // ------------------------------------------------------------------
+
+  /**
+   * `queueAssign` plus the rows the handler reads AFTER the job update: the
+   * locked order row, then `loadOrderProductionSnapshot`'s five reads in their
+   * fixed order, then the insert.
+   */
+  function queueAssignOnOrder(over: {
+    job?: Record<string, unknown>
+    updated?: Record<string, unknown>
+    orderExists?: boolean
+    snapshotJobs?: Array<Record<string, unknown>>
+    consolidation?: Array<Record<string, unknown>>
+    items?: Array<Record<string, unknown>>
+  } = {}) {
+    const {
+      orderExists = true,
+      snapshotJobs = [
+        {
+          id: JOB_ID,
+          stage: 'print',
+          status: 'assigned',
+          vendorId: VENDOR_ID,
+          assignedAt: PAST,
+          orderItemId: ITEM_A,
+        },
+      ],
+      consolidation = [],
+      items = [{ id: ITEM_A, frameId: null, giftCardPurchase: null }],
+    } = over
+
+    queueRows({
+      'select:production_jobs': [
+        [jobRow({ stage: 'print', ...(over.job ?? {}) })],
+        // The snapshot loader's own read of the order's jobs.
+        snapshotJobs,
+      ],
+      'select:vendors': [[{ id: VENDOR_ID, name: 'Print Co' }]],
+      'select:production_job_items': [
+        [{ orderItemId: ITEM_A, quantity: 1, widthInches: 24, heightInches: 36 }],
+      ],
+      'select:vendor_rates': [[rate()]],
+      'update:production_jobs': [
+        [jobRow({ vendorId: VENDOR_ID, status: 'assigned', ...(over.updated ?? {}) })],
+      ],
+      // The FOR UPDATE lock, then the snapshot loader's read of the same row.
+      'select:orders': [orderExists ? [{ id: ORDER_ID }] : [], [{ orderType: 'regular' }]],
+      'select:order_items': [items],
+      'select:order_consolidation': [consolidation],
+      'select:production_transfers': [[]],
+      'insert:order_consolidation': [
+        [{ orderId: ORDER_ID, vendorId: VENDOR_ID, decidedBy: null, decidedAt: PAST }],
+      ],
+    })
+  }
+
+  it('writes the consolidator itself at first assignment, with decided_by NULL', async () => {
+    queueAssignOnOrder()
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+    expect(res.status).toBe(200)
+    expect((await readJson(res)).consolidator).toEqual({
+      vendorId: VENDOR_ID,
+      basis: 'sole_vendor',
+    })
+
+    // Nothing wrote this before: `POST /:orderId/consolidator` was the only
+    // writer, so the MAJORITY path needed an explicit admin call and until
+    // somebody made it `no_consolidator` blocked the order out of fulfilment.
+    const written = inserts(orderConsolidation)
+    expect(written).toHaveLength(1)
+    expect(written[0]?.values).toMatchObject({
+      orderId: ORDER_ID,
+      vendorId: VENDOR_ID,
+      // NULL is the record of "the system chose, because there was nothing to
+      // choose". An id would claim an admin stood behind it.
+      decidedBy: null,
+    })
+    expect(written[0]?.inTx).toBe(true)
+
+    const rows = audits()
+    expect(rows.map((row) => row.action)).toEqual([
+      'production_job.assigned',
+      'order.consolidator_set',
+    ])
+    expect(rows[1]).toMatchObject({ entityType: 'order', entityId: ORDER_ID, inTx: true })
+    expect(rows[1]?.metadata?.decision).toBe('system_default')
+    expect(rows[1]?.metadata?.basis).toBe('sole_vendor')
+    expect(rows[1]?.metadata?.viaJobId).toBe(JOB_ID)
+  })
+
+  it('waits while a draft on the order is still unassigned', async () => {
+    queueAssignOnOrder({
+      snapshotJobs: [
+        {
+          id: JOB_ID,
+          stage: 'print',
+          status: 'assigned',
+          vendorId: VENDOR_ID,
+          assignedAt: PAST,
+          orderItemId: ITEM_A,
+        },
+        // proposeConsolidator ignores an unassigned draft, so this order reads
+        // as sole_vendor. It is not: the draft may yet go to another shop, and
+        // a decided_by NULL row would claim there was nothing to decide.
+        {
+          id: JOB_ID_2,
+          stage: 'frame',
+          status: 'draft',
+          vendorId: null,
+          assignedAt: null,
+          orderItemId: ITEM_B,
+        },
+      ],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+    expect(res.status).toBe(200)
+    expect((await readJson(res)).consolidator).toBeNull()
+
+    expect(inserts(orderConsolidation)).toHaveLength(0)
+    expect(audits()).toHaveLength(1)
+  })
+
+  it('leaves a split order to the admin who has to confirm it', async () => {
+    queueAssignOnOrder({
+      snapshotJobs: [
+        {
+          id: JOB_ID,
+          stage: 'print',
+          status: 'assigned',
+          vendorId: VENDOR_ID,
+          assignedAt: PAST,
+          orderItemId: ITEM_A,
+        },
+        {
+          id: JOB_ID_2,
+          stage: 'frame',
+          status: 'assigned',
+          vendorId: VENDOR_ID_2,
+          assignedAt: PAST,
+          orderItemId: ITEM_B,
+        },
+      ],
+      items: [
+        { id: ITEM_A, frameId: null, giftCardPurchase: null },
+        { id: ITEM_B, frameId: 'frame-1', giftCardPurchase: null },
+      ],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+    expect(res.status).toBe(200)
+
+    // `needsConfirmation` is the system saying it may propose but not write:
+    // the real criterion is not modelled, and an arbitrary choice an admin
+    // confirmed is auditable where the same choice written silently is not.
+    expect(inserts(orderConsolidation)).toHaveLength(0)
+    expect((await readJson(res)).consolidator).toBeNull()
+  })
+
+  it('never re-decides an order that already has a consolidator', async () => {
+    queueAssignOnOrder({ consolidation: [{ vendorId: VENDOR_ID_2 }] })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+    expect(res.status).toBe(200)
+
+    // Re-deciding is POST /:orderId/consolidator's act, never a side effect of
+    // an assignment — and after a transfer has dispatched it is refused there.
+    expect(inserts(orderConsolidation)).toHaveLength(0)
+    expect(audits()).toHaveLength(1)
+  })
+
+  it('locks the order row before reading whether it has been decided', async () => {
+    queueAssignOnOrder()
+
+    await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+
+    const orderRead = queries.findIndex((q) => q.op === 'select' && q.table === 'orders')
+    const decisionRead = queries.findIndex(
+      (q) => q.op === 'select' && q.table === 'order_consolidation'
+    )
+    const write = queries.findIndex(
+      (q) => q.op === 'insert' && q.table === 'order_consolidation'
+    )
+    expect(orderRead).toBeGreaterThanOrEqual(0)
+    expect(orderRead).toBeLessThan(decisionRead)
+    expect(decisionRead).toBeLessThan(write)
+    // Two admins assigning two jobs of one order serialise here rather than
+    // both reading "undecided" and the loser meeting a primary-key violation.
+    expect(queries[orderRead]?.inTx).toBe(true)
+  })
+
+  it('lets an audit write that fails inside the transaction take the assignment down', async () => {
+    queueAssign({
+      items: [{ orderItemId: ITEM_A, widthInches: 24, heightInches: 36 }],
+      rates: [rate()],
+      updated: { amountExpected: '100.00' },
+    })
+    failNext('insert:admin_audit_log')
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}/assign`,
+      json({ vendorId: VENDOR_ID })
+    )
+
+    expect(res.status).toBe(500)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+    expect(updates(productionJobs)[0]?.inTx).toBe(true)
+    // No row claiming a vendor owes us this work survives a transaction that
+    // never committed the assignment.
+    expect(audits().filter((row) => !row.inTx)).toHaveLength(0)
+  })
 })
 
 // ============================================================================
@@ -778,22 +1174,41 @@ describe('POST /api/admin/production/:jobId/assign', () => {
 // ============================================================================
 
 /**
- * The matrix in `lib/production-transitions.ts` is the authority; these two
- * tables are the enumeration of it this route is answerable for. `qc_passed`
- * and `qc_failed` appear in neither, because PATCH no longer accepts them at
- * all: a verdict with no review row is a verdict with no evidence, so those two
+ * The matrix in `lib/production-transitions.ts` is the authority; these tables
+ * are the enumeration of it this route is answerable for. `qc_passed` and
+ * `qc_failed` appear in none of them, because PATCH no longer accepts those two
+ * at all: a verdict with no review row is a verdict with no evidence, so they
  * are reachable only through POST /:jobId/reviews.
+ *
+ * **The split is the point.** These nine edges used to be ONE list asserting
+ * 200 for every one of them, which pinned the bug as intended behaviour: an
+ * edge the matrix marks with a `guard` is not simply legal here.
+ * `assertTransition` answers whether an admin may take it; the guard is the
+ * circumstance the route still has to establish, and PATCH established none of
+ * them.
  */
-const LEGAL_ADMIN_EDGES: Array<[string, string]> = [
-  ['draft', 'assigned'],
+const UNGUARDED_ADMIN_EDGES: Array<[string, string]> = [
   ['draft', 'cancelled'],
   ['assigned', 'cancelled'],
   ['received', 'cancelled'],
   ['qc_submitted', 'cancelled'],
-  ['qc_passed', 'dispatched'],
   ['qc_passed', 'cancelled'],
-  ['qc_failed', 'assigned'],
   ['qc_failed', 'cancelled'],
+]
+
+/**
+ * Legal for an admin, and refused by PATCH anyway, because the guard on the
+ * edge belongs to the route that can actually evaluate it.
+ *
+ * `priced-from-rate-card` cannot be answered by a route that takes no
+ * `vendorId`. Taking these through PATCH answered 200 over a row with a NULL
+ * vendor, a NULL `amount_expected` and a NULL `assigned_at` — and recorded it
+ * as `production_job.transitioned`, category `fulfilment`, where an auditor
+ * filtering `money` for "who committed us to this vendor" would never see it.
+ */
+const DELEGATED_ADMIN_EDGES: Array<[string, string, string]> = [
+  ['draft', 'assigned', 'POST /api/admin/production/:jobId/assign'],
+  ['qc_failed', 'assigned', 'POST /api/admin/production/:jobId/assign'],
 ]
 
 const ILLEGAL_ADMIN_EDGES: Array<[string, string]> = [
@@ -811,8 +1226,8 @@ const ILLEGAL_ADMIN_EDGES: Array<[string, string]> = [
 ]
 
 describe('PATCH /api/admin/production/:jobId', () => {
-  it.each(LEGAL_ADMIN_EDGES)(
-    'takes the legal edge %s -> %s and records exactly one transition row',
+  it.each(UNGUARDED_ADMIN_EDGES)(
+    'takes the unguarded edge %s -> %s and records exactly one transition row',
     async (from, to) => {
       queueRows({
         'select:production_jobs': [[jobRow({ status: from })]],
@@ -1078,6 +1493,226 @@ describe('PATCH /api/admin/production/:jobId', () => {
     )
     expect(empty.status).toBe(400)
   })
+
+  // ------------------------------------------------------------------
+  // The guard on the edge — the half `assertTransition` does not answer
+  // ------------------------------------------------------------------
+
+  it.each(DELEGATED_ADMIN_EDGES)(
+    'refuses the guarded edge %s -> %s and names the route that owns it',
+    async (from, to, route) => {
+      queueRows({ 'select:production_jobs': [[jobRow({ status: from })]] })
+
+      const res = await buildApp().request(
+        `/api/admin/production/${JOB_ID}`,
+        json({ status: to }, 'PATCH')
+      )
+      expect(res.status).toBe(409)
+
+      const body = await readJson(res)
+      expect(body).toMatchObject({
+        code: 'GUARD_NOT_EVALUABLE_HERE',
+        guard: 'priced-from-rate-card',
+        route,
+        from,
+        to: 'assigned',
+      })
+
+      // The unbillable job this refusal exists to prevent: `assigned` beside a
+      // NULL vendor, a NULL amount and a NULL assigned_at.
+      expect(updates(productionJobs)).toHaveLength(0)
+      expect(tx.rollbacks).toBe(1)
+      expect(tx.commits).toBe(0)
+
+      // ...and no `production_job.transitioned` row claiming a fulfilment event
+      // where the money row belongs.
+      const rows = audits()
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({
+        action: 'production_job.transition_refused',
+        outcome: 'failure',
+        inTx: false,
+      })
+    }
+  )
+
+  it('lets qc_passed -> dispatched through when the piece is on an open transfer', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
+      'select:production_transfer_jobs': [
+        [{ id: TRANSFER_ID, toVendorId: VENDOR_ID_2, dispatchedAt: null, receivedAt: null }],
+      ],
+      'update:production_jobs': [[jobRow({ status: 'dispatched', vendorId: VENDOR_ID })]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+    expect(res.status).toBe(200)
+
+    const rows = audits()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.action).toBe('production_job.transitioned')
+
+    // A parcel answers the guard on its own; the order is not read at all.
+    expect(selects(orders)).toHaveLength(0)
+  })
+
+  it('lets it through when the order already carries a shipping label', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
+      // The consolidator handing the goods to the courier: no inter-vendor
+      // parcel, and `evaluateLabelReadiness` reads exactly this case.
+      'select:production_transfer_jobs': [[]],
+      'select:orders': [[{ shippingDetails: { carrier: 'Delhivery', awbNumber: 'AWB-1' } }]],
+      'update:production_jobs': [[jobRow({ status: 'dispatched', vendorId: VENDOR_ID })]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+    expect(res.status).toBe(200)
+    expect(updates(productionJobs)).toHaveLength(1)
+  })
+
+  it('refuses qc_passed -> dispatched when nothing has moved the goods', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
+      'select:production_transfer_jobs': [[]],
+      'select:orders': [[{ shippingDetails: null }]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+
+    // THE unrecoverable one. `dispatched` is terminal with zero out-edges: the
+    // readiness gate would then report goods_not_at_consolidator forever,
+    // cancelling is illegal, and a fresh job does not remove this one from the
+    // order. The order could never be labelled again.
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    expect(body).toMatchObject({
+      code: 'GUARD_UNSATISFIED',
+      guard: 'open-transfer-or-order-label',
+      from: 'qc_passed',
+      to: 'dispatched',
+      transferId: null,
+      orderLabel: null,
+    })
+
+    expect(updates(productionJobs)).toHaveLength(0)
+    expect(tx.rollbacks).toBe(1)
+    expect(audits()).toMatchObject([
+      { action: 'production_job.transition_refused', outcome: 'failure', inTx: false },
+    ])
+  })
+
+  it('does not count a parcel that was declared lost as an open transfer', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
+      'select:production_transfer_jobs': [[]],
+      'select:orders': [[{ shippingDetails: {} }]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+    expect(res.status).toBe(409)
+
+    // The mock applies no predicates, so the exclusion is asserted on the SQL:
+    // a lost parcel leaves the work undone and a REPLACEMENT job carries it.
+    const { sql, params } = render(selects(productionTransferJobs)[0]?.where)
+    expect(params).toContain(JOB_ID)
+    expect(sql.toLowerCase()).toContain('lost_at')
+    expect(sql.toLowerCase()).toContain('is null')
+  })
+
+  it('reads the guard inside the transaction, before the write', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
+      'select:production_transfer_jobs': [
+        [{ id: TRANSFER_ID, toVendorId: VENDOR_ID_2, dispatchedAt: null, receivedAt: null }],
+      ],
+      'update:production_jobs': [[jobRow({ status: 'dispatched' })]],
+    })
+
+    await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+
+    const guardIndex = queries.findIndex(
+      (q) => q.op === 'select' && q.table === 'production_transfer_jobs'
+    )
+    const writeIndex = queries.findIndex(
+      (q) => q.op === 'update' && q.table === 'production_jobs'
+    )
+    expect(guardIndex).toBeGreaterThanOrEqual(0)
+    expect(guardIndex).toBeLessThan(writeIndex)
+    // Under the same lock as the job row it is about — outside the transaction
+    // it would be a fact read about a different moment.
+    expect(queries[guardIndex]?.inTx).toBe(true)
+  })
+
+  it('still treats a guarded SELF-edge as a no-op — nothing moved to guard', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'assigned', vendorId: VENDOR_ID })]],
+      'update:production_jobs': [[jobRow({ status: 'assigned', vendorId: VENDOR_ID })]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'assigned', dueAt: '2026-09-01T00:00:00.000Z' }, 'PATCH')
+    )
+    expect(res.status).toBe(200)
+    expect(queries.some((q) => q.table === 'production_transfer_jobs')).toBe(false)
+    expect(audits()).toHaveLength(0)
+  })
+
+  it('lets an audit write that fails inside the transaction take the whole thing down', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [jobRow({ status: 'draft' })],
+        [jobRow({ status: 'draft' })],
+      ],
+      'update:production_jobs': [[jobRow({ status: 'cancelled' })]],
+    })
+    // recordAudit RETHROWS when it is given a tx: the insert did not fail on
+    // its own, it aborted the caller's transaction. Swallowing would answer 200
+    // over a write Postgres is about to roll back.
+    failNext('insert:admin_audit_log')
+
+    const app = buildApp()
+    const res = await app.request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'cancelled' }, 'PATCH')
+    )
+
+    expect(res.status).toBe(500)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+    // Every row this request wrote — the job UPDATE and the audit row itself —
+    // was inside the transaction that rolled back. Nothing survives.
+    expect(updates(productionJobs)[0]?.inTx).toBe(true)
+    expect(audits().filter((row) => !row.inTx)).toHaveLength(0)
+
+    // The other half of the rule: a REFUSAL row is written outside the
+    // transaction, so it survives the rollback it exists to record.
+    const refused = await app.request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+    expect(refused.status).toBe(409)
+    expect(audits().filter((row) => !row.inTx)).toMatchObject([
+      { action: 'production_job.transition_refused', outcome: 'failure' },
+    ])
+  })
 })
 
 // ============================================================================
@@ -1266,6 +1901,9 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
       'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
       'insert:production_job_reviews': [[reviewRow({ verdict: 'pass' })]],
       'update:production_jobs': [[jobRow({ status: 'qc_passed' })]],
+      'select:production_job_photos': [
+        [photoRow('print_full'), photoRow('print_raking_light')],
+      ],
       'update:production_job_photos': [
         [
           photoRow('print_full', { reviewId: REVIEW_ID }),
@@ -1291,6 +1929,20 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
     expect(params).toContain(JOB_ID)
     expect(sql.toLowerCase()).toContain('superseded_at')
     expect(sql.toLowerCase()).toContain('is null')
+
+    // ...and a shot ALREADY judged is not re-stamped. `review_id` is a single
+    // column, so an overwrite is a deletion.
+    expect(sql.toLowerCase()).toContain('review_id')
+
+    const rows = audits()
+    expect(rows[0]?.metadata?.judgedPhotoIds).toEqual([
+      'photo-print_full',
+      'photo-print_raking_light',
+    ])
+    expect(rows[0]?.metadata?.stampedPhotoIds).toEqual([
+      'photo-print_full',
+      'photo-print_raking_light',
+    ])
   })
 
   it.each(NON_SUBMITTED_STATUSES)(
@@ -1350,7 +2002,21 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
         [jobRow({ status: 'qc_passed' })],
         [jobRow({ status: 'qc_failed' })],
       ],
-      'update:production_job_photos': [[], []],
+      // The SAME two live photographs, both times. Seeding this empty made the
+      // property unreachable, which is how the re-stamp survived review.
+      'select:production_job_photos': [
+        [photoRow('print_full'), photoRow('print_raking_light')],
+        [
+          photoRow('print_full', { reviewId: REVIEW_ID }),
+          photoRow('print_raking_light', { reviewId: REVIEW_ID }),
+        ],
+      ],
+      'update:production_job_photos': [
+        [photoRow('print_full', { reviewId: REVIEW_ID }), photoRow('print_raking_light', { reviewId: REVIEW_ID })],
+        // Nothing left to claim: both shots already point at the approving
+        // review, and `review_id IS NULL` is what keeps them pointing there.
+        [],
+      ],
     })
 
     const app = buildApp()
@@ -1379,10 +2045,28 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
       false
     )
 
-    expect(audits().map((row) => row.action)).toEqual([
+    const rows = audits()
+    expect(rows.map((row) => row.action)).toEqual([
       'production_job.qc_approved',
       'production_job.qc_rejected',
     ])
+
+    // THE property. `review_id` is a single column: re-stamping the same live
+    // photographs with the overturning review's id leaves no photograph
+    // pointing at the review that APPROVED them, which is exactly what §7 says
+    // the column is for — a dispute saying WHICH shots were signed off.
+    const [approving, overturning] = updates(productionJobPhotos)
+    expect((approving?.values as Record<string, unknown>).reviewId).toBe(REVIEW_ID)
+    expect((overturning?.values as Record<string, unknown>).reviewId).toBe(REVIEW_ID_2)
+    expect(render(overturning?.where).sql.toLowerCase()).toContain('review_id')
+
+    // The overturning verdict still says which shots it looked at — on its own
+    // audit row, where a second opinion is legible without erasing the first.
+    expect(rows[1]?.metadata?.judgedPhotoIds).toEqual([
+      'photo-print_full',
+      'photo-print_raking_light',
+    ])
+    expect(rows[1]?.metadata?.stampedPhotoIds).toEqual([])
   })
 
   it('rolls back — rather than returning a 201 — when the guarded UPDATE matches no row', async () => {
@@ -1454,6 +2138,29 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
     const missing = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
     expect(missing.status).toBe(404)
     expect(inserts(productionJobReviews)).toHaveLength(0)
+  })
+
+  it('lets an audit write that fails inside the transaction take the verdict down', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]],
+      'insert:production_job_reviews': [[reviewRow()]],
+      'update:production_jobs': [[jobRow({ status: 'qc_passed' })]],
+      'select:production_job_photos': [[photoRow('print_full')]],
+      'update:production_job_photos': [[photoRow('print_full', { reviewId: REVIEW_ID })]],
+    })
+    failNext('insert:admin_audit_log')
+
+    const res = await buildApp().request(reviewsPath, json({ verdict: 'pass' }))
+
+    expect(res.status).toBe(500)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+    // The review row, the move and the photo stamp were all inside the
+    // transaction that rolled back — so the append-only table gains no row for
+    // a verdict nobody recorded.
+    expect(inserts(productionJobReviews)[0]?.inTx).toBe(true)
+    expect(updates(productionJobs)[0]?.inTx).toBe(true)
+    expect(audits().filter((row) => !row.inTx)).toHaveLength(0)
   })
 
   it('lists the reviews newest first on the job detail — the latest verdict is the current one', async () => {
@@ -2444,5 +3151,38 @@ describe('module exports', () => {
 
     const handler = source.slice(start, end)
     expect(handler.match(/\.for\(["']update["']\)/g) ?? []).toHaveLength(2)
+  })
+
+  /**
+   * The same scan over the three JOB writers, which had none: `.for('update')`
+   * could be deleted from assign, PATCH and the QC verdict and every assertion
+   * in this file would still pass, because `query-recorder` answers a
+   * `.for('update')` chain exactly as it answers a plain read.
+   */
+  it.each([
+    [
+      'the consolidator default the assign handler writes',
+      'async function writeSystemDefaultConsolidator(',
+      '// POST /api/admin/production/:jobId/assign',
+      1,
+    ],
+    ['the assign handler', 'adminProductionApp.post(\n  "/:jobId/assign"', 'adminProductionApp.patch(', 1],
+    ['the PATCH handler', 'adminProductionApp.patch(', 'adminProductionApp.post(\n  "/:jobId/reviews"', 1],
+    ['the QC verdict', 'adminProductionApp.post(\n  "/:jobId/reviews"', 'adminProductionApp.get(\n  "/:jobId/photos"', 1],
+  ])('takes FOR UPDATE in %s', async (_label, from, to, expected) => {
+    const source = await import('node:fs').then((fs) =>
+      fs.readFileSync(
+        new URL('../../../src/routes/admin/production-jobs.ts', import.meta.url),
+        'utf8'
+      )
+    )
+
+    const start = source.indexOf(from as string)
+    const end = source.indexOf(to as string, start + 1)
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+
+    const handler = source.slice(start, end)
+    expect(handler.match(/\.for\(["']update["']\)/g) ?? []).toHaveLength(expected as number)
   })
 })
