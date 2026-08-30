@@ -53,7 +53,7 @@ MinIO API is not accessible on port 9000. Run "docker compose up -d"
 - [x] Run health check endpoint test
 
 #### 1.2 Database Setup
-- [x] Run database migrations (`bun run db:push`)
+- [x] Run database migrations (`bun run db:migrate`)
 - [x] Execute seed script (`bun run seed`)
 - [x] Verify seed data in Drizzle Studio
 - [x] Confirm test user accounts exist
@@ -187,7 +187,7 @@ cd /Users/dhruv/work/masonart.com
 cd docker && docker compose up -d && cd ..
 
 # Setup database
-cd packages/api && bun run db:push && bun run seed && cd ..
+cd packages/api && bun run db:migrate && bun run seed && cd ..
 
 # Start dev servers (terminal 1)
 bun run dev

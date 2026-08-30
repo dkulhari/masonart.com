@@ -25,7 +25,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun --env-file=../../.env ./node_modules/.bin/drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "bun run --env-file=../../.env src/database/seed.ts",

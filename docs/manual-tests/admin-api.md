@@ -10,7 +10,7 @@
 
 ## Prerequisites
 - [ ] Dev server running at http://localhost:3000 (API) and http://localhost:3001 (Frontend)
-- [ ] Database migrations applied (`bun run db:push`)
+- [ ] Database migrations applied (`bun run db:migrate` — not `db:push`, which skips the audit-log trigger, #663)
 - [ ] Docker services (PostgreSQL, Redis) running (`docker compose up -d`)
 - [ ] Admin user account created with role 'admin' or 'super-admin'
 - [ ] API testing tool ready (Postman, Insomnia, cURL, or browser DevTools)

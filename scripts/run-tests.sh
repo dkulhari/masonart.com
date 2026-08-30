@@ -234,9 +234,12 @@ setup_database() {
         set +a
     fi
 
-    # Always: migrate schema
+    # Always: migrate schema.
+    # db:migrate, never db:push — push diffs the drizzle DSL, which cannot
+    # express a function or trigger, so a pushed database has admin_audit_log
+    # without the trigger that makes it append-only (#663).
     echo "Running database migrations..."
-    bun run db:push 2>&1 | head -5
+    bun run db:migrate 2>&1 | head -5
 
     # Always: seed frames + admin
     echo "Seeding frames and admin user..."

@@ -61,7 +61,7 @@ chobii/
 5. **Run database migrations:**
    ```bash
    cd packages/api
-   bun run db:push
+   bun run db:migrate
    bun run seed
    ```
 
@@ -348,7 +348,10 @@ bun run db:generate
 # Run migrations
 bun run db:migrate
 
-# Push schema changes (development)
+# Push schema changes straight from the DSL — NEVER for setup (#663).
+# Push cannot create functions, triggers or policies, so a pushed database
+# gets admin_audit_log without the trigger that makes it append-only. Use
+# db:migrate to build or update any database you intend to keep.
 bun run db:push
 
 # Open Drizzle Studio (GUI)

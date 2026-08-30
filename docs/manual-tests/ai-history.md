@@ -10,7 +10,7 @@
 ## Prerequisites
 - [ ] Dev server running at http://localhost:3001
 - [ ] API server running at http://localhost:3000
-- [ ] Database migrations applied (`bun run db:push`)
+- [ ] Database migrations applied (`bun run db:migrate` — not `db:push`, which skips the audit-log trigger, #663)
 - [ ] Docker services (PostgreSQL, Redis) running
 - [ ] Test user account created with AI creations
 - [ ] Logged in as test user

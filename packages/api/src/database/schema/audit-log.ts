@@ -18,13 +18,24 @@
  * queries; this table duplicates the actor fact for them deliberately, so that
  * one place answers "who did what", always.
  *
- * ## Append-only means append-only
+ * ## Append-only means append-only — and it is NOT in this file
  *
  * The migration installs a BEFORE UPDATE OR DELETE trigger. UPDATE is always
  * refused. DELETE is refused unless the transaction has set
  * `chobii.audit_purge = 'on'`, which only the retention job does. App-level
  * discipline is not immutability — the point of an audit log is that the person
  * being audited cannot edit it.
+ *
+ * That trigger is raw SQL in `migrations/0021_admin_audit_log.sql`, because the
+ * drizzle DSL cannot express a trigger. **So `drizzle-kit push` does not create
+ * it.** A database built with `bun run db:push` has this table and none of its
+ * immutability: UPDATE and DELETE both succeed (#663). Build every database
+ * with `bun run db:migrate`.
+ *
+ * The trigger and its function are declared in `src/database/raw-sql-objects.ts`
+ * so that `tests/database/raw-sql-objects.test.ts` can assert they are actually
+ * present in whatever database the suite is pointed at. Anything else you add
+ * in raw SQL belongs in that manifest too — the test fails until it is there.
  *
  * ## Actor is snapshotted, not only referenced
  *

@@ -170,8 +170,12 @@ curl http://localhost:3000/health
 ### 6. Run Database Migrations
 
 ```bash
-# Run migrations inside the API container
-docker compose -f docker/docker-compose.prod.yml exec api bun run db:push
+# Run migrations inside the API container.
+# db:migrate, never db:push: push diffs the drizzle DSL, which cannot express
+# a function or trigger, so a pushed database has admin_audit_log without the
+# trigger that makes it append-only (#663). The banner above applies — the
+# real prod path is `make -C deploy migrate`.
+docker compose -f docker/docker-compose.prod.yml exec api bun run db:migrate
 
 # Or seed initial data
 docker compose -f docker/docker-compose.prod.yml exec api bun run seed
@@ -214,8 +218,8 @@ git pull origin main
 # Rebuild and restart (zero-downtime)
 docker compose -f docker/docker-compose.prod.yml up -d --build
 
-# Run migrations if schema changed
-docker compose -f docker/docker-compose.prod.yml exec api bun run db:push
+# Run migrations if schema changed (never db:push — see the banner and #663)
+docker compose -f docker/docker-compose.prod.yml exec api bun run db:migrate
 ```
 
 ### Health Check
