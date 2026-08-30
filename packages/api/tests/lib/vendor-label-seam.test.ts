@@ -107,13 +107,38 @@ const buildApp = () => buildRouteApp('/api/vendor', vendorApp)
 
 const API_SRC = resolve(__dirname, '../../src')
 
-/** The exact error Postgres raises for the column this feature cannot have yet. */
+/**
+ * The error the APPLICATION actually catches for a column that does not exist.
+ *
+ * Not the one Postgres raises — that one never reaches `vendor-scope.ts`.
+ * Drizzle wraps it in a `DrizzleQueryError` whose `message` is
+ * `Failed query: <sql>\nparams: <args>` and NOTHING else, and hangs the
+ * `postgres.js` error, carrying `code` and Postgres's own sentence, on `cause`.
+ *
+ * This used to fabricate a bare `Error` with the code and the sentence on the
+ * same object, which is a shape the driver does not produce — so the seam's
+ * detector passed here while returning `false` against every real request, and
+ * the 503 these tests assert was unreachable in every environment. The suite
+ * guarding the bug could not fail on it. #694 found the difference by driving
+ * the route end to end against a real database.
+ *
+ * So: the wrapped shape, deliberately split across the two links, which is what
+ * makes the detector's `cause` walk load-bearing rather than decorative.
+ */
 function undefinedColumn(column: string) {
-  const error = new Error(`column "order_shipments"."${column}" does not exist`) as Error & {
-    code?: string
-  }
-  error.code = '42703'
-  return error
+  const driverError = new Error(
+    `column "order_shipments"."${column}" does not exist`
+  ) as Error & { code?: string }
+  driverError.code = '42703'
+
+  // The wrapper quotes the SQL — so it mentions the column, and says nothing
+  // about why the query failed.
+  const wrapped = new Error(
+    `Failed query: select "order_shipments"."${column}" from "production_jobs"\nparams: `,
+    { cause: driverError }
+  )
+  wrapped.name = 'DrizzleQueryError'
+  return wrapped
 }
 
 /**

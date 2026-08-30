@@ -7,8 +7,8 @@
  *   admin  records a contact and invites that contact a login
  *   admin  creates a production job and assigns it — the expected amount is
  *          the rate-card figure, not a number anyone typed
- *   vendor signs in, sees THEIR job and not the other vendor's, marks it ready
- *   admin  records a QC pass
+ *   vendor signs in, sees THEIR job and not the other vendor's, and starts it
+ *   admin  finds no verdict to record, because a verdict IS a transition
  *   admin  records the settlement, and the payable drops to zero
  *
  * and then the two paths a regression would make silently permissive:
@@ -34,6 +34,36 @@
  * reset link (see the endpoint's header). With no mailbox to read, the harness
  * sets the credential itself via `set-test-user-password.ts`, the same way
  * `auth.setup.ts` reaches for `update-user-role.ts`.
+ *
+ * ## What #684/#689/#691 changed under this file, and what it asserts now
+ *
+ * This spec was written on 17 Aug against a production screen that carried a
+ * free `<select name=status>` and a vendor portal whose first move was `sent`.
+ * The `production-pipeline` feature replaced both, and for two whole phases
+ * this file drove three controls that no longer exist — `vendor-job-mark-sent`,
+ * and `admin-production-status` as a select — so it was failing on selectors
+ * rather than on behaviour. #694 owns the repair. It is a REPAIR and not a
+ * rewrite: the subject of this file is vendor onboarding, rate cards, isolation
+ * and the money, and every one of those still holds. Only the mechanics of
+ * moving a job moved.
+ *
+ * Three substitutions, each of them an assertion about the change:
+ *
+ * - `sent` is RETIRED (#675) — zero in-edges, zero out-edges. The vendor's
+ *   first move is `received`, so that is what the portal is driven through.
+ * - The status `<select>` is gone. A job's status is a `StatusPill`
+ *   (`admin-production-status-<status>`) and the moves are buttons off the
+ *   transition matrix (`admin-production-transition-to-<status>`). This file
+ *   asserts the select is ABSENT, which is the direct check that #684 landed.
+ * - **A verdict IS a transition.** `qc_passed` is not settable by any PATCH any
+ *   more; it exists only as the consequence of `POST /:jobId/reviews`, and only
+ *   from `qc_submitted`. So the old `selectOption('qc_passed')` is not merely a
+ *   dead selector, it is a move the system no longer has. What this file
+ *   asserts instead is the rule that replaced it — on a job the vendor has not
+ *   submitted there is NO verdict to record, and the screen says so. The full
+ *   QC round trip, shot list and all, is `production-pipeline.spec.ts`'s;
+ *   duplicating it here would double a serial admin suite's runtime to
+ *   re-prove somebody else's subject.
  *
  * ## Repo hazards honoured here
  *
@@ -81,7 +111,25 @@ const VENDOR_PASSWORD = 'TestPassword123!'
 /** The rate each vendor is given. Vendor A's is what must appear downstream. */
 const RATE_A = '450.00'
 const RATE_B = '375.00'
-const RATE_A_DISPLAY = '₹450.00'
+
+/**
+ * What job A is actually worth, and what every money assertion below compares
+ * against. Set once the order is known, because a payable is the rate card's
+ * band figure times the LINE'S QUANTITY — a line of three is priced as three
+ * (the `production-pipeline` fix; it used to be priced as one). Hard-coding
+ * `₹450.00` here only ever worked while the found order happened to have
+ * single-unit lines.
+ */
+let rateAAmount = ''
+let rateADisplay = ''
+
+/** `₹1,234.00` — the `en-IN` grouping these screens print. */
+function rupees(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
 
 interface CreatedVendor {
   id: string
@@ -176,6 +224,7 @@ async function addPrintRate(page: Page, amount: string): Promise<void> {
 
 interface AdminOrderItem {
   id: string
+  quantity: number
   variant: { widthInches: number | null; heightInches: number | null } | null
 }
 
@@ -187,31 +236,44 @@ interface AdminOrderItem {
  */
 async function findOrderWithTwoSizedItems(
   request: APIRequestContext
-): Promise<{ orderId: string; itemIds: [string, string] }> {
-  const list = await apiJson<{ items: Array<{ id: string }> }>(
-    request,
-    'get',
-    '/api/admin/orders?page=1&pageSize=50'
-  )
+): Promise<{ orderId: string; itemIds: [string, string]; quantityA: number }> {
+  // PAGED, not "the first fifty". A two-line order is a small minority of the
+  // seed and they are not at the front of it, so a single page stopped finding
+  // one as the order table grew and reported that as a missing seed — the wrong
+  // diagnosis to hand the next person.
+  let page = 1
+  let totalPages = 1
 
-  for (const summary of list.items) {
-    const detail = await apiJson<{ id: string; items: AdminOrderItem[] }>(
+  while (page <= totalPages) {
+    const list = await apiJson<{ items: Array<{ id: string }>; totalPages: number }>(
       request,
       'get',
-      `/api/admin/orders/${summary.id}`
+      `/api/admin/orders?page=${page}&pageSize=100`
     )
+    totalPages = list.totalPages
 
-    const sized = detail.items.filter(
-      (item) =>
-        item.variant?.widthInches != null && item.variant?.heightInches != null
-    )
+    for (const summary of list.items) {
+      const detail = await apiJson<{ id: string; items: AdminOrderItem[] }>(
+        request,
+        'get',
+        `/api/admin/orders/${summary.id}`
+      )
 
-    if (sized.length >= 2) {
-      return {
-        orderId: detail.id,
-        itemIds: [sized[0]!.id, sized[1]!.id],
+      const sized = detail.items.filter(
+        (item) =>
+          item.variant?.widthInches != null && item.variant?.heightInches != null
+      )
+
+      if (sized.length >= 2) {
+        return {
+          orderId: detail.id,
+          itemIds: [sized[0]!.id, sized[1]!.id],
+          quantityA: sized[0]!.quantity,
+        }
       }
     }
+
+    page += 1
   }
 
   throw new Error(
@@ -325,7 +387,13 @@ test.describe('vendor lifecycle', () => {
   test('admin assigns a job and the expected amount is the rate-card figure', async ({
     page,
   }) => {
-    const { orderId, itemIds } = await findOrderWithTwoSizedItems(page.request)
+    const { orderId, itemIds, quantityA } = await findOrderWithTwoSizedItems(
+      page.request
+    )
+
+    // A payable is the band figure times the line's quantity.
+    rateAAmount = (Number(RATE_A) * quantityA).toFixed(2)
+    rateADisplay = rupees(Number(rateAAmount))
 
     const createdA = await apiJson<{ job: { id: string } }>(
       page.request,
@@ -350,15 +418,20 @@ test.describe('vendor lifecycle', () => {
     const candidate = page.getByTestId(`admin-production-candidate-${vendorA.id}`)
     await expect(candidate).toBeVisible()
     // The preview is the rate card's figure, not a number typed anywhere.
-    await expect(candidate).toContainText(RATE_A_DISPLAY)
+    await expect(candidate).toContainText(rateADisplay)
 
     await page.getByTestId(`admin-production-assign-${vendorA.id}`).click()
 
     await expect(page.getByTestId('admin-production-assign-error')).toHaveCount(0)
     const summary = page.locator('dl').filter({ hasText: 'Payable' }).first()
     await expect(summary).toContainText(vendorA.name)
-    await expect(summary).toContainText(RATE_A_DISPLAY)
-    await expect(page.getByTestId('admin-production-status')).toHaveValue('assigned')
+    await expect(summary).toContainText(rateADisplay)
+
+    // #684: the free status `<select>` is gone. The status is a pill carrying
+    // its own value, and asserting the select's ABSENCE is what stops this file
+    // silently going green again against a screen that grew one back.
+    await expect(page.getByTestId('admin-production-status')).toHaveCount(0)
+    await expect(page.getByTestId('admin-production-status-assigned')).toBeVisible()
 
     // Job B goes to the other vendor, so the vendor portal below has something
     // it must NOT show.
@@ -367,7 +440,7 @@ test.describe('vendor lifecycle', () => {
     })
   })
 
-  test('vendor signs in, sees only their own job, and marks it ready', async ({
+  test('vendor signs in, sees only their own job, and starts work on it', async ({
     browser,
   }) => {
     const context = await browser.newContext()
@@ -410,51 +483,70 @@ test.describe('vendor lifecycle', () => {
       await page.waitForURL(new RegExp(`/vendor/jobs/${jobAId}`))
 
       await expect(page.getByTestId('vendor-job-detail')).toBeVisible()
-      await expect(page.getByTestId('vendor-job-amount')).toHaveText(
-        RATE_A_DISPLAY
-      )
+      await expect(page.getByTestId('vendor-job-amount')).toHaveText(rateADisplay)
 
-      // Inline two-step confirm. A native confirm() here would block the
-      // harness outright — see this file's header.
-      await page.getByTestId('vendor-job-mark-sent').click()
-      await expect(page.getByTestId('vendor-job-mark-sent-confirm')).toBeVisible()
-      await page.getByTestId('vendor-job-mark-sent-confirm').click()
+      // #675 retired `sent`: it has zero edges in both directions, so there is
+      // no control for it and there must not be one.
+      await expect(page.getByTestId('vendor-job-mark-sent')).toHaveCount(0)
 
-      await expect(page.getByTestId('vendor-job-detail')).toContainText(
-        'Sent back'
-      )
-      await expect(page.getByTestId('vendor-job-detail')).not.toContainText(
-        'Sent back to us: —'
-      )
+      // The vendor's first move is `received` — "I have everything I need to
+      // start". Inline two-step confirm. A native confirm() here would block
+      // the harness outright — see this file's header.
+      await page.getByTestId('vendor-job-mark-received').click()
+      await expect(
+        page.getByTestId('vendor-job-mark-received-confirm')
+      ).toBeVisible()
+      await page.getByTestId('vendor-job-mark-received-confirm').click()
+
+      await expect(page.getByTestId('vendor-job-action-error')).toHaveCount(0)
+
+      // The clock the status starts, printed rather than dashed out. It renders
+      // only once `receivedAt` exists, so its presence IS the move landing.
+      await expect(
+        page.getByTestId('vendor-job-in-production-since')
+      ).toBeVisible()
+      await expect(
+        page.getByTestId('vendor-job-in-production-since')
+      ).not.toContainText('—')
     } finally {
       await context.close()
     }
   })
 
-  test('admin records a QC pass against the returned job', async ({ page }) => {
+  test('a verdict is a transition, so a job nobody submitted has none to record', async ({
+    page,
+  }) => {
+    // What this test used to do — `selectOption('qc_passed')` on a free status
+    // dropdown — is not a move the system has any more, and it was never a
+    // sound one: it recorded a verdict as a status change with no review row
+    // behind it. #684/#689 made the verdict and the move ONE act, written in
+    // one transaction by `POST /:jobId/reviews`, and only from `qc_submitted`.
+    // So this asserts the rule that replaced it, on the job the vendor has just
+    // started. The full QC round trip is `production-pipeline.spec.ts`'s.
     await page.goto(`/admin/production/${jobAId}`, { waitUntil: 'networkidle' })
 
-    await expect(page.getByTestId('admin-production-status')).toHaveValue('sent')
+    // The vendor's move landed on our side too — one status, two screens.
+    await expect(page.getByTestId('admin-production-status-received')).toBeVisible()
+    await expect(page.getByTestId('admin-production-status')).toHaveCount(0)
     await expect(page.getByTestId('admin-production-reviews-empty')).toBeVisible()
 
-    await page.getByTestId('admin-production-review-verdict').selectOption('pass')
-    await page
-      .getByTestId('admin-production-review-notes')
-      .fill('Colour and trim both good.')
-    await page.getByTestId('admin-production-review-submit').click()
+    // No verdict edge leaves `received`, so the form is not merely disabled —
+    // it is not offered, and the screen says why rather than vanishing.
+    await expect(page.getByTestId('admin-production-review-unavailable')).toBeVisible()
+    await expect(page.getByTestId('admin-production-review-form')).toHaveCount(0)
+    await expect(page.getByTestId('admin-production-review-submit')).toHaveCount(0)
 
-    await expect(page.getByTestId('admin-production-review-error')).toHaveCount(0)
-    const reviews = page.getByTestId('admin-production-reviews')
-    await expect(reviews).toBeVisible()
-    await expect(reviews).toContainText('1 inspection')
-    await expect(reviews).toContainText('Pass')
-    await expect(reviews).toContainText('Colour and trim both good.')
-
-    // The verdict is a record; moving the job is the separate, deliberate act.
-    await page.getByTestId('admin-production-status').selectOption('qc_passed')
-    await expect(page.getByTestId('admin-production-status')).toHaveValue(
-      'qc_passed'
-    )
+    // And the transition panel offers exactly the matrix's admin edges out of
+    // `received`, which is `cancelled` and nothing else. `qc_submitted` is the
+    // vendor's; the two verdicts are reachable only through a review; `sent` is
+    // retired. A button for any of them would be a screen promising a 409.
+    const transitions = page.getByTestId('admin-production-transitions')
+    await expect(transitions).toBeVisible()
+    await expect(page.getByTestId('admin-production-transition-to-cancelled')).toBeVisible()
+    await expect(page.getByTestId('admin-production-transition-to-qc_passed')).toHaveCount(0)
+    await expect(page.getByTestId('admin-production-transition-to-qc_failed')).toHaveCount(0)
+    await expect(page.getByTestId('admin-production-transition-to-qc_submitted')).toHaveCount(0)
+    await expect(page.getByTestId('admin-production-transition-to-sent')).toHaveCount(0)
   })
 
   test('admin records the settlement and the payable drops to zero', async ({
@@ -464,13 +556,13 @@ test.describe('vendor lifecycle', () => {
     await page.getByTestId('vendor-tab-payables').click()
 
     await expect(page.getByTestId('vendor-payables-total')).toHaveText(
-      RATE_A_DISPLAY
+      rateADisplay
     )
     await expect(page.getByTestId(`vendor-payable-row-${jobAId}`)).toBeVisible()
     // The other vendor's job is on the other vendor's ledger.
     await expect(page.getByTestId(`vendor-payable-row-${jobBId}`)).toHaveCount(0)
     await expect(page.getByTestId('vendor-settlement-amount')).toHaveValue(
-      RATE_A
+      rateAAmount
     )
 
     await page.getByTestId('vendor-settlement-reference').fill(`NEFT-${RUN}`)
@@ -480,12 +572,12 @@ test.describe('vendor lifecycle', () => {
     await page.getByTestId('vendor-settlement-submit').click()
     const confirmPanel = page.getByTestId('vendor-settlement-confirm-panel')
     await expect(confirmPanel).toBeVisible()
-    await expect(confirmPanel).toContainText(`Record ${RATE_A_DISPLAY} against 1 job?`)
+    await expect(confirmPanel).toContainText(`Record ${rateADisplay} against 1 job?`)
     await page.getByTestId('vendor-settlement-confirm').click()
 
     await expect(page.getByTestId('vendor-settlement-error')).toHaveCount(0)
     await expect(page.getByTestId('vendor-settlement-success')).toContainText(
-      `Recorded ${RATE_A_DISPLAY} against 1 job.`
+      `Recorded ${rateADisplay} against 1 job.`
     )
     await expect(page.getByTestId('vendor-payables-empty')).toBeVisible()
     await expect(page.getByTestId('vendor-payables-total')).toHaveText('₹0.00')

@@ -20,19 +20,48 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.918Z'
-last_updated: '2026-08-30T12:02:20.918Z'
+last_updated: '2026-08-30T20:46:30.448Z'
 time_spent_minutes: 0
 labels:
   - e2e
   - testing
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T20:38:08.588Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T20:46:30.448Z'
+    text: |-
+      **Implementation steps (derived — this ticket had none)**
+
+      1. `tests/e2e/production-pipeline.spec.ts` — serial two-vendor consolidation happy path (`most_items` basis, so the consolidator must be *confirmed*), plus the four refusals interleaved at the moment each is actually reachable.
+      2. Repair (not replace) `tests/e2e/admin-vendor-lifecycle.spec.ts` — `vendor-job-mark-sent` → `-received`, the `admin-production-status` `<select>` → `TransitionPanel` buttons, and `selectOption('qc_passed')` → the review form that now moves the job.
+      3. Run each spec alone, chromium only, against a private server pair on :3020/:4322 (`:3000/:3001` and `:3010/:4321` are other sessions' and 16h stale).
+      4. Mutation-prove both: break something real, watch red, revert.
+      5. Commit; close session; mark done.
+
+      **Findings that shaped the design** (recorded before writing a line):
+
+      - **The label seam is wider than the ticket assumed.** `getVendorJobLabelKey` names `order_shipments.label_object_token` inside the SELECT list, so Postgres raises `42703` at *parse* time — before any WHERE predicate is applied. The documented `404 "Label not found"` for a non-consolidator is therefore **unreachable in every environment**: consolidator and non-consolidator alike get `503 LABEL_NOT_AVAILABLE`. The 404-with-presigner-never-called discrimination is covered where it can be — `packages/api/tests/routes/vendor/isolation.test.ts` — and the E2E asserts the honest 503.
+      - **`ORDER_HAS_LABEL` does *not* read the missing column.** It reads `orders.shipping_details ->> awbNumber|trackingNumber|shipmentId`. So "B confirms handover" *is* reachable today, via the real, pre-existing manual-dispatch route `PATCH /api/admin/orders/:id/shipping`. Only the signed label PDF is blocked.
+      - **No seeded order has a framed item** (`select count(frame_id) … having > 0` → 0 rows), so the frame stage cannot be driven without fixture surgery. The happy path uses §5's own case 3 (two print vendors, `most_items`, `CONFIRMATION_REQUIRED`), and the "frame job dispatching before its print passed" refusal is asserted as the guard that actually mechanises it — `open-transfer-or-order-label` → `409 GUARD_UNSATISFIED` — at the moment the consolidator is `qc_passed` with no parcel out and no label on the order.
+      - DB verified migrated to 0025 (26 rows in `drizzle.__drizzle_migrations`; `production_transfers`, `production_transfer_jobs`, `order_consolidation`, `production_job_photos` all present; `label_object_token` genuinely absent).
+work_sessions:
+  - start: '2026-08-30T20:38:09.579Z'
+    agent: claude-code
+    summary: 'Starting #694: E2E production-pipeline spec (two-vendor consolidation happy path + refusal cases), plus repairing the dead admin-vendor-lifecycle spec'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T20:38:08.588Z'
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}

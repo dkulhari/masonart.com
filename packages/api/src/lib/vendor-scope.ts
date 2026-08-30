@@ -449,23 +449,67 @@ export class LabelSeamNotReady extends Error {
 }
 
 /**
+ * Every error in a `cause` chain, outermost first.
+ *
+ * Drizzle does not hand its callers the driver's error. It wraps it in a
+ * `DrizzleQueryError` whose `message` is `Failed query: <sql>\nparams: <args>`
+ * — the SQL and nothing else — and hangs the `postgres.js` error, which is
+ * where `code` and Postgres's own sentence live, on `cause`. Neither half of
+ * the test below can be answered from one link alone, so the chain is walked.
+ *
+ * Bounded and cycle-safe: an error whose `cause` points back at itself would
+ * otherwise spin here, and a diagnostic helper must not be able to hang the
+ * request it is diagnosing.
+ */
+function causeChain(error: unknown): object[] {
+  const chain: object[] = []
+  const seen = new Set<unknown>()
+  let current = error
+
+  while (typeof current === 'object' && current !== null && !seen.has(current) && chain.length < 8) {
+    seen.add(current)
+    chain.push(current)
+    current = (current as { cause?: unknown }).cause
+  }
+
+  return chain
+}
+
+/**
  * Is this failure the MISSING SEAM, and not some other broken query?
  *
- * Both halves are required. `42703` alone would swallow a genuine typo in a
+ * Both halves are required, and they are asked of the whole `cause` chain
+ * rather than of one error. `42703` alone would swallow a genuine typo in a
  * column somewhere else in this select and report it to an operator as "the
  * label feature is not wired up yet", which is a bug that hides for months. The
  * column name alone would catch a permissions error that happened to quote it.
  * A driver that reports no `code` still gets recognised by the sentence
  * Postgres always renders, so this does not depend on one client library.
+ *
+ * **The chain walk is not defensive coding.** Reading only the top-level error
+ * made the 503 below unreachable in every environment: the wrapper carries the
+ * column name (it quotes the SQL) but neither the code nor the sentence, so the
+ * test failed and every label request answered the generic 500 this seam exists
+ * to prevent. `tests/lib/vendor-label-seam.test.ts` fabricated a bare `Error`
+ * with both fields on it — a shape the driver does not produce — so the suite
+ * guarding this could not fail. It now builds the wrapped shape, and #694's
+ * end-to-end run is what found the difference.
  */
 function isMissingLabelSeam(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
+  const chain = causeChain(error)
+  if (chain.length === 0) return false
 
-  const { code, message } = error as { code?: unknown; message?: unknown }
-  const text = typeof message === 'string' ? message : ''
-  if (!text.includes(LABEL_OBJECT_TOKEN_COLUMN)) return false
+  const messages = chain.map((link) => {
+    const { message } = link as { message?: unknown }
+    return typeof message === 'string' ? message : ''
+  })
 
-  return code === UNDEFINED_COLUMN || /does not exist/i.test(text)
+  if (!messages.some((text) => text.includes(LABEL_OBJECT_TOKEN_COLUMN))) return false
+
+  return (
+    chain.some((link) => (link as { code?: unknown }).code === UNDEFINED_COLUMN) ||
+    messages.some((text) => /does not exist/i.test(text))
+  )
 }
 
 /**
