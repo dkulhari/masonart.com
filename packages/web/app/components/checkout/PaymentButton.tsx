@@ -243,8 +243,22 @@ export function PaymentButton({
        */
       if (paymentData.fullyCoveredByGiftCard) {
         setStatus('success')
-        resetLocalCart()
+        /**
+         * Tell the page first, THEN empty the cart.
+         *
+         * `resetLocalCart()` flips the checkout page's `isEmpty`, and it used
+         * to run before `onSuccess` — so for the moment between the two the
+         * page rendered "Your cart is empty" at a customer who had just paid,
+         * and kept rendering it until the redirect landed. On a quick machine
+         * nobody sees it; under load the E2E caught the page still sitting
+         * there (#661). This path is the exposed one because a
+         * fully-gift-card-covered order has no gateway modal covering the gap.
+         *
+         * `onSuccess` sets the redirect going, so by the time the cart empties
+         * the page is already leaving.
+         */
         onSuccess(paymentData.orderId, paymentData.orderNumber)
+        resetLocalCart()
         return
       }
 

@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   ShoppingCart,
   MapPin,
@@ -73,9 +73,15 @@ const CHECKOUT_STEPS: { id: CheckoutStep; label: string; icon: React.ComponentTy
 // ============================================================================
 
 function CheckoutPage() {
+  const navigate = useNavigate()
   const items = useCartItems()
   const subtotal = useCartSubtotal()
   const isEmpty = useIsCartEmpty()
+  /**
+   * True from the moment payment succeeds until the browser leaves this page.
+   * Without it the emptied cart renders EmptyCartState over a paid order.
+   */
+  const [orderPlaced, setOrderPlaced] = useState(false)
   const { data: session } = useSession()
   const isLoggedIn = !!session?.user
 
@@ -291,7 +297,20 @@ function CheckoutPage() {
     )
   }, [])
 
-  const handlePaymentSuccess = (_orderId: string, orderNumber: string) => {
+  const handlePaymentSuccess = (orderId: string, orderNumber: string) => {
+    /**
+     * Claim the page before the cart empties underneath it.
+     *
+     * Payment clears the cart, `isEmpty` flips, and the guard below would swap
+     * this whole screen for "Your cart is empty" — while `window.location.href`
+     * is still on its way to the confirmation. On a quick machine the
+     * navigation wins and nobody notices; under load the re-render wins and a
+     * customer who has just paid is told their cart is empty (#661, caught by
+     * tests/e2e/gift-cards.spec.ts, which pays entirely with a gift card and so
+     * has no gateway modal covering the gap).
+     */
+    setOrderPlaced(true)
+
     // Save address if checkbox was checked, user is logged in, and address wasn't from saved addresses
     if (isLoggedIn && shippingAddress?.saveAddress && !selectedSavedAddressId) {
       addressesApi.create({
@@ -309,8 +328,29 @@ function CheckoutPage() {
       })
     }
 
-    // Redirect to order confirmation page
-    window.location.href = `/orders/${orderNumber}?success=true`
+    /**
+     * `/checkout/success`, which is where the confirmation page actually lives.
+     *
+     * This used to send the customer to `/orders/${orderNumber}?success=true`.
+     * There is no such route in this app — the account route is
+     * `/account/orders/$id` — so every completed checkout landed on a 404 with
+     * no order number, no summary and no receipt, right after taking the money.
+     * The gift-card purchase flow already navigates to `/checkout/success`
+     * (routes/gift-cards/index.tsx:151); the poster flow simply never did.
+     *
+     * The E2E missed it because it asserted only that the URL changed, and
+     * `/orders/…` satisfied its pattern while rendering "not found" (#661).
+     * Both identifiers go along: the page accepts either.
+     *
+     * Router navigation rather than a `window.location.href` assignment. The
+     * full-page assignment sometimes simply did not happen — under load the run
+     * sat on /checkout for a full minute after a paid order — and this is the
+     * same call the gift-card purchase flow already makes.
+     */
+    navigate({
+      to: '/checkout/success',
+      search: { orderNumber, orderId },
+    })
   }
 
   // Handle payment error
@@ -324,8 +364,8 @@ function CheckoutPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [currentStep])
 
-  // Empty cart state
-  if (isEmpty) {
+  // Empty cart state — but never over an order that was just paid for.
+  if (isEmpty && !orderPlaced) {
     return <EmptyCartState />
   }
 

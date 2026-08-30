@@ -85,10 +85,50 @@ async function advanceToPaymentStep(page: Page) {
  * straight to /checkout finds no gift card control and times out looking for
  * one — which says nothing about gift cards.
  */
+/**
+ * A poster in the cart, then checkout — waiting for the write, not for luck.
+ *
+ * The click used to be followed straight by `goto('/checkout')`. That raced:
+ * the POST that adds the line was still in flight, the checkout page loaded
+ * against a cart that did not yet contain it, and the run failed later at the
+ * pay step with nothing in the trace to explain why. Invisible on an idle
+ * machine and reproducible under load, which is exactly the shape this repo
+ * has hit before (#661).
+ *
+ * So: wait for the response, and confirm the cart actually reads back with a
+ * line in it. A 201 alone proves a row was written somewhere, not that this
+ * page's cart holds it.
+ */
 async function checkoutWithAnItem(page: Page) {
   await page.goto('/posters', { waitUntil: 'networkidle' })
   await page.locator('main a[href^="/posters/"]').first().click()
-  await page.getByRole('button', { name: /add to cart/i }).first().click()
+
+  const [added] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/cart/items') &&
+        response.request().method() === 'POST',
+      { timeout: 15_000 }
+    ),
+    page.getByRole('button', { name: /add to cart/i }).first().click(),
+  ])
+  expect(added.ok(), `add to cart failed: ${added.status()}`).toBe(true)
+
+  await expect
+    .poll(
+      async () => {
+        const cart = await page.evaluate(async () => {
+          const res = await fetch('/api/cart', { credentials: 'include' })
+          if (!res.ok) return 0
+          const body = (await res.json()) as { items?: unknown[]; cart?: { items?: unknown[] } }
+          return (body.items ?? body.cart?.items ?? []).length
+        })
+        return cart
+      },
+      { timeout: 15_000, message: 'the cart never reported the item it just accepted' }
+    )
+    .toBeGreaterThan(0)
+
   await page.goto('/checkout', { waitUntil: 'networkidle' })
   await expect(giftCardInput(page)).toBeVisible()
 }
@@ -217,15 +257,66 @@ test.describe('paying entirely with a gift card', () => {
 
     await advanceToPaymentStep(page)
 
-    await page.getByRole('button', { name: /^pay\b/i }).first().click()
+    /**
+     * Wait for the order POST itself, not just for the URL to change.
+     *
+     * The assertion below used to be the only thing watching this step, with a
+     * 30-second budget. On a saturated machine order creation plus the
+     * gift-card debit plus the redirect can exceed that, and the failure then
+     * reads as "the gateway was reached" — the one thing this test is meant to
+     * detect — when nothing of the sort happened. Waiting on the response makes
+     * a slow machine slow instead of wrong, and a genuine failure loud.
+     */
+    const [orderResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          /\/api\/orders(\?|$)/.test(response.url()) &&
+          response.request().method() === 'POST',
+        { timeout: 60_000 }
+      ),
+      page.getByRole('button', { name: /^pay\b/i }).first().click(),
+    ])
+    expect(
+      orderResponse.ok(),
+      `order creation failed: ${orderResponse.status()}`
+    ).toBe(true)
 
     // The order lands paid without a payment. If the gateway is reached at
     // all, its iframe appears instead and this times out — which is the
     // failure this spec exists to catch.
-    await expect(page).toHaveURL(/\/order-confirmation|\/orders\//, {
+    /**
+     * The confirmation PAGE, not merely a URL that changed.
+     *
+     * This assertion used to accept anything matching `/orders/`, and the app
+     * redirected to `/orders/<number>?success=true` — a route that does not
+     * exist. The pattern matched, the test passed, and every real customer
+     * landed on "not found" immediately after paying (#661). Asserting the
+     * order number is rendered is what makes this test able to see that.
+     */
+    await expect
+      .poll(() => page.url(), {
+        timeout: 60_000,
+        message:
+          'the order was paid but the browser never reached the confirmation page',
+      })
+      .toMatch(/\/checkout\/success/)
+
+    await expect(page.getByText(/thank you|order confirmed|order placed/i).first()).toBeVisible({
       timeout: 30_000,
     })
-    await expect(page.frameLocator('iframe.razorpay-checkout-frame').owner()).toHaveCount(0)
+    /**
+     * Not SHOWN, rather than not present.
+     *
+     * The confirmation is reached by client-side navigation now, so the
+     * document survives the transition and the Razorpay SDK's own hidden
+     * iframe — injected when the script loads, whether or not a modal ever
+     * opens — is still in the DOM. Counting elements therefore fails on a
+     * checkout that correctly skipped the gateway. What the assertion means,
+     * and now says, is that the customer was never shown a payment modal.
+     */
+    await expect(
+      page.frameLocator('iframe.razorpay-checkout-frame').owner()
+    ).toBeHidden()
 
     // Spent exactly what was owed — not the whole card, not zero.
     const spentPaise = 5_000_000 - (await giftCardBalancePaise(card.id))
