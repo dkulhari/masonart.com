@@ -48,7 +48,12 @@ const mockProducts = [
     colors: ['blue', 'white'],
     rooms: ['living-room', 'bedroom'],
     orientation: 'landscape',
-    images: [{ id: 'img-1', url: 'https://cdn.example.com/ocean.jpg', isPrimary: true }],
+    images: [
+      // altText is REQUIRED by the form's alt-text input (#652): an image
+      // without it leaves a required field empty, and native constraint
+      // validation then blocks the submit with no message anywhere.
+      { id: 'img-1', url: 'https://cdn.example.com/ocean.jpg', altText: 'Fixture artwork', isPrimary: true },
+    ],
     status: 'active',
     isFeatured: true,
     featuredOrder: 1,
@@ -68,7 +73,7 @@ const mockProducts = [
     colors: ['black', 'white', 'grey'],
     rooms: ['office', 'living-room'],
     orientation: 'portrait',
-    images: [{ id: 'img-2', url: 'https://cdn.example.com/mountain.jpg', isPrimary: true }],
+    images: [{ id: 'img-2', url: 'https://cdn.example.com/mountain.jpg', altText: 'Fixture artwork', isPrimary: true }],
     status: 'active',
     isFeatured: false,
     featuredOrder: null,
@@ -88,7 +93,7 @@ const mockProducts = [
     colors: ['black', 'white'],
     rooms: ['bedroom', 'bathroom'],
     orientation: 'square',
-    images: [{ id: 'img-3', url: 'https://cdn.example.com/botanical.jpg', isPrimary: true }],
+    images: [{ id: 'img-3', url: 'https://cdn.example.com/botanical.jpg', altText: 'Fixture artwork', isPrimary: true }],
     status: 'draft',
     isFeatured: false,
     featuredOrder: null,
@@ -108,7 +113,7 @@ const mockProducts = [
     colors: ['multi'],
     rooms: ['living-room', 'office'],
     orientation: 'square',
-    images: [{ id: 'img-4', url: 'https://cdn.example.com/ai-art.jpg', isPrimary: true }],
+    images: [{ id: 'img-4', url: 'https://cdn.example.com/ai-art.jpg', altText: 'Fixture artwork', isPrimary: true }],
     status: 'active',
     isFeatured: true,
     featuredOrder: 2,
@@ -128,7 +133,7 @@ const mockProducts = [
     colors: ['beige', 'gold', 'black'],
     rooms: ['bedroom', 'hallway'],
     orientation: 'portrait',
-    images: [{ id: 'img-5', url: 'https://cdn.example.com/paris.jpg', isPrimary: true }],
+    images: [{ id: 'img-5', url: 'https://cdn.example.com/paris.jpg', altText: 'Fixture artwork', isPrimary: true }],
     status: 'archived',
     isFeatured: false,
     featuredOrder: null,
@@ -942,18 +947,25 @@ test.describe('Edit Product Page', () => {
       }
     });
 
-    await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto('/admin/products/prod-001', { waitUntil: 'networkidle' });
 
-    // Update title
-    await page.locator('#title').fill('Updated Ocean Waves Poster');
+    /**
+     * Typed, not filled, and only once the page has hydrated.
+     *
+     * A value assertion proves nothing here — the server ships the input
+     * already populated — and `fill()` before React attaches sets a DOM value
+     * the component never sees, so the submit posts the old title or nothing
+     * at all.
+     */
+    await page.waitForTimeout(2500);
+    const title = page.locator('#title');
+    await title.click();
+    await title.press('End');
+    await title.pressSequentially(' Updated');
 
-    // Submit using main content submit button
     await page.locator('main button[type="submit"]').click();
 
-    await page.waitForTimeout(1000);
-
-    expect(updateCalled).toBe(true);
+    await expect.poll(() => updateCalled, { timeout: 10000 }).toBe(true);
   });
 
   test('should show success message after update', async ({ page }) => {
@@ -976,10 +988,12 @@ test.describe('Edit Product Page', () => {
       }
     });
 
-    await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto('/admin/products/prod-001', { waitUntil: 'networkidle' });
 
-    // Use role-based selector for reliability
+    // Same hydration wait as above — a click before React attaches submits
+    // nothing and no banner can ever appear.
+    await page.waitForTimeout(2500);
+
     const saveButton = page.getByRole('button', { name: /save/i });
     await expect(saveButton).toBeVisible();
     await saveButton.click();
@@ -1018,37 +1032,34 @@ test.describe('Delete/Archive Product', () => {
     await page.goto('/admin/products/prod-001');
     await page.waitForLoadState('domcontentloaded');
 
-    // Set up dialog handler to capture the native confirm dialog
-    let dialogMessage = '';
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.dismiss(); // Cancel the dialog
-    });
-
+    /**
+     * The in-page ConfirmDialog, not a native confirm().
+     *
+     * 2411e0df replaced 15 blocking native dialogs with one shared component
+     * precisely because `confirm()` freezes a browser-automation run the moment
+     * it opens. These tests still drove `page.on('dialog')`, so they waited for
+     * an event that can no longer fire.
+     */
     const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
     await deleteButton.click();
 
-    // Wait for dialog to be handled
-    await page.waitForTimeout(500);
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(/archive/i);
 
-    // Native confirm dialog should have been shown with appropriate message
-    expect(dialogMessage).toContain('archive');
+    // Cancelling leaves the admin where they were.
+    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(dialog).toBeHidden();
   });
 
   test('should cancel delete on confirmation dialog cancel', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
     await page.waitForLoadState('domcontentloaded');
 
-    // Set up dialog handler to dismiss (cancel) the dialog
-    page.once('dialog', async (dialog) => {
-      await dialog.dismiss();
-    });
-
     const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
     await deleteButton.click();
 
-    // Wait for dialog to be handled
-    await page.waitForTimeout(500);
+    await page.getByRole('dialog').getByRole('button', { name: /cancel/i }).click();
 
     // User should still be on the edit page (not redirected)
     await expect(page).toHaveURL(/\/admin\/products\/prod-001/);
@@ -1073,17 +1084,17 @@ test.describe('Delete/Archive Product', () => {
     await page.goto('/admin/products/prod-001');
     await page.waitForLoadState('domcontentloaded');
 
-    // Set up dialog handler to accept the confirmation
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
     const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
     await deleteButton.click();
 
-    await page.waitForTimeout(500);
+    // 'Archive product' is the confirm label the page passes; /^archive/i also
+    // matches the trigger behind the dialog, so scope to the dialog itself.
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /archive product/i })
+      .click();
 
-    expect(deleteCalled).toBe(true);
+    await expect.poll(() => deleteCalled, { timeout: 5000 }).toBe(true);
   });
 
   test('should redirect to products list after delete', async ({ page }) => {
@@ -1102,13 +1113,13 @@ test.describe('Delete/Archive Product', () => {
     await page.goto('/admin/products/prod-001');
     await page.waitForLoadState('domcontentloaded');
 
-    // Set up dialog handler to accept the confirmation
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-
     const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
     await deleteButton.click();
+
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /archive product/i })
+      .click();
 
     // URL may have query params like ?page=1&pageSize=20
     await expect(page).toHaveURL(/\/admin\/products(\?|$)/);
@@ -1657,13 +1668,19 @@ test.describe('Product Image Management', () => {
     await expect(imagePreview.first()).toBeVisible();
   });
 
-  test('should have Add Image button for images', async ({ page }) => {
+  test('offers both ways of adding an image', async ({ page }) => {
     await page.goto('/admin/products/new');
     await page.waitForLoadState('domcontentloaded');
 
-    // The Images section has an "Add Image" button
-    const addImageButton = page.getByRole('button', { name: 'Add Image' });
-    await expect(addImageButton).toBeVisible({ timeout: 5000 });
+    /**
+     * There is no single "Add Image" button any more. The Images section offers
+     * two routes — upload a file, or paste a URL — and asserting the old label
+     * asserted nothing about either.
+     */
+    await expect(page.getByRole('button', { name: /choose images/i })).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByRole('button', { name: /add by url/i })).toBeVisible();
   });
 });
 
