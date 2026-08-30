@@ -63,7 +63,7 @@ describe('Hono Server Startup', () => {
 
       expect(data).toHaveProperty('name');
       expect(data).toHaveProperty('version');
-      expect(data).toHaveProperty('documentation');
+      expect(data).toHaveProperty('health');
     });
 
     it('should return correct API name', async () => {
@@ -81,11 +81,21 @@ describe('Hono Server Startup', () => {
       expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
-    it('should include documentation endpoint', async () => {
+    it('should advertise the health endpoint path', async () => {
       const res = await app.request('/');
       const data = await res.json();
 
-      expect(data.documentation).toBe('/docs');
+      expect(data.health).toBe('/api/health');
+    });
+
+    it('should advertise a health path that is actually served', async () => {
+      const res = await app.request('/');
+      const data = await res.json();
+
+      // The root payload is the API's only self-description; an advertised
+      // path that 404s is worse than no advertisement at all.
+      const advertised = await app.request(data.health);
+      expect(advertised.status).not.toBe(404);
     });
   });
 
@@ -156,11 +166,20 @@ describe('Hono Server Startup', () => {
       expect(data).toHaveProperty('timestamp');
     });
 
-    it('should return ok status', async () => {
+    it('should return healthy status', async () => {
       const res = await app.request('/api/health');
       const data = await res.json();
 
-      expect(data.status).toBe('ok');
+      expect(data.status).toBe('healthy');
+    });
+
+    it('should report database and redis reachability', async () => {
+      const res = await app.request('/api/health');
+      const data = await res.json();
+
+      // The per-component block is what docs/RUNBOOK-OUTAGE.md L4 triages on.
+      expect(data.components.database.status).toBe('healthy');
+      expect(data.components.redis.status).toBe('healthy');
     });
 
     it('should return correct service name', async () => {

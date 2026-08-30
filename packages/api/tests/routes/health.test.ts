@@ -2,8 +2,21 @@
  * Tests for health check endpoints
  *
  * This test suite validates the health check API routes:
- * - GET /health - Basic health check for monitoring (returns: { status: 'healthy', timestamp })
- * - GET /api/health - API-prefixed health check with service info (returns: { status: 'ok', service, timestamp })
+ * - GET /health     - Health check for monitoring
+ * - GET /api/health - Alias that forwards to the /health handler, so it serves
+ *                     the identical payload. This is the canonical path: the
+ *                     container healthchecks and UptimeRobot both poll it.
+ *
+ * Both return the same body:
+ *   { status, service, version, timestamp, uptime, latency_ms,
+ *     components: { database: { status, latency_ms },
+ *                   redis:    { status, latency_ms } } }
+ *
+ * `status` is 'healthy' (HTTP 200) only when every component is healthy,
+ * otherwise 'unhealthy' (HTTP 503). The per-component block is the part
+ * operators actually read — docs/RUNBOOK-OUTAGE.md L4 triages a degraded
+ * service by looking at which component went unhealthy. Assert reachability,
+ * not the spelling of the status word.
  *
  * Health endpoints are unauthenticated and used for:
  * - Container health checks (Docker, Kubernetes)
@@ -188,24 +201,64 @@ describe('Health Endpoint Response Format (/health)', () => {
     });
   });
 
-  it('should only contain expected fields (status, timestamp)', async () => {
+  it('should contain the documented contract fields', async () => {
     if (!app) return;
 
     const res = await app.request('/health');
     const data = await res.json();
-    const keys = Object.keys(data);
 
-    expect(keys).toHaveLength(2);
-    expect(keys).toContain('status');
-    expect(keys).toContain('timestamp');
+    // Documented in docs/deployment.md; consumed by docs/RUNBOOK-OUTAGE.md L4.
+    expect(data).toHaveProperty('status');
+    expect(data).toHaveProperty('service');
+    expect(data).toHaveProperty('version');
+    expect(data).toHaveProperty('timestamp');
+    expect(data).toHaveProperty('uptime');
+    expect(data).toHaveProperty('latency_ms');
+    expect(data).toHaveProperty('components');
   });
 
-  it('should not contain service field', async () => {
+  it('should identify the service it reports on', async () => {
     if (!app) return;
 
     const res = await app.request('/health');
     const data = await res.json();
-    expect(data).not.toHaveProperty('service');
+    expect(data.service).toBe('chobii-api');
+  });
+
+  it('should report the database as reachable', async () => {
+    if (!app) return;
+
+    const res = await app.request('/health');
+    const data = await res.json();
+
+    expect(data.components.database.status).toBe('healthy');
+    expect(typeof data.components.database.latency_ms).toBe('number');
+  });
+
+  it('should report redis as reachable', async () => {
+    if (!app) return;
+
+    const res = await app.request('/health');
+    const data = await res.json();
+
+    expect(data.components.redis.status).toBe('healthy');
+    expect(typeof data.components.redis.latency_ms).toBe('number');
+  });
+
+  it('should derive overall status and HTTP code from the components', async () => {
+    if (!app) return;
+
+    const res = await app.request('/health');
+    const data = await res.json();
+
+    const components = Object.values(
+      data.components as Record<string, { status: string }>
+    );
+    const allHealthy = components.every(component => component.status === 'healthy');
+
+    // A monitor that trusts the 200 must never see it while a component is down.
+    expect(data.status).toBe(allHealthy ? 'healthy' : 'unhealthy');
+    expect(res.status).toBe(allHealthy ? 200 : 503);
   });
 
   it('should return valid JSON that can be parsed', async () => {
@@ -239,12 +292,12 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     expect(data).toHaveProperty('status');
   });
 
-  it('should return status as "ok"', async () => {
+  it('should return status as "healthy"', async () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
     const data = await res.json();
-    expect(data.status).toBe('ok');
+    expect(data.status).toBe('healthy');
   });
 
   it('should return service field', async () => {
@@ -303,23 +356,51 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     const data = await res.json();
 
     expect(data).toMatchObject({
-      status: 'ok',
+      status: 'healthy',
       service: 'chobii-api',
       timestamp: expect.any(String),
+      components: {
+        database: { status: 'healthy' },
+        redis: { status: 'healthy' },
+      },
     });
   });
 
-  it('should only contain expected fields (status, service, timestamp)', async () => {
+  it('should report the database as reachable', async () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
     const data = await res.json();
-    const keys = Object.keys(data);
 
-    expect(keys).toHaveLength(3);
-    expect(keys).toContain('status');
-    expect(keys).toContain('service');
-    expect(keys).toContain('timestamp');
+    expect(data.components.database.status).toBe('healthy');
+    expect(typeof data.components.database.latency_ms).toBe('number');
+  });
+
+  it('should report redis as reachable', async () => {
+    if (!app) return;
+
+    const res = await app.request('/api/health');
+    const data = await res.json();
+
+    expect(data.components.redis.status).toBe('healthy');
+    expect(typeof data.components.redis.latency_ms).toBe('number');
+  });
+
+  it('should derive overall status and HTTP code from the components', async () => {
+    if (!app) return;
+
+    const res = await app.request('/api/health');
+    const data = await res.json();
+
+    const components = Object.values(
+      data.components as Record<string, { status: string }>
+    );
+    const allHealthy = components.every(component => component.status === 'healthy');
+
+    // The container healthcheck and UptimeRobot both read only the HTTP code,
+    // so it has to track the component states exactly.
+    expect(data.status).toBe(allHealthy ? 'healthy' : 'unhealthy');
+    expect(res.status).toBe(allHealthy ? 200 : 503);
   });
 
   it('should return valid JSON that can be parsed', async () => {
@@ -573,7 +654,7 @@ describe('Health Check Query Parameters', () => {
     expect(res.status).toBe(200);
 
     const data = await res.json();
-    expect(data.status).toBe('ok');
+    expect(data.status).toBe('healthy');
   });
 });
 
@@ -731,7 +812,7 @@ describe('Health Check Consistency', () => {
       responses.map(res => res.json().then((d: { status: string }) => d.status))
     );
 
-    expect(statuses).toEqual(['ok', 'ok', 'ok']);
+    expect(statuses).toEqual(['healthy', 'healthy', 'healthy']);
   });
 
   it('should return consistent service name on /api/health', async () => {
@@ -956,8 +1037,8 @@ describe('Health Check Status Codes', () => {
 // Endpoint Differentiation Tests
 // ============================================================================
 
-describe('Health Check Endpoint Differentiation', () => {
-  it('should return different responses for /health and /api/health', async () => {
+describe('Health Check Endpoint Aliasing', () => {
+  it('should report the same status from /health and /api/health', async () => {
     if (!app) return;
 
     const res1 = await app.request('/health');
@@ -966,13 +1047,13 @@ describe('Health Check Endpoint Differentiation', () => {
     const data1 = await res1.json();
     const data2 = await res2.json();
 
-    // /health has 'healthy' status
-    expect(data1.status).toBe('healthy');
-    // /api/health has 'ok' status
-    expect(data2.status).toBe('ok');
+    // /api/health forwards to the /health handler, so the two must never
+    // disagree — a monitor polling one would otherwise miss what the other saw.
+    expect(data1.status).toBe(data2.status);
+    expect(res1.status).toBe(res2.status);
   });
 
-  it('should return service field only for /api/health', async () => {
+  it('should return the service field from both endpoints', async () => {
     if (!app) return;
 
     const res1 = await app.request('/health');
@@ -981,13 +1062,11 @@ describe('Health Check Endpoint Differentiation', () => {
     const data1 = await res1.json();
     const data2 = await res2.json();
 
-    // /health does not have 'service' field
-    expect(data1).not.toHaveProperty('service');
-    // /api/health has 'service' field
-    expect(data2).toHaveProperty('service');
+    expect(data1.service).toBe('chobii-api');
+    expect(data2.service).toBe('chobii-api');
   });
 
-  it('should have different number of fields', async () => {
+  it('should return the same field set from both endpoints', async () => {
     if (!app) return;
 
     const res1 = await app.request('/health');
@@ -996,10 +1075,20 @@ describe('Health Check Endpoint Differentiation', () => {
     const data1 = await res1.json();
     const data2 = await res2.json();
 
-    // /health has 2 fields (status, timestamp)
-    expect(Object.keys(data1)).toHaveLength(2);
-    // /api/health has 3 fields (status, service, timestamp)
-    expect(Object.keys(data2)).toHaveLength(3);
+    expect(Object.keys(data1).sort()).toEqual(Object.keys(data2).sort());
+  });
+
+  it('should report the same component set from both endpoints', async () => {
+    if (!app) return;
+
+    const res1 = await app.request('/health');
+    const res2 = await app.request('/api/health');
+
+    const data1 = await res1.json();
+    const data2 = await res2.json();
+
+    expect(Object.keys(data1.components).sort()).toEqual(['database', 'redis']);
+    expect(Object.keys(data2.components).sort()).toEqual(['database', 'redis']);
   });
 });
 
@@ -1030,12 +1119,15 @@ describe('Health Check Use Cases', () => {
   it('should work as Kubernetes readiness probe', async () => {
     if (!app) return;
 
-    // Kubernetes readiness probe checks if app can accept traffic
+    // Kubernetes readiness probe checks if app can accept traffic — which
+    // means its dependencies are reachable, not just that the process is up.
     const res = await app.request('/api/health');
     expect(res.status).toBe(200);
 
     const data = await res.json();
-    expect(data.status).toBe('ok');
+    expect(data.status).toBe('healthy');
+    expect(data.components.database.status).toBe('healthy');
+    expect(data.components.redis.status).toBe('healthy');
   });
 
   it('should work as load balancer health check', async () => {

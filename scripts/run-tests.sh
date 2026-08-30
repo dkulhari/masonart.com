@@ -367,7 +367,9 @@ health_check() {
 
     local HEALTH_RESPONSE
     HEALTH_RESPONSE=$(curl -s http://localhost:3000/api/health 2>/dev/null || echo "FAILED")
-    if echo "$HEALTH_RESPONSE" | grep -q "ok"; then
+    # /api/health reports {"status":"healthy",...} — it has never said "ok",
+    # so the old `grep -q "ok"` failed against a perfectly healthy API.
+    if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
         echo -e "  ${GREEN}✓${NC} API health check passed"
     else
         echo -e "  ${RED}✗${NC} API health check failed: $HEALTH_RESPONSE"
