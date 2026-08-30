@@ -52,7 +52,8 @@
  */
 
 import { eq } from 'drizzle-orm'
-import { db, closeDatabase } from './index'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import type * as schema from './schema'
 import { productionJobs, type ProductionJobStatus } from './schema/production-jobs'
 
 /** The one rewrite this script performs, named so tests and prose agree. */
@@ -62,14 +63,20 @@ export const SENT_RETIREMENT = {
 } as const satisfies { from: ProductionJobStatus; to: ProductionJobStatus }
 
 /**
- * The status a row should hold after retirement.
+ * What the retirement runs against.
  *
- * Total over the enum and idempotent: everything that is not `sent` is already
- * where it belongs, and `sent` never appears in the image, so a completed run
- * leaves none behind and a second run is a no-op.
+ * Narrowed to the two builders this script uses so a caller can hand it
+ * something other than the application pool — specifically a drizzle
+ * transaction, which is how the behavioural test exercises the real UPDATE
+ * against a real database and then rolls the whole thing back.
  */
-export function retiredStatus(status: ProductionJobStatus): ProductionJobStatus {
-  return status === SENT_RETIREMENT.from ? SENT_RETIREMENT.to : status
+export type RetirementDb = Pick<PostgresJsDatabase<typeof schema>, 'select' | 'update'>
+
+export interface RetirementOptions {
+  /** Report the count without writing anything. */
+  dryRun?: boolean
+  /** Where to run. Defaults to the application connection, imported lazily. */
+  db?: RetirementDb
 }
 
 export interface RetirementResult {
@@ -80,11 +87,27 @@ export interface RetirementResult {
 }
 
 /**
+ * Move every row still holding the retired status onto its replacement.
+ *
  * One statement, no transaction wrapper: a single UPDATE is already atomic, and
- * the rewrite is idempotent, so a half-finished run is simply resumable.
+ * the rewrite is idempotent — everything not `sent` is already where it belongs
+ * and the UPDATE never produces a `sent` — so a completed run leaves none
+ * behind, a second run matches nothing, and a half-finished run is simply
+ * resumable.
+ *
+ * `./index` is imported HERE and not at module scope. That module builds a
+ * twenty-connection pool and throws on a missing `DATABASE_URL` while it is
+ * being evaluated, so a static import made merely *importing* this file — which
+ * the tests do — require a database and leak a pool. Deferring it is the same
+ * shape services/ai-moderation.ts uses.
  */
-export async function retireSentStatus(dryRun = false): Promise<RetirementResult> {
-  const stale = await db
+export async function retireSentStatus({
+  dryRun = false,
+  db,
+}: RetirementOptions = {}): Promise<RetirementResult> {
+  const database: RetirementDb = db ?? (await import('./index')).db
+
+  const stale = await database
     .select({ id: productionJobs.id })
     .from(productionJobs)
     .where(eq(productionJobs.status, SENT_RETIREMENT.from))
@@ -93,7 +116,7 @@ export async function retireSentStatus(dryRun = false): Promise<RetirementResult
     return { found: stale.length, updated: 0 }
   }
 
-  const updated = await db
+  const updated = await database
     .update(productionJobs)
     .set({ status: SENT_RETIREMENT.to })
     .where(eq(productionJobs.status, SENT_RETIREMENT.from))
@@ -104,7 +127,7 @@ export async function retireSentStatus(dryRun = false): Promise<RetirementResult
 
 async function main(): Promise<void> {
   const dryRun = process.argv.includes('--dry-run')
-  const { found, updated } = await retireSentStatus(dryRun)
+  const { found, updated } = await retireSentStatus({ dryRun })
 
   if (found === 0) {
     console.log(`No production_jobs hold '${SENT_RETIREMENT.from}'. Nothing to retire.`)
@@ -121,14 +144,18 @@ async function main(): Promise<void> {
 // Run if executed directly. Guarded so importing this module — which a test
 // does — never opens a connection or rewrites a live database.
 if (import.meta.main) {
+  // Deferred for the same reason as the one inside retireSentStatus: the pool
+  // is a cost of RUNNING the script, never of importing it.
+  const shutdown = async (code: number): Promise<never> => {
+    const { closeDatabase } = await import('./index')
+    await closeDatabase()
+    process.exit(code)
+  }
+
   main()
-    .then(async () => {
-      await closeDatabase()
-      process.exit(0)
-    })
+    .then(() => shutdown(0))
     .catch(async (error) => {
       console.error(error)
-      await closeDatabase()
-      process.exit(1)
+      await shutdown(1)
     })
 }
