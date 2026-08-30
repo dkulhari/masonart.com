@@ -25,6 +25,12 @@ import { z } from 'zod'
  * What a row can be filed under. `money` and `privilege` are the launch gate:
  * history cannot be backfilled, so an unrecorded refund or promotion is
  * unanswerable forever.
+ *
+ * `fulfilment` is the production-pipeline tier — a job moving through print, QC
+ * and despatch. Spelled the British way, matching the `audit_category` value;
+ * `fulfillment` here would refuse every row the database accepts. What we OWE a
+ * supplier stays `money` even when the row is about a production job: the split
+ * is by what the row is about, not by table.
  */
 export const auditCategorySchema = z.enum([
   'money',
@@ -32,6 +38,7 @@ export const auditCategorySchema = z.enum([
   'catalogue',
   'config',
   'content',
+  'fulfilment',
 ])
 
 /**

@@ -57,11 +57,29 @@ describe('audit action registry', () => {
 })
 
 describe('audit category and outcome', () => {
-  it('accepts the five categories and refuses anything else', () => {
-    for (const c of ['money', 'privilege', 'catalogue', 'config', 'content']) {
+  it('accepts the six categories and refuses anything else', () => {
+    for (const c of ['money', 'privilege', 'catalogue', 'config', 'content', 'fulfilment']) {
       expect(auditCategorySchema.safeParse(c).success).toBe(true)
     }
     expect(auditCategorySchema.safeParse('everything').success).toBe(false)
+  })
+
+  /**
+   * `fulfilment` (#673) is the production-pipeline tier: a job moving through
+   * print, QC and despatch. It is spelled the British way, matching the
+   * `audit_category` value the migration adds — a schema that spells it
+   * `fulfillment` refuses every row the database accepts.
+   */
+  it('accepts fulfilment, and only the spelling the enum uses', () => {
+    expect(auditCategorySchema.safeParse('fulfilment').success).toBe(true)
+    expect(auditCategorySchema.safeParse('fulfillment').success).toBe(false)
+  })
+
+  it('filters on fulfilment through the same comma-joined query the router sends', () => {
+    expect(auditLogQuerySchema.parse({ category: 'fulfilment,money' }).category).toEqual([
+      'fulfilment',
+      'money',
+    ])
   })
 
   it('records a refusal as an outcome, not an absence', () => {

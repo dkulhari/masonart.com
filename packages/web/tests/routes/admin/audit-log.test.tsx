@@ -106,6 +106,25 @@ describe('auditLogSearchSchema', () => {
       'money',
     ])
   })
+
+  /**
+   * `fulfilment` (#673) is the sixth category, and this filter is the reason the
+   * viewer's `CATEGORIES` is one of three sites that must move with the enum.
+   * The list is a whitelist that silently DROPS anything it does not recognise —
+   * which is the right behaviour for a stale bookmark and exactly the wrong
+   * behaviour for a category the database is already writing. Forget this site
+   * and `?category=fulfilment` degrades to the unfiltered view: no error, no
+   * empty state, just the whole table and an admin who thinks the filter ran.
+   */
+  it('keeps fulfilment as a filter rather than silently dropping it', () => {
+    expect(auditLogSearchSchema.parse({ category: 'fulfilment' }).category).toEqual([
+      'fulfilment',
+    ])
+    expect(auditLogSearchSchema.parse({ category: 'fulfilment,money' }).category).toEqual([
+      'fulfilment',
+      'money',
+    ])
+  })
 })
 
 describe('AuditLogBody', () => {
@@ -117,6 +136,27 @@ describe('AuditLogBody', () => {
     // The entity cell, specifically — the summary also mentions the return, so
     // an unanchored match finds two nodes and proves nothing about either.
     expect(screen.getByText('return r1')).toBeInTheDocument()
+  })
+
+  /**
+   * `CATEGORY_STYLES` is the second half of the viewer's half of #673. The badge
+   * falls back to `bg-muted text-muted-foreground` for an unstyled category —
+   * the same neutral grey `config` deliberately uses — so a missing entry does
+   * not break the page, it just makes every fulfilment row look like a config
+   * row. That is a bug you find by squinting, which is to say never.
+   */
+  it('gives fulfilment its own badge rather than the unstyled fallback', () => {
+    render(
+      <AuditLogBody
+        entries={[row({ category: 'fulfilment', action: 'production_job.transitioned' })]}
+        isLoading={false}
+        error={null}
+      />
+    )
+
+    const badge = screen.getByText('fulfilment')
+    expect(badge.className).not.toContain('bg-muted')
+    expect(badge.className).toMatch(/\bbg-\S+/)
   })
 
   it('shows a skeleton while loading, and no fabricated emptiness', () => {

@@ -31,10 +31,42 @@ describe('production job schema', () => {
       'assigned',
       'sent',
       'received',
+      'qc_submitted',
       'qc_passed',
       'qc_failed',
+      'dispatched',
       'cancelled',
     ])
+  })
+
+  /**
+   * The two values production-pipeline adds (#673), and the one it retires.
+   *
+   * `qc_submitted` is the only state meaning the ball is in OUR court: work
+   * finished, shot list uploaded, blocked on us. It is the entire content of
+   * the admin QC queue and the precondition the label gate reads.
+   *
+   * `dispatched` is one value, not two, because parcel-to-next-vendor and
+   * parcel-to-courier are the same fact about the job: this vendor's custody
+   * ended.
+   *
+   * `sent` is retired in CODE ONLY and must stay in the Postgres type. Dropping
+   * an enum value means recreating the type and rewriting every dependent
+   * column, and rows still carry it until #675's backfill script runs — so the
+   * DSL has to keep reading them. The retirement is enforced by the transition
+   * matrix giving it zero in-edges and zero out-edges (#676), not here.
+   */
+  it('adds the two workflow statuses in workflow order and keeps retired `sent` readable', () => {
+    const values = productionJobStatusEnum.enumValues
+    expect(values).toContain('qc_submitted')
+    expect(values).toContain('dispatched')
+
+    // Position is not decoration: the DSL order must match the order Postgres
+    // holds, or drizzle-kit sees drift and offers to recreate the type.
+    expect(values.indexOf('qc_submitted')).toBe(values.indexOf('qc_passed') - 1)
+    expect(values.indexOf('dispatched')).toBe(values.indexOf('cancelled') - 1)
+
+    expect(values).toContain('sent')
   })
 
   it('production_job_items joins to order_items, not to orders', () => {

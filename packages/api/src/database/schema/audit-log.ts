@@ -63,12 +63,30 @@ import { users } from "./users";
  * Scope tier. `money` and `privilege` are the launch gate — history cannot be
  * backfilled, so an unrecorded refund is unanswerable forever.
  */
+/**
+ * `fulfilment` is appended, never inserted: `ALTER TYPE … ADD VALUE` with no
+ * BEFORE/AFTER puts it last, and this array must match that order or
+ * drizzle-kit reads the difference as drift.
+ *
+ * It is split from `money` by what the row is ABOUT, not by table. Assigning a
+ * production job or overriding its amount commits or changes what we owe a
+ * supplier, so those stay `money`; the job moving through print, QC and
+ * despatch is fulfilment. #667 filed all `production_job.*` under `money`, and
+ * this is the reconciliation.
+ *
+ * Three sites carry this list and must move together — this enum,
+ * `auditCategorySchema` in shared, and `CATEGORIES` in the admin viewer. The
+ * viewer's copy is a whitelist that silently DROPS what it does not recognise,
+ * so a category the database writes but the viewer omits is a filter that
+ * quietly returns everything.
+ */
 export const auditCategoryEnum = pgEnum("audit_category", [
   "money",
   "privilege",
   "catalogue",
   "config",
   "content",
+  "fulfilment",
 ]);
 
 /**

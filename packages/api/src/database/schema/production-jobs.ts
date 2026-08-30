@@ -28,14 +28,38 @@ import { vendors } from './vendors'
 
 export const productionJobStageEnum = pgEnum('production_job_stage', ['print', 'frame'])
 
-/** Vocabulary only. Legal transitions belong to production-pipeline. */
+/**
+ * Vocabulary only. Legal transitions live in `lib/production-transitions.ts`.
+ *
+ * Order matches the order Postgres holds, which is what `0023` positions with
+ * `ADD VALUE … BEFORE`. Keep the two in step: drizzle-kit compares the arrays,
+ * and a reordering reads as drift it would rather fix by recreating the type.
+ *
+ * `received` is re-meant by production-pipeline: it was "the vendor received the
+ * physical piece from us", it is now "the vendor has everything needed to
+ * start" — the artwork for a print job, the printed sheet for a frame job. Same
+ * actor, same moment in the vendor's day; only the label changed.
+ *
+ * `qc_submitted` is the one state meaning the ball is in OUR court: work
+ * finished, shot list uploaded, blocked on us. `dispatched` is one value and not
+ * two because parcel-to-next-vendor and parcel-to-courier are the same fact —
+ * this vendor's custody ended.
+ *
+ * `sent` is RETIRED but deliberately still here. Dropping an enum value means
+ * recreating the type and rewriting every dependent column, and rows carry it
+ * until #675's backfill script runs, so the DSL has to keep reading them. The
+ * retirement is enforced by the transition matrix giving it zero in-edges and
+ * zero out-edges (#676) — never by removing it from this list.
+ */
 export const productionJobStatusEnum = pgEnum('production_job_status', [
   'draft',
   'assigned',
   'sent',
   'received',
+  'qc_submitted',
   'qc_passed',
   'qc_failed',
+  'dispatched',
   'cancelled',
 ])
 
