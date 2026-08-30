@@ -321,10 +321,27 @@ screen cannot disagree**. Two functions because a "not ready" with no reason is 
 class of bug `OrderProductionPanel.tsx` already guards against: a confident answer over
 an incomplete read.
 
-With `J` = the order's non-cancelled jobs, ready **iff**: `J` is non-empty; every order
-item requiring production is covered by some job in `J`; a consolidator `C` is set;
-every job in `J` is `qc_passed` or `dispatched`; every `qc_passed` job is at `C`; and
-every `dispatched` job rode a transfer to `C` that is received and not lost.
+With `J` = the order's non-cancelled jobs, ready **iff**: **the order was actually
+read**; `J` is non-empty; every order item requiring production is covered by some job
+in `J`; a consolidator `C` is set; **`C` itself holds at least one live job**; every job
+in `J` is `qc_passed` or `dispatched`; every `qc_passed` job is at `C`; and every
+`dispatched` job rode a transfer to `C` that is received and not lost.
+
+The two clauses in bold were added after review, and both closed a **fail-open** hole —
+the failure direction that matters, because this gate exists to stop a courier label
+being bought:
+
+- **`order_not_found`.** The snapshot loader defaulted a missing `orders` row to
+  `orderType: 'regular'` and never checked one came back. A missing order then read as
+  zero-items-zero-jobs, which is the gift-card *ready* path — so a deleted or mistyped
+  id returned `ready: true`. "Nothing to produce" and "nothing was read" are not the
+  same answer and must not share one.
+- **`consolidator_holds_no_job`.** The one-label-per-order property below has a
+  precondition nothing enforced: it only holds if `C` itself holds a live job. Cancel
+  `C`'s own duplicate job while another vendor's job sits `dispatched` on a received
+  transfer to `C`, and the order reads ready — permanently, since no job's status can
+  change again. Both original tests for the property gave `C` a job, so it was never
+  exercised.
 
 A property falls out for free: **once the consolidator's own jobs go `dispatched`, the
 predicate goes false again** — a `dispatched` job with no inbound transfer to `C` is a
