@@ -23,7 +23,10 @@
  * 3. **An order with nothing to produce is not blocked.** A gift-card order has
  *    no jobs and never will. Reading "no jobs" as "not ready" would wedge every
  *    such order out of fulfilment forever.
- * 4. **The reader is injected, and defaults to `db`.** Both directions are
+ * 4. **A missing order is not an empty one.** An id matching no row reads back
+ *    as an order with no items and no jobs — the gift-card shape — and the gate
+ *    exists to refuse it.
+ * 5. **The reader is injected, and defaults to `db`.** Both directions are
  *    asserted, because the whole point of the parameter is that
  *    order-dispatch-tracking can evaluate this INSIDE its shipment transaction.
  *    A default that silently ignored the argument would still pass every
@@ -92,10 +95,28 @@ function transfer(over: Partial<ReadinessTransfer> = {}): ReadinessTransfer {
   }
 }
 
+/**
+ * A live job of the consolidator's own, on a second line of the order.
+ *
+ * Every case that puts the job under test at another vendor needs one: a
+ * consolidator holding no live job is blocked in its own right — the
+ * one-label-per-order property has nothing to hang on — and that blocker would
+ * otherwise be mixed in with the condition the case is about.
+ */
+function consolidatorJob(over: Partial<ReadinessJob> = {}): ReadinessJob {
+  return job({ id: 'job-c', vendorId: A, orderItemIds: ['item-c'], ...over })
+}
+
+/** The order line `consolidatorJob` covers. */
+function consolidatorItem(): ReadinessItem {
+  return item({ id: 'item-c' })
+}
+
 /** A single rolled poster, printed and QC-passed at A, with A consolidating. */
 function snapshot(over: Partial<OrderProductionSnapshot> = {}): OrderProductionSnapshot {
   return {
     orderId: 'order-1',
+    orderExists: true,
     orderType: 'regular',
     items: [item()],
     jobs: [job()],
@@ -215,7 +236,10 @@ describe('evaluateLabelReadiness — the six conditions', () => {
   it('blocks a qc_passed job held by a vendor who is not the consolidator', () => {
     // The goods passed QC at B. Nobody has moved them, so they are not where
     // the parcel to the customer is being packed.
-    const readiness = evaluate({ jobs: [job({ vendorId: B })] })
+    const readiness = evaluate({
+      items: [item(), consolidatorItem()],
+      jobs: [job({ vendorId: B }), consolidatorJob()],
+    })
 
     expect(readiness.ready).toBe(false)
     expect(codes(readiness)).toEqual(['goods_not_at_consolidator'])
@@ -226,7 +250,8 @@ describe('evaluateLabelReadiness — the six conditions', () => {
 describe('evaluateLabelReadiness — dispatched jobs and their transfers', () => {
   it('is ready when a dispatched job rode a received transfer to the consolidator', () => {
     const readiness = evaluate({
-      jobs: [job({ vendorId: B, status: 'dispatched' })],
+      items: [item(), consolidatorItem()],
+      jobs: [job({ vendorId: B, status: 'dispatched' }), consolidatorJob()],
       transfers: [transfer({ toVendorId: A, receivedAt: NOW, jobIds: ['job-1'] })],
     })
 
@@ -235,7 +260,8 @@ describe('evaluateLabelReadiness — dispatched jobs and their transfers', () =>
 
   it('blocks while the parcel is still in flight', () => {
     const readiness = evaluate({
-      jobs: [job({ vendorId: B, status: 'dispatched' })],
+      items: [item(), consolidatorItem()],
+      jobs: [job({ vendorId: B, status: 'dispatched' }), consolidatorJob()],
       transfers: [transfer({ toVendorId: A, receivedAt: null, jobIds: ['job-1'] })],
     })
 
@@ -248,7 +274,8 @@ describe('evaluateLabelReadiness — dispatched jobs and their transfers', () =>
     // The original job stays `dispatched` with its payable intact; a
     // replacement draft job is what unblocks the order, not this row changing.
     const readiness = evaluate({
-      jobs: [job({ vendorId: B, status: 'dispatched' })],
+      items: [item(), consolidatorItem()],
+      jobs: [job({ vendorId: B, status: 'dispatched' }), consolidatorJob()],
       transfers: [
         transfer({ toVendorId: A, receivedAt: null, lostAt: NOW, jobIds: ['job-1'] }),
       ],
@@ -260,7 +287,8 @@ describe('evaluateLabelReadiness — dispatched jobs and their transfers', () =>
 
   it('reports lost rather than misrouted when a lost parcel was also going elsewhere', () => {
     const readiness = evaluate({
-      jobs: [job({ vendorId: B, status: 'dispatched' })],
+      items: [item(), consolidatorItem()],
+      jobs: [job({ vendorId: B, status: 'dispatched' }), consolidatorJob()],
       transfers: [
         transfer({ toVendorId: C, receivedAt: null, lostAt: NOW, jobIds: ['job-1'] }),
       ],
@@ -271,7 +299,8 @@ describe('evaluateLabelReadiness — dispatched jobs and their transfers', () =>
 
   it('blocks when the parcel was received by someone other than the consolidator', () => {
     const readiness = evaluate({
-      jobs: [job({ vendorId: B, status: 'dispatched' })],
+      items: [item(), consolidatorItem()],
+      jobs: [job({ vendorId: B, status: 'dispatched' }), consolidatorJob()],
       transfers: [transfer({ toVendorId: C, receivedAt: NOW, jobIds: ['job-1'] })],
     })
 
@@ -323,6 +352,104 @@ describe('the emergent property: one label per order', () => {
     expect(after.ready).toBe(false)
     expect(codes(after)).toEqual(['goods_not_at_consolidator'])
     expect(after.blockers[0]?.jobId).toBe('job-frame')
+  })
+
+  it('blocks when the consolidator`s own job was cancelled out from under it', () => {
+    // The property above has a precondition: C ships by its OWN jobs going
+    // `dispatched`. Here B printed item-1, transferred it to C and C received
+    // it, but C`s duplicate print job was cancelled by an admin. Every other
+    // clause holds and no row can ever change again — so without this clause C
+    // ships the parcel and the order stays labelable forever, once per pickup.
+    const readiness = evaluate({
+      consolidatorVendorId: C,
+      jobs: [
+        job({ id: 'job-b', vendorId: B, status: 'dispatched' }),
+        job({ id: 'job-c', vendorId: C, status: 'cancelled' }),
+      ],
+      transfers: [transfer({ toVendorId: C, receivedAt: NOW, jobIds: ['job-b'] })],
+    })
+
+    expect(readiness.ready).toBe(false)
+    expect(codes(readiness)).toEqual(['consolidator_holds_no_job'])
+  })
+
+  it('is ready once the consolidator holds a live job, and false again when it ships', () => {
+    // The same order with C`s job alive: ready, and then not, which is the
+    // whole property. Both halves are asserted here so the clause above cannot
+    // be satisfied by a rule that simply never lets a transfer-fed C through.
+    const jobsAt = (consolidatorStatus: ReadinessJob['status']) => [
+      job({ id: 'job-b', vendorId: B, status: 'dispatched' }),
+      job({
+        id: 'job-c',
+        vendorId: C,
+        status: consolidatorStatus,
+        orderItemIds: ['item-c'],
+      }),
+    ]
+    const order = {
+      consolidatorVendorId: C,
+      items: [item(), consolidatorItem()],
+      transfers: [transfer({ toVendorId: C, receivedAt: NOW, jobIds: ['job-b'] })],
+    }
+
+    expect(evaluate({ ...order, jobs: jobsAt('qc_passed') }).ready).toBe(true)
+
+    const shipped = evaluate({ ...order, jobs: jobsAt('dispatched') })
+
+    expect(shipped.ready).toBe(false)
+    expect(codes(shipped)).toEqual(['goods_not_at_consolidator'])
+    expect(shipped.blockers[0]?.jobId).toBe('job-c')
+  })
+})
+
+describe('an order that does not exist', () => {
+  /**
+   * The fail-open this module could not survive. A deleted or mistyped id reads
+   * back as an order with no items and no jobs — byte for byte the gift-card
+   * shape — and the gate whose entire purpose is to refuse used to pass it.
+   */
+  it('blocks an id that matched no order row', () => {
+    const readiness = evaluate({
+      orderExists: false,
+      items: [],
+      jobs: [],
+      consolidatorVendorId: null,
+    })
+
+    expect(readiness.ready).toBe(false)
+    expect(codes(readiness)).toEqual(['order_not_found'])
+  })
+
+  it('tells the two identical-looking snapshots apart', () => {
+    const missing = evaluate({
+      orderExists: false,
+      items: [],
+      jobs: [],
+      consolidatorVendorId: null,
+    })
+    const giftCard = evaluate({
+      orderType: 'gift_card',
+      items: [item({ isGiftCard: true })],
+      jobs: [],
+      consolidatorVendorId: null,
+    })
+
+    expect(missing.ready).toBe(false)
+    expect(giftCard.ready).toBe(true)
+  })
+
+  it('does not also invent the blockers of an order it never read', () => {
+    // `no_jobs` and `no_consolidator` are true of the empty snapshot and would
+    // be noise: there is no order to have jobs or a consolidator.
+    const readiness = evaluate({
+      orderExists: false,
+      items: [],
+      jobs: [],
+      consolidatorVendorId: null,
+    })
+
+    expect(codes(readiness)).not.toContain('no_jobs')
+    expect(codes(readiness)).not.toContain('no_consolidator')
   })
 })
 
@@ -528,6 +655,25 @@ describe('getOrderLabelReadiness and its boolean', () => {
 
     expect(snapshotRead.transfers).toHaveLength(1)
     expect(snapshotRead.transfers[0]?.jobIds).toEqual(['job-1', 'job-2'])
+  })
+
+  it('is not ready when no order row comes back for the id', async () => {
+    // The gift-card case above reads exactly like this one apart from the order
+    // row, and it is ready. The reads themselves cannot tell them apart, which
+    // is why the snapshot carries `orderExists`.
+    const missingId = '00000000-0000-4000-8000-000000000000'
+    queueOrder({ order: [], items: [], jobs: [], consolidation: [] })
+
+    const readiness = await getOrderLabelReadiness(missingId, reader)
+
+    expect(readiness.ready).toBe(false)
+    expect(codes(readiness)).toEqual(['order_not_found'])
+
+    queue.reset()
+    readerSelect.mockReset()
+    queueOrder({ order: [], items: [], jobs: [], consolidation: [] })
+
+    expect(await isOrderReadyToLabel(missingId, reader)).toBe(false)
   })
 
   it('reports no consolidator when the order has no consolidation row', async () => {

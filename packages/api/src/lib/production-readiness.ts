@@ -26,13 +26,22 @@
  *
  * With `J` = the order's jobs whose status is not `cancelled`, ready **iff**:
  *
+ *   - the order was actually read, and
  *   - `J` is non-empty, and
  *   - every order item requiring production is covered by some job in `J`, and
  *   - a consolidator `C` is set (`order_consolidation.vendor_id`), and
+ *   - `C` holds at least one job in `J`, and
  *   - every job in `J` is `qc_passed` or `dispatched`, and
  *   - every `qc_passed` job has `vendor_id = C`, and
  *   - every `dispatched` job is on a transfer `T` with `T.to_vendor_id = C`,
  *     `T.received_at IS NOT NULL` and `T.lost_at IS NULL`.
+ *
+ * The single exception is an order with nothing to produce — a gift card buys
+ * no goods — which is ready with an empty `J`. That exception is exactly why
+ * the first clause is a clause: an id matching no row reads back as an order
+ * with no items and no jobs, the same shape as the gift card, and one of the
+ * two must be ready while the other must never be. A gate whose whole purpose
+ * is to refuse cannot let a deleted or mistyped id through it.
  *
  * ## The property that falls out: one label per order
  *
@@ -42,6 +51,13 @@
  * A second label for the same order is therefore structurally impossible: no
  * `label_created_at` column to keep in step, no advisory lock, nothing anyone
  * has to remember. `tests/lib/production-readiness.test.ts` pins it.
+ *
+ * That argument has a precondition, which is why `C` holding a job is a clause
+ * of the predicate rather than an assumption behind it: a consolidator with no
+ * live job of its own has nothing that CAN go `dispatched`, so handing the
+ * parcel to the courier changes no row this predicate reads and the order stays
+ * labelable forever. Cancelling `C`'s only job is enough to reach that state,
+ * so the clause is checked rather than argued.
  *
  * ## Why the predicate is pure and the reading is not
  *
@@ -137,6 +153,14 @@ export interface ReadinessTransfer {
 
 export interface OrderProductionSnapshot {
   orderId: string
+  /**
+   * Whether an `orders` row came back for `orderId`.
+   *
+   * Not derivable from the rest, and required rather than optional: a deleted
+   * or mistyped id reads as an order with no items and no jobs, which is
+   * indistinguishable from a gift-card order unless the read says so.
+   */
+  orderExists: boolean
   /** `gift_card` orders buy no goods; nothing is ever produced for them. */
   orderType: OrderType
   items: readonly ReadinessItem[]
@@ -157,10 +181,14 @@ export interface OrderProductionSnapshot {
  * line of the spec rather than to an implementation detail.
  */
 export type LabelBlockerCode =
+  /** No `orders` row was read for this id: deleted, or never existed. */
+  | 'order_not_found'
   /** The order has work to do and no live job doing it. */
   | 'no_jobs'
   /** Nobody has decided which vendor assembles and ships the order. */
   | 'no_consolidator'
+  /** The consolidator holds no live job, so shipping would change nothing. */
+  | 'consolidator_holds_no_job'
   /** An order item requiring production has no live job covering that stage. */
   | 'item_uncovered'
   /** A live job has not reached `qc_passed` (or has failed back). */
@@ -226,6 +254,18 @@ export function evaluateLabelReadiness(snapshot: OrderProductionSnapshot): Label
   const items = producibleItems(snapshot)
   const blockers: LabelBlocker[] = []
 
+  // Answered first and alone. Nothing was read, so every other condition below
+  // would be a verdict about rows that do not exist — and the "nothing to
+  // produce" branch immediately after this one would return `ready: true` for
+  // an id the gate exists to refuse.
+  if (!snapshot.orderExists) {
+    blockers.push({
+      code: 'order_not_found',
+      message: `No order ${snapshot.orderId} exists, so there is nothing to buy a label for.`,
+    })
+    return { ready: blockers.length === 0, consolidatorVendorId, blockers }
+  }
+
   // An order with nothing to produce is not waiting on production. A gift-card
   // order has no jobs and never will; reading that as "not ready" would wedge
   // it out of fulfilment permanently.
@@ -262,6 +302,18 @@ export function evaluateLabelReadiness(snapshot: OrderProductionSnapshot): Label
       code: 'no_consolidator',
       message:
         'No consolidator has been chosen for this order, so there is no vendor the goods are supposed to be at.',
+    })
+  } else if (jobs.length > 0 && !jobs.some((job) => job.vendorId === consolidatorVendorId)) {
+    // The precondition of one-label-per-order. C ships by its OWN jobs going
+    // `dispatched`; a C holding none — its only job cancelled, say — ships
+    // without changing a row this predicate reads, so the order would satisfy
+    // the gate again after it had already gone out. `no_jobs` is the honest
+    // complaint when there is no live work at all, so this asks only about an
+    // order whose work is live somewhere else.
+    blockers.push({
+      code: 'consolidator_holds_no_job',
+      message:
+        'The consolidator holds no live production job for this order. Nothing it does — including handing the parcel to the courier — would change whether the order looks ready.',
     })
   }
 
@@ -412,6 +464,9 @@ export async function loadOrderProductionSnapshot(
 
   return {
     orderId,
+    // The row itself, not its contents: `?? 'regular'` below is a default for a
+    // column, and defaults are exactly how a missing order used to pass.
+    orderExists: orderRows.length > 0,
     orderType: orderRows[0]?.orderType ?? 'regular',
     items: itemRows.map((row) => ({
       id: row.id,
