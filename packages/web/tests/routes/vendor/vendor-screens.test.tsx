@@ -33,15 +33,20 @@
  * state machine and cannot fail the day the matrix moves.
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   PRODUCTION_JOB_STATUSES,
   PRODUCTION_TRANSITIONS,
+  QC_PHOTO_MAX_BYTES,
+  QC_SHOT_LIST,
+  QC_STAGES,
   UNREACHABLE_STATUSES,
   nextStatuses,
+  qcShotsForStage,
+  requiredQcSlots,
   type ProductionJobStatus,
 } from '@chobii/shared'
 
@@ -69,7 +74,20 @@ import {
 import {
   VendorJobDetailBody,
   InlineConfirm,
+  QcVerdictBanner,
+  VendorJobWriteError,
+  VendorQcShotList,
+  mergeQcShots,
+  missingRequiredQcSlots,
+  patchVendorJobStatus,
+  uploadVendorQcPhoto,
+  withdrawVendorQcPhoto,
   type VendorJobDetailResponse,
+  type VendorJobReview,
+  type VendorQcPanelState,
+  type VendorQcPhoto,
+  type VendorQcPhotoSet,
+  type VendorQcShot,
 } from '~/routes/vendor/jobs/$id'
 import { VendorRatesBody, bandLabel, isCurrentBand, type VendorRate } from '~/routes/vendor/rates'
 import {
@@ -88,6 +106,8 @@ import {
   VENDOR_JOB_STATUS_LABELS,
   VENDOR_JOB_STATUS_STYLES,
   VENDOR_UNKNOWN_STATUS_STYLE,
+  vendorMayUploadPhotos,
+  type VendorJobStage,
 } from '~/lib/vendor-nav'
 
 afterEach(cleanup)
@@ -644,6 +664,840 @@ describe('the job detail action strip', () => {
     expect(screen.getByTestId('vendor-job-detail')).toBeInTheDocument()
     expect(screen.queryByTestId('vendor-job-error')).not.toBeInTheDocument()
     expect(screen.getByTestId('vendor-job-action-error')).toHaveTextContent(/cancelled/i)
+  })
+})
+
+// ============================================================================
+// The shot list — QC_SHOT_LIST rendered, and the photos hung off it
+// ============================================================================
+
+/**
+ * The uploader's structure is the SHARED list; only the photographs come from
+ * the API. Every assertion below is written against `@chobii/shared` rather
+ * than against slots repeated here, for the same reason the action strip is:
+ * a test that restates the answer is a second copy of the shot list and cannot
+ * fail the day a shot is added to it.
+ */
+describe('the QC shot list', () => {
+  const photoIn = (slot: string, over: Partial<VendorQcPhoto> = {}): VendorQcPhoto => ({
+    id: `photo-${slot}`,
+    contentType: 'image/jpeg',
+    sizeBytes: 2_400_000,
+    uploadedAt: '2026-08-14T09:00:00.000Z',
+    reviewId: null,
+    // Null on purpose here: these tests are about the STRUCTURE of the panel,
+    // and the display path — bytes fetched from R2, rendered from a blob — has
+    // its own describe below with fetch and `createObjectURL` under control.
+    // A signed URL in this fixture would put a real network call in a unit test.
+    url: null,
+    ...over,
+  })
+
+  /** A photo set answering exactly the shared list, with `filled` shot. */
+  const photoSet = (
+    stage: VendorJobStage,
+    filled: string[] = []
+  ): VendorQcPhotoSet => ({
+    jobId: detail.job.id,
+    stage,
+    status: 'received',
+    shots: (qcShotsForStage(stage) ?? []).map((shot) => ({
+      slot: shot.slot,
+      label: shot.label,
+      required: shot.required,
+      onShotList: true,
+      photo: filled.includes(shot.slot) ? photoIn(shot.slot) : null,
+    })),
+    missingRequiredSlots: requiredQcSlots(stage).filter((slot) => !filled.includes(slot)),
+    expiresInSeconds: 300,
+    expiresAt: '2026-08-14T09:05:00.000Z',
+  })
+
+  const panel = (over: Partial<VendorQcPanelState> = {}): VendorQcPanelState => ({
+    data: null,
+    isLoading: false,
+    error: null,
+    onRetry: () => {},
+    ...over,
+  })
+
+  it.each([...QC_STAGES])('renders every slot the %s shot list asks for', (stage) => {
+    const { container } = render(
+      <VendorQcShotList stage={stage} qc={panel({ data: photoSet(stage) })} canUpload />
+    )
+
+    const rendered = Array.from(
+      container.querySelectorAll('[data-testid^="vendor-qc-shot-"]')
+    ).map((el) => el.getAttribute('data-testid'))
+
+    expect(rendered).toEqual(QC_SHOT_LIST[stage].map((shot) => `vendor-qc-shot-${shot.slot}`))
+  })
+
+  it.each([...QC_STAGES])('shows the %s shot list in the vendor’s words, not slot keys alone', (stage) => {
+    render(<VendorQcShotList stage={stage} qc={panel({ data: photoSet(stage) })} canUpload />)
+    for (const shot of QC_SHOT_LIST[stage]) {
+      expect(screen.getByText(shot.label)).toBeInTheDocument()
+    }
+  })
+
+  it.each([...QC_STAGES])('marks exactly the required slots of %s required', (stage) => {
+    const { container } = render(
+      <VendorQcShotList stage={stage} qc={panel({ data: photoSet(stage) })} canUpload />
+    )
+
+    const flagged = QC_SHOT_LIST[stage]
+      .filter((shot) =>
+        container
+          .querySelector(`[data-testid="vendor-qc-shot-${shot.slot}"]`)
+          ?.textContent?.includes('Required')
+      )
+      .map((shot) => shot.slot)
+
+    expect(flagged).toEqual(requiredQcSlots(stage))
+  })
+
+  it('renders the shot list even before the photos have loaded', () => {
+    // A vendor has to know what to photograph while we are still finding out
+    // what they already photographed. The structure is the shared list; only
+    // the images depend on the request.
+    render(<VendorQcShotList stage="print" qc={panel({ isLoading: true })} canUpload />)
+    expect(screen.getByTestId('vendor-qc-shots-skeleton')).toBeInTheDocument()
+    for (const shot of QC_SHOT_LIST.print) {
+      expect(screen.getByTestId(`vendor-qc-shot-${shot.slot}`)).toBeInTheDocument()
+    }
+  })
+
+  it('shows the read failure and still names what has to be shot', () => {
+    render(
+      <VendorQcShotList
+        stage="print"
+        qc={panel({ error: 'Failed to load the photographs' })}
+        canUpload
+      />
+    )
+    expect(screen.getByTestId('vendor-qc-shots-error')).toHaveTextContent(
+      /failed to load the photographs/i
+    )
+    // An empty shot list after a failed read would say the vendor photographed
+    // nothing, which is a different and worse claim than "we could not look".
+    expect(screen.getByTestId(`vendor-qc-shot-${QC_SHOT_LIST.print[0].slot}`)).toBeInTheDocument()
+  })
+
+  it('retry is wired on the photo panel', () => {
+    const onRetry = vi.fn()
+    render(<VendorQcShotList stage="print" qc={panel({ error: 'nope', onRetry })} canUpload />)
+    fireEvent.click(screen.getByTestId('vendor-qc-shots-retry'))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('says so rather than rendering an empty panel when a stage asks for nothing', () => {
+    render(
+      <VendorQcShotList
+        stage={'sculpture' as VendorJobStage}
+        qc={panel({ data: null })}
+        canUpload
+      />
+    )
+    expect(screen.getByTestId('vendor-qc-shots-empty')).toBeInTheDocument()
+  })
+
+  it('shows a photo uploaded outside this stage’s shot list rather than dropping it', () => {
+    // `production_job_photos.slot` is `text` with no enum under it. A photo
+    // filed under a slot this stage does not ask for is a photograph nobody can
+    // find, and hiding it here is how it stays hidden.
+    const set = photoSet('print')
+    set.shots.push({
+      slot: 'frame_back',
+      label: 'Uploaded outside the print shot list',
+      required: false,
+      onShotList: false,
+      photo: photoIn('frame_back'),
+    })
+
+    render(<VendorQcShotList stage="print" qc={panel({ data: set })} canUpload />)
+    expect(screen.getByTestId('vendor-qc-shot-frame_back')).toBeInTheDocument()
+  })
+
+  it('hands the picked file to the caller with the slot it belongs to', () => {
+    const onUpload = vi.fn()
+    render(
+      <VendorQcShotList
+        stage="print"
+        qc={panel({ data: photoSet('print'), onUpload })}
+        canUpload
+      />
+    )
+
+    const file = new File(['x'], 'shot.jpg', { type: 'image/jpeg' })
+    fireEvent.change(screen.getByTestId('vendor-qc-upload-print_full'), {
+      target: { files: [file] },
+    })
+
+    expect(onUpload).toHaveBeenCalledWith('print_full', file)
+  })
+
+  it.each([...PRODUCTION_JOB_STATUSES])(
+    'opens the upload window on %s exactly when the guarded submit is offered',
+    (status) => {
+      // The window is not a list, it is a consequence: a QC photograph exists
+      // for one purpose, satisfying `shot-list-complete`, so a vendor may
+      // change the shot list precisely while that guarded move is on offer.
+      // Written from the ACTION STRIP rather than by repeating the filter, so
+      // a hardcoded `['received']` that outlives the matrix fails here.
+      const offersGuardedSubmit = nextVendorActions(status).some(
+        (action) => action.guard === 'shot-list-complete'
+      )
+      expect(vendorMayUploadPhotos(status)).toBe(offersGuardedSubmit)
+    }
+  )
+
+  it('offers the picker on the job screen while the job is in production', () => {
+    const { container } = render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, status: 'received' } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    expect(container.querySelectorAll('input[type="file"]').length).toBe(
+      QC_SHOT_LIST[detail.job.stage].length
+    )
+    expect(screen.queryByTestId('vendor-qc-shots-locked')).not.toBeInTheDocument()
+  })
+
+  it('offers no picker on the job screen once the job has been handed over', () => {
+    const { container } = render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, status: 'dispatched' } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    expect(container.querySelectorAll('input[type="file"]').length).toBe(0)
+    expect(screen.getByTestId('vendor-qc-shots-locked')).toBeInTheDocument()
+  })
+
+  it('offers no picker at all once the job has left the upload window', () => {
+    // `QC_PHOTO_UPLOAD_STATUSES` is derived from the guarded edge, and the API
+    // answers 409 outside it. A picker that can only produce a refusal is a
+    // support ticket.
+    const { container } = render(
+      <VendorQcShotList stage="print" qc={panel({ data: photoSet('print') })} canUpload={false} />
+    )
+    expect(container.querySelectorAll('input[type="file"]').length).toBe(0)
+    expect(screen.getByTestId('vendor-qc-shots-locked')).toBeInTheDocument()
+  })
+
+  it('asks before withdrawing a shot, and never with a native dialog', () => {
+    const onWithdraw = vi.fn()
+    render(
+      <VendorQcShotList
+        stage="print"
+        qc={panel({ data: photoSet('print', ['print_full']), onWithdraw })}
+        canUpload
+      />
+    )
+
+    fireEvent.click(screen.getByTestId('vendor-qc-withdraw-print_full'))
+    expect(onWithdraw).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('vendor-qc-withdraw-print_full-confirm'))
+    expect(onWithdraw).toHaveBeenCalledWith('photo-print_full', 'print_full')
+  })
+
+  it('keeps one slot’s failure on that slot', () => {
+    render(
+      <VendorQcShotList
+        stage="print"
+        qc={panel({
+          data: photoSet('print'),
+          slotErrors: { print_full: 'That photograph is too large. The limit is 25MB.' },
+        })}
+        canUpload
+      />
+    )
+    expect(screen.getByTestId('vendor-qc-error-print_full')).toHaveTextContent(/too large/i)
+    expect(screen.queryByTestId('vendor-qc-error-print_raking_light')).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// Submit for approval — enabled only when every required slot is live
+// ============================================================================
+
+describe('submitting the shot list for approval', () => {
+  const shotsFor = (stage: VendorJobStage, filled: string[]): VendorQcShot[] =>
+    (qcShotsForStage(stage) ?? []).map((shot) => ({
+      slot: shot.slot,
+      label: shot.label,
+      required: shot.required,
+      onShotList: true,
+      photo: filled.includes(shot.slot)
+        ? {
+            id: `photo-${shot.slot}`,
+            contentType: 'image/jpeg',
+            sizeBytes: 1_000,
+            uploadedAt: '2026-08-14T09:00:00.000Z',
+            reviewId: null,
+            url: null,
+          }
+        : null,
+    }))
+
+  const setFor = (stage: VendorJobStage, filled: string[]): VendorQcPhotoSet => ({
+    jobId: detail.job.id,
+    stage,
+    status: 'received',
+    shots: shotsFor(stage, filled),
+    missingRequiredSlots: requiredQcSlots(stage).filter((slot) => !filled.includes(slot)),
+    expiresInSeconds: 300,
+    expiresAt: '2026-08-14T09:05:00.000Z',
+  })
+
+  const inProduction = (stage: VendorJobStage): VendorJobDetailResponse => ({
+    ...detail,
+    job: { ...detail.job, stage, status: 'received' },
+  })
+
+  const bodyWith = (stage: VendorJobStage, filled: string[] | null) =>
+    render(
+      <VendorJobDetailBody
+        data={inProduction(stage)}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        qc={{
+          data: filled === null ? null : setFor(stage, filled),
+          isLoading: false,
+          error: null,
+          onRetry: () => {},
+        }}
+      />
+    )
+
+  it.each([...QC_STAGES])('disables submit on a %s job with nothing photographed', (stage) => {
+    bodyWith(stage, [])
+    expect(screen.getByTestId('vendor-job-mark-qc_submitted')).toBeDisabled()
+    expect(screen.getByTestId('vendor-job-guard-qc_submitted')).toBeInTheDocument()
+  })
+
+  it.each([...QC_STAGES])(
+    'still disables submit on a %s job one required shot short',
+    (stage) => {
+      const required = requiredQcSlots(stage)
+      bodyWith(stage, required.slice(0, -1))
+      expect(screen.getByTestId('vendor-job-mark-qc_submitted')).toBeDisabled()
+    }
+  )
+
+  it.each([...QC_STAGES])(
+    'enables submit on a %s job once every required shot is live',
+    (stage) => {
+      bodyWith(stage, requiredQcSlots(stage))
+      const button = screen.getByTestId('vendor-job-mark-qc_submitted')
+      expect(button).not.toBeDisabled()
+      expect(screen.queryByTestId('vendor-job-guard-qc_submitted')).not.toBeInTheDocument()
+    }
+  )
+
+  it('does not hold the submit back for a missing OPTIONAL shot', () => {
+    const optional = QC_SHOT_LIST.print.filter((shot) => !shot.required)
+    expect(optional.length).toBeGreaterThan(0)
+    bodyWith('print', requiredQcSlots('print'))
+    expect(screen.getByTestId('vendor-job-mark-qc_submitted')).not.toBeDisabled()
+  })
+
+  it('leaves the submit live while the photos have not been read', () => {
+    // Absent is UNKNOWN, not unsatisfied. Greying out a legal move because the
+    // evidence has not loaded is worse than spending a round trip on it — the
+    // API evaluates the guard either way.
+    bodyWith('print', null)
+    expect(screen.getByTestId('vendor-job-mark-qc_submitted')).not.toBeDisabled()
+  })
+
+  it('counts a live photo, not an empty slot, when deriving what is missing', () => {
+    expect(missingRequiredQcSlots('print', mergeQcShots('print', shotsFor('print', [])))).toEqual(
+      requiredQcSlots('print')
+    )
+    expect(
+      missingRequiredQcSlots('print', mergeQcShots('print', shotsFor('print', requiredQcSlots('print'))))
+    ).toEqual([])
+  })
+})
+
+// ============================================================================
+// The 422 names the missing shots, and so does the screen
+// ============================================================================
+
+describe('the refusal a vendor can act on', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the slots the API named instead of dropping them into a string', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        error:
+          'This job cannot go to QC until every required photograph is uploaded. ' +
+          'Still missing: print_colour_reference, print_raking_light.',
+        code: 'SHOT_LIST_INCOMPLETE',
+        guard: 'shot-list-complete',
+        from: 'received',
+        to: 'qc_submitted',
+        missingSlots: ['print_colour_reference', 'print_raking_light'],
+        allowed: [],
+      }),
+    })
+
+    const failure = await patchVendorJobStatus(detail.job.id, 'qc_submitted').then(
+      () => null,
+      (error: unknown) => error as VendorJobWriteError
+    )
+
+    expect(failure).toBeInstanceOf(VendorJobWriteError)
+    expect(failure?.code).toBe('SHOT_LIST_INCOMPLETE')
+    expect(failure?.missingSlots).toEqual([
+      'print_colour_reference',
+      'print_raking_light',
+    ])
+  })
+
+  it('renders the missing shots in the vendor’s own words, not only the keys', () => {
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, stage: 'print', status: 'received' } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        actionError="This job cannot go to QC until every required photograph is uploaded."
+        actionMissingSlots={['print_colour_reference', 'print_raking_light']}
+      />
+    )
+
+    const named = screen.getByTestId('vendor-job-action-missing-slots')
+    for (const slot of ['print_colour_reference', 'print_raking_light']) {
+      const label = QC_SHOT_LIST.print.find((shot) => shot.slot === slot)?.label
+      expect(label).toBeDefined()
+      expect(named).toHaveTextContent(label as string)
+      // The key too: it is what the audit row and the API's own sentence use.
+      expect(named).toHaveTextContent(slot)
+    }
+    // And a shot that is NOT missing is not named.
+    expect(named).not.toHaveTextContent('The whole print, flat and front-on')
+  })
+
+  it('names nothing when the refusal was not about the shot list', () => {
+    render(
+      <VendorJobDetailBody
+        data={detail}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        actionError="This job was cancelled."
+      />
+    )
+    expect(screen.queryByTestId('vendor-job-action-missing-slots')).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// Upload — presign, straight to R2, then complete. Never a delete.
+// ============================================================================
+
+describe('uploading a shot', () => {
+  const fetchMock = vi.fn()
+  const file = () => new File(['bytes'], 'shot.jpg', { type: 'image/jpeg' })
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  /** presign -> PUT -> complete, in that order. */
+  const happyPath = (supersededPhotoId: string | null = null) => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          uploadUrl: 'https://r2.example.com/production-qc/j/print_full/u.jpg?X-Amz-Signature=abc',
+          key: 'production-qc/j/print_full/u.jpg',
+          slot: 'print_full',
+          contentType: 'image/jpeg',
+          maxBytes: QC_PHOTO_MAX_BYTES,
+          expiresInSeconds: 900,
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          photo: {
+            id: 'photo-new',
+            slot: 'print_full',
+            contentType: 'image/jpeg',
+            sizeBytes: 5,
+            uploadedAt: '2026-08-14T10:00:00.000Z',
+          },
+          supersededPhotoId,
+        }),
+      })
+  }
+
+  it('presigns, PUTs straight to R2 and then records what landed', async () => {
+    happyPath()
+    await uploadVendorQcPhoto('j', 'print_full', file())
+
+    const [presignUrl, presignInit] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(presignUrl).toContain('/api/vendor/jobs/j/photos/presign')
+    expect(presignInit.method).toBe('POST')
+    expect(presignInit.credentials).toBe('include')
+
+    const [putUrl, putInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+    // The BYTES do not route through our API. A 25MB photograph through Hono
+    // holds a request open on the box that also serves the storefront.
+    expect(putUrl).not.toContain('/api/')
+    expect(putUrl).toContain('r2.example.com')
+    expect(putInit.method).toBe('PUT')
+    // The signature IS the auth; a cookie ride-along changes what R2 hashes.
+    expect(putInit.credentials).toBeUndefined()
+
+    const [completeUrl, completeInit] = fetchMock.mock.calls[2] as [string, RequestInit]
+    expect(completeUrl).toContain('/api/vendor/jobs/j/photos/complete')
+    expect(JSON.parse(String(completeInit.body))).toMatchObject({
+      slot: 'print_full',
+      key: 'production-qc/j/print_full/u.jpg',
+    })
+  })
+
+  it('re-uploading supersedes: it issues no DELETE and says the old shot is still on file', async () => {
+    happyPath('photo-old')
+    const result = await uploadVendorQcPhoto('j', 'print_full', file())
+
+    expect(result.supersededPhotoId).toBe('photo-old')
+    for (const [, init] of fetchMock.mock.calls as [string, RequestInit | undefined][]) {
+      expect(init?.method).not.toBe('DELETE')
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('shows the replacement and says the earlier shot stayed on file', async () => {
+    fetchMock.mockResolvedValue({ ok: true, blob: async () => new Blob(['new bytes']) })
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:replacement')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+
+    render(
+      <VendorQcShotList
+        stage="print"
+        qc={{
+          data: {
+            jobId: 'j',
+            stage: 'print',
+            status: 'received',
+            shots: (qcShotsForStage('print') ?? []).map((shot) => ({
+              slot: shot.slot,
+              label: shot.label,
+              required: shot.required,
+              onShotList: true,
+              photo:
+                shot.slot === 'print_full'
+                  ? {
+                      id: 'photo-new',
+                      contentType: 'image/jpeg',
+                      sizeBytes: 5,
+                      uploadedAt: '2026-08-14T10:00:00.000Z',
+                      reviewId: null,
+                      url: 'https://r2.example.com/production-qc/j/print_full/new.jpg?X-Amz-Signature=new',
+                    }
+                  : null,
+            })),
+            missingRequiredSlots: [],
+            expiresInSeconds: 300,
+            expiresAt: '2026-08-14T10:05:00.000Z',
+          },
+          isLoading: false,
+          error: null,
+          onRetry: () => {},
+          supersededSlots: { print_full: 'photo-old' },
+        }}
+        canUpload
+      />
+    )
+
+    // The NEW shot is what the slot shows...
+    await waitFor(() =>
+      expect(screen.getByTestId('vendor-qc-photo-print_full')).toBeInTheDocument()
+    )
+    // ...and the replacement is named rather than implied, because the earlier
+    // row is superseded, not deleted, and a silently swapped thumbnail hides it.
+    expect(screen.getByTestId('vendor-qc-superseded-print_full')).toHaveTextContent(
+      /still on file/i
+    )
+  })
+
+  it('refuses a file QC cannot review before spending a presign', async () => {
+    await expect(
+      uploadVendorQcPhoto('j', 'print_full', new File(['x'], 'p.heic', { type: 'image/heic' }))
+    ).rejects.toThrow(/JPEG, PNG or WebP/i)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses an oversized photograph before spending a presign', async () => {
+    const huge = new File(['x'], 'big.jpg', { type: 'image/jpeg' })
+    Object.defineProperty(huge, 'size', { value: QC_PHOTO_MAX_BYTES + 1 })
+
+    await expect(uploadVendorQcPhoto('j', 'print_full', huge)).rejects.toThrow(/too large/i)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not record an upload that never landed', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          uploadUrl: 'https://r2.example.com/x?X-Amz-Signature=abc',
+          key: 'production-qc/j/print_full/u.jpg',
+          slot: 'print_full',
+          contentType: 'image/jpeg',
+          maxBytes: QC_PHOTO_MAX_BYTES,
+          expiresInSeconds: 900,
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+
+    await expect(uploadVendorQcPhoto('j', 'print_full', file())).rejects.toThrow(/403/)
+    // A `complete` after a failed PUT writes a row for a photograph that is not
+    // there, which is QC evidence of nothing.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('withdrawing a shot removes it from the LIVE list, not from history', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'Photograph withdrawn', photoId: 'p1', slot: 'print_full' }),
+    })
+
+    await withdrawVendorQcPhoto('j', 'p1')
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain('/api/vendor/jobs/j/photos/p1')
+    expect(init.method).toBe('DELETE')
+  })
+})
+
+// ============================================================================
+// The verdict banner — a fail that does not say what to redo is a phone call
+// ============================================================================
+
+describe('the QC verdict banner', () => {
+  const review = (over: Partial<VendorJobReview> = {}): VendorJobReview => ({
+    id: 'review-1',
+    verdict: 'fail',
+    defects: ['banding across the top third', 'scuffed lower left corner'],
+    notes: 'Reprint and reshoot.',
+    createdAt: '2026-08-14T09:00:00.000Z',
+    ...over,
+  })
+
+  it('renders one chip per defect on a fail', () => {
+    const failed = review()
+    render(<QcVerdictBanner reviews={[failed]} />)
+
+    const chips = screen.getAllByTestId('vendor-job-verdict-defect')
+    expect(chips.map((chip) => chip.textContent)).toEqual(failed.defects)
+  })
+
+  it('says what to redo without a phone call', () => {
+    render(<QcVerdictBanner reviews={[review()]} />)
+    const banner = screen.getByTestId('vendor-job-verdict')
+    expect(banner).toHaveTextContent(/banding across the top third/)
+    expect(banner).toHaveTextContent(/Reprint and reshoot/)
+  })
+
+  it('shows no defect chips on a pass', () => {
+    render(<QcVerdictBanner reviews={[review({ verdict: 'pass', defects: null, notes: null })]} />)
+    expect(screen.getByTestId('vendor-job-verdict')).toBeInTheDocument()
+    expect(screen.queryAllByTestId('vendor-job-verdict-defect')).toHaveLength(0)
+  })
+
+  it('shows no defect chips on a pass that still carries a defect list', () => {
+    // The verdict decides, not the array. `defects` is nullish on a pass, so a
+    // non-empty one is either an overturned earlier judgement or a note we
+    // accepted the piece in spite of — and a row of red chips under "we
+    // approved this job" tells a vendor to redo work we already took.
+    render(
+      <QcVerdictBanner
+        reviews={[review({ verdict: 'pass', defects: ['a scuff we accepted'], notes: null })]}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-verdict')).toBeInTheDocument()
+    expect(screen.queryAllByTestId('vendor-job-verdict-defect')).toHaveLength(0)
+    expect(screen.queryByTestId('vendor-job-verdict-no-defects')).not.toBeInTheDocument()
+  })
+
+  it('shows the LATEST verdict, not the first one recorded', () => {
+    render(
+      <QcVerdictBanner
+        reviews={[
+          review({ id: 'old', verdict: 'fail', defects: ['old defect'], createdAt: '2026-08-10T00:00:00.000Z' }),
+          review({ id: 'new', verdict: 'pass', defects: null, notes: null, createdAt: '2026-08-14T00:00:00.000Z' }),
+        ]}
+      />
+    )
+    expect(screen.queryAllByTestId('vendor-job-verdict-defect')).toHaveLength(0)
+    expect(screen.getByTestId('vendor-job-verdict')).not.toHaveTextContent('old defect')
+  })
+
+  it('says a fail arrived with no defect rather than showing an empty chip row', () => {
+    // The API refuses a fail with no defect, so this is a regression tell, not
+    // a normal state — and an empty chip row would read as "nothing wrong",
+    // which inverts the verdict.
+    render(<QcVerdictBanner reviews={[review({ defects: [] })]} />)
+    expect(screen.queryAllByTestId('vendor-job-verdict-defect')).toHaveLength(0)
+    expect(screen.getByTestId('vendor-job-verdict-no-defects')).toBeInTheDocument()
+  })
+
+  it('renders nothing at all before any verdict exists', () => {
+    const { container } = render(<QcVerdictBanner reviews={[]} />)
+    expect(container.innerHTML).toBe('')
+  })
+
+  it('rides on the job detail so a failed job leads with what to redo', () => {
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, status: 'qc_failed' }, reviews: [review()] }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-verdict')).toBeInTheDocument()
+    expect(screen.getAllByTestId('vendor-job-verdict-defect')).toHaveLength(2)
+  })
+})
+
+// ============================================================================
+// The photograph is shown, and its signature is not
+// ============================================================================
+
+describe('showing a photograph without parking its signature in the DOM', () => {
+  const signed =
+    'https://r2.example.com/production-qc/j/print_full/u.jpg?X-Amz-Signature=deadbeefcafe'
+
+  const withPhoto = (): VendorQcPhotoSet => ({
+    jobId: 'j',
+    stage: 'print',
+    status: 'received',
+    shots: (qcShotsForStage('print') ?? []).map((shot) => ({
+      slot: shot.slot,
+      label: shot.label,
+      required: shot.required,
+      onShotList: true,
+      photo:
+        shot.slot === 'print_full'
+          ? {
+              id: 'photo-1',
+              contentType: 'image/jpeg',
+              sizeBytes: 1_048_576,
+              uploadedAt: '2026-08-14T09:00:00.000Z',
+              reviewId: null,
+              url: signed,
+            }
+          : null,
+    })),
+    missingRequiredSlots: [],
+    expiresInSeconds: 300,
+    expiresAt: '2026-08-14T09:05:00.000Z',
+  })
+
+  const fetchMock = vi.fn()
+  let createObjectURL: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+    createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:vendor-qc-preview')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('fetches the bytes and renders them from a local blob, never from the signed URL', async () => {
+    fetchMock.mockResolvedValue({ ok: true, blob: async () => new Blob(['x']) })
+
+    const { container } = render(
+      <VendorQcShotList
+        stage="print"
+        qc={{ data: withPhoto(), isLoading: false, error: null, onRetry: () => {} }}
+        canUpload
+      />
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('vendor-qc-photo-print_full')).toHaveAttribute(
+        'src',
+        'blob:vendor-qc-preview'
+      )
+    )
+
+    expect(createObjectURL).toHaveBeenCalled()
+    // The bytes came straight from R2, not through our API.
+    expect(String(fetchMock.mock.calls[0][0])).toBe(signed)
+    // And the signature is nowhere in the markup.
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+  })
+
+  it('keeps the signature out of the DOM even when the bytes cannot be fetched', async () => {
+    // R2 CORS, an expired signature, a dropped connection — all end here, and
+    // none of them may be answered with a link carrying the signature.
+    fetchMock.mockRejectedValue(new Error('network'))
+
+    const { container } = render(
+      <VendorQcShotList
+        stage="print"
+        qc={{ data: withPhoto(), isLoading: false, error: null, onRetry: () => {} }}
+        canUpload
+      />
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('vendor-qc-photo-unavailable-print_full')).toBeInTheDocument()
+    )
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.innerHTML).not.toContain('r2.example.com')
+  })
+
+  it('embeds nothing — no iframe, no embed, no object', async () => {
+    fetchMock.mockResolvedValue({ ok: true, blob: async () => new Blob(['x']) })
+
+    const { container } = render(
+      <VendorQcShotList
+        stage="print"
+        qc={{ data: withPhoto(), isLoading: false, error: null, onRetry: () => {} }}
+        canUpload
+      />
+    )
+
+    await waitFor(() => expect(screen.getByTestId('vendor-qc-photo-print_full')).toBeInTheDocument())
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
   })
 })
 

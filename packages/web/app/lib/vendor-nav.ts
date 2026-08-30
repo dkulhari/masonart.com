@@ -346,6 +346,41 @@ export function vendorNoActionReason(status: ProductionJobStatus): string {
   }
 }
 
+/**
+ * The statuses in which a vendor may still change a job's shot list.
+ *
+ * DERIVED from the guard, not listed — the same computation
+ * `QC_PHOTO_UPLOAD_STATUSES` in `packages/api/src/lib/production-transitions.ts`
+ * makes over the same shared table, and for the same reason. A QC photograph
+ * exists for exactly one purpose, satisfying `shot-list-complete`, so the window
+ * for uploading, replacing or withdrawing one is precisely the set of statuses a
+ * vendor can take that guarded edge FROM.
+ *
+ * Repeating the answer here as `['received']` would be the third copy of the
+ * matrix, and #684 is the standing lesson on what those cost: `routes/vendor.ts`
+ * held `['sent', 'received']` as a literal and the RETIRED `sent` stayed in a
+ * vendor's public vocabulary for two phases after the rows stopped using it.
+ * A guard moved to a different edge moves this window with it.
+ */
+export const VENDOR_PHOTO_UPLOAD_STATUSES: readonly ProductionJobStatus[] =
+  PRODUCTION_JOB_STATUSES.filter((from) =>
+    PRODUCTION_JOB_STATUSES.some((to) => {
+      const edge = PRODUCTION_TRANSITIONS[from][to]
+      return edge?.guard === 'shot-list-complete' && edge.actors.includes('vendor')
+    })
+  )
+
+/**
+ * May this vendor still add, replace or withdraw a shot on a job in `status`?
+ *
+ * The portal asks this to decide whether to render a picker at all. Outside the
+ * window the API answers 409, and a control whose only possible outcome is a
+ * refusal is a support ticket rather than an affordance.
+ */
+export function vendorMayUploadPhotos(status: ProductionJobStatus): boolean {
+  return VENDOR_PHOTO_UPLOAD_STATUSES.includes(status)
+}
+
 export const VENDOR_JOB_STAGES = ['print', 'frame'] as const
 export type VendorJobStage = (typeof VENDOR_JOB_STAGES)[number]
 

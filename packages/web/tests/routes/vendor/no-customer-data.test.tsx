@@ -45,8 +45,11 @@ import {
 } from '~/routes/vendor/index'
 import {
   VendorJobDetailBody,
+  VendorQcShotList,
   type VendorJobDetailResponse,
+  type VendorQcPhotoSet,
 } from '~/routes/vendor/jobs/$id'
+import { QC_SHOT_LIST, qcShotsForStage } from '@chobii/shared'
 import { VendorRatesBody, type VendorRate } from '~/routes/vendor/rates'
 import {
   VendorPaymentsBody,
@@ -221,6 +224,137 @@ describe('no customer data reaches the DOM', () => {
     )
     expect(screen.getByTestId('vendor-payments-outstanding')).toBeInTheDocument()
     expectNoCustomerData(container.innerHTML)
+  })
+})
+
+// ============================================================================
+// The QC shot list — the vendor's own photographs, and R2's signature
+// ============================================================================
+
+/**
+ * The one-line mechanical replacement for the rule that died with in-house
+ * dispatch (§6 of the production-pipeline design).
+ *
+ * The old absolute — "no customer data crosses this boundary at all" — was
+ * assertable only while we shipped everything ourselves. Its replacement (R2)
+ * says customer data reaches a vendor ONLY as opaque rendered bytes behind a
+ * short-lived signature, handed to the operating system and never rendered into
+ * the portal's own DOM. Two assertions carry that here:
+ *
+ * - **No `iframe`, `embed` or `object` in the container.** Rendering the
+ *   carrier's label PDF inline would put a customer's address into the vendor
+ *   portal's markup, which is exactly what R2 forbids. The rule is enforced on
+ *   the whole screen rather than on the label card, so it cannot be reopened by
+ *   a later panel.
+ * - **No `X-Amz-Signature` in `innerHTML`.** A signed URL in the DOM is a
+ *   capability sitting in a screenshot, a bug report and a session replay. The
+ *   vendor's QC photographs are their own work and showing them is the point of
+ *   the screen — so they are fetched as bytes and rendered from a local `blob:`
+ *   URL. The signature stays in a variable.
+ */
+describe('the vendor portal embeds nothing and parks no signature', () => {
+  const signed =
+    'https://r2.example.com/production-qc/j/frame_front/u.jpg?X-Amz-Signature=deadbeefcafe'
+
+  /** The job's own stage, so the panel and the job cannot drift apart here. */
+  const stage = pollutedDetail.job.stage
+  const firstSlot = QC_SHOT_LIST[stage][0].slot
+
+  /** A shot list carrying a signed URL and the pollution, as a leak would. */
+  const pollutedPhotos: VendorQcPhotoSet = {
+    jobId: pollutedDetail.job.id,
+    stage,
+    status: 'received',
+    shots: (qcShotsForStage(stage) ?? []).map((shot, index) => ({
+      slot: shot.slot,
+      label: shot.label,
+      required: shot.required,
+      onShotList: true,
+      photo:
+        index === 0
+          ? ({
+              id: '77777777-7777-4777-8777-777777777777',
+              contentType: 'image/jpeg',
+              sizeBytes: 1_048_576,
+              uploadedAt: '2026-08-14T09:00:00.000Z',
+              reviewId: null,
+              url: signed,
+              ...POLLUTION,
+            } as VendorQcPhotoSet['shots'][number]['photo'])
+          : null,
+    })),
+    missingRequiredSlots: [],
+    expiresInSeconds: 300,
+    expiresAt: '2026-08-14T09:05:00.000Z',
+    ...POLLUTION,
+  } as VendorQcPhotoSet
+
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ ok: true, blob: async () => new Blob(['x']) })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:vendor-qc-preview')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('shows the photograph without putting its signature in the markup', async () => {
+    const { container } = render(
+      <VendorQcShotList
+        stage={stage}
+        qc={{ data: pollutedPhotos, isLoading: false, error: null, onRetry: () => {} }}
+        canUpload
+      />
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`vendor-qc-photo-${firstSlot}`)).toHaveAttribute(
+        'src',
+        'blob:vendor-qc-preview'
+      )
+    )
+
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expect(container.innerHTML).not.toContain('r2.example.com')
+    expectNoCustomerData(container.innerHTML)
+  })
+
+  it('embeds nothing: no iframe, no embed, no object, anywhere on the job screen', async () => {
+    const { container } = render(
+      <VendorJobDetailBody
+        data={pollutedDetail}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        qc={{ data: pollutedPhotos, isLoading: false, error: null, onRetry: () => {} }}
+      />
+    )
+
+    // Non-vacuous: the screen has actually rendered a photograph, so "no
+    // embeds" is a statement about a page with media on it rather than about an
+    // empty div.
+    await waitFor(() =>
+      expect(screen.getByTestId(`vendor-qc-photo-${firstSlot}`)).toBeInTheDocument()
+    )
+    expect(screen.getByTestId('vendor-job-detail')).toBeInTheDocument()
+    expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
+    expect(container.innerHTML).not.toContain('X-Amz-Signature')
+    expectNoCustomerData(container.innerHTML)
+  })
+
+  it('the assertion has teeth on both halves', () => {
+    // A guard on the guard, matching the one above: an embed and a signature
+    // must each be detectable, or the two tests above pass by doing nothing.
+    const probe = document.createElement('div')
+    probe.innerHTML = `<iframe src="x"></iframe><a href="?X-Amz-Signature=z">y</a>`
+    expect(probe.querySelectorAll('iframe, embed, object').length).toBe(1)
+    expect(probe.innerHTML).toContain('X-Amz-Signature')
   })
 })
 

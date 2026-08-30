@@ -50,6 +50,44 @@
  * automation harness and is why nine admin files have no E2E coverage on their
  * destructive paths.
  *
+ * ## The shot list is the shared list; only the photographs are the API's
+ *
+ * `VendorQcShotList` renders `QC_SHOT_LIST` from `@chobii/shared` — the exact
+ * list `assertShotListComplete` validates against — and hangs whatever
+ * `GET /api/vendor/jobs/:id/photos` returns off it. The split is why the panel
+ * still says what to shoot while the photographs are loading, and after a
+ * failed read: an empty panel would tell a print shop nothing is asked of them.
+ *
+ * "Send for approval" is disabled until every required slot is live, and the
+ * evidence for that comes from the photographs actually on screen rather than
+ * from a second count. When they have not been read the guard is left ABSENT,
+ * which `nextVendorActions` treats as unknown and leaves the move live — the
+ * API evaluates the guard either way, and greying out a legal move because a
+ * request has not come back is worse than spending a round trip. When the API
+ * refuses anyway, its 422 names the missing slots and `VendorJobWriteError`
+ * carries them through so the screen can name them back. A refusal a vendor
+ * cannot act on is a support ticket.
+ *
+ * Uploads go presign -> PUT straight to R2 -> complete, `review-media.ts`'s
+ * pattern. The bytes never route through our API; a 25MB raking-light shot
+ * through Hono holds a request open on the box that also serves the storefront.
+ * A re-upload SUPERSEDES: the row is not deleted, `superseded_at` plus a partial
+ * unique index keeps one live photo per slot, and the screen says so rather than
+ * silently swapping the thumbnail.
+ *
+ * ## A photograph is shown; its signature is not
+ *
+ * `QcPhotoImage` fetches the bytes and renders them from a local `blob:` URL
+ * instead of putting the presigned URL in `src`. §6 of the design (R2) says
+ * customer data reaches a vendor only as opaque bytes behind a short-lived
+ * signature and NEVER as something rendered into the portal's own DOM;
+ * `tests/routes/vendor/no-customer-data.test.tsx` enforces the mechanical half
+ * of that on this whole screen — no `iframe`, `embed` or `object`, and no
+ * `X-Amz-Signature` anywhere in the markup. These photographs are the vendor's
+ * own work and showing them is the point of the panel, so the rule that bites
+ * is the second one: a signed URL in the DOM is a capability sitting in every
+ * screenshot and bug report the vendor ever files.
+ *
  * ## A failed write does not blank a good read
  *
  * `actionError` is separate from the page error and renders beside the buttons.
@@ -68,12 +106,19 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { AlertCircle, ArrowLeft, Download } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
-import type { ProductionJobStatus } from '@chobii/shared'
+import {
+  QC_PHOTO_CONTENT_TYPES,
+  QC_PHOTO_MAX_BYTES,
+  qcShotsForStage,
+  type ProductionJobStatus,
+  type QcStage,
+} from '@chobii/shared'
 import {
   VENDOR_JOBS_SEARCH,
   formatVendorAmount,
   formatVendorDate,
   nextVendorActions,
+  vendorMayUploadPhotos,
   vendorNoActionReason,
   type VendorGuardState,
   type VendorJobStage,
@@ -223,8 +268,19 @@ export async function patchVendorJobStatus(
   })
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string }
-    throw new Error(body.error ?? 'Failed to update this job')
+    // The BODY is kept, not flattened into a sentence. A 422 carries
+    // `missingSlots`, and that list is the only thing on this screen a vendor
+    // can act on — see `VendorJobWriteError`.
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string
+      code?: string
+      missingSlots?: string[]
+    }
+    throw new VendorJobWriteError(body.error ?? 'Failed to update this job', {
+      status: response.status,
+      code: body.code,
+      missingSlots: Array.isArray(body.missingSlots) ? body.missingSlots : undefined,
+    })
   }
 
   const body = (await response.json()) as { job: VendorJob }
@@ -355,6 +411,768 @@ export function ArtworkDownloadButton({
 }
 
 // ============================================================================
+// QC photographs — the shot list, and the bytes that never touch our API
+// ============================================================================
+
+/**
+ * One live photograph, as `GET /api/vendor/jobs/:id/photos` answers it.
+ *
+ * `url` is a presigned DOWNLOAD url with a five-minute life. The object key
+ * never leaves the API, so this is the only handle the screen has — and it is
+ * null when the stored key falls outside the `qcPhoto` signing scope, which is
+ * R3 failing closed. Such a photograph is still LISTED: one that exists and
+ * cannot be shown is worth seeing on the screen.
+ */
+export interface VendorQcPhoto {
+  id: string
+  contentType: string
+  sizeBytes: number
+  uploadedAt: string
+  /** The first review that judged this shot, once one has. */
+  reviewId: string | null
+  url: string | null
+}
+
+/** One slot of the shot list, with whatever is live in it. */
+export interface VendorQcShot {
+  slot: string
+  label: string
+  required: boolean
+  /** False for a photo in a slot this stage's shot list does not ask for. */
+  onShotList: boolean
+  photo: VendorQcPhoto | null
+}
+
+export interface VendorQcPhotoSet {
+  jobId: string
+  stage: VendorJobStage
+  status: ProductionJobStatus
+  shots: VendorQcShot[]
+  missingRequiredSlots: string[]
+  expiresInSeconds: number
+  expiresAt: string
+}
+
+/** What `POST .../photos/presign` hands back. Nothing here is stored. */
+export interface VendorQcPresign {
+  /** Short-lived, signed, and pointing at R2 — NOT at our API. */
+  uploadUrl: string
+  key: string
+  slot: string
+  contentType: string
+  maxBytes: number
+  expiresInSeconds: number
+}
+
+export interface VendorQcUploadResult {
+  photo: {
+    id: string
+    slot: string
+    contentType: string
+    sizeBytes: number
+    uploadedAt: string
+  }
+  /**
+   * The shot this one replaced, or null when the slot was empty.
+   *
+   * Surfaced rather than swallowed: a re-upload SUPERSEDES, and a UI that
+   * silently swapped the thumbnail would hide the fact that the earlier
+   * photograph is still on file and still discoverable in a dispute.
+   */
+  supersededPhotoId: string | null
+}
+
+/**
+ * Everything the photo panel needs, in one prop.
+ *
+ * One object rather than nine flat props because #693 adds a card to this same
+ * screen and every prop on `VendorJobDetailBody` is a thing the next ticket has
+ * to read past.
+ */
+export interface VendorQcPanelState {
+  data: VendorQcPhotoSet | null
+  isLoading: boolean
+  /** A failed READ of the photographs. It never blanks the job. */
+  error: string | null
+  onRetry: () => void
+  onUpload?: (slot: string, file: File) => void | Promise<void>
+  onWithdraw?: (photoId: string, slot: string) => void | Promise<void>
+  /** The slot with a write in flight. Locks that slot's controls, not the page. */
+  busySlot?: string | null
+  /** A failed WRITE, keyed by the slot that caused it. */
+  slotErrors?: Record<string, string>
+  /** slot -> the photo id the last upload into it superseded. */
+  supersededSlots?: Record<string, string | null>
+}
+
+/**
+ * A refused write, with the API's own body intact.
+ *
+ * `patchVendorJobStatus` used to throw a bare `Error(body.error)`, which threw
+ * away `missingSlots` — so the one refusal a vendor can actually act on arrived
+ * as a sentence with slot keys buried in it and nothing the screen could
+ * render. A 422 naming the missing shots and a screen that cannot name them
+ * back is still a phone call.
+ */
+export class VendorJobWriteError extends Error {
+  readonly status: number
+  readonly code?: string
+  readonly missingSlots?: string[]
+
+  constructor(
+    message: string,
+    init: { status: number; code?: string; missingSlots?: string[] }
+  ) {
+    super(message)
+    this.name = 'VendorJobWriteError'
+    this.status = init.status
+    this.code = init.code
+    this.missingSlots = init.missingSlots
+    // Keeps `instanceof` honest whatever the build target lowers this class to.
+    Object.setPrototypeOf(this, VendorJobWriteError.prototype)
+  }
+}
+
+/** Pull the API's `{ error }` out of a response, falling back to `fallback`. */
+async function readVendorError(response: Response, fallback: string): Promise<string> {
+  const body = (await response.json().catch(() => ({}))) as { error?: string }
+  return body.error ?? fallback
+}
+
+/**
+ * The shot list, laid out slot by slot, with each live photograph in its place.
+ *
+ * The STRUCTURE is `QC_SHOT_LIST` from `@chobii/shared` — the same list the API
+ * validates against — and only the PHOTOGRAPHS come from the response. That
+ * split is deliberate: a vendor has to know what to shoot while we are still
+ * finding out what they already shot, and an empty panel during the load (or
+ * after a failed one) reads as "nothing is asked of you".
+ *
+ * A live photo in a slot this stage does not ask for is APPENDED rather than
+ * dropped, mirroring `qcShotEntries` in `routes/vendor.ts`. `slot` is a `text`
+ * column with no enum under it, so a photograph nobody can find is a real
+ * failure mode and hiding it here is how it stays invisible.
+ */
+export function mergeQcShots(
+  stage: VendorJobStage,
+  shots: VendorQcShot[] | null | undefined
+): VendorQcShot[] {
+  const listed = qcShotsForStage(stage as QcStage) ?? []
+  const bySlot = new Map((shots ?? []).map((shot) => [shot.slot, shot]))
+  const listedSlots = new Set(listed.map((shot) => shot.slot))
+
+  const entries: VendorQcShot[] = listed.map((shot) => ({
+    slot: shot.slot,
+    label: shot.label,
+    required: shot.required,
+    onShotList: true,
+    photo: bySlot.get(shot.slot)?.photo ?? null,
+  }))
+
+  for (const shot of shots ?? []) {
+    if (listedSlots.has(shot.slot)) continue
+    entries.push({ ...shot, onShotList: false })
+  }
+
+  return entries
+}
+
+/**
+ * The required slots with nothing live in them.
+ *
+ * Computed from the entries this screen is RENDERING rather than read off the
+ * response's `missingRequiredSlots`, so the button and the tiles cannot
+ * disagree — a submit greyed out beside a shot list that looks complete is the
+ * refusal a vendor cannot act on, one layer up. The API computes the same set
+ * from the same `QC_SHOT_LIST` over the same rows, which is what makes the two
+ * answers equal by construction rather than by luck.
+ */
+export function missingRequiredQcSlots(
+  stage: VendorJobStage,
+  entries: VendorQcShot[]
+): string[] {
+  const live = new Set(entries.filter((entry) => entry.photo).map((entry) => entry.slot))
+  return (qcShotsForStage(stage as QcStage) ?? [])
+    .filter((shot) => shot.required && !live.has(shot.slot))
+    .map((shot) => shot.slot)
+}
+
+/** A slot in the vendor's words, falling back to the key itself. */
+export function qcSlotLabel(stage: VendorJobStage, slot: string): string {
+  return (qcShotsForStage(stage as QcStage) ?? []).find((shot) => shot.slot === slot)?.label ?? slot
+}
+
+export interface VendorMissingShot {
+  slot: string
+  label: string
+}
+
+/** The slots a refusal named, each with the sentence the vendor was shown. */
+export function missingShotsFor(
+  stage: VendorJobStage,
+  slots: readonly string[]
+): VendorMissingShot[] {
+  return slots.map((slot) => ({ slot, label: qcSlotLabel(stage, slot) }))
+}
+
+/**
+ * Why this file cannot be photographed evidence, or null.
+ *
+ * Checked here so the browser refuses at the door instead of spending a presign
+ * round trip and a 25MB PUT on something the API was always going to refuse.
+ * The wording matches `routes/vendor.ts` verbatim so a vendor sees one sentence
+ * whichever side catches it — and HEIC lands here deliberately: it is what a
+ * phone shoots by default and what no reviewer's browser displays.
+ */
+export function qcPhotoRejection(file: File): string | null {
+  const contentType = (file.type ?? '').toLowerCase().trim()
+  if (!QC_PHOTO_CONTENT_TYPES[contentType]) {
+    return 'That file type cannot be reviewed. Send a JPEG, PNG or WebP.'
+  }
+  if (file.size > QC_PHOTO_MAX_BYTES) {
+    return `That photograph is too large. The limit is ${Math.round(
+      QC_PHOTO_MAX_BYTES / (1024 * 1024)
+    )}MB.`
+  }
+  return null
+}
+
+// ============================================================================
+// Fetchers — photos
+// ============================================================================
+
+/** The shot list with its live photographs and their short-lived signatures. */
+export async function fetchVendorJobPhotos(jobId: string): Promise<VendorQcPhotoSet> {
+  const response = await fetch(`${getApiUrl()}/api/vendor/jobs/${jobId}/photos`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error(await readVendorError(response, 'Failed to load the photographs'))
+  }
+
+  return (await response.json()) as VendorQcPhotoSet
+}
+
+/**
+ * Put one photograph in a slot: presign, PUT straight to R2, then say so.
+ *
+ * **The bytes do not come through our API.** A 25MB raking-light shot routed
+ * through Hono means buffering it in the Node process and holding a request
+ * open for the whole transfer, on the box that also serves the storefront. This
+ * is `routes/review-media.ts`'s pattern and `useReviews.uploadReviewMedia`'s
+ * shape, reused rather than re-derived.
+ *
+ * The PUT carries no credentials and no header but `Content-Type`. The
+ * signature IS the auth; a cookie ride-along or an extra header changes what R2
+ * hashes and the upload comes back 403.
+ *
+ * `complete` runs only after a successful PUT. A row written for an object that
+ * never landed is QC evidence of nothing, and the API answers that case with a
+ * 422 of its own — but the browser knows first and must not ask.
+ */
+export async function uploadVendorQcPhoto(
+  jobId: string,
+  slot: string,
+  file: File
+): Promise<VendorQcUploadResult> {
+  const rejection = qcPhotoRejection(file)
+  if (rejection) throw new Error(rejection)
+
+  const presignResponse = await fetch(
+    `${getApiUrl()}/api/vendor/jobs/${jobId}/photos/presign`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot, contentType: file.type, sizeBytes: file.size }),
+    }
+  )
+
+  if (!presignResponse.ok) {
+    throw new Error(await readVendorError(presignResponse, 'Could not prepare the upload'))
+  }
+
+  const presign = (await presignResponse.json()) as VendorQcPresign
+
+  const uploadResponse = await fetch(presign.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': presign.contentType },
+    body: file,
+  })
+
+  if (!uploadResponse.ok) {
+    // R2 answers in XML, so there is no `{ error }` to read here.
+    throw new Error(`Upload failed (${uploadResponse.status})`)
+  }
+
+  const completeResponse = await fetch(
+    `${getApiUrl()}/api/vendor/jobs/${jobId}/photos/complete`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slot,
+        key: presign.key,
+        contentType: presign.contentType,
+        sizeBytes: file.size,
+      }),
+    }
+  )
+
+  if (!completeResponse.ok) {
+    throw new Error(await readVendorError(completeResponse, 'Could not record the upload'))
+  }
+
+  return (await completeResponse.json()) as VendorQcUploadResult
+}
+
+/**
+ * Take a shot off the LIVE list.
+ *
+ * The row is superseded, not deleted, and the R2 object is left alone — the
+ * collection this removes the photograph from is "the live shot list", which is
+ * what `superseded_at IS NULL` means. So the verb the vendor reads is
+ * "withdraw" rather than "delete", because the history survives.
+ */
+export async function withdrawVendorQcPhoto(jobId: string, photoId: string): Promise<void> {
+  const response = await fetch(
+    `${getApiUrl()}/api/vendor/jobs/${jobId}/photos/${photoId}`,
+    { method: 'DELETE', credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    throw new Error(await readVendorError(response, 'Could not withdraw that photograph'))
+  }
+}
+
+// ============================================================================
+// Showing a photograph without parking its signature in the DOM
+// ============================================================================
+
+/** Bytes as a print shop reads them. A raking-light shot of a whole print is big. */
+function formatPhotoBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${bytes} B`
+}
+
+/**
+ * One photograph, fetched as bytes and rendered from a local `blob:` URL.
+ *
+ * **Not `<img src={photo.url}>`.** `tests/routes/vendor/no-customer-data.test.tsx`
+ * bans `X-Amz-Signature` from this screen's `innerHTML`, and it is right to: a
+ * signed URL in the markup is a capability sitting in every screenshot, bug
+ * report and session replay the vendor ever makes, readable by anyone who sees
+ * it for as long as it lives. The admin QC panel can put the URL in `src`
+ * because that screen is ours; this one is a third party's.
+ *
+ * So the signature stays in a variable, the request goes straight to R2, and
+ * what lands in the DOM is an object URL that means nothing outside this tab.
+ * The vendor sees the shot they took, which is the whole point of the panel —
+ * R2's rule is about customer data reaching a vendor, and these photographs are
+ * the vendor's own work.
+ *
+ * A failure here — R2 CORS, an expired signature, a dropped connection, a
+ * scope-refused key that arrived with `url: null` — says so in words. It is
+ * never answered with a link carrying the signature, which would put back
+ * exactly what this component exists to keep out.
+ */
+export function QcPhotoImage({
+  slot,
+  label,
+  url,
+}: {
+  slot: string
+  label: string
+  url: string | null
+}) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setObjectUrl(null)
+
+    if (!url) {
+      setFailed(true)
+      return
+    }
+
+    setFailed(false)
+    let cancelled = false
+    let created: string | null = null
+
+    void (async () => {
+      try {
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`Photo fetch failed (${response.status})`)
+        const blob = await response.blob()
+        if (cancelled) return
+        created = URL.createObjectURL(blob)
+        setObjectUrl(created)
+      } catch {
+        if (!cancelled) setFailed(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      // The blob is held in memory until it is revoked, and a vendor working
+      // through a frame job's eight slots would otherwise accumulate every one.
+      if (created) URL.revokeObjectURL(created)
+    }
+  }, [url])
+
+  if (objectUrl) {
+    return (
+      <img
+        data-testid={`vendor-qc-photo-${slot}`}
+        src={objectUrl}
+        alt={label}
+        className="w-full rounded border border-border object-cover"
+      />
+    )
+  }
+
+  if (failed) {
+    return (
+      <p
+        data-testid={`vendor-qc-photo-unavailable-${slot}`}
+        className="rounded border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground"
+      >
+        This photograph could not be shown. It is still on file and we can still
+        see it — reload the page to try again.
+      </p>
+    )
+  }
+
+  return (
+    <div
+      data-testid={`vendor-qc-photo-loading-${slot}`}
+      className="h-32 animate-pulse rounded bg-muted"
+      aria-hidden="true"
+    />
+  )
+}
+
+// ============================================================================
+// The shot list panel
+// ============================================================================
+
+export interface VendorQcShotListProps {
+  stage: VendorJobStage
+  qc: VendorQcPanelState
+  /** Whether the matrix still lets this vendor change the shot list. */
+  canUpload: boolean
+}
+
+/**
+ * What this job has to be photographed with, and what is in each slot.
+ *
+ * Skeleton, error and empty are all here, and the first two render ALONGSIDE
+ * the slots rather than instead of them: the list of shots is knowable without
+ * the request, and replacing it with a spinner or an error box would tell a
+ * vendor nothing is asked of them. Only a stage whose shot list is genuinely
+ * empty gets the empty state, and that is a real condition — `stage` is checked
+ * against `QC_SHOT_LIST`, which a stage added to the API and not to shared
+ * would miss.
+ */
+export function VendorQcShotList({ stage, qc, canUpload }: VendorQcShotListProps) {
+  const entries = mergeQcShots(stage, qc.data?.shots)
+  const missing = new Set(missingRequiredQcSlots(stage, entries))
+  const superseded = qc.supersededSlots ?? {}
+  const slotErrors = qc.slotErrors ?? {}
+
+  if (entries.length === 0) {
+    return (
+      <div
+        data-testid="vendor-qc-shots-empty"
+        className="rounded-lg border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground"
+      >
+        This job asks for no photographs, and none has been uploaded outside a
+        shot list either. There is nothing to do here.
+      </div>
+    )
+  }
+
+  return (
+    <div data-testid="vendor-qc-shots" className="space-y-3">
+      {qc.error && (
+        <div
+          data-testid="vendor-qc-shots-error"
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+        >
+          <p className="mb-1 font-medium">{qc.error}</p>
+          <p className="mb-4 text-muted-foreground">
+            The shots below are what this job asks for. What you have already
+            uploaded is not shown, because we could not read it — which is not
+            the same as you not having taken it.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="vendor-qc-shots-retry"
+            onClick={qc.onRetry}
+          >
+            Try again
+          </Button>
+        </div>
+      )}
+
+      {qc.isLoading && (
+        <div
+          data-testid="vendor-qc-shots-skeleton"
+          className="h-8 animate-pulse rounded bg-muted"
+          aria-busy="true"
+          aria-label="Loading your photographs"
+        />
+      )}
+
+      {!canUpload && (
+        <p
+          data-testid="vendor-qc-shots-locked"
+          className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+        >
+          Photographs can be added, replaced or withdrawn only while a job is in
+          production. This one is not, so the shot list is read-only.
+        </p>
+      )}
+
+      {!qc.error && !qc.isLoading && missing.size > 0 && (
+        <p data-testid="vendor-qc-missing" className="text-xs text-muted-foreground">
+          {missing.size} required shot(s) still to take. We cannot start the
+          approval until each one is here.
+        </p>
+      )}
+
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {entries.map((entry) => (
+          <li
+            key={entry.slot}
+            data-testid={`vendor-qc-shot-${entry.slot}`}
+            className={cn(
+              'space-y-2 rounded-lg border p-3 text-sm',
+              !entry.onShotList
+                ? 'border-amber-200 bg-amber-50/40'
+                : entry.photo
+                  ? 'border-border'
+                  : missing.has(entry.slot)
+                    ? 'border-destructive/40 bg-destructive/5'
+                    : 'border-dashed border-border'
+            )}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{entry.label}</span>
+              {entry.onShotList && (
+                <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                  {entry.required ? 'Required' : 'Optional'}
+                </span>
+              )}
+              {!entry.onShotList && (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                  Not on this job&rsquo;s shot list
+                </span>
+              )}
+            </div>
+
+            <p className="font-mono text-xs text-muted-foreground">{entry.slot}</p>
+
+            {entry.photo ? (
+              <>
+                <QcPhotoImage slot={entry.slot} label={entry.label} url={entry.photo.url} />
+                <p className="text-xs text-muted-foreground">
+                  {formatVendorDate(entry.photo.uploadedAt)} ·{' '}
+                  {formatPhotoBytes(entry.photo.sizeBytes)} · {entry.photo.contentType}
+                </p>
+                {superseded[entry.slot] && (
+                  <p
+                    data-testid={`vendor-qc-superseded-${entry.slot}`}
+                    className="text-xs text-muted-foreground"
+                  >
+                    This replaced an earlier shot. The earlier one is still on
+                    file and we can still see it — nothing was deleted.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p
+                className={cn(
+                  'text-xs',
+                  missing.has(entry.slot) ? 'text-destructive' : 'text-muted-foreground'
+                )}
+              >
+                Not yet photographed
+                {missing.has(entry.slot)
+                  ? ' — the approval cannot start without it.'
+                  : '. This one is up to you.'}
+              </p>
+            )}
+
+            {canUpload && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label
+                  className="cursor-pointer rounded border border-border px-3 py-1.5 text-xs hover:bg-muted"
+                  htmlFor={`vendor-qc-upload-${entry.slot}`}
+                >
+                  {entry.photo ? 'Replace this shot' : 'Add a photograph'}
+                </label>
+                <input
+                  id={`vendor-qc-upload-${entry.slot}`}
+                  data-testid={`vendor-qc-upload-${entry.slot}`}
+                  type="file"
+                  className="sr-only"
+                  accept={Object.keys(QC_PHOTO_CONTENT_TYPES).join(',')}
+                  disabled={qc.busySlot === entry.slot}
+                  onChange={(event) => {
+                    const picked = event.target.files?.[0]
+                    // Cleared so picking the SAME file again still fires a
+                    // change — a vendor retrying a failed upload otherwise gets
+                    // nothing at all.
+                    event.target.value = ''
+                    if (picked) void qc.onUpload?.(entry.slot, picked)
+                  }}
+                />
+                {qc.busySlot === entry.slot && (
+                  <span
+                    data-testid={`vendor-qc-busy-${entry.slot}`}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Uploading…
+                  </span>
+                )}
+                {entry.photo && (
+                  <InlineConfirm
+                    testId={`vendor-qc-withdraw-${entry.slot}`}
+                    label="Withdraw"
+                    question="Take this shot off the list?"
+                    busy={qc.busySlot === entry.slot}
+                    onConfirm={() =>
+                      qc.onWithdraw?.(entry.photo?.id as string, entry.slot)
+                    }
+                  />
+                )}
+              </div>
+            )}
+
+            {slotErrors[entry.slot] && (
+              <p
+                data-testid={`vendor-qc-error-${entry.slot}`}
+                role="alert"
+                className="text-xs text-destructive"
+              >
+                {slotErrors[entry.slot]}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ============================================================================
+// The verdict banner
+// ============================================================================
+
+/**
+ * The most recent verdict, whatever order the reviews arrived in.
+ *
+ * `getVendorJobReviews` already orders by `created_at DESC`, so this is usually
+ * `reviews[0]` — but the banner is the one place on this screen where showing
+ * the wrong row means telling a vendor to redo work that was already approved,
+ * or that a failed piece passed. Sorting costs nothing and does not depend on
+ * a promise made in a different package.
+ */
+export function latestVendorReview(reviews: VendorJobReview[]): VendorJobReview | null {
+  let latest: VendorJobReview | null = null
+
+  for (const review of reviews) {
+    if (!latest) {
+      latest = review
+      continue
+    }
+    const candidate = new Date(review.createdAt).getTime()
+    const incumbent = new Date(latest.createdAt).getTime()
+    if (Number.isNaN(incumbent) || (!Number.isNaN(candidate) && candidate > incumbent)) {
+      latest = review
+    }
+  }
+
+  return latest
+}
+
+/**
+ * Our verdict, at the top of the job, with the defects spelled out.
+ *
+ * A fail that does not say what to redo is a phone call, which is precisely
+ * what this feature exists to remove — so the defects render as chips rather
+ * than as a comma-joined sentence, one per thing to fix. The API refuses to
+ * record a fail with no defect at all (§7), so an empty chip row would mean a
+ * regression upstream; it gets a sentence rather than a blank space, because a
+ * defect list rendering as nothing reads as "we found nothing wrong", which is
+ * the opposite of the verdict it sits under.
+ *
+ * Nothing renders before the first verdict. The "Quality checks" list below
+ * already says none has been recorded, and a banner announcing the absence of
+ * news would sit at the top of every job a vendor ever opens.
+ */
+export function QcVerdictBanner({ reviews }: { reviews: VendorJobReview[] }) {
+  const latest = latestVendorReview(reviews)
+  if (!latest) return null
+
+  const failed = latest.verdict === 'fail'
+  const defects = latest.defects ?? []
+
+  return (
+    <div
+      data-testid="vendor-job-verdict"
+      role="status"
+      className={cn(
+        'space-y-2 rounded-lg border p-4',
+        failed
+          ? 'border-red-200 bg-red-50 text-red-900'
+          : 'border-green-200 bg-green-50 text-green-900'
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">
+          {failed ? 'Changes needed on this job' : 'We approved this job'}
+        </span>
+        <span className="text-xs opacity-80">{formatVendorDate(latest.createdAt)}</span>
+      </div>
+
+      {failed &&
+        (defects.length > 0 ? (
+          <ul
+            data-testid="vendor-job-verdict-defects"
+            className="flex flex-wrap gap-2"
+            aria-label="What has to be put right"
+          >
+            {defects.map((defect) => (
+              <li
+                key={defect}
+                data-testid="vendor-job-verdict-defect"
+                className="rounded-full border border-red-300 bg-white px-2 py-0.5 text-xs"
+              >
+                {defect}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p data-testid="vendor-job-verdict-no-defects" className="text-sm">
+            We did not record what was wrong, which should not happen. Ask us
+            before you redo anything.
+          </p>
+        ))}
+
+      {latest.notes && <p className="text-sm opacity-90">{latest.notes}</p>}
+    </div>
+  )
+}
+
+// ============================================================================
 // The action strip — the matrix, rendered
 // ============================================================================
 
@@ -380,6 +1198,15 @@ export interface VendorJobActionsProps {
    * artwork and the QC history all at once (#684).
    */
   error?: string | null
+  /**
+   * The shots the API's 422 named, already in the vendor's words.
+   *
+   * A refusal you cannot act on is a support ticket. The API answers an
+   * incomplete shot list with `missingSlots`, and this is where that list turns
+   * back into the sentences the uploader shows — the raw keys ride along too,
+   * because they are what the API's own message and the audit row use.
+   */
+  missingShots?: VendorMissingShot[]
 }
 
 /**
@@ -396,6 +1223,7 @@ export function VendorJobActions({
   busy = false,
   guards,
   error,
+  missingShots,
 }: VendorJobActionsProps) {
   const actions = nextVendorActions(status, guards)
 
@@ -445,13 +1273,34 @@ export function VendorJobActions({
       )}
 
       {error && (
-        <p
-          data-testid="vendor-job-action-error"
-          role="alert"
-          className="text-sm text-destructive"
-        >
-          {error}
-        </p>
+        <div className="space-y-2">
+          <p
+            data-testid="vendor-job-action-error"
+            role="alert"
+            className="text-sm text-destructive"
+          >
+            {error}
+          </p>
+
+          {missingShots && missingShots.length > 0 && (
+            <ul
+              data-testid="vendor-job-action-missing-slots"
+              className="flex flex-wrap gap-2"
+              aria-label="The shots still to take"
+            >
+              {missingShots.map((shot) => (
+                <li
+                  key={shot.slot}
+                  data-testid="vendor-job-action-missing-slot"
+                  className="rounded-full border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs"
+                >
+                  <span>{shot.label}</span>{' '}
+                  <span className="font-mono opacity-70">{shot.slot}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   )
@@ -521,6 +1370,15 @@ export interface VendorJobDetailBodyProps {
   guards?: VendorGuardState
   /** A failed WRITE. It renders beside the buttons and keeps the job on screen. */
   actionError?: string | null
+  /** The slots a 422 named. Turned into words against the job's own stage. */
+  actionMissingSlots?: string[]
+  /**
+   * The shot list and its photographs.
+   *
+   * Optional: the panel still renders what the stage ASKS for without it, which
+   * is what every existing caller that passes nothing gets.
+   */
+  qc?: VendorQcPanelState
 }
 
 /**
@@ -536,6 +1394,8 @@ export function VendorJobDetailBody({
   busyStatus = false,
   guards,
   actionError = null,
+  actionMissingSlots,
+  qc,
 }: VendorJobDetailBodyProps) {
   if (error) return <JobError message={error} onRetry={onRetry} />
   if (isLoading) return <JobSkeleton />
@@ -544,6 +1404,32 @@ export function VendorJobDetailBody({
   const { job, items, reviews } = data
   const agreed = formatVendorAmount(job.amountExpected)
   const final = formatVendorAmount(job.amountActual)
+
+  const qcPanel: VendorQcPanelState = qc ?? {
+    data: null,
+    isLoading: false,
+    error: null,
+    onRetry: () => {},
+  }
+
+  /**
+   * The evidence for the ONE guard this screen can answer itself.
+   *
+   * Only supplied once the photographs have actually been read: absent means
+   * UNKNOWN, and `nextVendorActions` deliberately treats unknown as "leave the
+   * move live and let the API decide". Greying out a legal submit because a
+   * request has not come back yet is worse than spending a round trip on it.
+   *
+   * An explicit `guards` prop still wins, so a caller testing the strip in
+   * isolation is not fighting the panel.
+   */
+  const shotListGuard: VendorGuardState = qcPanel.data
+    ? {
+        'shot-list-complete':
+          missingRequiredQcSlots(job.stage, mergeQcShots(job.stage, qcPanel.data.shots))
+            .length === 0,
+      }
+    : {}
 
   return (
     <div className="space-y-6" data-testid="vendor-job-detail">
@@ -577,6 +1463,10 @@ export function VendorJobDetailBody({
         </div>
       </div>
 
+      {/* Our verdict, before anything a vendor might act on. A failed job has
+          to lead with what to redo. */}
+      <QcVerdictBanner reviews={reviews} />
+
       {/* What this vendor can do next, straight off the transition matrix */}
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
@@ -586,10 +1476,23 @@ export function VendorJobDetailBody({
           status={job.status}
           onStatus={onStatus}
           busy={busyStatus}
-          guards={guards}
+          guards={{ ...shotListGuard, ...guards }}
           error={actionError}
+          missingShots={
+            actionMissingSlots ? missingShotsFor(job.stage, actionMissingSlots) : undefined
+          }
         />
       </div>
+
+      {/* The shot list — what we judge the work on */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Photographs</h2>
+        <VendorQcShotList
+          stage={job.stage}
+          qc={qcPanel}
+          canUpload={vendorMayUploadPhotos(job.status)}
+        />
+      </section>
 
       {/* Items and their artwork */}
       <section className="space-y-3">
@@ -673,6 +1576,17 @@ function VendorJobDetailPage() {
   // Kept apart from `error` on purpose — see the file header. A refused
   // transition must not blank a job that loaded fine.
   const [actionError, setActionError] = useState<string | null>(null)
+  const [actionMissingSlots, setActionMissingSlots] = useState<string[] | undefined>(undefined)
+
+  // The photographs are read SEPARATELY from the job, and their failures stay
+  // separate too: signed URLs expire on their own five-minute schedule, so a
+  // refresh of the shot list must not re-fetch (or be able to blank) the job.
+  const [photos, setPhotos] = useState<VendorQcPhotoSet | null>(null)
+  const [photosLoading, setPhotosLoading] = useState(true)
+  const [photosError, setPhotosError] = useState<string | null>(null)
+  const [busySlot, setBusySlot] = useState<string | null>(null)
+  const [slotErrors, setSlotErrors] = useState<Record<string, string>>({})
+  const [supersededSlots, setSupersededSlots] = useState<Record<string, string | null>>({})
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -687,9 +1601,69 @@ function VendorJobDetailPage() {
     }
   }, [id])
 
+  const loadPhotos = useCallback(async () => {
+    setPhotosLoading(true)
+    try {
+      setPhotos(await fetchVendorJobPhotos(id))
+      setPhotosError(null)
+    } catch (photosLoadError) {
+      // The shot list itself still renders from `QC_SHOT_LIST`; only what is
+      // IN the slots is unknown, and the panel says which of the two it is.
+      setPhotos(null)
+      setPhotosError((photosLoadError as Error).message)
+    } finally {
+      setPhotosLoading(false)
+    }
+  }, [id])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadPhotos()
+  }, [load, loadPhotos])
+
+  const uploadPhoto = async (slot: string, file: File) => {
+    setBusySlot(slot)
+    setSlotErrors((current) => {
+      const next = { ...current }
+      delete next[slot]
+      return next
+    })
+
+    try {
+      const result = await uploadVendorQcPhoto(id, slot, file)
+      // Named rather than implied: the earlier row is superseded, not deleted,
+      // and a silently swapped thumbnail would hide that it is still on file.
+      setSupersededSlots((current) => ({ ...current, [slot]: result.supersededPhotoId }))
+      await loadPhotos()
+      // A slot that just became live may have been the last one the guard was
+      // waiting on, so the submit button's evidence changed with it.
+      setActionError(null)
+      setActionMissingSlots(undefined)
+    } catch (uploadError) {
+      // Kept on the SLOT. One failed shot must not take the other seven of a
+      // frame job's list down with it.
+      setSlotErrors((current) => ({ ...current, [slot]: (uploadError as Error).message }))
+    } finally {
+      setBusySlot(null)
+    }
+  }
+
+  const withdrawPhoto = async (photoId: string, slot: string) => {
+    setBusySlot(slot)
+    try {
+      await withdrawVendorQcPhoto(id, photoId)
+      setSupersededSlots((current) => {
+        const next = { ...current }
+        delete next[slot]
+        return next
+      })
+      await loadPhotos()
+    } catch (withdrawError) {
+      setSlotErrors((current) => ({ ...current, [slot]: (withdrawError as Error).message }))
+    } finally {
+      setBusySlot(null)
+    }
+  }
 
   const setStatus = async (status: VendorJobStatus) => {
     setBusyStatus(true)
@@ -700,9 +1674,18 @@ function VendorJobDetailPage() {
       // A 409 body carries `{ error, code, from, to, allowed }`, so the reload
       // also brings back the status the refusal was measured against.
       await load()
+      // The upload window opens and closes with the status, so the panel has to
+      // be re-read alongside the job rather than left showing stale pickers.
+      await loadPhotos()
       setActionError(null)
+      setActionMissingSlots(undefined)
     } catch (patchError) {
       setActionError((patchError as Error).message)
+      // A 422 names the shots that are missing. Dropping them here is what
+      // leaves a vendor with a refusal and no way to act on it.
+      setActionMissingSlots(
+        patchError instanceof VendorJobWriteError ? patchError.missingSlots : undefined
+      )
     } finally {
       setBusyStatus(false)
     }
@@ -732,6 +1715,18 @@ function VendorJobDetailPage() {
         onStatus={setStatus}
         busyStatus={busyStatus}
         actionError={actionError}
+        actionMissingSlots={actionMissingSlots}
+        qc={{
+          data: photos,
+          isLoading: photosLoading,
+          error: photosError,
+          onRetry: () => void loadPhotos(),
+          onUpload: uploadPhoto,
+          onWithdraw: withdrawPhoto,
+          busySlot,
+          slotErrors,
+          supersededSlots,
+        }}
       />
     </div>
   )
