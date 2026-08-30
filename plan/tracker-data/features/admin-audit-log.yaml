@@ -78,7 +78,8 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "663": db:push silently builds a database without the audit-log immutability trigger, and the docs tell you to use it
   in_progress: {}
   done:
     "635": Contract - shared audit action registry and zod schemas
@@ -97,9 +98,9 @@ tickets:
     "648": E2E and runbook - an admin action appears in the viewer
     "649": Bug - the actor FK and the immutability trigger contradict each other
     "650": Bug - the audit floor records anonymous 401s, flooding the table
-total_tickets: 16
-completion_percentage: 100
-is_completed: true
+total_tickets: 17
+completion_percentage: 94
+is_completed: false
 plan:
   phases:
     - name: Contract

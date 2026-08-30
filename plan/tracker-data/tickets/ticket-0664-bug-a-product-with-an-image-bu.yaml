@@ -1,0 +1,46 @@
+ticket_number: 664
+title: Bug - a product with an image but no alt text cannot be saved, and the form says nothing
+description: |-
+  ## Finding
+  Surfaced while repairing the admin-products E2E (#652), by probing why a save silently did nothing.
+
+  The images section renders an **`Alt text` input marked `required`** for each image. When a product carries an image whose `altText` is empty — which the API permits, and which every fixture and any older row can be — native constraint validation refuses the whole form submit. No request is made, no error banner appears, and `ProductForm.validateForm()` never runs because the browser blocks submission before React's handler.
+
+  Probed directly:
+  ```
+  INVALID: [{ tag: "INPUT", type: "text", placeholder: "Alt text", required: true, value: "",
+              near: "Main (matted artwork) Room mockup Detail Texture Frame preview" }]
+  ```
+  Result: click Save, nothing happens, nothing explains it.
+
+  ## Why it is worse than it looks
+  The Images section is **collapsible**. When a required-but-empty control is inside a collapsed section, Chrome cannot focus it to show its bubble and gives up silently (it logs "An invalid form control ... is not focusable" to the console, which no admin reads). So the failure mode is: an admin edits a title, clicks Save, and the page does nothing at all, with the cause hidden behind a section they never opened.
+
+  ## Fix, one of
+  - Validate alt text in `validateForm()` alongside title/sku/slug/basePrice, so the message lands next to the field and the section auto-expands — consistent with how the rest of the form reports problems; or
+  - drop `required` from the input and treat missing alt text as a warning, since the API accepts it.
+
+  Whichever way, the invariant is: **Save either works or says why.** A silent no-op is the one outcome that must not survive.
+
+  ## Note
+  The E2E fixtures now set `altText`, so the suite exercises the happy path. This ticket is the product defect they stopped hiding.
+feature: admin-panel
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T04:38:56.300Z'
+last_updated: '2026-08-30T04:38:56.300Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - bug
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

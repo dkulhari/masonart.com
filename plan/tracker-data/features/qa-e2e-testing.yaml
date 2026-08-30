@@ -19,19 +19,19 @@ work_session_summary:
   agents: {}
 tickets:
   todo:
-    "651": E2E stale - admin-frames expects size buttons, the poster page now uses a select
-    "652": E2E stale - admin-products still expects native confirm() and an old edit flow
-    "653": E2E stale - admin-orders expects the Export button that was deliberately removed
-    "654": E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
     "661": E2E flaky - paying entirely with a gift card fails then passes on retry
   in_progress: {}
   done:
     "184": "Bug: admin-approvals status transition tests timeout with networkidle"
     "185": "Bug: admin-reviews bulk actions beforeEach times out waiting for stats card"
     "186": "Bug: Replace networkidle with domcontentloaded in all admin E2E tests"
+    "651": E2E stale - admin-frames expects size buttons, the poster page now uses a select
+    "652": E2E stale - admin-products still expects native confirm() and an old edit flow
+    "653": E2E stale - admin-orders expects the Export button that was deliberately removed
+    "654": E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
     "660": E2E failing - a staged order does not reach the storefront intact
 total_tickets: 9
-completion_percentage: 44
+completion_percentage: 89
 is_completed: false
-last_activity: "2026-08-30T03:28:57.892Z"
+last_activity: "2026-08-30T04:39:24.853Z"
 started: "2026-08-30T03:23:50.136Z"

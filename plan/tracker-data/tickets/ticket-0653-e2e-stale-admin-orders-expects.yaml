@@ -11,19 +11,36 @@ description: |-
 feature: qa-e2e-testing
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T08:55:30.109Z'
-last_updated: '2026-08-17T08:55:30.109Z'
+last_updated: '2026-08-30T03:49:22.727Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:49:18.211Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T03:49:22.727Z'
+    text: |-
+      ✅ **Completed** — commit `d662af04`
+
+      **Root cause**: the button was removed deliberately by `f72c9b81` (#604) — it was wired to `alert('Export functionality coming soon')`, so it exported nothing and its blocking native dialog froze E2E runs that clicked near it. `packages/web/app/routes/admin/orders/index.tsx:478` already carries a comment saying no Export button belongs there. The assertion outlived the button.
+
+      **Fix**: assertion deleted, replaced in place by a comment explaining why there is no Export test — the next person to notice the gap should find the reasoning rather than re-add it. If orders export comes back as a real feature it needs its own ticket and a test against a real download.
+
+      **Verification**:
+      - Command: `SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4321 E2E_API_URL=http://localhost:3010 bunx playwright test tests/e2e/admin-orders.spec.ts --project=chromium`
+      - Result: PASS — **126 passed**, 0 failed (was 126 passed / 1 failed)
+      - Typecheck: 4/4 packages green via the pre-commit gate
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T03:49:18.211Z'

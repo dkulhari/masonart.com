@@ -126,7 +126,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T05:12:37.390Z'
-last_updated: '2026-08-28T03:00:40.573Z'
+last_updated: '2026-08-30T04:08:40.885Z'
 time_spent_minutes: 25
 labels:
   - refactor
@@ -187,6 +187,30 @@ comments:
   - author: system
     timestamp: '2026-08-28T03:00:35.768Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T04:04:48.407Z'
+    text: |-
+      Follow-up filed: **#662** — "packages/api tests are never typechecked" (qa-testing, task, medium).
+
+      Scoped with `noUncheckedIndexedAccess` relaxed for `tests/` only, since nothing ships from that tree. Burn-down is measured, not estimated: 1244 → 882 (relax the flag) → 382 (typed `json<T>()` helper, 500 errors over 413 call sites) → 311 (delete 71 unused declarations) → 0 by hand.
+
+      Carries the two traps this ticket hit: `"types": []` is mandatory or the config silently suppresses every error, and `tsconfig.json` cannot simply widen its `include` because `rootDir: ./src` fails with TS6059 on every test file — verified both.
+
+      The second follow-up from my completion note — `db:push` not creating `admin_audit_log_immutable()` — is **not** filed yet.
+  - author: mcp-client
+    timestamp: '2026-08-30T04:08:40.885Z'
+    text: |-
+      Second follow-up now filed too: **#663** — "db:push silently builds a database without the audit-log immutability trigger" (admin-audit-log, bug, high).
+
+      Both follow-ups from the completion note are now tracked: #662 (test typechecking) and #663 (this one). Nothing left open from #633.
+
+      Filed higher than I first described it, because verifying it turned up more than the trigger gap: `db:push` is the **documented setup path** in `README.md`, all four `docs/manual-tests/*.md` files, and `TEST-EXECUTION-REMEDIATION.md` — and `docs/deployment.md` contradicts itself, warning "never db:push against prod" on line 8 while lines 174 and 218 run exactly that against `docker-compose.prod.yml`.
+
+      Proved the impact rather than reasoning about it: pushed the schema into a throwaway postgres:16, confirmed the table exists with `pg_trigger` and `pg_proc` both at 0, then rewrote an audit row recording a `privilege` action to `harmless.read` and deleted it — both statements succeeded with no error.
+
+      Good news bounding it: only migration 0021 contains raw SQL across the whole history, so this is one object pair rather than an open-ended class. And `tests/database/audit-log-immutability.test.ts` already detects it (2 failures against the push-built database) — nothing just runs it against freshly provisioned environments.
+
+      Step 1 of #663 is checking production before anything else; the real deploy path is `make -C deploy migrate`, so prod is likely unaffected, but that should be confirmed not assumed.
 work_sessions:
   - start: '2026-08-28T02:35:54.483Z'
     agent: claude-code

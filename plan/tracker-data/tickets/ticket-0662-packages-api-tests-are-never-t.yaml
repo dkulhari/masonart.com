@@ -1,0 +1,184 @@
+ticket_number: 662
+title: packages/api tests are never typechecked — 1244 latent errors, and a broken test file passes the gate
+description: |-
+  ## Problem
+
+  `packages/api/tsconfig.json` has `include: ["src/**/*"]`. The `tests/` tree is **not typechecked** — not by `npx tsc --noEmit`, not by `turbo run typecheck`, not by the pre-commit hook. There is no eslint/biome config at the repo root either, so nothing checks test files but vitest.
+
+  **To be clear about scope: all of this is in test code. `src/` typechecks clean — 0 errors. Nothing here ships to production.**
+
+  ## Why it matters anyway
+
+  Tests are code that can be wrong, and a test file that fails to run protects nothing.
+
+  This is not theoretical. During #633 a refactor script deleted six `let counter` declarations that were still used by `orderNumber`. `turbo run typecheck` passed clean and the pre-commit hook let it through. Only vitest caught it, at runtime. That whole class of error — undefined identifiers, wrong arity, wrong object shapes — is invisible today.
+
+  Some errors also point at real fidelity gaps between tests and production. Confirmed example: `tests/services/email-templates.test.ts:58` builds a shipping address with `country: 'India'`, but `OrderShippingAddress` (`src/database/schema/orders.ts:28`) declares `countryCode: string` as **required** and has no `country` field. That test exercises a shape production never produces. Inert today — the template reads neither field — but that is drift nobody can currently see.
+
+  ## Measured current state
+
+  1244 errors across 102 of 192 test files. Dominated by two idioms, not 1244 distinct problems:
+
+  | Code | Count | What it is |
+  |---|---|---|
+  | TS18046 | 535 | `'body' is of type 'unknown'` — from `await res.json()` |
+  | TS2532 | 230 | `Object is possibly 'undefined'` — indexed access |
+  | TS18048 | 215 | `'mood' is possibly 'undefined'` — indexed access |
+  | TS2345 | 117 | `'string \| undefined' not assignable to 'string'` |
+  | rest | 147 | long tail |
+
+  Worst files: `tests/database/migrations.test.ts` (70), `tests/database/ai.test.ts` (63), `tests/database/users.test.ts` (56), `tests/routes/tracking.test.ts` (54), `tests/routes/health.test.ts` (49).
+
+  ## Agreed scope: relax indexed access for tests
+
+  Test code is held to a lower bar than `src` here, deliberately. `noUncheckedIndexedAccess` off for `tests/` only. Nothing ships from this tree, and the errors it produces (`result.images[0]` possibly undefined) are noise in a test that has just asserted the array has two entries. The flag stays on for `src`.
+
+  Everything that catches a genuinely broken test — undefined identifiers, wrong arity, wrong shapes — is still on.
+
+  ## Measured burn-down
+
+  Each number below was measured, not estimated:
+
+  | After | Errors |
+  |---|---|
+  | today | 1244 |
+  | `noUncheckedIndexedAccess: false` for tests | **882** |
+  | typed `json<T>()` helper (500 errors, 413 call sites) | **382** |
+  | delete 71 unused declarations (TS6133) | **311** |
+  | triage the residual by hand | 0 |
+
+  ## A separate tsconfig is required, not just tidier
+
+  Widening `include` in `packages/api/tsconfig.json` does **not** work. It sets `rootDir: "./src"` with `composite`/`declaration` for the build, so adding tests fails with TS6059 on every test file:
+
+  ```
+  error TS6059: File '.../tests/ai/presets.test.ts' is not under 'rootDir' '.../src'.
+  ```
+
+  So: leave `tsconfig.json` alone and add `tsconfig.test.json` beside it, run as a second command in the `typecheck` script.
+
+  ## Trap: `types` silently suppresses everything
+
+  Setting `"types": ["@types/bun", "vitest/globals"]` in the test config makes resolution fail with TS2688 and **silently suppresses every other error** — the config then reports clean on genuinely broken code. This wasted time during #633.
+
+  Use `"types": []`. And self-test any such config before trusting it: append a reference to an undefined identifier and confirm it errors. A config that reports zero errors is indistinguishable from one that is not looking.
+
+  ## Context
+
+  - Sibling ticket: #626 did the same job for `packages/web` src (22 errors).
+  - Discovered during #633.
+  - The full 1244-line error dump is reproducible with the config in step 1.
+  - Do not run prettier on any file touched here — the repo has no prettier config and defaults rewrite whole files.
+feature: qa-testing
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T04:04:32.642Z'
+last_updated: '2026-08-30T04:04:32.642Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - types
+  - tech-debt
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Add packages/api/tsconfig.test.json — separate from tsconfig.json, which cannot include tests because rootDir is ./src
+    file: packages/api/tsconfig.test.json
+    status: pending
+    code: |-
+      {
+        "extends": "../../tsconfig.json",
+        "compilerOptions": {
+          "noEmit": true,
+          "composite": false,
+          "declaration": false,
+          "declarationMap": false,
+          // Test code is held to a lower bar than src on this one flag only.
+          // Nothing ships from tests/, and `result.images[0]` being possibly
+          // undefined is noise in a test that just asserted the array has two
+          // entries. Everything that catches a genuinely broken test stays on.
+          "noUncheckedIndexedAccess": false,
+          // MUST stay empty. Naming types here (e.g. ["@types/bun"]) fails
+          // resolution with TS2688 and silently suppresses every other error,
+          // so the config reports clean on broken code.
+          "types": []
+        },
+        "include": ["src/**/*", "tests/**/*"]
+      }
+  - id: 2
+    action: verify-pass
+    description: Self-test the config, then record the baseline. A config reporting zero errors is indistinguishable from one that is not looking — prove it looks before trusting it.
+    command: cd packages/api && printf '\nconst __probe = __definitelyNotDefined;\n' >> tests/helpers/live-db.ts && npx tsc -p tsconfig.test.json 2>&1 | grep -c __definitelyNotDefined && git checkout -- tests/helpers/live-db.ts && npx tsc -p tsconfig.test.json 2>&1 | grep -c 'error TS'
+    expected_result: Probe count 1 (config genuinely checks), then 882 errors. If the probe count is 0, the config is inert — fix it before going further.
+    status: pending
+  - id: 3
+    action: implement
+    description: Add a typed json<T>() test helper and move the 413 res.json() call sites onto it — the single biggest category, 500 errors
+    file: packages/api/tests/helpers/http.ts
+    status: pending
+    code: |-
+      /**
+       * `Response.json()` is typed `unknown`, so every `body.field` read in a
+       * route test is a type error (500 of them, #<this ticket>). Tests already
+       * know the shape they expect — this lets them say so once.
+       */
+      export async function json<T = Record<string, unknown>>(
+        res: Response,
+      ): Promise<T> {
+        return (await res.json()) as T;
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the json() migration dropped the count and changed no behaviour
+    command: cd packages/api && npx tsc -p tsconfig.test.json 2>&1 | grep -c 'error TS' && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes --no-file-parallelism
+    expected_result: ~382 errors. Route suites pass with the same test count as before the change — record that count first.
+    status: pending
+  - id: 5
+    action: implement
+    description: 'Delete the 71 unused declarations TS6133 reports. Check each is genuinely dead before removing — in #633 six ''unused'' counters were still used by orderNumber.'
+    command: cd packages/api && npx tsc -p tsconfig.test.json 2>&1 | grep 'error TS6133'
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm the deletions and that nothing they fed has broken
+    command: cd packages/api && npx tsc -p tsconfig.test.json 2>&1 | grep -c 'error TS' && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests --no-file-parallelism
+    expected_result: ~311 errors, full api suite green
+    status: pending
+  - id: 7
+    action: implement
+    description: Triage the residual ~311 by hand. These are the ones worth reading — they include real test/production drift, e.g. email-templates.test.ts:58 setting `country` where OrderShippingAddress requires `countryCode`. Fix the test to match production, not the type to match the test.
+    status: pending
+  - id: 8
+    action: verify-pass
+    description: Zero errors, and the whole api suite still green with an unchanged test count
+    command: cd packages/api && npx tsc -p tsconfig.test.json && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests --no-file-parallelism
+    expected_result: 0 errors; test count identical to the run recorded in step 4
+    status: pending
+  - id: 9
+    action: implement
+    description: Wire the test config into the typecheck script so the gate actually runs it
+    file: packages/api/package.json
+    status: pending
+    code: '"typecheck": "tsc --noEmit && tsc -p tsconfig.test.json"'
+  - id: 10
+    action: verify-pass
+    description: 'Prove the gate now catches what it missed in #633 — a test file referencing an undefined identifier must fail the pre-commit hook'
+    command: cd packages/api && printf '\nconst __probe = __definitelyNotDefined;\n' >> tests/helpers/live-db.ts && (cd ../.. && turbo run typecheck); git checkout -- tests/helpers/live-db.ts
+    expected_result: turbo run typecheck FAILS on the probe. Before this ticket it passed clean. Restore the file afterwards.
+    status: pending
+  - id: 11
+    action: commit
+    description: Commit, noting the deliberate strictness split between src and tests
+    command: 'git add packages/api/tsconfig.test.json packages/api/package.json packages/api/tests && git commit -m "test(api): typecheck the test tree"'
+    status: pending
+current_step: 1

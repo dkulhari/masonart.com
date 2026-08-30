@@ -17,19 +17,39 @@ description: |-
 feature: qa-testing
 type: bug
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:39.132Z'
-last_updated: '2026-08-20T12:19:39.132Z'
+last_updated: '2026-08-30T04:00:22.712Z'
 time_spent_minutes: 0
 labels:
   - testing
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:59:49.817Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T04:00:22.712Z'
+    text: |-
+      ✅ **Completed** — commit `ff97f102`. **Verdict: test bug.**
+
+      **Root cause**: `GEMINI_MODELS.flash` is `process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image"` (`src/ai/generator.ts:156`) — a module-level constant whose default was deliberately migrated off the retired `gemini-2.0-flash-exp` when it started 404ing mid-2026 (the comment at :153 records it). The test still asserted the retired literal, so it passed only for a developer whose shell exported `GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp`. Selection logic itself was fine — `result.provider === "gemini"` always passed.
+
+      Proved the mechanism rather than assuming it: importing the module printed `gemini-2.5-flash-image`, and with `GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp` exported it printed exactly the value the old assertion needed. Because the constant is captured at import time, `vi.stubEnv` inside the test body cannot pin it — the env must be cleared before the module loads, which `vi.hoisted` now does.
+
+      **Second determinism hole closed**: the test made a real HTTPS call to `generativelanguage.googleapis.com` on every run (581ms, with a visible 400 API_KEY_INVALID in stderr while "passing"). The SDK is mocked now, and the mock also asserts which model id was handed to it.
+
+      **Also**: the file moves to one convention (`vi.stubEnv`/`vi.unstubAllEnvs` rather than save-and-restore of `process.env`), every provider key the other tests read is pinned explicitly instead of some of them, and a new test covers the `GEMINI_IMAGE_MODEL` override so the env wiring stays guarded when the default is bumped again.
+
+      **Verification** — 5/5 four ways: twice plain, once with `env -u` stripping every provider var, and once with a hostile shell exporting `GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp` (the export that used to be load-bearing). Was 1 failed / 3 passed. Typecheck clean.
+
+      **Worth separate tickets**: (1) the model id is frozen at import while the API key is read per call, so a runtime `GEMINI_IMAGE_MODEL` change is ignored without a module reload; (2) the generator module header omits Gemini entirely and `generateWithGemini`'s docblock still says "Uses Gemini 2.0 Flash" — the same staleness class that produced this failure.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T03:59:49.817Z'

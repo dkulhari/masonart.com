@@ -28,19 +28,49 @@ description: |-
 feature: qa-testing
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:38.949Z'
-last_updated: '2026-08-20T12:19:38.949Z'
+last_updated: '2026-08-30T03:55:41.318Z'
 time_spent_minutes: 0
 labels:
   - testing
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:55:09.831Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T03:55:41.318Z'
+    text: |-
+      ✅ **Completed** — commit `1daa583c`. **Changed the tests, not the payload** — and the evidence is the point, because the other direction would have broken production alerting.
+
+      **Who actually reads `/api/health`** (checked before deciding):
+      | Consumer | Reads |
+      |---|---|
+      | `docker/docker-compose.prod.yml:93` container healthcheck | `r.ok` — HTTP code only |
+      | `deploy/rendered/docker-compose.yml:72` | same probe |
+      | `packages/web/app/lib/api.ts:1494` | `response.ok` |
+      | UptimeRobot → Slack (OPERATIONS.md:75) | HTTP code |
+      | `docs/RUNBOOK-OUTAGE.md:90` | **the per-component block** — "if `database` or `redis` is unhealthy, go fix that container" |
+      | `docs/deployment.md:228` | documents the payload verbatim as `status: "healthy"` + `components` |
+
+      Nothing matches on `"ok"`. `documentation` appears nowhere in the repo outside `server.test.ts`, and there is no `/docs` route to point at. Restoring the tests' contract would have **deleted** the `components.database` / `components.redis` block and the 503-on-degraded behaviour — the exact things the runbook triages on.
+
+      **Root cause**: the suites encode an early scaffold contract that was superseded when `/health` grew real dependency probing (DB + Redis reachability, latencies, 503 when degraded). The payload was upgraded and the ops docs were updated with it; the tests never were.
+
+      **Files changed**: `tests/routes/health.test.ts` (assertions re-derived — components reachable, latencies numeric, status/HTTP code tracking component health rather than a spelling; the `/health` vs `/api/health` "differentiation" tests inverted to assert the two agree, since `/api/health` is an alias), `tests/server.test.ts`, and `scripts/run-tests.sh:370`.
+
+      **Live bug fixed as a side effect**: `scripts/run-tests.sh` grepped the health body for `"ok"`, which the shipped payload has not contained for some time — so the dev smoke check has been reporting `API health check failed` and setting `OVERALL_STATUS=1` against a perfectly healthy API.
+
+      **Verification**: `bunx vitest run tests/routes/health.test.ts tests/server.test.ts` → **179 passed, 0 failed** (was 14 failed / 157 passed). Count rises because the replacements are more granular than the field-count tests they retire.
+
+      **Worth separate tickets**: (1) `/` reports `version: "0.0.1"` while `/health` hardcodes `"1.0.0"` — two versions for one service, and monitoring sees the hardcoded one. (2) The `/api/health` alias re-enters the full app via `app.request("/health")`, so every poll runs the middleware stack twice and logs two lines.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T03:55:09.831Z'

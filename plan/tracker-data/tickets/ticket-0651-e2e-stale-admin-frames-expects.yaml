@@ -16,19 +16,43 @@ description: |-
 feature: qa-e2e-testing
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T08:55:30.034Z'
-last_updated: '2026-08-17T08:55:30.034Z'
+last_updated: '2026-08-30T04:19:21.945Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T04:19:12.087Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T04:19:21.945Z'
+    text: |-
+      ✅ **Completed** — commit `6355e1d5`. The suite was 0/4 and therefore testing nothing; repairing it surfaced **a live bug it was written to catch**.
+
+      ## The live bug
+      `/api/products/:slug` embeds the frame options and caches the whole response per slug and viewer (`product:<slug>:guest|:member`). `purgeFramesCache` dropped only `product:frames` — so an admin reprice updated the frames list while every already-cached product page went on quoting the **old** uplift for the rest of its TTL, with the cart charging the new one. Archiving had the same shape: the buy panel kept offering a frame that no longer existed. Now calls `purgeProductResponseCache`, which covers both.
+
+      The three existing frames suites asserted `deleteCached` was *called* with `product:frames` — a spy that passed the entire time this was live, which is the exact lesson `cache-purge-harness.ts` was built for after #527. New `frame-cache-purge.test.ts` asserts on the **keyspace** over the in-memory Redis fake, for reprice and archive.
+
+      ## Four separate reasons the E2E was red — none of them the feature
+      1. **Size became a `<select>`** in `2f29ee65`; the helper still clicked for a button matching `/\d+ × \d+/`. The frame selector renders only once a size is chosen, so every test died there.
+      2. **`new RegExp('Stretch + Gold Frame')`** — the `+` quantifies the preceding space, so the pattern demanded two spaces and never matched. Worse in the archive test, where a pattern matching nothing satisfies `toHaveCount(0)`: it **passed for the wrong reason**.
+      3. **The last-frame loop** clicked `rows.nth(0)` and stopped when that row had no Archive button — but an archived row stays in the table wearing Unarchive, so it stopped after one frame and never provoked the guard it then asserted on.
+      4. **The repricing assertion** compared the admin preview's uplift for a ₹4,999 print against a storefront product costing ₹1,699 — true only while the first product on /posters happened to cost ₹4,999.
+
+      ## Data hygiene
+      The suite archives frames by design, and a failed assertion left them archived in the shared dev database, breaking the *next* run at an unrelated step. Two frames ('Stretch + Gold Frame', 'Rolled Canvas') were sitting archived from earlier failures — restored, and now a `beforeEach` heals it plus the last test's restore moved into a `finally`.
+
+      **Verification**: admin-frames **4/4** (was 0/4), frames + frames-archive **22/22**, frame-cache-purge **3/3** (red first for the right reason: `expected true to be false` on the surviving `product:golden-flow:guest` key), typecheck clean.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T04:19:12.087Z'

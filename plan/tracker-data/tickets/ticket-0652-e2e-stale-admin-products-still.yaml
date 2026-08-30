@@ -22,19 +22,41 @@ description: |-
 feature: qa-e2e-testing
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T08:55:30.076Z'
-last_updated: '2026-08-17T08:55:30.076Z'
+last_updated: '2026-08-30T04:39:30.819Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T04:39:24.758Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T04:39:30.819Z'
+    text: |-
+      ✅ **Completed** — commit `982297e4`. Three distinct causes behind the 6 failures, none of them the feature.
+
+      **1. Native confirm() (3 tests).** They drove `page.on('dialog')` for a dialog `2411e0df` deliberately removed — it replaced 15 blocking native dialogs with one shared `ConfirmDialog` precisely because `confirm()` freezes an automation run the moment it opens. Now they click through the real dialog, scoped to it so `/^archive/i` cannot match the trigger sitting behind it.
+
+      **2. The edit tests never fired a PATCH — and the reason is a product defect.** Probing rather than reading found it: the fixture images carried no `altText`, the form marks that input `required`, and **native constraint validation blocked the entire submit** — no request, no error text, nothing to see:
+      ```
+      INVALID: [{ tag: "INPUT", type: "text", placeholder: "Alt text", required: true, value: "" }]
+      ```
+      Fixtures now set `altText`. The defect itself is filed as **#664**: the Images section is collapsible, so an admin editing a product whose image lacks alt text clicks Save and gets silence, with the cause hidden inside a section they never opened.
+
+      **3. Clicking before hydration.** A value assertion proves nothing here — the server ships the input already populated — and `fill()` before React attaches sets a DOM value the component never sees. The title is now typed with `pressSequentially` after a hydration wait, the recipe this repo already learned for its login form.
+
+      **Also**: the image test asserted an "Add Image" button that no longer exists. The section offers two routes now (Choose Images, Add by URL) and the test asserts both.
+
+      **Verification**: `bunx playwright test tests/e2e/admin-products.spec.ts --project=chromium` → **99 passed**, 0 failed (was 93 passed / 6 failed). Typecheck green.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T04:39:24.758Z'

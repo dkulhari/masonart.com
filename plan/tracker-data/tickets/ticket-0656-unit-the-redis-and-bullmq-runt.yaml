@@ -19,19 +19,41 @@ description: |-
 feature: qa-testing
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:38.999Z'
-last_updated: '2026-08-20T12:19:38.999Z'
+last_updated: '2026-08-30T04:00:13.873Z'
 time_spent_minutes: 0
 labels:
   - testing
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:59:48.545Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T04:00:13.873Z'
+    text: |-
+      ✅ **Completed** — commit `06fc9e00`.
+
+      **Root cause**: both suites drove the real `poster-app-redis` from a shared keyspace — fixed literal cache keys (`test:string`, `test:rate:user1`), BullMQ's default `bull` prefix, and cleanup by `KEYS test:*` / `DEL bull:ai-generation:*`. Two runs on this machine overwrote, counted and deleted each other's data. Reproduced before changing anything: sequential run 1 → 6 failed, run 2 of the identical command → 9 failed, **a different set** (rate-limit tests killed by the previous run's leftover ZSETs). That is the ticket's signature.
+
+      Two same-run defects compounded it: `aiGenerationWorker` starts consuming at import time and was taking the jobs under assertion (`Job N could not be removed because it is locked by another worker`), and `redis.test.ts` never connected the `lazyConnect` singleton — it relied on an earlier signature test having incidentally issued a command, so under load the first runtime test read `null` from a still-connecting client.
+
+      **Isolation**: per-run key prefix `test:redis:<pid>:`, and BullMQ's native `prefix` (`bull-test-ai-<pid>`) rather than a pid-suffixed queue *name* — same guarantee since a queue's identity is `<prefix>:<name>`, but `AI_GENERATION_QUEUE_NAME` stays the real production constant so the tests pinning it remain meaningful. Cleanup scans rather than `KEYS`, because the box is shared. New `tests/helpers/live-redis.ts` mirrors `live-db.ts`.
+
+      **Silent-green path removed**: every runtime test opened with `if (!isRedisAvailable) return`, so a run with no Redis reported success while asserting nothing. Now loud, with `ALLOW_MISSING_REDIS` to skip out loud (#575 convention).
+
+      **Production fix riding along**: `getQueueStats` counted only `waiting`, but `addAIGenerationJob` gives every job a priority, so queued jobs sit in BullMQ v5's `prioritized` state and went uncounted.
+
+      **Verification**: two **concurrent** runs, 209/209 each — the case that used to fail. Three concurrent runs also green, zero leftover keys afterwards. Unreachable Redis fails loudly; `ALLOW_MISSING_REDIS=true` passes and says so. 29 suites that mock `lib/redis` still green (391 tests); typecheck clean.
+
+      **Worth a separate ticket**: `cancelAIGenerationJob` cannot cancel a queued job — it only removes when the state is `waiting` or `delayed`, but every job has a priority and therefore sits in `prioritized`, so cancel silently returns `false`. The existing test passes only because it cancels a *delayed* job. User-visible: "cancel my generation" does nothing.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T03:59:48.545Z'

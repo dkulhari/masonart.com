@@ -1,0 +1,120 @@
+ticket_number: 663
+title: db:push silently builds a database without the audit-log immutability trigger, and the docs tell you to use it
+description: "## Problem\n\n`admin_audit_log` is append-only. That guarantee is not in the schema — it is a Postgres trigger and function written as raw SQL in migration `0021_admin_audit_log.sql`:\n\n```sql\nCREATE OR REPLACE FUNCTION admin_audit_log_immutable() RETURNS trigger AS $$\nBEGIN\n\tIF TG_OP = 'UPDATE' THEN\n\t\tRAISE EXCEPTION 'admin_audit_log is append-only: UPDATE is not permitted';\n\tEND IF;\n\tIF current_setting('chobii.audit_purge', true) IS DISTINCT FROM 'on' THEN\n\t\tRAISE EXCEPTION 'admin_audit_log is append-only: DELETE requires the retention job';\n\tEND IF;\n\tRETURN OLD;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER admin_audit_log_immutable_trg\n\tBEFORE UPDATE OR DELETE ON \"admin_audit_log\"\n\tFOR EACH ROW EXECUTE FUNCTION admin_audit_log_immutable();\n```\n\nDrizzle's schema DSL cannot express a trigger or a function, so **`drizzle-kit push` does not create either**. It creates the `admin_audit_log` table and nothing that protects it. `drizzle-kit migrate` does, because it replays the SQL.\n\nA database built with `db:push` has an audit log that anyone with database access can rewrite or erase.\n\n## Verified, not inferred\n\nBuilt a throwaway `postgres:16`, pushed the current schema into it, and inspected:\n\n```\ninformation_schema.tables  admin_audit_log       -> 1   (table created)\npg_trigger admin_audit_log_immutable_trg        -> 0   (absent)\npg_proc    admin_audit_log_immutable            -> 0   (absent)\n```\n\nThen exercised it. Every statement below succeeded, with no error:\n\n```sql\nINSERT INTO admin_audit_log (actor_user_id, actor_email, action, category, outcome)\nVALUES ('attacker','a@x.com','user.delete','privilege','success');   -- INSERT 0 1\n\nUPDATE admin_audit_log SET action='harmless.read' WHERE actor_user_id='attacker';\n-- UPDATE 1;  action is now 'harmless.read'\n\nDELETE FROM admin_audit_log WHERE actor_user_id='attacker';          -- DELETE 1\n-- rows_remaining: 0\n```\n\nAn audit entry recording a privilege action was rewritten to look benign, then deleted outright. On a `migrate`-built database both statements raise.\n\n## The docs point people at push\n\n`bun run db:push` is the documented setup path in:\n\n- `README.md:64` and `README.md:352` — the getting-started flow\n- `docs/manual-tests/flow-auth.md`, `ai-history.md`, `admin-orders.md`, `account.md` — all four say \"Database migrations applied (`bun run db:push`)\"\n- `docs/TEST-EXECUTION-REMEDIATION.md:56` and `:190`\n\nSo every developer and manual-test environment set up by the book has an unprotected audit log.\n\n**`docs/deployment.md` contradicts itself.** Line 8 says \"**never `db:push` against prod**\". Lines 174 and 218 then instruct:\n\n```bash\ndocker compose -f docker/docker-compose.prod.yml exec api bun run db:push\n```\n\nThe banner calls the file a local walkthrough that is superseded, but the prod-compose commands are still sitting there, ready to be copied.\n\n`docs/OPERATIONS.md:124` and `docs/GO-LIVE-PLAN.md:59` get it right, and the real deploy path is `make -C deploy migrate`. Production is very likely fine — this is filed high rather than critical for that reason — but it should be confirmed rather than assumed (step 1).\n\n## Blast radius is exactly one object pair\n\nChecked every migration for raw SQL that the DSL cannot round-trip:\n\n```\ngrep -l \"CREATE FUNCTION\\|CREATE OR REPLACE FUNCTION\\|CREATE TRIGGER\" src/database/migrations/*.sql\n  -> src/database/migrations/0021_admin_audit_log.sql\n```\n\nOnly 0021. No policies, no CHECK constraints, no other functions. So this is one concrete gap, not an open-ended class — but it will recur the next time someone adds raw SQL to a migration, which is what step 5 guards.\n\n## There is already a detector\n\n`tests/database/audit-log-immutability.test.ts` catches this. Run against the push-built database above:\n\n```\n✓ accepts an insert\n× refuses an UPDATE, so the audited cannot edit the audit\n× refuses a DELETE from an ordinary transaction\nAssertionError: the statement was not refused at all: expected undefined to be defined\nTests: 2 failed | 4 passed\n```\n\nThe test is correct and already written. Nothing runs it against a freshly provisioned environment, which is why the gap stayed invisible.\n\n## Context\n\n- Found during #623 (rebuilding the drizzle meta snapshots), where a `pg_dump` diff between a migrate-built and a push-built database showed the function and trigger present in only one of them.\n- `#93` already established that push is unsafe against a production schema, for the separate reason that it drops columns.\n- Do not run prettier on any file touched here — the repo has no prettier config and defaults rewrite whole files."
+feature: admin-audit-log
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T04:08:25.292Z'
+last_updated: '2026-08-30T04:08:25.292Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - security
+  - docs
+  - tech-debt
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: verify-pass
+    description: First, establish whether production is actually affected. Check the live database for the trigger before changing anything — the fix is different if prod is already missing it.
+    command: |-
+      # against the production database, read-only
+      psql "$PROD_DATABASE_URL" -At -c "SELECT count(*) FROM pg_trigger WHERE tgname='admin_audit_log_immutable_trg';"
+    expected_result: 1 = production is fine, this is a dev/docs bug. 0 = production audit log is mutable; stop and escalate before continuing, and apply 0021's trigger block to prod first.
+    status: pending
+  - id: 2
+    action: write-test
+    description: Add a schema-level guard that fails loudly on any database missing the trigger, independent of whether the behavioural suite runs
+    file: packages/api/tests/database/audit-log-immutability.test.ts
+    status: pending
+    code: |-
+      it("has the immutability trigger installed at all", async () => {
+        if (!reachable) return;
+
+        // The behavioural tests below can only fail *after* a statement slips
+        // through. This one names the cause: drizzle's DSL cannot express a
+        // trigger, so a database built with `db:push` gets the table and none
+        // of its protection (#<this ticket>).
+        const [trigger] = await client`
+          SELECT tgname FROM pg_trigger WHERE tgname = 'admin_audit_log_immutable_trg'
+        `;
+
+        expect(
+          trigger,
+          "admin_audit_log_immutable_trg is missing. This database was almost " +
+            "certainly built with `drizzle-kit push`, which cannot create " +
+            "triggers. Rebuild it with `bun run db:migrate`.",
+        ).toBeDefined();
+      });
+  - id: 3
+    action: verify-fail
+    description: Confirm the new guard fails on a push-built database and passes on a migrate-built one
+    command: cd packages/api && docker run -d --name gap-check -e POSTGRES_PASSWORD=x -e POSTGRES_USER=x -e POSTGRES_DB=x -p 55663:5432 postgres:16 && sleep 5 && DATABASE_URL='postgresql://x:x@localhost:55663/x' bunx drizzle-kit push --force && DATABASE_URL='postgresql://x:x@localhost:55663/x' bunx vitest run tests/database/audit-log-immutability.test.ts; docker rm -f gap-check
+    expected_result: FAIL on the push-built database, naming the missing trigger. Then passes against the normal migrate-built dev database.
+    status: pending
+  - id: 4
+    action: implement
+    description: Fix the docs — the root cause. Replace db:push with db:migrate in every setup path, and delete the two prod-compose push commands that contradict deployment.md's own banner.
+    status: pending
+    code: |-
+      # README.md:64, README.md:352
+      -   bun run db:push
+      +   bun run db:migrate
+
+      # docs/manual-tests/{flow-auth,ai-history,admin-orders,account}.md
+      - - [ ] Database migrations applied (`bun run db:push`)
+      + - [ ] Database migrations applied (`bun run db:migrate`)
+
+      # docs/TEST-EXECUTION-REMEDIATION.md:56, :190
+      - bun run db:push
+      + bun run db:migrate
+
+      # docs/deployment.md:174, :218 -- these contradict the file's own line 8
+      - docker compose -f docker/docker-compose.prod.yml exec api bun run db:push
+      + docker compose -f docker/docker-compose.prod.yml exec api bun run db:migrate
+
+      # Add near the db:push script in packages/api/package.json:
+      #   db:push writes the schema directly and cannot create triggers or
+      #   functions. admin_audit_log's append-only trigger lives in migration
+      #   0021 as raw SQL, so a pushed database has the table without its
+      #   protection. Use db:migrate for anything you intend to trust.
+  - id: 5
+    action: implement
+    description: 'Guard the recurrence: make the raw-SQL dependency visible where the next person will look, rather than only in a migration nobody re-reads'
+    file: packages/api/src/database/schema/audit-log.ts
+    status: pending
+    code: |-
+      /**
+       * Append-only is enforced by a Postgres trigger, NOT by anything in this
+       * file. `admin_audit_log_immutable_trg` and its function are raw SQL in
+       * migration 0021 because drizzle's DSL cannot express either.
+       *
+       * Consequence: `drizzle-kit push` creates this table with none of its
+       * protection. Provision with `db:migrate`. tests/database/
+       * audit-log-immutability.test.ts fails loudly if the trigger is absent.
+       *
+       * Anything else added here that needs database-level enforcement has the
+       * same problem — check it survives a push, or say in the migration that
+       * it does not.
+       */
+  - id: 6
+    action: verify-pass
+    description: Full audit-log suite green against a properly migrated database, and no doc still recommends push for setup
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/database/audit-log-immutability.test.ts tests/database/audit-log-schema.test.ts && cd ../.. && grep -rn 'db:push' README.md docs/ | grep -v 'never\|not a substitute\|cannot create'
+    expected_result: Suites pass. The grep returns only lines that warn against push — no remaining line that recommends it as a setup step.
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the guard, the docs fix and the schema note together
+    command: 'git add packages/api/tests/database/audit-log-immutability.test.ts packages/api/src/database/schema/audit-log.ts packages/api/package.json README.md docs/ && git commit -m "fix(audit): stop db:push producing a mutable audit log"'
+    status: pending
+current_step: 1

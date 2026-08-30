@@ -17,19 +17,37 @@ description: |-
 feature: qa-testing
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:39.087Z'
-last_updated: '2026-08-20T12:19:39.087Z'
+last_updated: '2026-08-30T03:59:59.077Z'
 time_spent_minutes: 0
 labels:
   - testing
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:59:49.158Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T03:59:59.077Z'
+    text: |-
+      ✅ **Completed** — commit `ef4b6b3b`. **Verdict: the named failure was a stale fixture, but the investigation found a real live bug beside it.**
+
+      **The named test**: `?styles=minimalist,abstract` uses ids that no longer exist — the vocabulary (`packages/shared/src/constants/facets.ts:43`) calls it `minimalist-art`, and `abstract` is a **subject**, not a style. A sibling test at `products.test.ts:238` already carried that exact correction in a comment; the runtime test 500 lines below was missed when the mesonart vocabulary landed. The storefront had already been fixed too (`homeCategories.ts:46`: "A subject, not a style — `?styles=abstract` is rejected by the API"). Comma-joined parsing was never broken — `facetList` split on commas and the storefront sends comma-joined.
+
+      **The live bug**: `?styles=a&styles=b` — the canonical `URLSearchParams` form — returned **400 on every array facet**, on both `/api/products` and `/api/collections/:slug`. Hono's query validator collapses a repeated param into an array before zod sees it, and `facetList` began at `z.string()`, so it failed with "Expected string, received array". Any hand-written link, external referrer or non-storefront client hit it.
+
+      **Files changed**: new `src/lib/facet-query.ts` (one `facetList`, accepting string | array | mixed); `src/routes/products.ts` and `src/routes/collections.ts` now import it — the definition had been duplicated **verbatim** across both, and the second copy's own comment pointed at the first, which is precisely how the vocabulary fix drifted between them. Tests are table-driven across all **seven** array facets (styles, subjects, colors, rooms, vibe, aesthetic, medium — not the four originally assumed) in both wire shapes, accept and reject.
+
+      **Verification**: products **92/92** (was 1 failed / 76 passed; intermediate red of 8 failures after adding the repeated-param cases, all of them that shape), all three route suites together **113/113**, `tsc --noEmit` clean.
+
+      **Worth a separate ticket**: `packages/web/app/routes/posters/$slug.tsx:466` — the PDP breadcrumb does `product.styles?.[0] || 'all'` and links to `/posters?styles=all`. `all` is not in the vocabulary, so any product with no styles emits a link that 400s the grid. Live storefront bug, web side.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T03:59:49.158Z'

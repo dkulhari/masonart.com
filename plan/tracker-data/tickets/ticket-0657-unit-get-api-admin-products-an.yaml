@@ -21,19 +21,46 @@ description: |-
 feature: qa-testing
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:39.040Z'
-last_updated: '2026-08-20T12:19:39.040Z'
+last_updated: '2026-08-30T03:55:20.638Z'
 time_spent_minutes: 0
 labels:
   - testing
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:55:09.157Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T03:55:20.638Z'
+    text: |-
+      ✅ **Completed** — commit `53230fcd`. **Verdict: APP BUG, not a test artefact.**
+
+      `GET /api/admin/products` was returning 500 on **every** request, for every role. The admin product list was dead.
+
+      **Root cause**: `unitsSoldSql()` (`packages/api/src/lib/product-sales.ts:59`) wrote its correlated subquery as `where order_items.product_id = ${products.id}`. Drizzle's `buildSelection` rewrites every Column chunk of a selected `sql` template to a **bare identifier** when the query has no joins (`isSingleTable`). The admin list selects that helper directly from `products` with no join, so `${products.id}` rendered as `"id"` — which inside the subquery resolves against `order_items` and `orders`, both of which have an `id`. Postgres: `column reference "id" is ambiguous` (42702). The handler's catch flattened it to `{"error":"Failed to fetch products"}`.
+
+      The storefront call site was unaffected: it sits in `ORDER BY` on a query that `leftJoin`s reviews, so the qualifier survived. One helper, correct in one place and broken in the other.
+
+      **Why nothing caught it**: `tests/routes/admin/product-popularity.test.ts` mocks `db` with a chain that accepts any query and resolves to canned rows — 7/7 green while the endpoint failed every call. It asserted key names and never rendered a byte of SQL.
+
+      **Files changed**:
+      - `src/lib/product-sales.ts` — reference the table plus an explicit identifier, neither of which the rewrite reaches; renders `"products"."id"` in both single-table and joined shapes, with the column name still read off the schema so a rename cannot leave a stale literal
+      - `src/routes/admin/products.ts` — the list catch now logs the real error before the 500, matching `/stats`
+      - `tests/lib/product-sales.test.ts` — **new**, 5 tests asserting the rendered SQL text via `QueryBuilder().toSQL()` (no DB needed) plus the schema facts the raw SQL depends on
+
+      **Verification**: products-role-access **5/5** (was 3/5), product-sales **5/5** (new, red first for the right reason), admin products 117/117, product-popularity 7/7, product-stats 10/10, typecheck clean. Confirmed by hand against the dev database — query returns rows, AI-003 correctly reports `units_sold = 3`.
+
+      **Follow-ups worth their own tickets** (raised by this work):
+      1. Mocked-`db` route suites give false green — every admin list endpoint tested this way could be 500ing in production right now. Either render `.toSQL()` in those mocks or add one real-DB smoke test per admin list route.
+      2. The drizzle `isSingleTable` trap deserves a documented convention (always nest correlated SQL, never select a bare template). A sweep of `packages/api/src` found `unitsSoldSql` was the only current instance.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-30T03:55:09.157Z'

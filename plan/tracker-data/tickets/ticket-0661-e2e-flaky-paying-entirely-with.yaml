@@ -19,13 +19,58 @@ status: todo
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:54.457Z'
-last_updated: '2026-08-20T12:19:54.457Z'
+last_updated: '2026-08-30T05:36:40.061Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-30T05:36:40.061Z'
+    text: |-
+      ## State as of 2026-08-30 — partially fixed, NOT closed
+
+      Commit `281ccf43`. Three real defects found and fixed; one intermittent failure remains and is the reason this stays open.
+
+      ### Fixed
+      1. **The post-payment redirect 404'd.** Checkout sent the customer to `/orders/${orderNumber}?success=true` — no such route exists (`/account/orders/$id` is the account one). Verified by hand: that URL returns **404, renders "not found"**. Every completed checkout landed there. Now goes to `/checkout/success`, which the gift-card purchase flow already used.
+      2. **EmptyCartState rendered over a paid order.** Payment clears the cart → `isEmpty` flips → the guard fired while the redirect was in flight. Added an `orderPlaced` flag; `PaymentButton` now calls `onSuccess` before `resetLocalCart`.
+      3. **The gateway assertion was wrong after the redirect became client-side.** `toHaveCount(0)` on `iframe.razorpay-checkout-frame` fails because the document survives SPA navigation and the SDK's hidden iframe with it. Now asserts the modal is not *shown*.
+
+      Spec also waits for the add-to-cart POST and reads the cart back before going to checkout.
+
+      **Why the test never caught #1:** it asserted only that the URL changed, and `/orders/…` matched its pattern while the page said "not found". It now asserts `/checkout/success` **and** that the confirmation renders.
+
+      ### NOT fixed — the reason this ticket stays open
+      Under load (concurrent `vitest run tests/routes`, load avg 6–14), roughly **1 run in 3–4** still fails:
+
+      ```
+      Error: the order was paid but the browser never reached the confirmation page
+      Received string: "http://localhost:4321/checkout"
+      ```
+
+      The order **is** created and paid (`orders` row: `confirmed` / `paid`, `gift_card_amount` = full total). The browser simply stays on `/checkout` for the full 60s, showing the empty-cart panel.
+
+      ### Ruled out
+      - Cart race on add-to-cart — hardened, still fails.
+      - `window.location.href` vs router `navigate()` — **both** stall; switching to `navigate()` did not fix it.
+      - Order creation / gift-card debit — server-side always succeeds.
+      - Another suite clearing the cart — `cart-gift-card-lines.test.ts` scopes to a pid-suffixed user.
+
+      ### Next step for whoever picks this up
+      Instrument and run until it reproduces (it did not reproduce in 4 consecutive traced runs, so leave the tracing in and loop):
+      - `console.log` in `PaymentButton`'s `fullyCoveredByGiftCard` branch, in `handlePaymentSuccess`, and immediately before `navigate()` (`routes/checkout/index.tsx`);
+      - forward page console into the spec with `page.on('console', …)`.
+
+      The question to answer: in a stalled run, which of the three lines print? That splits it cleanly into "the success path never ran" vs "navigate() was called and did nothing".
+
+      Repro command (needs the private server pair on :3010/:4321):
+      ```
+      SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4321 E2E_API_URL=http://localhost:3010 \
+        bunx playwright test tests/e2e/gift-cards.spec.ts --project=chromium
+      ```
+      with `cd packages/api && DATABASE_URL=…5440… bunx vitest run tests/routes` running alongside to load the box. Alone it passes every time.
 work_sessions: []
 related_tickets: []
 blocked_by: []
