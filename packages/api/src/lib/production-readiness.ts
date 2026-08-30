@@ -573,7 +573,12 @@ export async function isOrderReadyToLabel(
 // ============================================================================
 
 export type ConsolidatorBasis =
-  /** One vendor holds every job on the order. The overwhelming majority. */
+  /**
+   * One vendor holds every job on the order that has a vendor at all.
+   *
+   * The overwhelming majority — but it is only a DECISION once there is no live
+   * job still waiting to be placed. See `needsConfirmation`.
+   */
   | 'sole_vendor'
   /** A frame job exists, so the framed piece stays where it was framed. */
   | 'frame_vendor'
@@ -588,11 +593,21 @@ export interface ConsolidatorProposal {
   /**
    * Whether an admin has to confirm before this is written.
    *
-   * False only for `sole_vendor`, which is written automatically at first
-   * assignment with `decided_by = NULL` recording "system default". The other
-   * two are proposals: the real criterion — who is nearest the customer, which
-   * leg is cheapest — is not modelled, and a confirmed proposal keeps an
-   * arbitrary choice visible and auditable instead of silently arbitrary.
+   * False only for a `sole_vendor` proposal over an order with NOTHING LEFT TO
+   * PLACE, which is written automatically with `decided_by = NULL` recording
+   * "system default". `decided_by IS NULL` is a claim — "there was nothing to
+   * choose" — and it is only true once every live job has a vendor: a job still
+   * sitting in `draft` is work whose vendor is undecided, and the next
+   * assignment can put it at a second vendor or, worse, make it the frame job
+   * that flips the answer entirely (rule 2: you never courier a finished framed
+   * piece TO a poster shop). Writing a silent default off the first assignment
+   * of a multi-job order commits the order to a vendor nobody chose and nothing
+   * re-proposes.
+   *
+   * The other two bases are proposals for a different reason: the real
+   * criterion — who is nearest the customer, which leg is cheapest — is not
+   * modelled, and a confirmed proposal keeps an arbitrary choice visible and
+   * auditable instead of silently arbitrary.
    */
   needsConfirmation: boolean
 }
@@ -653,19 +668,34 @@ function bestHolding(holdings: readonly VendorHolding[]): VendorHolding | null {
 /**
  * Which vendor should assemble the order and ship it to the customer.
  *
- * Cancelled jobs and unassigned drafts are ignored — neither holds anything.
+ * Cancelled jobs hold nothing and are ignored outright — cancellation has no
+ * out-edge. Unassigned drafts hold nothing either, so they never contribute a
+ * vendor; but they are NOT nothing, because the vendor they land on is exactly
+ * what a `sole_vendor` system default claims cannot exist. They therefore
+ * cannot decide the proposal, and they can withhold the right to write it
+ * silently — see `needsConfirmation`.
  */
 export function proposeConsolidator(jobs: readonly ReadinessJob[]): ConsolidatorProposal {
-  const assigned = jobs.filter((job) => job.status !== 'cancelled' && job.vendorId)
+  const live = jobs.filter((job) => job.status !== 'cancelled')
+  const assigned = live.filter((job) => job.vendorId)
+  /** Live work with no vendor yet: a decision that has not been taken. */
+  const unplaced = live.length - assigned.length
   const holdings = holdingsOf(assigned)
 
   if (holdings.length === 0) {
     return { vendorId: null, basis: 'none', needsConfirmation: false }
   }
 
-  // 1. One vendor holds everything. No admin action; `decided_by` stays NULL.
+  // 1. One vendor holds everything anybody has placed. Automatic with
+  //    `decided_by = NULL` ONLY when there is nothing left to place: that
+  //    column says "the system chose because there was nothing to choose", and
+  //    an unplaced draft is the choice still to come.
   if (holdings.length === 1) {
-    return { vendorId: holdings[0]!.vendorId, basis: 'sole_vendor', needsConfirmation: false }
+    return {
+      vendorId: holdings[0]!.vendorId,
+      basis: 'sole_vendor',
+      needsConfirmation: unplaced > 0,
+    }
   }
 
   // 2. A finished framed piece is bulky, fragile and glazed. You never courier
@@ -682,18 +712,48 @@ export function proposeConsolidator(jobs: readonly ReadinessJob[]): Consolidator
   return { vendorId: best!.vendorId, basis: 'most_items', needsConfirmation: true }
 }
 
+/** The three timestamps a parcel's commitment is read from. */
+type TransferTimestamps = {
+  dispatchedAt: Date | null
+  receivedAt: Date | null
+  lostAt: Date | null
+}
+
+/**
+ * Has this parcel actually committed the order to its destination?
+ *
+ * Dispatched, and not written off. A DECLARED LOSS is the one thing that
+ * un-commits it: the justification for freezing the consolidator is that "the
+ * goods are already moving", and after a loss they demonstrably are not — the
+ * parcel is gone, `POST /transfers/:id/lost` has created replacement `draft`
+ * jobs, and re-routing that replacement work to a different consolidator is the
+ * correct operational response rather than something to refuse. Reading a lost
+ * transfer as in-flight freezes the consolidator permanently at exactly the
+ * moment it most needs to move.
+ *
+ * Arrival wins over a lost stamp, the same way `transferState` in
+ * `routes/admin/transfers.ts` reads it. The route makes that pair unreachable,
+ * but a row holding both is a parcel sitting on a shelf at vendor B, and goods
+ * that arrived are the strongest possible commitment.
+ */
+function transferCommitsConsolidator(transfer: TransferTimestamps): boolean {
+  if (transfer.receivedAt) return true
+  if (transfer.lostAt) return false
+  return transfer.dispatchedAt !== null
+}
+
 /**
  * May the consolidator still be changed?
  *
- * Until the first transfer on the order has dispatched. After that the goods
- * are already moving, and re-routing them is a phone call to a courier, not a
- * database write. The 409 belongs to the route (#682); this is the predicate it
- * asks.
+ * Until the first transfer on the order has committed — dispatched and neither
+ * lost nor superseded by a later arrival. After that the goods really are
+ * moving, and re-routing them is a phone call to a courier, not a database
+ * write. The 409 belongs to the route (#682); this is the predicate it asks.
  */
 export function consolidatorOverrideAllowed(
-  transfers: readonly { dispatchedAt: Date | null }[]
+  transfers: readonly TransferTimestamps[]
 ): boolean {
-  return transfers.every((transfer) => transfer.dispatchedAt === null)
+  return transfers.every((transfer) => !transferCommitsConsolidator(transfer))
 }
 
 /** The same question, read from the order's transfers. */
@@ -702,7 +762,13 @@ export async function canOverrideConsolidator(
   reader: ProductionReader = db
 ): Promise<boolean> {
   const rows = await reader
-    .select({ dispatchedAt: productionTransfers.dispatchedAt })
+    .select({
+      dispatchedAt: productionTransfers.dispatchedAt,
+      // Both read, because a lost parcel is not in flight and an arrived one
+      // is not lost however the row is stamped.
+      receivedAt: productionTransfers.receivedAt,
+      lostAt: productionTransfers.lostAt,
+    })
     .from(productionTransfers)
     .where(eq(productionTransfers.orderId, orderId))
 

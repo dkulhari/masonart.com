@@ -742,14 +742,54 @@ describe('proposeConsolidator — the system proposes, an admin confirms', () =>
     expect(proposal.vendorId).toBe(B)
   })
 
-  it('ignores cancelled jobs and unassigned drafts', () => {
+  it('ignores cancelled jobs entirely: cancellation has no out-edge', () => {
     const proposal = proposeConsolidator([
       job({ id: 'job-1', vendorId: A }),
       job({ id: 'job-2', vendorId: B, status: 'cancelled' }),
-      job({ id: 'job-3', vendorId: null, status: 'draft' }),
+      // Cancelled AND unassigned: neither a second vendor nor work still to
+      // place, so it withholds nothing.
+      job({ id: 'job-3', vendorId: null, status: 'cancelled' }),
     ])
 
     expect(proposal).toEqual({ vendorId: A, basis: 'sole_vendor', needsConfirmation: false })
+  })
+
+  it('will not write a silent system default while live work is unplaced', () => {
+    // `decided_by IS NULL` claims "there was nothing to choose". With a draft
+    // still waiting for a vendor there is: the next assignment can land at a
+    // second vendor, or be the frame job that flips the answer entirely. The
+    // vendor proposed is still the only candidate — but it is a PROPOSAL.
+    const proposal = proposeConsolidator([
+      job({ id: 'job-print', vendorId: A }),
+      job({ id: 'job-frame', stage: 'frame', vendorId: null, status: 'draft' }),
+    ])
+
+    expect(proposal.vendorId).toBe(A)
+    expect(proposal.basis).toBe('sole_vendor')
+    expect(proposal.needsConfirmation).toBe(true)
+  })
+
+  it('writes the system default once every live job is placed at that vendor', () => {
+    const proposal = proposeConsolidator([
+      job({ id: 'job-print', vendorId: A }),
+      job({ id: 'job-frame', stage: 'frame', vendorId: A }),
+    ])
+
+    expect(proposal).toEqual({ vendorId: A, basis: 'sole_vendor', needsConfirmation: false })
+  })
+
+  it('lets an unplaced draft withhold nothing once two vendors are already in play', () => {
+    // Two vendors is already a judgement an admin has to confirm; the draft
+    // cannot make it more of one.
+    const proposal = proposeConsolidator([
+      job({ id: 'job-1', vendorId: A, orderItemIds: ['i1'] }),
+      job({ id: 'job-2', vendorId: B, orderItemIds: ['i2', 'i3'] }),
+      job({ id: 'job-3', vendorId: null, status: 'draft', orderItemIds: ['i4'] }),
+    ])
+
+    expect(proposal.vendorId).toBe(B)
+    expect(proposal.basis).toBe('most_items')
+    expect(proposal.needsConfirmation).toBe(true)
   })
 
   it('proposes nothing for an order with no assigned jobs', () => {
@@ -772,22 +812,67 @@ describe('proposeConsolidator — the system proposes, an admin confirms', () =>
 })
 
 describe('overriding the consolidator', () => {
+  /** Just the three timestamps the predicate reads. */
+  const parcel = (over: Partial<ReadinessTransfer> = {}) => {
+    const { dispatchedAt, receivedAt, lostAt } = transfer(over)
+    return { dispatchedAt, receivedAt, lostAt }
+  }
+
   it('is allowed while nothing has physically left', () => {
     expect(consolidatorOverrideAllowed([])).toBe(true)
-    expect(consolidatorOverrideAllowed([{ dispatchedAt: null }])).toBe(true)
+    expect(consolidatorOverrideAllowed([parcel({ dispatchedAt: null, receivedAt: null })])).toBe(
+      true
+    )
   })
 
   it('is refused once the first transfer on the order has dispatched', () => {
     // The 409 belongs to the route (#682); this is only the predicate it asks.
-    expect(consolidatorOverrideAllowed([{ dispatchedAt: null }, { dispatchedAt: NOW }])).toBe(
-      false
-    )
+    expect(
+      consolidatorOverrideAllowed([
+        parcel({ dispatchedAt: null, receivedAt: null }),
+        parcel({ dispatchedAt: NOW, receivedAt: null }),
+      ])
+    ).toBe(false)
   })
 
-  it('reads the order`s transfers through the injected reader', async () => {
+  it('is refused for a transfer that has already arrived', () => {
+    expect(consolidatorOverrideAllowed([parcel({ receivedAt: NOW })])).toBe(false)
+  })
+
+  it('is allowed again once the parcel is declared lost', () => {
+    // The 409 is justified by "the goods are already moving". After a declared
+    // loss they demonstrably are not: the parcel is gone, replacement `draft`
+    // jobs exist, and re-routing that replacement work to a different
+    // consolidator is the correct operational response. Reading a lost transfer
+    // as in-flight freezes the consolidator permanently, at exactly the moment
+    // it has to move.
+    expect(
+      consolidatorOverrideAllowed([
+        parcel({ dispatchedAt: ASSIGNED, receivedAt: null, lostAt: NOW }),
+      ])
+    ).toBe(true)
+  })
+
+  it('is still refused when one transfer is lost and another is live', () => {
+    expect(
+      consolidatorOverrideAllowed([
+        parcel({ dispatchedAt: ASSIGNED, receivedAt: null, lostAt: NOW }),
+        parcel({ dispatchedAt: NOW, receivedAt: null }),
+      ])
+    ).toBe(false)
+  })
+
+  it('lets arrival win over a lost stamp, exactly as transferState reads it', () => {
+    // The route makes the pair unreachable; a row holding both is a parcel on a
+    // shelf at vendor B, and goods that arrived are the strongest commitment
+    // there is.
+    expect(consolidatorOverrideAllowed([parcel({ receivedAt: NOW, lostAt: NOW })])).toBe(false)
+  })
+
+  it('reads the transfers of the order through the injected reader', async () => {
     const readerSelect = vi.fn()
     const queue = createSelectQueue(readerSelect)
-    queue.queueSelects([{ dispatchedAt: NOW }])
+    queue.queueSelects([{ dispatchedAt: NOW, receivedAt: null, lostAt: null }])
 
     const allowed = await canOverrideConsolidator('order-1', {
       select: readerSelect,
@@ -795,5 +880,24 @@ describe('overriding the consolidator', () => {
 
     expect(allowed).toBe(false)
     expect(queue.selects).toHaveLength(1)
+  })
+
+  it('selects lost_at as well, or a lost parcel freezes the order forever', async () => {
+    const readerSelect = vi.fn()
+    const queue = createSelectQueue(readerSelect)
+    queue.queueSelects([{ dispatchedAt: ASSIGNED, receivedAt: null, lostAt: NOW }])
+
+    const allowed = await canOverrideConsolidator('order-1', {
+      select: readerSelect,
+    } as unknown as Parameters<typeof canOverrideConsolidator>[1])
+
+    expect(allowed).toBe(true)
+    // The columns have to be SELECTed for the predicate to see them at all: a
+    // read of `dispatched_at` alone answers this question wrong forever.
+    expect(Object.keys(queue.selects[0]!.fields as Record<string, unknown>).sort()).toEqual([
+      'dispatchedAt',
+      'lostAt',
+      'receivedAt',
+    ])
   })
 })

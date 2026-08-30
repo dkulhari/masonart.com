@@ -21,8 +21,12 @@
  *    and refuses, rather than routing a replacement for somebody else's work.
  * 3. **`lost_at` is settable only by an admin.** It costs money, and a vendor
  *    declaring it is a vendor deciding who eats that cost.
- * 4. **A received transfer can never be declared lost** — 409. It arrived; the
- *    dispute is about something else.
+ * 4. **"Lost" means a parcel that LEFT and did not arrive** — 409 otherwise. A
+ *    received transfer arrived; the dispute is about something else. An
+ *    undispatched one never left, so nothing is missing. And a job that is not
+ *    itself `dispatched` never rode anywhere, so replacing it would leave two
+ *    live jobs over the same order items — the premise of property 5 is that
+ *    the original IS dispatched.
  *
  * 5. **THE ORIGINAL KEEPS ITS PAYABLE.** The suite sums `lib/vendor-payables`
  *    over the vendor's rows before the call and over every row that exists
@@ -414,6 +418,62 @@ describe('POST /api/admin/transfers/:id/lost — refusals', () => {
     expect(inserts(productionJobItems)).toHaveLength(0)
   })
 
+  it('409s a transfer that never dispatched: nothing left, so nothing is lost', async () => {
+    // A parcel still sitting at vendor A cannot have gone missing. Declaring it
+    // lost would create a replacement — a second job somebody has to be paid to
+    // make — for goods that are on the shelf.
+    seedLostable({ dispatchedAt: null })
+
+    const res = await declareLost()
+    const body = await readJson<{ error: string }>(res)
+
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/not been dispatched/i)
+    expect(updates(productionTransfers)).toHaveLength(0)
+    expect(inserts(productionJobs)).toHaveLength(0)
+    expect(inserts(productionJobItems)).toHaveLength(0)
+  })
+
+  it('409s when a job on the parcel has not been dispatched either', async () => {
+    // The route's whole premise is that the original stays `dispatched` with
+    // its payable intact. A `qc_passed` job is still at vendor A, so a
+    // replacement leaves two live jobs over the same order items and readiness
+    // reports the order blocked twice over.
+    seedLostable()
+    queueRows({
+      'select:production_transfer_jobs': [
+        [jobRow(), jobRow({ id: JOB_B, status: 'qc_passed' })],
+      ],
+    })
+
+    const res = await declareLost()
+    const body = await readJson<{ error: string }>(res)
+
+    expect(res.status).toBe(409)
+    expect(body.error).toContain(JOB_B)
+    expect(body.error).toContain('qc_passed')
+    expect(body.error).not.toContain(JOB_A)
+    expect(tx.rollbacks).toBe(1)
+    expect(tx.commits).toBe(0)
+    expect(inserts(productionJobs)).toHaveLength(0)
+    expect(inserts(productionJobItems)).toHaveLength(0)
+  })
+
+  it('409s a parcel whose jobs were cancelled rather than dispatched', async () => {
+    // Cancellation has no out-edge. Replacing a job nobody is going to be paid
+    // for is not a replacement, it is a duplicate.
+    seedLostable()
+    queueRows({
+      'select:production_transfer_jobs': [[jobRow({ status: 'cancelled' })]],
+    })
+
+    const res = await declareLost()
+
+    expect(res.status).toBe(409)
+    expect(tx.rollbacks).toBe(1)
+    expect(inserts(productionJobs)).toHaveLength(0)
+  })
+
   it('422s when a job on the parcel is not the sending vendor’s', async () => {
     seedLostable()
     queueRows({
@@ -497,7 +557,11 @@ describe('POST /api/admin/transfers/:id/lost', () => {
     const { sql, params } = render(update.where)
     expect(params).toContain(TRANSFER_ID)
     // Belt and braces against anything that slipped in between the read and
-    // the write, exactly as vendor-payables does it.
+    // the write, exactly as vendor-payables does it. All three timestamps: a
+    // parcel is lost only if it dispatched, has not arrived, and is not
+    // already written off.
+    expect(sql).toContain('dispatched_at')
+    expect(sql).toContain('is not null')
     expect(sql).toContain('received_at')
     expect(sql).toContain('lost_at')
     expect(sql).toContain('is null')
@@ -569,8 +633,13 @@ describe('POST /api/admin/transfers/:id/lost', () => {
   it('never deletes the original’s item rows: they say what its payable was for', async () => {
     seedLostable()
 
-    await declareLost()
+    const res = await declareLost()
 
+    // The handler has to have RUN for the absence below to mean anything: with
+    // no handler at all there are no deletes either, and the assertion passes
+    // while proving nothing.
+    expect(res.status).toBe(200)
+    expect(insertedRows(productionJobs)).toHaveLength(2)
     expect(recorder.deletes(productionJobItems)).toHaveLength(0)
     expect(recorder.deletes(productionJobs)).toHaveLength(0)
   })
@@ -578,8 +647,12 @@ describe('POST /api/admin/transfers/:id/lost', () => {
   it('leaves the original jobs alone — status, amounts and settlement all untouched', async () => {
     seedLostable()
 
-    await declareLost()
+    const res = await declareLost()
 
+    // Pinned first: the call succeeded and did create the replacements. An
+    // absence asserted over a handler that never ran is not evidence.
+    expect(res.status).toBe(200)
+    expect(insertedRows(productionJobs)).toHaveLength(2)
     // Not "does not set status to qc_failed" but "does not write to the table
     // at all". Moving the original would slander vendor A's QC record and
     // pollute the defect history a future scorecard reads.
@@ -590,7 +663,16 @@ describe('POST /api/admin/transfers/:id/lost', () => {
     seedLostable()
     const before = sumPayable(ORIGINAL_JOBS)
 
-    await declareLost()
+    const res = await declareLost()
+
+    // THE headline claim of this file, and the one an absence-only assertion
+    // cannot make: with no handler the patch is empty and nothing is inserted,
+    // so `after === before` holds trivially. Both replacements have to exist
+    // before the equality below says anything about the money.
+    expect(res.status).toBe(200)
+    const replacements = insertedRows(productionJobs)
+    expect(replacements).toHaveLength(2)
+    expect(replacements.map((r) => r.replacesJobId).sort()).toEqual([JOB_A, JOB_B].sort())
 
     // Every production_jobs row the database now holds: the originals with any
     // recorded UPDATE applied over them, plus whatever the route inserted. The
@@ -618,11 +700,14 @@ describe('POST /api/admin/transfers/:id/lost', () => {
   it('never puts the original on a second parcel', async () => {
     seedLostable()
 
-    await declareLost()
+    const res = await declareLost()
 
     // A job is on at most one transfer, EVER — the database enforces it with a
     // unique index on job_id alone. The route's half is making a REPLACEMENT
-    // rather than re-parcelling.
+    // rather than re-parcelling: both halves are asserted, or a deleted handler
+    // passes this on the strength of having done nothing.
+    expect(res.status).toBe(200)
+    expect(insertedRows(productionJobs)).toHaveLength(2)
     expect(inserts(productionTransferJobs)).toHaveLength(0)
     expect(updates(productionTransferJobs)).toHaveLength(0)
   })

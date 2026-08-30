@@ -21,6 +21,26 @@
  * vendor B never learns the parcel came from vendor A. The admin sees both
  * ends, because if somebody has to chase a carrier it is us.
  *
+ * ## What "lost" means, and therefore what it refuses
+ *
+ * A parcel that LEFT and did not arrive. Both halves are checked, because the
+ * rest of this file is written on that premise and quietly costs money when it
+ * does not hold:
+ *
+ * - `received_at` set → 409. It arrived; the dispute is about something else.
+ * - `lost_at` set → 409, so one declaration makes one set of replacements.
+ * - `dispatched_at` NULL → 409. Nothing left the sending vendor, so nothing is
+ *   missing; the goods are on vendor A's shelf and a replacement would be a
+ *   second job somebody has to be paid to make.
+ * - any job on the parcel not `dispatched` → 409. See the premise below: the
+ *   original stays `dispatched` with its payable intact, which is only true of
+ *   a job that IS dispatched. A `qc_passed` original plus a `draft` replacement
+ *   is two live jobs over the same order items, and `lib/production-readiness.ts`
+ *   reports the order blocked twice over for it.
+ * - any job on the parcel belonging to another vendor → 422, because a
+ *   replacement for work that was never vendor A's is routed against the wrong
+ *   leg.
+ *
  * ## The original job keeps its status AND its payable
  *
  * This is the decision the whole route exists to encode. When a transfer is
@@ -379,6 +399,18 @@ adminTransfersApp.post(
           );
         }
 
+        if (!transfer.dispatchedAt) {
+          // "Lost" is a parcel that LEFT and did not arrive. One that never
+          // left is a mis-click or a mistake in the record, not a loss: the
+          // goods are still on vendor A's shelf, and the replacement this route
+          // would create is a second job somebody has to be paid to make. A
+          // pending transfer is corrected or abandoned, never declared lost.
+          throw new TransferRefused(
+            "This transfer has not been dispatched, so nothing has left the sending vendor to be lost. Correct the transfer instead.",
+            409
+          );
+        }
+
         const lostAt = new Date();
 
         // The predicate is repeated here rather than trusted from the read,
@@ -390,6 +422,7 @@ adminTransfersApp.post(
           .where(
             and(
               eq(productionTransfers.id, id),
+              isNotNull(productionTransfers.dispatchedAt),
               isNull(productionTransfers.receivedAt),
               isNull(productionTransfers.lostAt)
             )
@@ -432,6 +465,29 @@ adminTransfersApp.post(
               .map((job) => job.id)
               .join(", ")}`,
             422
+          );
+        }
+
+        // The premise of this entire route — the original stays `dispatched`
+        // with its payable intact — is only true of a job that IS dispatched.
+        // A job still `qc_passed` is on vendor A's shelf: nothing carried it,
+        // so nothing about it was lost, and a replacement would leave TWO live
+        // jobs covering the same order items. `lib/production-readiness.ts`
+        // then reports both `goods_not_at_consolidator` (the original, passed
+        // QC at the wrong vendor) and `job_not_qc_passed` (the `draft`
+        // replacement), and we are paying twice for goods nobody has lost.
+        //
+        // Refused rather than repaired, for the same reason as the check above:
+        // this reads other tables' rows, so no CHECK constraint can say it, and
+        // a trigger doing it under READ COMMITTED is a race dressed as
+        // enforcement. Cancel the job or correct the parcel first.
+        const notDispatched = jobs.filter((job) => job.status !== "dispatched");
+        if (notDispatched.length > 0) {
+          throw new TransferRefused(
+            `These jobs are not dispatched, so nothing on this parcel left the sending vendor: ${notDispatched
+              .map((job) => `${job.id} (${job.status})`)
+              .join(", ")}`,
+            409
           );
         }
 
