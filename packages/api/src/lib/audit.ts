@@ -169,13 +169,16 @@ export interface AuditEntryInput {
 }
 
 /**
- * The subset of a Hono context this module reads.
+ * The subset of a Hono context this module reads: `user`, `requestId` and
+ * `vendorId`, plus the request's method, path and headers.
  *
  * Declared structurally rather than as `Pick<Context, …>` for two reasons: a
  * caller inside a queue or a script can hand over a stub instead of faking a
  * whole request, and — the reason it is written this way — `Context` is generic
  * over its Variables map, so a `Pick` of the default instantiation refuses every
- * route that declares its own variables.
+ * route that declares its own variables. Reading one more key must not change
+ * that: `get` stays `(key: string) => unknown`, and each key is narrowed at the
+ * point it is read.
  */
 interface AuditContext {
   get(key: string): unknown;
@@ -202,15 +205,41 @@ type AuditWriter = { insert: typeof db.insert };
  *
  * ## Claims the request
  *
- * Sets `audited` on the context. `middleware/audit.ts` reads that flag and skips
- * its own coarse `admin.request` row, so one action produces one row.
+ * Sets `audited` on the context, BEFORE the insert. `middleware/audit.ts` reads
+ * that flag and skips its own coarse `admin.request` row, so one action produces
+ * one row. Claiming first is deliberate: if the insert then fails, the price is
+ * a *missing* row rather than a *misleading* floor row attributing the action to
+ * nothing in particular. Nobody may read an absent row as "it did not happen".
  *
- * ## Atomicity is opt-in
+ * ## The caller supplies the change; the context supplies the facts
  *
- * Pass `tx` when the audit belongs to the same transaction as the business
- * write — a gift-card ledger entry, say — and the two commit or fail together.
- * Omit it and the audit is written independently, which is what you want when
- * the business write has already committed.
+ * The category is derived from the action, and the ip, user agent, request id,
+ * method, path and `vendorId` are read off the context here. None of them is a
+ * parameter, because a caller cannot get a context fact wrong if a caller never
+ * supplies it — per-call-site capture means the first route added next year
+ * forgets. `vendorId` is merged AFTER `entry.metadata` for the same reason: a
+ * handler that spreads a request body cannot make the row claim it was written
+ * for a shop it was not. An admin request has no `vendorId` and gets no key —
+ * "has a vendorId" must keep meaning "was written for a vendor".
+ *
+ * ## Atomicity is opt-in — and getting it backwards destroys evidence
+ *
+ * **Share the transaction when the audit row would be a LIE if the business
+ * write rolled back.** A row saying "job moved to qc_passed" beside a job still
+ * sitting in `qc_submitted` is worse than no row. So a state move, an
+ * assignment, an amount override, a transfer despatch — anything whose row only
+ * makes sense if the write committed — passes the same `tx` the write uses.
+ *
+ * **NEVER share the transaction for a refusal.** This is the trap, and the
+ * instinct is the wrong way round. A refusal row (`outcome: 'failure'`, e.g.
+ * `production_job.transition_refused`) records that a transaction was *rolled
+ * back*; writing it inside that transaction rolls the row back too and erases
+ * the very evidence it exists to preserve. Refusals — and any row written after
+ * the business write already committed — omit `tx` and are written
+ * independently.
+ *
+ * Rule of thumb: `tx` when the row asserts something the transaction must make
+ * true; no `tx` when the row asserts something about the transaction itself.
  */
 export async function recordAudit(
   c: AuditContext,
@@ -226,6 +255,9 @@ export async function recordAudit(
     | null
     | undefined;
   const requestId = (c.get("requestId") as string | undefined) ?? null;
+  // Set by `requireVendor` on every /api/vendor/* request. Read here rather
+  // than passed by each call site — see the doc comment above.
+  const vendorId = (c.get("vendorId") as string | undefined) ?? null;
 
   try {
     const writer = tx ?? db;
@@ -246,6 +278,10 @@ export async function recordAudit(
         method: c.req.method,
         path: c.req.path,
         ...(entry.metadata ?? {}),
+        // Last, so a caller cannot overwrite which vendor this was written for.
+        // Absent entirely on an admin request: an admin acts for nobody, and a
+        // null here would make the field stop answering its one question.
+        ...(vendorId ? { vendorId } : {}),
       }) as never,
       requestId,
       ipAddress: getClientIp(c as unknown as Context),
@@ -261,6 +297,7 @@ export async function recordAudit(
         entityType: entry.entityType,
         entityId: entry.entityId,
         actorUserId: user?.id ?? null,
+        vendorId,
       },
       "audit write failed"
     );

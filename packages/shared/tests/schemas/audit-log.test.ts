@@ -56,6 +56,96 @@ describe('audit action registry', () => {
   })
 })
 
+/**
+ * The production pipeline (#679) is the first feature to file rows under
+ * `fulfilment`, and the split is the thing worth testing. #667 originally put
+ * every `production_job.*` action under `money`; the design reconciles that by
+ * asking what the ROW is about rather than which table it touches. Assigning a
+ * job commits what we owe a supplier, so it is money. Moving that same job from
+ * printing to qc_submitted moves no money, so it is fulfilment.
+ */
+describe('production pipeline actions', () => {
+  /** Commits or changes what we owe a supplier. */
+  const MONEY_ACTIONS = [
+    'production_job.assigned',
+    'production_job.reassigned',
+    'production_job.amount_overridden',
+    'production_transfer.declared_lost',
+  ] as const
+
+  /** A job or a transfer moving through print, QC and despatch. */
+  const FULFILMENT_ACTIONS = [
+    'production_job.created',
+    'production_job.transitioned',
+    'production_job.transition_refused',
+    'production_job.photos_submitted',
+    'production_job.qc_approved',
+    'production_job.qc_rejected',
+    'production_job.label_issued',
+    'production_transfer.dispatched',
+    'production_transfer.received',
+    'order.consolidator_set',
+  ] as const
+
+  it('registers every production action, so a handler can name it at all', () => {
+    for (const action of [...MONEY_ACTIONS, ...FULFILMENT_ACTIONS]) {
+      expect(AUDIT_ACTIONS).toContain(action)
+      expect(auditActionSchema.safeParse(action).success).toBe(true)
+    }
+  })
+
+  it('files what we owe a supplier under money, not under the job it sits on', () => {
+    for (const action of MONEY_ACTIONS) {
+      expect(AUDIT_ACTION_CATEGORY[action]).toBe('money')
+    }
+  })
+
+  it('files a job moving through print, QC and despatch under fulfilment', () => {
+    for (const action of FULFILMENT_ACTIONS) {
+      expect(AUDIT_ACTION_CATEGORY[action]).toBe('fulfilment')
+    }
+  })
+
+  /**
+   * A cancellation is a TRANSITION, recorded as `production_job.transitioned`.
+   * A separate action would put two rows on one state move and break the
+   * "one row per transition" property the timeline is read through. Its money
+   * consequence, if any, is a separate `production_job.amount_overridden`.
+   *
+   * Contrast `order.cancelled`, which IS split out (routes/admin/orders.ts):
+   * cancelling an order is itself the money decision, not a state move.
+   */
+  it('does not split out a job cancellation — a cancellation is a transition', () => {
+    expect(AUDIT_ACTIONS).not.toContain('production_job.cancelled')
+    expect(auditActionSchema.safeParse('production_job.cancelled').success).toBe(false)
+    expect(AUDIT_ACTIONS).toContain('order.cancelled')
+  })
+
+  /**
+   * The registry is a tuple and the category map is keyed on it, so a duplicate
+   * spelling would silently give one action two entries and make a category
+   * filter return half its history.
+   */
+  it('maps every registered action to exactly one category', () => {
+    expect(new Set(AUDIT_ACTIONS).size).toBe(AUDIT_ACTIONS.length)
+    expect(Object.keys(AUDIT_ACTION_CATEGORY).length).toBe(AUDIT_ACTIONS.length)
+    for (const action of AUDIT_ACTIONS) {
+      expect(auditCategorySchema.safeParse(AUDIT_ACTION_CATEGORY[action]).success).toBe(true)
+    }
+  })
+
+  /**
+   * #671 will fail the build on an action nothing emits. Declaring anything for
+   * a later phase to fill in breaks the build the day that guard lands, so the
+   * registry must hold nothing for order-dispatch-tracking yet.
+   */
+  it('declares nothing for a later phase to emit', () => {
+    for (const action of AUDIT_ACTIONS) {
+      expect(action.startsWith('shipment.')).toBe(false)
+    }
+  })
+})
+
 describe('audit category and outcome', () => {
   it('accepts the six categories and refuses anything else', () => {
     for (const c of ['money', 'privilege', 'catalogue', 'config', 'content', 'fulfilment']) {
