@@ -7,12 +7,14 @@
 
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 
+import { resolveDatabaseUrl } from '../src/config/database-url';
+
 // Set test environment
 process.env.NODE_ENV = 'test';
 
 // Configure test environment variables
 process.env.PORT = '3000';
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
+process.env.DATABASE_URL = resolveDatabaseUrl();
 
 /**
  * A disposable database, when one is configured, is used by EVERYTHING (#580).

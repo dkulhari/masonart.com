@@ -81,6 +81,10 @@ DEV_LOG="/tmp/chobii-dev.log"
 # Project root (resolve from script location)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# DB_HOST/DB_PORT/... from the root .env — the single place they are set.
+source "$PROJECT_ROOT/scripts/lib/db-env.sh"
+chobii_load_db_env "$PROJECT_ROOT" || exit 1
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Argument parsing
 # ─────────────────────────────────────────────────────────────────────────────
@@ -187,21 +191,22 @@ start_docker_services() {
     echo ""
 
     local DOCKER_OK=true
-    check_service "PostgreSQL" 5433 || DOCKER_OK=false
+    check_service "PostgreSQL" "$DB_PORT" || DOCKER_OK=false
     check_service "Redis" 6380 || DOCKER_OK=false
     check_service "MinIO API" 9000 || DOCKER_OK=false
 
     if [ "$DOCKER_OK" = false ]; then
         echo ""
         echo -e "${YELLOW}Starting Docker services...${NC}"
-        cd "$PROJECT_ROOT/docker" && docker compose up -d && cd "$PROJECT_ROOT"
+        # --no-recreate: never move a running postgres off the port .env expects
+        cd "$PROJECT_ROOT/docker" && docker compose up -d --no-recreate && cd "$PROJECT_ROOT"
 
         echo "Waiting for services to initialize..."
         sleep 10
 
         echo ""
         echo "Re-checking services:"
-        check_service "PostgreSQL" 5433 || { print_error "PostgreSQL failed to start"; exit 1; }
+        check_service "PostgreSQL" "$DB_PORT" || { print_error "PostgreSQL failed to start"; exit 1; }
         check_service "Redis" 6380 || { print_error "Redis failed to start"; exit 1; }
         check_service "MinIO API" 9000 || { print_error "MinIO failed to start"; exit 1; }
     fi
@@ -615,7 +620,7 @@ cmd_setup() {
     echo "Services running:"
     echo "  • Web App:    http://localhost:3001"
     echo "  • API Server: http://localhost:3000"
-    echo "  • PostgreSQL: localhost:5433"
+    echo "  • PostgreSQL: ${DB_HOST}:${DB_PORT}"
     echo "  • Redis:      localhost:6380"
     echo "  • MinIO:      http://localhost:9000"
     echo ""

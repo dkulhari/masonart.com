@@ -3,6 +3,7 @@ import { createConnection } from 'net';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { resolveDatabaseUrl } from '../../packages/api/src/config/database-url';
 
 /**
  * Tests to verify Docker Compose services are properly configured and running
@@ -15,7 +16,7 @@ import { execSync } from 'child_process';
  * - Basic connectivity to each service
  *
  * Expected Docker Compose setup:
- * - PostgreSQL 16 on port 5433 (host) -> 5432 (container)
+ * - PostgreSQL 16 on the host port from .env DATABASE_URL -> 5432 (container)
  * - Redis 7-alpine on port 6380 (host) -> 6379 (container)
  * - MinIO on port 9000 (API) and 9001 (Console)
  */
@@ -24,11 +25,20 @@ import { execSync } from 'child_process';
 const rootDir = process.cwd();
 const dockerComposeFile = join(rootDir, 'docker', 'docker-compose.yml');
 
+/**
+ * The host port postgres is expected on, taken from the root .env — the one
+ * place this is configured. POSTGRES_PORT overrides it for one-off runs.
+ */
+function expectedPostgresPort(): number {
+  if (process.env.POSTGRES_PORT) return parseInt(process.env.POSTGRES_PORT, 10);
+  return parseInt(new URL(resolveDatabaseUrl()).port || '5432', 10);
+}
+
 // Configuration for Docker services
 const DOCKER_SERVICES = {
   postgres: {
     host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5433', 10),
+    port: expectedPostgresPort(),
     user: process.env.POSTGRES_USER || 'poster_app',
     password: process.env.POSTGRES_PASSWORD || 'dev_password',
     database: process.env.POSTGRES_DB || 'poster_app_dev',
@@ -212,8 +222,17 @@ describe('Docker Compose Configuration', () => {
       expect(dockerComposeContent).toContain(`image: ${DOCKER_SERVICES.postgres.image}`);
     });
 
-    it('should expose port 5433 externally', () => {
-      expect(dockerComposeContent).toMatch(/["']?5433:5432["']?/);
+    // The published port is interpolated from POSTGRES_PORT so that .env
+    // stays the single place it is configured. Several projects run postgres
+    // on this machine, so a literal here is how it drifted onto a neighbour's.
+    it('should publish the host port from POSTGRES_PORT', () => {
+      expect(dockerComposeContent).toMatch(/["']?\$\{POSTGRES_PORT:-\d+\}:5432["']?/);
+    });
+
+    it('should default POSTGRES_PORT to the port .env uses', () => {
+      const match = dockerComposeContent.match(/\$\{POSTGRES_PORT:-(\d+)\}:5432/);
+      expect(match).not.toBeNull();
+      expect(Number(match![1])).toBe(expectedPostgresPort());
     });
 
     it('should have container name configured', () => {
@@ -471,7 +490,7 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
     it('should be using expected database configuration', () => {
       expect(DOCKER_SERVICES.postgres.user).toBe('poster_app');
       expect(DOCKER_SERVICES.postgres.database).toBe('poster_app_dev');
-      expect(DOCKER_SERVICES.postgres.port).toBe(5433);
+      expect(DOCKER_SERVICES.postgres.port).toBe(expectedPostgresPort());
     });
   });
 

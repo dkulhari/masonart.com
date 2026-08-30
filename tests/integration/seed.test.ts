@@ -14,6 +14,11 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import {
+  destructiveDbSkipReason,
+  getDestructiveDbUrl,
+} from '../../packages/api/tests/helpers/destructive-db';
+
 // Dynamically import postgres only when needed for runtime tests
 type PostgresClient = any;
 
@@ -35,8 +40,17 @@ beforeAll(async () => {
     // Dynamically import postgres
     const postgres = (await import('postgres')).default;
 
-    // Use test database URL or fall back to development
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    // DESTRUCTIVE: the seed-insertion block below runs
+    // `DELETE FROM products/product_variants/frames` in a beforeEach. This
+    // suite lives outside packages/api, so it never adopted the #332 guard
+    // and would happily empty the dev catalogue whenever DATABASE_URL was
+    // exported from .env (which every ticket note tells you to do).
+    const databaseUrl = getDestructiveDbUrl();
+    if (!databaseUrl) {
+      console.log(destructiveDbSkipReason());
+      isDatabaseAvailable = false;
+      return;
+    }
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,

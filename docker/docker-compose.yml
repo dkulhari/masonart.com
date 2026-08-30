@@ -6,8 +6,12 @@ services:
       POSTGRES_USER: poster_app
       POSTGRES_PASSWORD: dev_password
       POSTGRES_DB: poster_app_dev
+    # Host port comes from POSTGRES_PORT so the root .env stays the single
+    # place it is configured. Other projects on this machine publish postgres
+    # on 5432 and 5433; a literal here is how chobii once pointed at one.
+    # `bun run dev` / `dev:services` derive POSTGRES_PORT from DATABASE_URL.
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5440}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

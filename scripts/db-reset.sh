@@ -61,17 +61,11 @@ done
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# Load environment variables
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | grep DATABASE_URL | xargs)
-fi
-
-# Database connection details
-DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5433}"
-DB_USER="${DB_USER:-poster_app}"
-DB_PASSWORD="${DB_PASSWORD:-dev_password}"
-DB_NAME="${DB_NAME:-poster_app_dev}"
+# Database connection details, resolved from the root .env — the single place
+# this is configured. No port default here: other projects on this machine
+# publish postgres on 5432 and 5433, and guessing hits the wrong server.
+source "$PROJECT_ROOT/scripts/lib/db-env.sh"
+chobii_load_db_env "$PROJECT_ROOT" || exit 1
 
 echo -e "${BLUE}"
 echo "╔══════════════════════════════════════════════════════════════╗"

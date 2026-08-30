@@ -21,6 +21,7 @@ import postgres from 'postgres';
 // Import connection modules - these should work even without database running
 import * as databaseModule from '../../src/database/index';
 import * as dbModule from '../../src/db/index';
+import { resolveDatabaseUrl } from '../../src/config/database-url';
 
 // Helper to check if database is available
 let isDatabaseAvailable = false;
@@ -35,7 +36,8 @@ beforeAll(async () => {
 
   // Try to connect to database
   try {
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    // Read-only probe (SELECT 1) — safe against whatever .env points at.
+    const databaseUrl = resolveDatabaseUrl();
     testClient = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,

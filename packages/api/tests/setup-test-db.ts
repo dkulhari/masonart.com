@@ -4,17 +4,14 @@
 
 import postgres from 'postgres';
 
+import { resolveDatabaseUrl } from '../src/config/database-url';
+
 async function setupTestDatabase() {
   console.log('Setting up test database...');
 
-  // Connect to the default database first
-  const defaultDb = postgres({
-    host: 'localhost',
-    port: 5433,
-    database: 'poster_app_dev',
-    username: 'poster_app',
-    password: 'dev_password',
-  });
+  // Connect through the same URL everything else uses, so this can never
+  // create the test database on a different server than the suites read.
+  const defaultDb = postgres(resolveDatabaseUrl());
 
   try {
     // Check if test database exists

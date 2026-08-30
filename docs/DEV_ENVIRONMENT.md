@@ -22,7 +22,7 @@ bun install
 
 # 4. Push database schema
 cd packages/api
-DATABASE_URL="postgresql://poster_app:dev_password@localhost:5433/poster_app_dev" bunx drizzle-kit push --force
+DATABASE_URL="postgresql://poster_app:dev_password@localhost:5440/poster_app_dev" bunx drizzle-kit push --force
 cd ..
 
 # 5. Seed the database with sample data
@@ -46,7 +46,7 @@ bun run dev
 
 | Service | Host Port | Container Port | Description |
 |---------|-----------|----------------|-------------|
-| PostgreSQL | 5433 | 5432 | Database |
+| PostgreSQL | 5440 (from `.env`) | 5432 | Database |
 | Redis | 6380 | 6379 | Cache & Queue |
 | MinIO API | 9000 | 9000 | S3-compatible storage |
 | MinIO Console | 9001 | 9001 | Storage admin UI |
@@ -76,7 +76,7 @@ The `.env` file in the project root contains all configuration. Key variables:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://poster_app:dev_password@localhost:5433/poster_app_dev
+DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev
 
 # Redis
 REDIS_URL=redis://localhost:6380
@@ -113,7 +113,7 @@ cd packages/web && bun run dev
 cd packages/api
 
 # Push schema changes to database
-DATABASE_URL="postgresql://poster_app:dev_password@localhost:5433/poster_app_dev" bunx drizzle-kit push --force
+DATABASE_URL="postgresql://poster_app:dev_password@localhost:5440/poster_app_dev" bunx drizzle-kit push --force
 
 # Generate migrations
 bun run db:generate
@@ -182,7 +182,7 @@ After running `bun run seed`, the database contains:
 ### Port Conflicts
 
 If ports 5432 or 6379 are already in use by other projects, the docker-compose.yml uses alternate ports:
-- PostgreSQL: 5433 (instead of 5432)
+- PostgreSQL: 5440 (instead of 5432 — 5432 and 5433 belong to other projects on this machine)
 - Redis: 6380 (instead of 6379)
 
 Make sure your `.env` file reflects these ports.

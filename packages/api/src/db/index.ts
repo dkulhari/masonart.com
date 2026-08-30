@@ -8,12 +8,16 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
+import { resolveDatabaseUrl } from '../config/database-url';
+
 /**
- * Get database connection URL from environment
- * Defaults to local development database if not set
+ * Get database connection URL.
+ *
+ * Resolves from DATABASE_URL, then the root .env, then throws — there is no
+ * port fallback on purpose. See src/config/database-url.ts.
  */
 export function getDatabaseUrl(): string {
-  return process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
+  return resolveDatabaseUrl();
 }
 
 /**

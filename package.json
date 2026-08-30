@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
-    "dev": "turbo run dev",
+    "dev": "./scripts/dev-services.sh && turbo run dev",
+    "dev:services": "./scripts/dev-services.sh",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { resolveDatabaseUrl } from "../../src/config/database-url";
 import {
   reviews,
   reviewStatusEnum,
@@ -35,9 +36,7 @@ beforeAll(async () => {
 
   try {
     // Use test database URL or fall back to development
-    const databaseUrl =
-      process.env.DATABASE_URL ||
-      "postgresql://poster_app:dev_password@localhost:5433/poster_app_dev";
+    const databaseUrl = resolveDatabaseUrl();
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,

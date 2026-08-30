@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
+import { resolveDatabaseUrl } from './src/config/database-url';
+
 export default defineConfig({
   test: {
     globals: true,
@@ -12,10 +14,9 @@ export default defineConfig({
       NODE_ENV: 'test',
       // Respect externally-set URLs (alt ports, CI) instead of clobbering
       // them — the hardcoded dev URL here is what let destructive suites
-      // reach the real dev database (#332).
-      DATABASE_URL:
-        process.env.DATABASE_URL ||
-        'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev',
+      // reach the real dev database (#332). Resolves from the root .env, the
+      // single place this is configured; throws rather than guess a port.
+      DATABASE_URL: resolveDatabaseUrl(),
       // Destructive suites (tests/database/) only run when this points at a
       // *_test database — see tests/helpers/destructive-db.ts (#332).
       TEST_DATABASE_URL: process.env.TEST_DATABASE_URL || '',
