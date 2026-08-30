@@ -747,6 +747,19 @@ describe('Products Runtime Tests (Database Required)', () => {
       expect(json).toHaveProperty('items');
     });
 
+    /**
+     * The storefront joins a multi-value facet with commas — see the
+     * `values.join(',')` in `packages/web/app/routes/posters/index.tsx` — and
+     * `facetList` splits on the comma before checking each part against the
+     * vocabulary in `@chobii/shared`.
+     *
+     * This test used to send `?styles=minimalist,abstract`, and read as though
+     * the comma were the problem. Neither value is a style: `minimalist-art`
+     * is the style id and `abstract` is a SUBJECT. The sibling case in
+     * "Products Query Parameter Validation" was corrected when the vocabulary
+     * landed and this one was missed, so it kept 400ing on the values while
+     * looking like a broken filter.
+     */
     it('should filter by styles', async () => {
       if (!isDatabaseAvailable) {
         console.log('Skipping: Database not available');
@@ -754,12 +767,81 @@ describe('Products Runtime Tests (Database Required)', () => {
       }
       if (!app) return;
 
-      const res = await app.request('/api/products?styles=minimalist,abstract');
+      const res = await app.request(
+        '/api/products?styles=minimalist-art,pop-art'
+      );
       expect(res.status).toBe(200);
 
       const json = await res.json();
       expect(json).toHaveProperty('items');
     });
+
+    it('should filter by styles given as repeated query params', async () => {
+      if (!isDatabaseAvailable) {
+        console.log('Skipping: Database not available');
+        return;
+      }
+      if (!app) return;
+
+      const res = await app.request(
+        '/api/products?styles=minimalist-art&styles=pop-art'
+      );
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toHaveProperty('items');
+    });
+
+    /**
+     * A half-fixed filter set is worse than a consistently broken one, so
+     * every array facet is exercised in both wire shapes with values taken
+     * from its own vocabulary.
+     */
+    const arrayFacetCases: ReadonlyArray<readonly [string, string, string]> = [
+      ['styles', 'minimalist-art', 'pop-art'],
+      ['subjects', 'abstract', 'landscape'],
+      ['colors', 'blue', 'white'],
+      ['rooms', 'living-room', 'bedroom'],
+      ['vibe', 'tranquility-and-zen', 'warmth-and-cozy'],
+      ['aesthetic', 'japandi-essence', 'organic-modern'],
+      ['medium', 'giclee-canvas', 'fine-art-paper'],
+    ];
+
+    for (const [facet, first, second] of arrayFacetCases) {
+      it(`should filter by ${facet} in both comma-joined and repeated form`, async () => {
+        if (!isDatabaseAvailable) {
+          console.log('Skipping: Database not available');
+          return;
+        }
+        if (!app) return;
+
+        const joined = await app.request(
+          `/api/products?${facet}=${first},${second}`
+        );
+        expect(joined.status).toBe(200);
+        expect(await joined.json()).toHaveProperty('items');
+
+        const repeated = await app.request(
+          `/api/products?${facet}=${first}&${facet}=${second}`
+        );
+        expect(repeated.status).toBe(200);
+        expect(await repeated.json()).toHaveProperty('items');
+      });
+
+      it(`rejects an unknown ${facet} value in either form`, async () => {
+        if (!app) return;
+
+        const joined = await app.request(
+          `/api/products?${facet}=${first},not-a-real-value`
+        );
+        expect(joined.status).toBe(400);
+
+        const repeated = await app.request(
+          `/api/products?${facet}=${first}&${facet}=not-a-real-value`
+        );
+        expect(repeated.status).toBe(400);
+      });
+    }
 
     it('should filter by price range', async () => {
       if (!isDatabaseAvailable) {

@@ -46,6 +46,7 @@ import {
   uniquenessSchema,
   availabilitySchema,
 } from "@chobii/shared";
+import { facetList } from "../lib/facet-query";
 import { unitsSoldSql } from "../lib/product-sales";
 import {
   optionalAuth,
@@ -146,37 +147,21 @@ async function loadSaleContext(isMember: boolean) {
  * Query parameters for product listing
  */
 /**
- * A comma-separated facet parameter, every value checked against its
- * vocabulary.
+ * Facet parameters accept both the comma-joined and the repeated form, and
+ * every value is checked against its vocabulary.
  *
- * Two things this buys:
+ * Two things that buys:
  *
- * 1. **Safety.** The array filters below build a postgres ARRAY literal with
- *    `sql.raw` and hand-rolled quote escaping. That is only ever safe while
- *    the values are constrained; this constrains them.
+ * 1. **Safety.** The array filters below build a postgres ARRAY literal. That
+ *    is only ever safe while the values are constrained; this constrains them.
  * 2. **Honesty.** An unknown value is a 400. Ignoring it would hand the
  *    shopper an unfiltered grid that they believe was filtered — the worst of
  *    the available failure modes. A partly-valid list fails too, rather than
  *    quietly filtering on the half we recognised.
+ *
+ * @see lib/facet-query.ts — shared with routes/collections.ts, which had a
+ *   verbatim second copy of this schema.
  */
-const facetList = (member: z.ZodTypeAny) =>
-  z
-    .string()
-    .optional()
-    .transform((value) =>
-      value === undefined
-        ? undefined
-        : value
-            .split(",")
-            .map((part) => part.trim())
-            .filter(Boolean)
-    )
-    .refine(
-      (values) =>
-        values === undefined || values.every((v) => member.safeParse(v).success),
-      { message: "Unknown filter value" }
-    );
-
 const listProductsQuerySchema = z.object({
   // Pagination
   page: z.coerce.number().int().positive().optional().default(1),

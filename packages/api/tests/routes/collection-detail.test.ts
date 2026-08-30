@@ -179,6 +179,23 @@ describe('shopper facets narrow within the collection', () => {
     const res = await app.request('/api/collections/pop-art?styles=not-a-style');
     expect(res.status).toBe(400);
   });
+
+  /**
+   * `?colors=blue&colors=white` is what `URLSearchParams` writes by default,
+   * and hono hands zod an array for it. `facetList` used to start at
+   * `z.string()`, so the repeated form 400d on every array facet on both this
+   * route and /api/products while the comma-joined form the storefront sends
+   * worked — the two shapes now resolve to the same list.
+   */
+  it('accepts a facet repeated rather than comma-joined', async () => {
+    queueSelects([popArt], [{ count: 1 }], [product('a')]);
+
+    const res = await app.request(
+      '/api/collections/pop-art?colors=blue&colors=white'
+    );
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('pagination', () => {

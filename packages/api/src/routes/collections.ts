@@ -45,6 +45,7 @@ import {
   type CollectionRuleShape,
 } from "../lib/collection-resolver";
 import { representativesFor } from "../lib/collection-imagery";
+import { facetList } from "../lib/facet-query";
 import { getCached, setCached, CacheKeys } from "../lib/redis";
 import type { Collection } from "../database/schema/collections";
 
@@ -155,31 +156,6 @@ collectionsApp.get("/", async (c) => {
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
-
-/**
- * Comma-separated facet list, validated against the shared vocabulary.
- *
- * Same shape as `facetList` in routes/products.ts. An unknown value is a 400
- * rather than a silently-ignored parameter: a shopper who believes the grid is
- * filtered and is looking at an unfiltered one is the failure #452 was.
- */
-const facetList = (member: z.ZodTypeAny) =>
-  z
-    .string()
-    .optional()
-    .transform((value) =>
-      value === undefined
-        ? undefined
-        : value
-            .split(",")
-            .map((part) => part.trim())
-            .filter(Boolean)
-    )
-    .refine(
-      (values) =>
-        values === undefined || values.every((v) => member.safeParse(v).success),
-      { message: "Unknown filter value" }
-    );
 
 const detailQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
