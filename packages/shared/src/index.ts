@@ -41,6 +41,10 @@ export * from './schemas/audit-log';
 // modules, so './schemas/index.ts' alone does not make these reachable through
 // `@chobii/shared`.
 export * from './schemas/production-qc';
+// The production transition matrix. Same reason as the five above: this barrel
+// enumerates schema modules, so './schemas/index.ts' alone does not make these
+// reachable through `@chobii/shared`.
+export * from './schemas/production-transitions';
 
 // Constants
 export * from './constants/brand';

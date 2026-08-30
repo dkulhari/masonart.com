@@ -29,22 +29,37 @@
  * cannot serialise anything, and pretending otherwise would be worse than not
  * trying.
  *
+ * ## Where the table itself lives, and why not here
+ *
+ * The grammar is here. The TABLE is in `@chobii/shared`
+ * (`schemas/production-transitions.ts`), and it moved for one reason: §4 says
+ * "the admin and vendor UIs render actions **from the matrix** rather than from
+ * a hardcoded list that can drift", and `packages/web` cannot import this file.
+ * It is not a dependency of web, and the value import below would drag
+ * `drizzle-orm/pg-core` into a browser bundle. The only alternatives were a
+ * second copy of the table in web — the exact drift the design forbids — or one
+ * copy both packages read. There is one copy, and this module is still the only
+ * thing in the API that decides whether a job may move.
+ *
  * ## Totality
  *
- * `PRODUCTION_TRANSITIONS` is a mapped type over every enum value, so a status
- * added to the enum without a row here is a *compile* error, and the anti-drift
- * test makes it a test failure too. This matters more than it looks: a partial
- * map would answer "no" for the new status, which reads exactly like a working
- * state machine while the new state is bricked.
+ * `PRODUCTION_TRANSITIONS` is annotated as a mapped type over every enum value,
+ * so a status added to the enum without a row in the shared table is a *compile*
+ * error here, and the anti-drift test makes it a test failure too. This matters
+ * more than it looks: a partial map would answer "no" for the new status, which
+ * reads exactly like a working state machine while the new state is bricked. It
+ * is also what lets the table live outside the package that owns the enum
+ * without the two silently parting company.
  *
  * ## `sent` is retired by having no edges
  *
  * Dropping an enum value means recreating the type and rewriting every
  * dependent column, and rows still carry `sent` until #675's backfill runs. So
- * it stays in the vocabulary and is retired *here*, with zero in-edges and zero
- * out-edges. Nothing can enter it and nothing can leave it.
+ * it stays in the vocabulary and is retired in the table, with zero in-edges and
+ * zero out-edges. Nothing can enter it and nothing can leave it.
  */
 
+import { PRODUCTION_TRANSITIONS as SHARED_PRODUCTION_TRANSITIONS } from '@chobii/shared'
 import { productionJobStatusEnum } from '../database/schema/production-jobs'
 
 export type ProductionJobStatus = (typeof productionJobStatusEnum.enumValues)[number]
@@ -102,55 +117,7 @@ export type TransitionMatrix = { readonly [From in ProductionJobStatus]: Transit
  * way top to bottom, and so `Object.keys` can be compared against the enum
  * directly.
  */
-export const PRODUCTION_TRANSITIONS: TransitionMatrix = {
-  draft: {
-    assigned: { actors: ['admin'], guard: 'priced-from-rate-card' },
-    cancelled: { actors: ['admin'] },
-  },
-
-  assigned: {
-    // A self-edge, and a legal no-op rather than a refusal: this is
-    // reassignment before work starts, which re-prices from the rate card.
-    assigned: { actors: ['admin'], guard: 'priced-from-rate-card' },
-    received: { actors: ['vendor'] },
-    cancelled: { actors: ['admin'] },
-  },
-
-  // RETIRED (#675). Zero in-edges, zero out-edges. This empty row is the
-  // enforcement — see the module header before adding anything to it.
-  sent: {},
-
-  received: {
-    qc_submitted: { actors: ['vendor'], guard: 'shot-list-complete' },
-    cancelled: { actors: ['admin'] },
-  },
-
-  qc_submitted: {
-    qc_passed: { actors: ['admin'], guard: 'review-verdict-pass' },
-    qc_failed: { actors: ['admin'], guard: 'review-verdict-fail' },
-    cancelled: { actors: ['admin'] },
-  },
-
-  qc_passed: {
-    // A second review may still fail a job before it leaves.
-    qc_failed: { actors: ['admin'], guard: 'review-verdict-fail' },
-    dispatched: { actors: ['vendor', 'admin'], guard: 'open-transfer-or-order-label' },
-    cancelled: { actors: ['admin'] },
-  },
-
-  qc_failed: {
-    received: { actors: ['vendor'] }, // rework in place
-    assigned: { actors: ['admin'], guard: 'priced-from-rate-card' }, // rework elsewhere
-    cancelled: { actors: ['admin'] },
-  },
-
-  // Terminal. A lost transfer creates a NEW job; it never resurrects this one.
-  dispatched: {},
-
-  // Terminal. Cancellation always wins a race, because it has no out-edge for
-  // anything to move on to.
-  cancelled: {},
-}
+export const PRODUCTION_TRANSITIONS: TransitionMatrix = SHARED_PRODUCTION_TRANSITIONS
 
 const STATUS_VALUES = productionJobStatusEnum.enumValues as readonly ProductionJobStatus[]
 

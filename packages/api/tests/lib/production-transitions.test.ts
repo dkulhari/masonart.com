@@ -26,6 +26,8 @@
 
 import { describe, it, expect } from 'vitest'
 
+import { PRODUCTION_JOB_STATUSES as SHARED_PRODUCTION_JOB_STATUSES } from '@chobii/shared'
+
 import { productionJobStatusEnum } from '../../src/database/schema/production-jobs'
 import {
   PRODUCTION_TRANSITIONS,
@@ -127,6 +129,21 @@ describe('the transition matrix is total', () => {
 
   it('deep-equals the enum on its key set, so a new status cannot be silently denied', () => {
     expect(Object.keys(PRODUCTION_TRANSITIONS)).toEqual([...productionJobStatusEnum.enumValues])
+  })
+
+  /**
+   * The table itself lives in `@chobii/shared` so that `packages/web` can render
+   * actions FROM the matrix (design §4) rather than from a second copy of it —
+   * web cannot import this package, and the enum below cannot leave it. That
+   * makes THIS the seam, and `PRODUCTION_JOB_STATUSES` the part of it a type
+   * cannot check: `nextStatuses` over there iterates that list, so a status
+   * missing from it is an action the admin screen silently never offers, while
+   * the API goes on allowing the move. Only equality with the enum catches it.
+   */
+  it('is ordered by a shared status list that still matches the enum exactly', () => {
+    expect([...SHARED_PRODUCTION_JOB_STATUSES]).toEqual([
+      ...productionJobStatusEnum.enumValues,
+    ])
   })
 
   it('names every target it allows as a real status', () => {
