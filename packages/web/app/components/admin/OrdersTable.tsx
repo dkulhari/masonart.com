@@ -16,7 +16,6 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
   type ColumnDef,
   type SortingState,
   type ColumnFiltersState,
@@ -34,6 +33,7 @@ import {
   Package,
   DollarSign,
 } from 'lucide-react'
+import { AdminDataTable, AdminTableSkeleton } from './AdminDataTable'
 import {
   RowActionsMenu,
   ROW_ACTION_ITEM,
@@ -41,7 +41,6 @@ import {
 } from './RowActionsMenu'
 import { SortableHeader } from './SortableHeader'
 import { StatusBadge } from './StatusBadge'
-import { TablePagination } from './TablePagination'
 import { formatPrice } from '~/lib/utils'
 
 // ============================================================================
@@ -519,82 +518,15 @@ export function OrdersTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id} className="border-b border-border bg-muted/50">
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
-                      style={{ width: header.column.getSize() }}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {isLoading ? (
-                // Loading skeleton
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border">
-                    {columns.map((_, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-6 animate-pulse rounded bg-muted" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : table.getRowModel().rows.length === 0 ? (
-                // Empty state
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    className="px-4 py-12 text-center text-muted-foreground"
-                  >
-                    <Package className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                    <p className="mt-3">No orders found</p>
-                    {globalFilter && (
-                      <p className="mt-1 text-sm">
-                        Try adjusting your search or filter to find what you&apos;re looking for.
-                      </p>
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                // Data rows
-                table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border transition-colors hover:bg-muted/50"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className="px-4 py-3 text-sm"
-                        style={{ width: cell.column.getSize() }}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {!isLoading && table.getRowModel().rows.length > 0 && (
-          <TablePagination table={table} itemNoun="orders" />
-        )}
-      </div>
+      <AdminDataTable
+        table={table}
+        columnCount={columns.length}
+        isLoading={isLoading}
+        emptyIcon={Package}
+        emptyTitle="No orders found"
+        isFiltered={Boolean(globalFilter)}
+        itemNoun="orders"
+      />
     </div>
   )
 }
@@ -616,32 +548,7 @@ export function OrdersTableSkeleton() {
       </div>
 
       {/* Table skeleton */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="border-b border-border bg-muted/50 px-4 py-3">
-          <div className="flex gap-4">
-            {[150, 200, 140, 120, 70, 100, 50].map((w, i) => (
-              <div
-                key={i}
-                className="h-4 animate-pulse rounded bg-muted"
-                style={{ width: w }}
-              />
-            ))}
-          </div>
-        </div>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="border-b border-border px-4 py-3">
-            <div className="flex items-center gap-4">
-              {[150, 200, 140, 120, 70, 100, 50].map((w, j) => (
-                <div
-                  key={j}
-                  className="h-6 animate-pulse rounded bg-muted"
-                  style={{ width: w }}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <AdminTableSkeleton widths={[150, 200, 140, 120, 70, 100, 50]} />
     </div>
   )
 }
