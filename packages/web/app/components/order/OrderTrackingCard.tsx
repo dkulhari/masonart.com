@@ -214,7 +214,7 @@ export function OrderTrackingCard({
     <div className={cn('space-y-4', className)}>
       {/* Header with refresh button */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">
+        <h3 className="text-lg text-foreground">
           Shipment{shipments.length > 1 ? 's' : ''} ({shipments.length})
         </h3>
         <button

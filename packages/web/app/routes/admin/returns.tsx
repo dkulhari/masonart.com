@@ -793,7 +793,7 @@ function AdminReturnsPage() {
       {modalMode === 'reject' && selectedReturn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-foreground">Reject Return Request</h2>
+            <h2 className="text-lg text-foreground">Reject Return Request</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Please provide a reason for rejecting this return request.
             </p>
@@ -843,7 +843,7 @@ function AdminReturnsPage() {
       {modalMode === 'refund' && selectedReturn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-foreground">Process Refund</h2>
+            <h2 className="text-lg text-foreground">Process Refund</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Order {selectedReturn.order.orderNumber} - Total:{' '}
               {formatCurrency(selectedReturn.order.total)}
@@ -934,7 +934,7 @@ function AdminReturnsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground">Return Details</h2>
+              <h2 className="text-lg text-foreground">Return Details</h2>
               <button
                 onClick={() => {
                   setModalMode(null)

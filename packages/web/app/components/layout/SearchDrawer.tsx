@@ -210,7 +210,7 @@ export function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
             this was a bare 36px icon box, the mobile BAR's affordance borrowed
             onto a modal surface. */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-4">
-          <h2 id={titleId} className="text-lg font-semibold">
+          <h2 id={titleId} className="text-lg">
             Search
           </h2>
           <Button

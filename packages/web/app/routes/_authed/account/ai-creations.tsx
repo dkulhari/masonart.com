@@ -319,7 +319,7 @@ function AICreationsHistoryPage() {
             {/* Create New Button */}
             <a
               href="/create"
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:from-purple-600 hover:to-pink-600"
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-sm font-medium text-white transition-all hover:from-purple-600 hover:to-pink-600"
             >
               <Plus className="h-4 w-4" />
               Create New
@@ -348,7 +348,7 @@ function AICreationsHistoryPage() {
             <div className="sticky top-24 space-y-6">
               {/* Status Filter */}
               <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="mb-4 text-sm font-semibold text-foreground">Status</h3>
+                <h3 className="mb-4 text-sm text-foreground">Status</h3>
                 <div className="space-y-1">
                   {STATUS_FILTERS.map((option) => (
                     <button
@@ -370,7 +370,7 @@ function AICreationsHistoryPage() {
 
               {/* Style Filter */}
               <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="mb-4 text-sm font-semibold text-foreground">Style</h3>
+                <h3 className="mb-4 text-sm text-foreground">Style</h3>
                 <div className="space-y-1 max-h-64 overflow-y-auto">
                   {STYLE_FILTERS.map((option) => (
                     <button
@@ -392,7 +392,7 @@ function AICreationsHistoryPage() {
 
               {/* Moderation Status Filter */}
               <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="mb-4 text-sm font-semibold text-foreground">Approval Status</h3>
+                <h3 className="mb-4 text-sm text-foreground">Approval Status</h3>
                 <div className="space-y-1">
                   {MODERATION_FILTERS.map((option) => (
                     <button
@@ -418,7 +418,7 @@ function AICreationsHistoryPage() {
           {showFilters && (
             <div className="rounded-xl border border-border bg-card p-4 lg:hidden">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Filters</h3>
+                <h3 className="text-sm text-foreground">Filters</h3>
                 <button
                   type="button"
                   onClick={() => setShowFilters(false)}

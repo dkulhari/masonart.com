@@ -419,7 +419,7 @@ describe('BestSellersRail — category pill row', () => {
     const allPill = screen.getByRole('button', { name: 'All' })
     const wabiPill = screen.getByRole('button', { name: 'Wabi-Sabi Art' })
 
-    // Active pill (All by default) - bg-band-strong with font-semibold
+    // Active pill (All by default) - bg-band-strong with font-medium
     expect(allPill.className).toContain('bg-band-strong')
     expect(allPill.className).toContain('text-foreground')
 

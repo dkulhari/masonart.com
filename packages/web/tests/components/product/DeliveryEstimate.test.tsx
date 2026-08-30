@@ -43,12 +43,13 @@ describe('DeliveryEstimate', () => {
     expect(screen.getByText('Feb 3–Feb 3')).toBeTruthy()
   })
 
-  it('bolds the date range while the surrounding sentence stays muted', () => {
+  it('emphasises the date range at a loaded weight while the surrounding sentence stays muted', () => {
     render(<DeliveryEstimate now={MONDAY} />)
 
     const range = screen.getByText('Jan 12–Jan 20')
     expect(range.tagName).toBe('STRONG')
-    expect(range.className).toContain('font-semibold')
+    // 500, not 600: Poppins loads 300/400/500, so semibold would be synthesised.
+    expect(range.className).toContain('font-medium')
     expect(range.className).toContain('text-foreground')
 
     const wrapper = screen.getByText(/Arrives soon! Get it by/).closest('p')

@@ -161,7 +161,7 @@ export function CartDrawer({ className }: CartDrawerProps) {
         <div className="flex items-center justify-between border-b border-border px-4 py-4">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            <h2 id="cart-drawer-title" className="text-lg font-semibold">
+            <h2 id="cart-drawer-title" className="text-lg">
               Your Cart
             </h2>
             {itemCount > 0 && (
@@ -220,7 +220,7 @@ export function CartDrawer({ className }: CartDrawerProps) {
               {/* Subtotal */}
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Subtotal</span>
-                <span className="text-lg font-semibold text-foreground">
+                <span className="text-lg font-medium text-foreground">
                   {formatPrice(subtotal)}
                 </span>
               </div>

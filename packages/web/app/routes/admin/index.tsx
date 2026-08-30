@@ -362,7 +362,7 @@ function AdminDashboard() {
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border p-4">
-              <h2 className="font-semibold text-foreground">Recent Orders</h2>
+              <h2 className="text-foreground">Recent Orders</h2>
               <a
                 href="/admin/orders"
                 className="flex items-center gap-1 text-sm text-brand-500 hover:text-brand-600"
@@ -407,7 +407,7 @@ function AdminDashboard() {
           {/* Quick Actions Card */}
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border p-4">
-              <h2 className="font-semibold text-foreground">Quick Actions</h2>
+              <h2 className="text-foreground">Quick Actions</h2>
             </div>
             <div className="p-2">
               <QuickActionButton
@@ -437,7 +437,7 @@ function AdminDashboard() {
           {/* Order Status Breakdown */}
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border p-4">
-              <h2 className="font-semibold text-foreground">Order Status</h2>
+              <h2 className="text-foreground">Order Status</h2>
             </div>
             <div className="p-4">
               {isLoading ? (
@@ -551,7 +551,7 @@ function RecentOrderRow({ order }: RecentOrderRowProps) {
 
       {/* Amount */}
       <div className="text-right">
-        <p className="font-semibold text-foreground">
+        <p className="font-medium text-foreground">
           {formatPrice(parseFloat(order.total))}
         </p>
         <p

@@ -307,7 +307,7 @@ function AdminOrderDetailPage() {
       ) : (
         <div className="rounded-xl border border-border bg-card p-12 text-center">
           <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h2 className="mt-4 text-lg font-semibold text-foreground">Order Not Found</h2>
+          <h2 className="mt-4 text-lg text-foreground">Order Not Found</h2>
           <p className="mt-2 text-muted-foreground">
             The order you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>

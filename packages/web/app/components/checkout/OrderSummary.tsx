@@ -139,7 +139,7 @@ export function OrderSummary({
       {/* Header */}
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
+          <h2 className="text-lg text-foreground">Order Summary</h2>
           <span className="rounded-full bg-highlight px-2.5 py-0.5 text-sm font-medium text-foreground">
             {itemCount} {itemCount === 1 ? 'item' : 'items'}
           </span>
@@ -300,7 +300,7 @@ export function OrderSummary({
       {/* Total */}
       <div className="border-t border-border p-4">
         <div className="flex items-center justify-between">
-          <span className="text-base font-semibold text-foreground">Total</span>
+          <span className="text-base font-medium text-foreground">Total</span>
           <span
             className={cn(
               'text-xl font-medium text-foreground',
@@ -331,7 +331,7 @@ export function OrderSummary({
             ))}
 
             <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-              <span className="text-base font-semibold text-foreground">
+              <span className="text-base font-medium text-foreground">
                 Amount due
               </span>
               <span className="text-xl font-medium text-foreground">
@@ -491,7 +491,7 @@ export function CompactOrderSummary({
         </div>
       )}
 
-      <div className="flex justify-between border-t border-border pt-2 font-semibold">
+      <div className="flex justify-between border-t border-border pt-2 font-medium">
         <span className="text-foreground">Total</span>
         <span className="text-foreground">{formatPrice(total)}</span>
       </div>

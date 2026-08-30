@@ -495,7 +495,7 @@ function CreatePage() {
                 onClick={handleGenerate}
                 disabled={!isFormValid || isGenerating || !!(user && walletBalance && costEstimate && !costEstimate.canUseFreeGeneration && walletBalance.balance.paise < costEstimate.cost.userPricePaise)}
                 className={cn(
-                  'flex items-center justify-center gap-2 rounded-lg px-8 py-4 text-base font-semibold transition-all',
+                  'flex items-center justify-center gap-2 rounded-lg px-8 py-4 text-base font-medium transition-all',
                   isFormValid && !isGenerating
                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30'
                     : 'cursor-not-allowed bg-muted text-muted-foreground'
@@ -581,7 +581,7 @@ function CreatePage() {
                 )
               }
               className={cn(
-                'flex flex-shrink-0 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-all',
+                'flex flex-shrink-0 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-medium transition-all',
                 isFormValid && !isGenerating
                   ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
                   : 'cursor-not-allowed bg-muted text-muted-foreground'
@@ -717,7 +717,7 @@ function CostPreviewCard({
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
             FREE
           </span>
         </div>
@@ -751,7 +751,7 @@ function CostPreviewCard({
           </div>
         </div>
         <div className="text-right">
-          <p className="text-lg font-semibold text-foreground">
+          <p className="text-lg font-medium text-foreground">
             {costEstimate.cost.formatted}
           </p>
           {costEstimate.cost.markupPercentage > 0 && (

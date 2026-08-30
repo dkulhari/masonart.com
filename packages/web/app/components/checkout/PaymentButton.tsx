@@ -394,7 +394,7 @@ export function PaymentButton({
         onClick={handlePayment}
         disabled={isDisabled}
         className={cn(
-          'flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base font-semibold transition-all',
+          'flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base font-medium transition-all',
           'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
           status === 'success'
             ? 'bg-green-500 text-white'

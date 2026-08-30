@@ -124,7 +124,7 @@ export function DeliveryEstimate({
       <CheckCircle2 className="h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
       <span>
         Arrives soon! Get it by{' '}
-        <strong className="font-semibold text-foreground">{range}</strong> if you order
+        <strong className="font-medium text-foreground">{range}</strong> if you order
         today
       </span>
     </p>

@@ -343,7 +343,7 @@ function CommentsTimeline({ comments }: CommentsTimelineProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+      <h3 className="flex items-center gap-2 text-lg text-foreground">
         <MessageSquare className="h-5 w-5" />
         Conversation
       </h3>
@@ -594,7 +594,7 @@ function ApprovalPage() {
         {isPendingUpload && (
           <div className="rounded-xl border border-border bg-white p-8 text-center">
             <Clock className="mx-auto h-16 w-16 text-gray-400" />
-            <h2 className="mt-4 text-xl font-semibold text-foreground">
+            <h2 className="mt-4 text-xl text-foreground">
               Waiting for Production Photos
             </h2>
             <p className="mx-auto mt-2 max-w-md text-muted-foreground">
@@ -607,7 +607,7 @@ function ApprovalPage() {
         {/* Photos Grid */}
         {approval.photos.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">Production Photos</h2>
+            <h2 className="text-lg text-foreground">Production Photos</h2>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {approval.photos.map((photo, index) => (
                 <button
@@ -646,7 +646,7 @@ function ApprovalPage() {
             {isApproved && (
               <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
                 <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-                <h2 className="mt-3 text-lg font-semibold text-green-800">
+                <h2 className="mt-3 text-lg text-green-800">
                   Photos Approved!
                 </h2>
                 <p className="mt-1 text-green-700">
@@ -658,7 +658,7 @@ function ApprovalPage() {
             {/* Change Request Form */}
             {showChangeForm ? (
               <div className="rounded-xl border border-border bg-white p-6">
-                <h3 className="mb-4 text-lg font-semibold text-foreground">
+                <h3 className="mb-4 text-lg text-foreground">
                   Request Changes
                 </h3>
                 <textarea
@@ -696,7 +696,7 @@ function ApprovalPage() {
             ) : (
               <div className="flex flex-col gap-4 rounded-xl border border-border bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-foreground">Ready to approve?</h3>
+                  <h3 className="text-foreground">Ready to approve?</h3>
                   <p className="text-sm text-muted-foreground">
                     Review the photos above and approve when you&apos;re satisfied.
                   </p>
@@ -732,7 +732,7 @@ function ApprovalPage() {
         {isExpired && (
           <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-600" />
-            <h2 className="mt-3 text-lg font-semibold text-red-800">
+            <h2 className="mt-3 text-lg text-red-800">
               Approval Deadline Passed
             </h2>
             <p className="mt-1 text-red-700">
@@ -745,7 +745,7 @@ function ApprovalPage() {
         {isApproved && (
           <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
             <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-            <h2 className="mt-3 text-lg font-semibold text-green-800">
+            <h2 className="mt-3 text-lg text-green-800">
               Photos Approved!
             </h2>
             <p className="mt-1 text-green-700">

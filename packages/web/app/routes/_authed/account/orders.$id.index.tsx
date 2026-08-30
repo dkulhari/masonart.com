@@ -310,7 +310,7 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+      <h2 className="flex items-center gap-2 text-lg text-foreground">
         <Camera className="h-5 w-5 text-foreground" />
         Production Approval
       </h2>
@@ -550,7 +550,7 @@ function OrderDetailPage() {
           </a>
           <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-            <h2 className="mt-4 text-lg font-semibold text-red-900">
+            <h2 className="mt-4 text-lg text-red-900">
               {error || 'Order not found'}
             </h2>
             <p className="mt-2 text-sm text-red-700">
@@ -624,7 +624,7 @@ function OrderDetailPage() {
             {/* Order Items */}
             <div className="rounded-xl border border-border bg-card">
               <div className="border-b border-border p-4">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <h2 className="flex items-center gap-2 text-lg text-foreground">
                   <Package className="h-5 w-5 text-foreground" />
                   Items ({order.items.length})
                 </h2>
@@ -668,7 +668,7 @@ function OrderDetailPage() {
                     </div>
                     {/* Price */}
                     <div className="text-right">
-                      <p className="font-semibold text-foreground">
+                      <p className="font-medium text-foreground">
                         {formatPrice(item.totalPrice)}
                       </p>
                       {item.quantity > 1 && (
@@ -719,7 +719,7 @@ function OrderDetailPage() {
 
             {/* Order Summary */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <h2 className="flex items-center gap-2 text-lg text-foreground">
                 <FileText className="h-5 w-5 text-foreground" />
                 Order Summary
               </h2>
@@ -747,7 +747,7 @@ function OrderDetailPage() {
                   </div>
                 )}
                 <div className="border-t border-border pt-2">
-                  <div className="flex justify-between text-base font-semibold">
+                  <div className="flex justify-between text-base font-medium">
                     <span className="text-foreground">Total</span>
                     <span className="text-foreground">{formatPrice(order.total)}</span>
                   </div>
@@ -767,7 +767,7 @@ function OrderDetailPage() {
                       </span>
                     </div>
                     <div className="border-t border-border pt-2">
-                      <div className="flex justify-between text-base font-semibold">
+                      <div className="flex justify-between text-base font-medium">
                         <span className="text-foreground">Charged</span>
                         <span className="text-foreground">
                           {formatPrice(order.total - order.giftCardAmount!)}
@@ -797,7 +797,7 @@ function OrderDetailPage() {
 
             {/* Shipping Address */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+              <h2 className="flex items-center gap-2 text-lg text-foreground">
                 <MapPin className="h-5 w-5 text-foreground" />
                 Shipping Address
               </h2>
@@ -821,14 +821,14 @@ function OrderDetailPage() {
             {/* Customer Notes */}
             {order.customerNotes && (
               <div className="rounded-xl border border-border bg-card p-4">
-                <h2 className="text-sm font-semibold text-foreground">Order Notes</h2>
+                <h2 className="text-sm text-foreground">Order Notes</h2>
                 <p className="mt-2 text-sm text-muted-foreground">{order.customerNotes}</p>
               </div>
             )}
 
             {/* Need Help */}
             <div className="rounded-xl border border-border bg-muted/30 p-4">
-              <h3 className="text-sm font-semibold text-foreground">Need Help?</h3>
+              <h3 className="text-sm text-foreground">Need Help?</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 If you have questions about your order, please contact our support team.
               </p>

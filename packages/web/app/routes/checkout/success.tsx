@@ -173,7 +173,7 @@ function OrderSuccessPage() {
             <p className="mb-8 text-muted-foreground">{error}</p>
             <a
               href="/account/orders"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
             >
               View All Orders
               <ArrowRight className="h-4 w-4" />
@@ -236,14 +236,14 @@ function OrderSuccessPage() {
             <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:justify-center">
               <a
                 href="/posters"
-                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
               >
                 <ShoppingBag className="h-4 w-4" />
                 Continue Shopping
               </a>
               <a
                 href="/account/orders"
-                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
               >
                 <User className="h-4 w-4" />
                 View All Orders
@@ -289,7 +289,7 @@ function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeader
         <Receipt className="h-5 w-5 text-foreground" />
         <div className="text-left">
           <p className="text-xs text-muted-foreground">Order Number</p>
-          <p className="text-lg font-semibold text-foreground">{orderNumber}</p>
+          <p className="text-lg font-medium text-foreground">{orderNumber}</p>
         </div>
         <button
           type="button"
@@ -340,7 +340,7 @@ function OrderItemsSection({ items }: OrderItemsSectionProps) {
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <h2 className="flex items-center gap-2 text-base text-foreground">
           <Package className="h-5 w-5 text-foreground" />
           Order Items ({items.length})
         </h2>
@@ -380,7 +380,7 @@ function OrderItemsSection({ items }: OrderItemsSectionProps) {
 
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
-                  <span className="text-sm font-semibold text-foreground">
+                  <span className="text-sm font-medium text-foreground">
                     {formatPrice(itemTotal)}
                   </span>
                 </div>
@@ -415,7 +415,7 @@ function ShippingSection({ address, method, estimatedDelivery }: ShippingSection
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <h2 className="flex items-center gap-2 text-base text-foreground">
           <MapPin className="h-5 w-5 text-foreground" />
           Shipping Details
         </h2>
@@ -474,7 +474,7 @@ function OrderSummarySection({
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <h2 className="flex items-center gap-2 text-base text-foreground">
           <CreditCard className="h-5 w-5 text-foreground" />
           Payment Summary
         </h2>
@@ -505,7 +505,7 @@ function OrderSummarySection({
 
         {/* Total */}
         <div className="flex justify-between border-t border-border pt-3">
-          <span className="text-base font-semibold text-foreground">Total Paid</span>
+          <span className="text-base font-medium text-foreground">Total Paid</span>
           <span className="text-lg font-medium text-foreground">{formatPrice(total)}</span>
         </div>
 
@@ -554,7 +554,7 @@ function WhatNextSection() {
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
-        <h2 className="text-base font-semibold text-foreground">What Happens Next?</h2>
+        <h2 className="text-base text-foreground">What Happens Next?</h2>
       </div>
 
       <div className="p-6">
@@ -612,14 +612,14 @@ function GenericSuccessState() {
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
             <a
               href="/posters"
-              className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+              className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               <ShoppingBag className="h-4 w-4" />
               Continue Shopping
             </a>
             <a
               href="/account/orders"
-              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
             >
               <User className="h-4 w-4" />
               View Orders

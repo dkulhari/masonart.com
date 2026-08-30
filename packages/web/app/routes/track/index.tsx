@@ -198,7 +198,7 @@ function GuestOrderLookupForm({
             type="text"
             value={orderNumber}
             onChange={(e) => setOrderNumber(e.target.value)}
-            placeholder="e.g., MA-2024-001234"
+            placeholder="e.g., CA-2026-001234"
             className="h-12 w-full rounded-lg border border-input bg-background px-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             disabled={isLoading}
           />
@@ -309,7 +309,7 @@ function GuestOrderLookupForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-semibold text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-medium text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
             <>
@@ -368,7 +368,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
                 <StatusIcon className={cn('h-5 w-5', statusConfig.color)} />
               </div>
               <div>
-                <p className={cn('font-semibold', statusConfig.color)}>
+                <p className={cn('font-medium', statusConfig.color)}>
                   {statusConfig.label}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -386,7 +386,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
         <div className="p-6">
           {/* Timeline */}
           <div className="mb-6">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="mb-4 text-sm uppercase tracking-wider text-muted-foreground">
               Order Progress
             </h3>
             <TrackingTimeline
@@ -399,7 +399,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
           {/* Shipping Info */}
           {order.tracking && (
             <div className="border-t border-border pt-6">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="mb-4 text-sm uppercase tracking-wider text-muted-foreground">
                 Shipping Details
               </h3>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -441,7 +441,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
           {/* Delivery Location */}
           {order.shippingAddress?.city && (
             <div className="mt-6 border-t border-border pt-6">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="mb-4 text-sm uppercase tracking-wider text-muted-foreground">
                 Delivery Location
               </h3>
               <div className="flex items-start gap-3">
@@ -470,7 +470,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
 
       {/* Need Help */}
       <div className="rounded-xl border border-border bg-muted/30 p-6 text-center">
-        <h3 className="text-sm font-semibold text-foreground">Need Help?</h3>
+        <h3 className="text-sm text-foreground">Need Help?</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           If you have questions about your order, please contact our support team.
         </p>

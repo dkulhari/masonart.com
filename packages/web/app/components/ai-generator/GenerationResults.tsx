@@ -454,7 +454,7 @@ function EmptyState() {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
         <ImageIcon className="h-8 w-8 text-primary" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
+      <h3 className="mb-2 text-lg text-foreground">
         No generations yet
       </h3>
       <p className="max-w-sm text-sm text-muted-foreground">
@@ -487,7 +487,7 @@ function GeneratingState({ progress, message, status }: GeneratingStateProps) {
         </div>
       </div>
 
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
+      <h3 className="mb-2 text-lg text-foreground">
         {status === 'queued' ? 'In Queue' : 'Generating Your Poster'}
       </h3>
       <p className="mb-4 text-sm text-muted-foreground">{message}</p>
@@ -524,7 +524,7 @@ function ErrorState({ message, onRetry }: ErrorStateProps) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
         <AlertCircle className="h-8 w-8 text-destructive" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
+      <h3 className="mb-2 text-lg text-foreground">
         Generation Failed
       </h3>
       <p className="mb-4 max-w-sm text-sm text-muted-foreground">{message}</p>
@@ -556,7 +556,7 @@ function CancelledState({ onRetry }: CancelledStateProps) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
         <AlertCircle className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
+      <h3 className="mb-2 text-lg text-foreground">
         Generation Cancelled
       </h3>
       <p className="mb-4 text-sm text-muted-foreground">

@@ -50,7 +50,7 @@ interface InfoSectionProps {
 export function InfoSection({ heading, children }: InfoSectionProps) {
   return (
     <section>
-      <h2 className="mb-3 text-xl font-semibold text-foreground">{heading}</h2>
+      <h2 className="mb-3 text-xl text-foreground">{heading}</h2>
       <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">{children}</div>
     </section>
   )

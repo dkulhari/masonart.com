@@ -393,7 +393,7 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
       className="space-y-3 rounded-xl border border-border bg-card p-6"
     >
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Production</h2>
+        <h2 className="text-lg text-foreground">Production</h2>
         <p className="text-sm text-muted-foreground">
           What has been sent out to be made for this order — and what has not.
         </p>

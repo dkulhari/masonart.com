@@ -171,7 +171,7 @@ export function CartItem({
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                'font-semibold text-foreground',
+                'font-medium text-foreground',
                 compact ? 'text-sm' : 'text-base'
               )}
             >

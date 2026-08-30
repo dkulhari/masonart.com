@@ -220,7 +220,7 @@ export function ProductRail({
                 className={cn(
                   'flex h-10 min-h-[44px] shrink-0 items-center justify-center rounded-full px-6 text-center text-sm transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:h-[52px] lg:px-7 lg:text-base',
                   isSelected
-                    ? 'bg-band-strong font-semibold text-foreground'
+                    ? 'bg-band-strong font-medium text-foreground'
                     : 'bg-[#f5f1e6] font-normal text-foreground hover:bg-band'
                 )}
               >

@@ -189,7 +189,7 @@ export function AccountDashboardPage() {
             {/* Recent Orders */}
             <div className="rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <h2 className="flex items-center gap-2 text-lg text-foreground">
                   <Package className="h-5 w-5 text-foreground" />
                   Recent Orders
                 </h2>
@@ -217,7 +217,7 @@ export function AccountDashboardPage() {
           <div className="space-y-6">
             {/* Quick Actions */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-base font-semibold text-foreground">Quick Actions</h3>
+              <h3 className="mb-4 text-base text-foreground">Quick Actions</h3>
               <div className="space-y-3">
                 {QUICK_ACTIONS.map((action) => (
                   <QuickActionCard key={action.href} action={action} />
@@ -227,7 +227,7 @@ export function AccountDashboardPage() {
 
             {/* Help Section */}
             <div className="rounded-xl border border-border bg-muted/30 p-6">
-              <h3 className="mb-2 text-base font-semibold text-foreground">Need Help?</h3>
+              <h3 className="mb-2 text-base text-foreground">Need Help?</h3>
               <p className="mb-4 text-sm text-muted-foreground">
                 Have questions about your order or account?
               </p>
@@ -278,7 +278,7 @@ function ProfileCard({ user, onSignOut }: ProfileCardProps) {
 
         {/* User Info */}
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold text-foreground truncate">
+          <h2 className="text-lg text-foreground truncate">
             {user.name || 'User'}
           </h2>
           <p className="text-sm text-muted-foreground truncate">{user.email}</p>

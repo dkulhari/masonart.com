@@ -66,7 +66,7 @@ export function OfferRail() {
         'fixed right-0 top-1/2 z-40 hidden -translate-y-1/2 lg:flex',
         'items-center justify-center',
         'rounded-l-lg bg-black py-5 pl-2 pr-1.5',
-        'text-xs font-semibold uppercase tracking-widest text-white',
+        'text-xs font-medium uppercase tracking-widest text-white',
         'shadow-lg transition-colors hover:bg-neutral-800',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         // Rotates the text, not the box, so the tab keeps its hit area and the

@@ -268,7 +268,7 @@ export function AddFundsButton({
   // Button styles based on variant
   const buttonStyles = {
     default: cn(
-      'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all',
+      'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
       'focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2',
       status === 'success'
         ? 'bg-emerald-500 text-white'
@@ -277,7 +277,7 @@ export function AddFundsButton({
           : 'bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.98]'
     ),
     outline: cn(
-      'flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-all',
+      'flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2.5 text-sm font-medium transition-all',
       'focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2',
       status === 'success'
         ? 'border-emerald-500 bg-emerald-50 text-emerald-600'

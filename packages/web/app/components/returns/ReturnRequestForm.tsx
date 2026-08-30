@@ -141,7 +141,7 @@ export function ReturnRequestForm({
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
             <CheckCircle className="h-6 w-6 text-green-600" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold text-green-900">
+          <h3 className="mt-4 text-lg text-green-900">
             Return Request Submitted
           </h3>
           <p className="mt-2 text-sm text-green-700">

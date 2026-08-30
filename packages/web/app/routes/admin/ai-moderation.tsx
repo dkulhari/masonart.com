@@ -865,7 +865,7 @@ function AdminAIModerationPage() {
       {rejectModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h3 className="text-lg text-gray-900 mb-4">
               {rejectModal.bulk
                 ? `Reject ${selectedGenerations.size} Generations`
                 : "Reject Generation"}

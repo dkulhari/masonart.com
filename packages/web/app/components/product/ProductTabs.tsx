@@ -582,7 +582,7 @@ function AboutPanel({
 
           {roomSuggestions && roomSuggestions.length > 0 && (
             <div>
-              <h3 className="mb-3 text-lg font-semibold text-foreground">Perfect For</h3>
+              <h3 className="mb-3 text-lg text-foreground">Perfect For</h3>
               <div className="flex flex-wrap gap-2">
                 {roomSuggestions.map((room) => (
                   <span
@@ -599,7 +599,7 @@ function AboutPanel({
 
         {glance.length > 0 && (
           <aside className="h-fit rounded-lg border border-border bg-muted/30 p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground">
+            <h3 className="text-xs uppercase tracking-[0.18em] text-foreground">
               At A Glance
             </h3>
             <dl className="mt-4 space-y-3 text-sm">
@@ -663,7 +663,7 @@ function DetailsPanel({ spec }: { spec: ProductTabsSpecData }) {
       <div className="grid gap-8 sm:grid-cols-2">
         {availableVariants.length > 0 && (
           <div>
-            <h3 className="mb-3 text-lg font-semibold text-foreground">Available Sizes</h3>
+            <h3 className="mb-3 text-lg text-foreground">Available Sizes</h3>
             <ul className="space-y-1">
               {availableVariants.map((variant) => (
                 <li key={variant.id}>{variant.sizeLabel}</li>
@@ -674,7 +674,7 @@ function DetailsPanel({ spec }: { spec: ProductTabsSpecData }) {
 
         {availableFrames.length > 0 && (
           <div>
-            <h3 className="mb-3 text-lg font-semibold text-foreground">
+            <h3 className="mb-3 text-lg text-foreground">
               Frame &amp; Material Options
             </h3>
             <ul className="space-y-2">
@@ -702,7 +702,7 @@ function ShippingPanel() {
   return (
     <div className="grid gap-8 text-sm text-muted-foreground sm:grid-cols-2 sm:gap-12">
       <section>
-        <h3 className="mb-2 text-lg font-semibold text-foreground">Shipping</h3>
+        <h3 className="mb-2 text-lg text-foreground">Shipping</h3>
         <p>
           Free shipping on orders over {freeShippingThresholdLabel}. Below that, the cost is
           calculated and shown at checkout before payment.
@@ -728,7 +728,7 @@ function ShippingPanel() {
       </section>
 
       <section>
-        <h3 className="mb-2 text-lg font-semibold text-foreground">Returns &amp; Refunds</h3>
+        <h3 className="mb-2 text-lg text-foreground">Returns &amp; Refunds</h3>
         <p>
           Return any order within {RETURN_WINDOW_DAYS} days of delivery for a full refund. Start a
           return from{' '}

@@ -252,7 +252,7 @@ function AddressesPage() {
           {showForm && (
             <div className="mb-6 rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                <h2 className="font-semibold text-foreground">
+                <h2 className="text-foreground">
                   {editingAddress ? 'Edit Address' : 'Add New Address'}
                 </h2>
                 <button
@@ -315,7 +315,7 @@ function AddressesPage() {
           {addresses.length === 0 && !showForm ? (
             <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center">
               <MapPin className="mx-auto h-12 w-12 text-muted-foreground/40" />
-              <h3 className="mt-4 text-lg font-semibold text-foreground">No saved addresses</h3>
+              <h3 className="mt-4 text-lg text-foreground">No saved addresses</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Add an address to speed up your checkout experience.
               </p>
@@ -341,7 +341,7 @@ function AddressesPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">{address.fullName}</span>
+                        <span className="font-medium text-foreground">{address.fullName}</span>
                         {address.isDefault && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-foreground">
                             <Star className="h-3 w-3" />
@@ -406,7 +406,7 @@ function AddressesPage() {
 
           {/* Info Card */}
           <div className="mt-8 rounded-xl border border-border bg-muted/30 p-6">
-            <h3 className="text-sm font-semibold text-foreground">About Saved Addresses</h3>
+            <h3 className="text-sm text-foreground">About Saved Addresses</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Your saved addresses make checkout faster. Your default address will be
               automatically selected when you place an order. You can save up to 10 addresses.

@@ -197,7 +197,7 @@ export function ReviewModal({
               />
             )}
             <div>
-              <h2 id="review-modal-title" className="text-lg font-semibold text-foreground">
+              <h2 id="review-modal-title" className="text-lg text-foreground">
                 {existingReview ? 'Edit Review' : 'Write a Review'}
               </h2>
               <p className="text-sm text-muted-foreground line-clamp-1">{productName}</p>

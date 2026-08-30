@@ -190,7 +190,7 @@ export function TrustList({ className }: TrustListProps) {
             <Icon className="mt-0.5 h-6 w-6 shrink-0 text-foreground" aria-hidden="true" />
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-foreground">{row.title}</span>
+                <span className="text-sm font-medium text-foreground">{row.title}</span>
                 <TrustTooltip id={tooltipId} title={row.title} detail={row.detail} />
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">{row.sub}</p>

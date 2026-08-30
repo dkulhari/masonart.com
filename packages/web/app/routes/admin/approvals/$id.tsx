@@ -276,7 +276,7 @@ function PhotoUploadSection({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
+      <h2 className="mb-4 flex items-center gap-2 text-lg text-gray-900">
         <Camera className="h-5 w-5" />
         Production Photos
       </h2>
@@ -434,7 +434,7 @@ function CommentsSection({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
+      <h2 className="mb-4 flex items-center gap-2 text-lg text-gray-900">
         <MessageSquare className="h-5 w-5" />
         Comments
       </h2>

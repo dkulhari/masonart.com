@@ -259,7 +259,7 @@ export function JoinGalleryModal({
 
         <p
           id="join-gallery-headline"
-          className="pr-8 text-xl font-semibold uppercase tracking-wide text-foreground"
+          className="pr-8 text-xl font-medium uppercase tracking-wide text-foreground"
         >
           {active.headline}
         </p>

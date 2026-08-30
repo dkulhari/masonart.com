@@ -206,7 +206,7 @@ export function ReturnStatusCard({
           {returnRequest.refundAmount && returnRequest.status === 'refunded' && (
             <div className="hidden text-right sm:block">
               <p className="text-sm text-muted-foreground">Refund Amount</p>
-              <p className="font-semibold text-green-600">
+              <p className="font-medium text-green-600">
                 {formatPrice(parseFloat(returnRequest.refundAmount))}
               </p>
             </div>
@@ -226,7 +226,7 @@ export function ReturnStatusCard({
           {returnRequest.refundAmount && returnRequest.status === 'refunded' && (
             <div className="mb-4 rounded-lg bg-green-50 p-3 sm:hidden">
               <p className="text-sm text-muted-foreground">Refund Amount</p>
-              <p className="text-lg font-semibold text-green-600">
+              <p className="text-lg font-medium text-green-600">
                 {formatPrice(parseFloat(returnRequest.refundAmount))}
               </p>
             </div>

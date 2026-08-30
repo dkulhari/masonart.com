@@ -237,7 +237,7 @@ export function FilterSortDrawer({
             aria-hidden="true"
             className="absolute left-1/2 top-3 h-1 w-10 -translate-x-1/2 rounded-full bg-border"
           />
-          <h2 id={titleId} className="text-lg font-semibold">
+          <h2 id={titleId} className="text-lg">
             Filter and sort
           </h2>
           {/* The cart and menu drawers' close control. */}

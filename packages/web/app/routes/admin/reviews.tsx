@@ -1185,7 +1185,7 @@ function ReviewRow({
             <td colSpan={8}>
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                 <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-                  <h3 className="text-lg font-semibold text-foreground">Reject Review</h3>
+                  <h3 className="text-lg text-foreground">Reject Review</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Add optional notes explaining the rejection reason.
                   </p>

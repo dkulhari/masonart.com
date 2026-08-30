@@ -419,7 +419,7 @@ function CheckoutPage() {
 
                 {/* Customer Notes */}
                 <div className="rounded-xl border border-border bg-card p-6">
-                  <h3 className="mb-4 text-base font-semibold text-foreground">
+                  <h3 className="mb-4 text-base text-foreground">
                     Order Notes <span className="text-muted-foreground font-normal">(Optional)</span>
                   </h3>
                   <textarea
@@ -445,7 +445,7 @@ function CheckoutPage() {
                     onClick={goToNextStep}
                     disabled={!canProceedFromCurrentStep()}
                     className={cn(
-                      'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors',
+                      'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-medium transition-colors',
                       'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                       canProceedFromCurrentStep()
                         ? 'bg-primary text-primary-foreground hover:bg-primary/85'
@@ -464,7 +464,7 @@ function CheckoutPage() {
               <div className="space-y-6">
                 {/* Delivery Options */}
                 <div className="rounded-xl border border-border bg-card p-6">
-                  <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold text-foreground">
+                  <h2 className="mb-4 flex items-center gap-3 text-lg text-foreground">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground">
                       <Truck className="h-5 w-5" />
                     </div>
@@ -483,7 +483,7 @@ function CheckoutPage() {
                 {shippingAddress && (
                   <div className="rounded-xl border border-border bg-card p-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-base font-semibold text-foreground">Shipping To</h3>
+                      <h3 className="text-base text-foreground">Shipping To</h3>
                       <button
                         type="button"
                         onClick={() => setCurrentStep('shipping')}
@@ -519,7 +519,7 @@ function CheckoutPage() {
                     onClick={goToNextStep}
                     disabled={!canProceedFromCurrentStep()}
                     className={cn(
-                      'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors',
+                      'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-medium transition-colors',
                       'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                       canProceedFromCurrentStep()
                         ? 'bg-primary text-primary-foreground hover:bg-primary/85'
@@ -538,7 +538,7 @@ function CheckoutPage() {
               <div className="space-y-6">
                 {/* Payment Section - Placeholder for Razorpay */}
                 <div className="rounded-xl border border-border bg-card p-6">
-                  <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold text-foreground">
+                  <h2 className="mb-4 flex items-center gap-3 text-lg text-foreground">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground">
                       <CreditCard className="h-5 w-5" />
                     </div>
@@ -697,7 +697,7 @@ function CheckoutSteps({ currentStep, onStepClick }: CheckoutStepsProps) {
               >
                 <div
                   className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors',
                     isCompleted && 'bg-green-500 text-white',
                     isCurrent && 'bg-primary text-primary-foreground',
                     !isCompleted && !isCurrent && 'bg-muted text-muted-foreground'
@@ -760,7 +760,7 @@ function EmptyCartState() {
 
           <a
             href="/posters"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
           >
             Browse Posters
             <ChevronRight className="h-4 w-4" />

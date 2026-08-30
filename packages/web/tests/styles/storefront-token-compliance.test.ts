@@ -52,16 +52,24 @@ type Scope = 'storefront' | 'everywhere'
 
 const FORBIDDEN: Array<{ pattern: RegExp; why: string; scope: Scope }> = [
   {
-    pattern: /\bfont-(bold|extrabold|black)\b/,
+    pattern: /\bfont-(semibold|bold|extrabold|black)\b/,
     /*
      * Not a preference. __root.tsx loads Poppins 300/400/500 and Urbanist
-     * 300/500 — nothing above 500 exists in the document, so 700/800/900 are
-     * drawn by the browser's synthetic-bold algorithm: the real glyphs smeared
-     * wider and heavier than either face draws. An admin screen renders that
-     * artefact exactly as badly as a product page does.
+     * 300/500 — nothing above 500 exists in the document, so 600/700/800/900
+     * are drawn by the browser's synthetic-bold algorithm: the real glyphs
+     * smeared wider and heavier than either face draws. An admin screen
+     * renders that artefact exactly as badly as a product page does.
+     *
+     * `semibold` joined the list in #632. The line was originally drawn at 700
+     * by accident rather than by argument: 600 is not loaded either, and the
+     * measured reference design never uses it — mesonart-parity-analysis.md §2
+     * records Poppins 300 body, Urbanist 300 headings, Poppins 500 product
+     * titles and nav, and no 600 anywhere. 176 uses were swept, headings by
+     * deleting the class (the base layer already supplies Urbanist 300) and
+     * emphasis by dropping to font-medium.
      */
     scope: 'everywhere',
-    why: 'weight 700+ is never loaded (see the font link in __root.tsx), so this renders as synthesised faux-bold. Use font-medium, or nothing at all inside a heading — the base layer supplies Urbanist 300.',
+    why: 'weight 600+ is never loaded (see the font link in __root.tsx), so this renders as synthesised faux-bold. Use font-medium, or nothing at all inside a heading — the base layer supplies Urbanist 300.',
   },
   {
     pattern: /\b(fill|text)-yellow-400\b/,

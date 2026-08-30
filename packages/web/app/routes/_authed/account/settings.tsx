@@ -83,7 +83,7 @@ function SettingsPage() {
 
       {/* Profile */}
       <section className="mb-8 rounded-xl border border-border bg-card p-6">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">Profile</h2>
+        <h2 className="mb-4 text-lg text-foreground">Profile</h2>
         <dl className="grid gap-4 sm:grid-cols-2">
           <div className="flex items-start gap-3">
             <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
@@ -130,7 +130,7 @@ function SettingsPage() {
 
       {/* Preferences */}
       <section className="rounded-xl border border-border bg-card p-6">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">Preferences</h2>
+        <h2 className="mb-4 text-lg text-foreground">Preferences</h2>
         <div className="divide-y divide-border">
           {preferenceLinks.map((link) => (
             <a

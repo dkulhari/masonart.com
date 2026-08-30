@@ -139,7 +139,7 @@ function ShippingOptionCard({
 
         {/* Price and Selection */}
         <div className="flex items-center gap-3">
-          <span className={cn('text-right font-semibold', option.isFree ? 'text-green-600' : 'text-foreground')}>
+          <span className={cn('text-right font-medium', option.isFree ? 'text-green-600' : 'text-foreground')}>
             {option.isFree ? 'FREE' : formatPrice(option.finalCost)}
           </span>
 

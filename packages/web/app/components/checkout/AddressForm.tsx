@@ -205,7 +205,7 @@ export function AddressForm({
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground">
           <MapPin className="h-5 w-5" />
         </div>
-        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <h2 className="text-lg text-foreground">{title}</h2>
       </div>
 
       {/* Form Fields */}
@@ -533,7 +533,7 @@ export function SavedAddressSelector({
 
   return (
     <div className={cn('rounded-xl border border-border bg-card p-6', className)}>
-      <h3 className="mb-4 text-base font-semibold text-foreground">Saved Addresses</h3>
+      <h3 className="mb-4 text-base text-foreground">Saved Addresses</h3>
 
       <div className="space-y-3">
         {addresses.map((address) => (

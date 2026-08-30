@@ -84,7 +84,7 @@ function GuestOrderLookupForm({ onSubmit, isLoading, error }: GuestOrderLookupFo
           <Package className="h-6 w-6 text-brand-600" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Look Up Your Order</h2>
+          <h2 className="text-lg text-foreground">Look Up Your Order</h2>
           <p className="text-sm text-muted-foreground">
             Enter your order details to view tracking information
           </p>
@@ -104,7 +104,7 @@ function GuestOrderLookupForm({ onSubmit, isLoading, error }: GuestOrderLookupFo
               type="text"
               value={orderNumber}
               onChange={(e) => setOrderNumber(e.target.value)}
-              placeholder="MA-2024-001234"
+              placeholder="CA-2026-001234"
               className="w-full rounded-lg border border-border bg-background py-2.5 pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               disabled={isLoading}
             />
@@ -290,7 +290,7 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      expect(screen.getByPlaceholderText('MA-2024-001234')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('CA-2026-001234')).toBeInTheDocument()
     })
   })
 
@@ -321,7 +321,7 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'MA-2024-001234' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'CA-2026-001234' } })
       fireEvent.click(screen.getByRole('button', { name: /track order/i }))
 
       expect(screen.getByText('Please enter your email address')).toBeInTheDocument()
@@ -338,7 +338,7 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'MA-2024-001234' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'CA-2026-001234' } })
       fireEvent.click(screen.getByRole('button', { name: /phone/i }))
       fireEvent.click(screen.getByRole('button', { name: /track order/i }))
 
@@ -358,12 +358,12 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'MA-2024-001234' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'CA-2026-001234' } })
       fireEvent.change(screen.getByLabelText('Email Address'), { target: { value: 'test@example.com' } })
       fireEvent.click(screen.getByRole('button', { name: /track order/i }))
 
       expect(onSubmit).toHaveBeenCalledWith({
-        orderNumber: 'MA-2024-001234',
+        orderNumber: 'CA-2026-001234',
         email: 'test@example.com',
         phone: undefined,
       })
@@ -379,13 +379,13 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'MA-2024-001234' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'CA-2026-001234' } })
       fireEvent.click(screen.getByRole('button', { name: /phone/i }))
       fireEvent.change(screen.getByLabelText('Phone Number'), { target: { value: '9876543210' } })
       fireEvent.click(screen.getByRole('button', { name: /track order/i }))
 
       expect(onSubmit).toHaveBeenCalledWith({
-        orderNumber: 'MA-2024-001234',
+        orderNumber: 'CA-2026-001234',
         email: undefined,
         phone: '9876543210',
       })
@@ -401,12 +401,12 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: '  MA-2024-001234  ' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: '  CA-2026-001234  ' } })
       fireEvent.change(screen.getByLabelText('Email Address'), { target: { value: '  test@example.com  ' } })
       fireEvent.click(screen.getByRole('button', { name: /track order/i }))
 
       expect(onSubmit).toHaveBeenCalledWith({
-        orderNumber: 'MA-2024-001234',
+        orderNumber: 'CA-2026-001234',
         email: 'test@example.com',
         phone: undefined,
       })
@@ -490,7 +490,7 @@ describe('GuestOrderLookupForm', () => {
       expect(screen.getByText('Please enter your order number')).toBeInTheDocument()
 
       // Fill form and submit again
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'MA-2024-001234' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'CA-2026-001234' } })
       fireEvent.change(screen.getByLabelText('Email Address'), { target: { value: 'test@example.com' } })
       fireEvent.click(screen.getByRole('button', { name: /track order/i }))
 
@@ -534,7 +534,7 @@ describe('GuestOrderLookupForm', () => {
         />
       )
 
-      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'MA-2024-001234' } })
+      fireEvent.change(screen.getByLabelText('Order Number'), { target: { value: 'CA-2026-001234' } })
       fireEvent.change(screen.getByLabelText('Email Address'), { target: { value: 'test@example.com' } })
       fireEvent.submit(screen.getByRole('button', { name: /track order/i }).closest('form')!)
 

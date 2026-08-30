@@ -174,7 +174,7 @@ export function ConfirmDialog({ request, onResolve }: ConfirmDialogProps) {
         onKeyDown={handleKeyDown}
         className="relative z-10 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl"
       >
-        <h2 id={titleId} className="text-lg font-semibold text-foreground">
+        <h2 id={titleId} className="text-lg text-foreground">
           {request.title}
         </h2>
 

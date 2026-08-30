@@ -305,7 +305,7 @@ function WalletPage() {
 
             {/* Quick Top-up */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold text-foreground">
+              <h2 className="mb-4 text-lg text-foreground">
                 Add Funds
               </h2>
 
@@ -359,7 +359,7 @@ function WalletPage() {
             {/* Transaction History */}
             <div className="rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                <h2 className="text-lg font-semibold text-foreground">
+                <h2 className="text-lg text-foreground">
                   Transaction History
                 </h2>
                 <button
@@ -434,7 +434,7 @@ function WalletPage() {
           <div className="space-y-6">
             {/* Stats Card */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-base font-semibold text-foreground">
+              <h3 className="mb-4 text-base text-foreground">
                 Wallet Stats
               </h3>
               <div className="space-y-4">
@@ -460,7 +460,7 @@ function WalletPage() {
             {/* Exchange Rate Info */}
             {walletData?.exchangeRate && (
               <div className="rounded-xl border border-border bg-muted/30 p-6">
-                <h3 className="mb-2 text-base font-semibold text-foreground">
+                <h3 className="mb-2 text-base text-foreground">
                   Exchange Rate
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -478,7 +478,7 @@ function WalletPage() {
 
             {/* How it works */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-base font-semibold text-foreground">
+              <h3 className="mb-4 text-base text-foreground">
                 How it works
               </h3>
               <ol className="space-y-3 text-sm text-muted-foreground">

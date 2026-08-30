@@ -200,7 +200,7 @@ function ReturnRequestPage() {
           </a>
           <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-            <h2 className="mt-4 text-lg font-semibold text-red-900">
+            <h2 className="mt-4 text-lg text-red-900">
               {error || 'Order not found'}
             </h2>
             <p className="mt-2 text-sm text-red-700">
@@ -253,7 +253,7 @@ function ReturnRequestPage() {
             {/* Existing Return Status */}
             {activeReturn && (
               <div>
-                <h2 className="mb-4 text-lg font-semibold text-foreground">
+                <h2 className="mb-4 text-lg text-foreground">
                   Active Return Request
                 </h2>
                 <ReturnStatusCard
@@ -278,7 +278,7 @@ function ReturnRequestPage() {
             {/* Return Request Form (only if eligible and no active return) */}
             {canRequestReturn && !activeReturn && (
               <div>
-                <h2 className="mb-4 text-lg font-semibold text-foreground">
+                <h2 className="mb-4 text-lg text-foreground">
                   Submit Return Request
                 </h2>
                 <div className="rounded-xl border border-border bg-card p-6">
@@ -293,7 +293,7 @@ function ReturnRequestPage() {
             {/* Previous Return Requests (closed/rejected) */}
             {returns.filter((r) => ['rejected', 'closed'].includes(r.status)).length > 0 && (
               <div>
-                <h2 className="mb-4 text-lg font-semibold text-foreground">
+                <h2 className="mb-4 text-lg text-foreground">
                   Previous Return Requests
                 </h2>
                 <div className="space-y-4">
@@ -318,7 +318,7 @@ function ReturnRequestPage() {
 
             {/* Help */}
             <div className="rounded-xl border border-border bg-muted/30 p-4">
-              <h3 className="text-sm font-semibold text-foreground">Need Help?</h3>
+              <h3 className="text-sm text-foreground">Need Help?</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 If you have questions about our return policy or need assistance with your return, please contact our support team.
               </p>

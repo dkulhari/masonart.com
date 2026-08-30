@@ -375,7 +375,7 @@ function EditProductPage() {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
           <AlertCircle className="h-8 w-8 text-red-600" />
         </div>
-        <h2 className="mt-6 text-xl font-semibold text-foreground">
+        <h2 className="mt-6 text-xl text-foreground">
           Product Not Found
         </h2>
         <p className="mt-2 text-muted-foreground">

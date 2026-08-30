@@ -207,7 +207,7 @@ export function ShippingConfigForm({
       <div className="flex items-start gap-3">
         <Truck className="mt-1 h-5 w-5 text-foreground" />
         <div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg text-foreground">
             Free shipping threshold
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -321,7 +321,7 @@ export function ShippingConfigForm({
       <button
         type="submit"
         disabled={isSaving}
-        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/85 disabled:opacity-60"
+        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/85 disabled:opacity-60"
       >
         {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
         Save threshold
@@ -395,7 +395,7 @@ function AdminShippingPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold text-foreground">Shipping</h1>
+      <h1 className="text-2xl text-foreground">Shipping</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         What the storefront promises and what checkout charges, from one
         setting.

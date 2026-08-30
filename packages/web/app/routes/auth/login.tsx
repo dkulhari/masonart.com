@@ -587,7 +587,7 @@ export function LoginPage() {
                   type="submit"
                   disabled={isLoading || !isEmailFormValid}
                   className={cn(
-                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
                     'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     isEmailFormValid && !isLoading
                       ? 'bg-primary text-primary-foreground hover:bg-primary/85'
@@ -649,7 +649,7 @@ export function LoginPage() {
                   type="submit"
                   disabled={isLoading || !isPhoneValid}
                   className={cn(
-                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
                     'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     isPhoneValid && !isLoading
                       ? 'bg-primary text-primary-foreground hover:bg-primary/85'
@@ -770,7 +770,7 @@ export function LoginPage() {
                   type="submit"
                   disabled={isLoading || phoneFormData.otp.length !== 6}
                   className={cn(
-                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
                     'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     phoneFormData.otp.length === 6 && !isLoading
                       ? 'bg-primary text-primary-foreground hover:bg-primary/85'

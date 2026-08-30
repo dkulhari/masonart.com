@@ -252,7 +252,7 @@ function OrderHistoryPage() {
           {/* Sidebar Filters (Desktop) */}
           <aside className="hidden lg:block">
             <div className="sticky top-24 rounded-xl border border-border bg-card p-4">
-              <h3 className="mb-4 text-sm font-semibold text-foreground">Filter by Status</h3>
+              <h3 className="mb-4 text-sm text-foreground">Filter by Status</h3>
               <div className="space-y-1">
                 {STATUS_FILTERS.map((option) => (
                   <button
@@ -277,7 +277,7 @@ function OrderHistoryPage() {
           {showFilters && (
             <div className="rounded-xl border border-border bg-card p-4 lg:hidden">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Filter by Status</h3>
+                <h3 className="text-sm text-foreground">Filter by Status</h3>
                 <button
                   type="button"
                   onClick={() => setShowFilters(false)}

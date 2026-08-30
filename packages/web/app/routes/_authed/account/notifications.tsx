@@ -214,7 +214,7 @@ function NotificationPreferencesPage() {
           <div className="mx-auto max-w-2xl">
             <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
               <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-              <h2 className="mt-4 text-lg font-semibold text-red-900">
+              <h2 className="mt-4 text-lg text-red-900">
                 Unable to Load Preferences
               </h2>
               <p className="mt-2 text-sm text-red-700">
@@ -285,7 +285,7 @@ function NotificationPreferencesPage() {
               <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-4">
                 <Mail className="h-5 w-5 text-foreground" />
                 <div>
-                  <h2 className="font-semibold text-foreground">Email Notifications</h2>
+                  <h2 className="text-foreground">Email Notifications</h2>
                   <p className="text-xs text-muted-foreground">Sent to your account email</p>
                 </div>
               </div>
@@ -309,7 +309,7 @@ function NotificationPreferencesPage() {
               <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-4">
                 <Smartphone className="h-5 w-5 text-foreground" />
                 <div>
-                  <h2 className="font-semibold text-foreground">SMS Notifications</h2>
+                  <h2 className="text-foreground">SMS Notifications</h2>
                   <p className="text-xs text-muted-foreground">Sent to your phone number</p>
                 </div>
               </div>
@@ -330,7 +330,7 @@ function NotificationPreferencesPage() {
 
             {/* Info Card */}
             <div className="rounded-xl border border-border bg-muted/30 p-6">
-              <h3 className="text-sm font-semibold text-foreground">About Notifications</h3>
+              <h3 className="text-sm text-foreground">About Notifications</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Email notifications are sent to your account email address. SMS notifications
                 require a verified phone number. Important order and security notifications

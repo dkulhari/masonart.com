@@ -441,13 +441,13 @@ function OrderSummary({
 
   return (
     <div className="sticky top-24 rounded-xl border border-border bg-card p-6">
-      <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
+      <h2 className="text-lg text-foreground">Order Summary</h2>
 
       {/* Free Shipping Progress */}
       {hasShippingFee && (
         <div className="mt-4 rounded-lg bg-accent p-3">
           <p className="text-sm text-foreground">
-            Add <span className="font-semibold">{formatPrice(amountUntilFreeShipping)}</span> more
+            Add <span className="font-medium">{formatPrice(amountUntilFreeShipping)}</span> more
             for free shipping!
           </p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent">
@@ -510,7 +510,7 @@ function OrderSummary({
           data-testid="cart-saving-locked"
           className="mt-4 rounded-lg border border-border bg-accent p-4"
         >
-          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
             <Lock className="h-4 w-4" aria-hidden="true" />
             Save {formatPrice(lockedSaving / 100)} with the gallery
           </p>
@@ -521,7 +521,7 @@ function OrderSummary({
           <button
             type="button"
             onClick={onJoinGallery}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:bg-foreground/85"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-colors hover:bg-foreground/85"
           >
             Join the gallery
           </button>
@@ -534,7 +534,7 @@ function OrderSummary({
           data-testid="cart-total"
           className="flex items-center justify-between"
         >
-          <span className="text-base font-semibold text-foreground">Estimated Total</span>
+          <span className="text-base font-medium text-foreground">Estimated Total</span>
           <span className="text-xl font-medium text-foreground">{formatPrice(total)}</span>
         </div>
       </div>
@@ -542,7 +542,7 @@ function OrderSummary({
       {/* Checkout Button */}
       <a
         href="/checkout"
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
       >
         Proceed to Checkout
         <ArrowRight className="h-4 w-4" />
@@ -595,7 +595,7 @@ function EmptyCartState() {
         <ShoppingBag className="h-10 w-10 text-muted-foreground" />
       </div>
 
-      <h2 className="mb-2 text-xl font-semibold text-foreground">Your cart is empty</h2>
+      <h2 className="mb-2 text-xl text-foreground">Your cart is empty</h2>
 
       <p className="mb-8 text-muted-foreground">
         Looks like you haven't added anything to your cart yet.
@@ -605,7 +605,7 @@ function EmptyCartState() {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <a
           href="/posters"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
         >
           Browse Posters
           <ArrowRight className="h-4 w-4" />
@@ -620,7 +620,7 @@ function EmptyCartState() {
 
       {/* Recommendations Section */}
       <div className="mt-16 border-t border-border pt-8">
-        <h3 className="mb-4 text-lg font-semibold text-foreground">
+        <h3 className="mb-4 text-lg text-foreground">
           Recommended for You
         </h3>
         <p className="text-sm text-muted-foreground">

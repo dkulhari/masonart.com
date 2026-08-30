@@ -172,7 +172,7 @@ export function OrderList({
     return (
       <div className={cn('rounded-xl border border-red-200 bg-red-50 p-6 text-center', className)}>
         <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-        <h3 className="mt-4 text-lg font-semibold text-red-900">Unable to load orders</h3>
+        <h3 className="mt-4 text-lg text-red-900">Unable to load orders</h3>
         <p className="mt-2 text-sm text-red-700">{error}</p>
       </div>
     )
@@ -222,7 +222,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">Order</span>
-            <span className="font-semibold text-foreground">{order.orderNumber}</span>
+            <span className="font-medium text-foreground">{order.orderNumber}</span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Placed on {formatDate(order.createdAt)}
@@ -301,7 +301,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
       {/* Footer */}
       <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">{formatPrice(order.total)}</p>
+          <p className="text-sm font-medium text-foreground">{formatPrice(order.total)}</p>
           {order.estimatedDelivery && order.status !== 'delivered' && order.status !== 'cancelled' && (
             <p className="mt-0.5 text-xs text-muted-foreground">
               Est. delivery: {order.estimatedDelivery}
@@ -388,13 +388,13 @@ function EmptyOrdersState({ className }: EmptyOrdersStateProps) {
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
         <ShoppingBag className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold text-foreground">No orders yet</h3>
+      <h3 className="mt-4 text-lg text-foreground">No orders yet</h3>
       <p className="mt-2 text-sm text-muted-foreground">
         Start shopping to see your order history here.
       </p>
       <a
         href="/posters"
-        className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+        className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
       >
         Browse Posters
         <ArrowRight className="h-4 w-4" />

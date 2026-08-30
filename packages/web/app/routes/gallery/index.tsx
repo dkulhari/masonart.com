@@ -201,7 +201,7 @@ function GalleryPage() {
           </p>
           <Link
             to="/create"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
           >
             <Sparkles className="h-4 w-4" />
             Create Your Own
@@ -387,7 +387,7 @@ function EmptyGalleryState() {
         <Sparkles className="h-10 w-10 text-muted-foreground" />
       </div>
 
-      <h2 className="mb-2 text-xl font-semibold text-foreground">No artworks yet</h2>
+      <h2 className="mb-2 text-xl text-foreground">No artworks yet</h2>
 
       <p className="mb-8 text-muted-foreground">
         Be the first to share your AI-generated creations with the community!
@@ -395,7 +395,7 @@ function EmptyGalleryState() {
 
       <Link
         to="/create"
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-primary/85"
       >
         <Sparkles className="h-4 w-4" />
         Create with AI

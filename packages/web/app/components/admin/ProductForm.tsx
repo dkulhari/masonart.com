@@ -249,7 +249,7 @@ function FormSection({
   if (!collapsible) {
     return (
       <div className="rounded-xl border border-border bg-card p-6">
-        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        <h3 className="text-lg text-foreground">{title}</h3>
         {description && (
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         )}
@@ -266,7 +266,7 @@ function FormSection({
         className="flex w-full items-center justify-between p-6"
       >
         <div>
-          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+          <h3 className="text-lg text-foreground">{title}</h3>
           {description && (
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}

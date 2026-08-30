@@ -618,7 +618,7 @@ export function RegisterPage() {
                 type="submit"
                 disabled={isLoading || !isFormValid}
                 className={cn(
-                  'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                  'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
                   'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                   isFormValid && !isLoading
                     ? 'bg-primary text-primary-foreground hover:bg-primary/85'

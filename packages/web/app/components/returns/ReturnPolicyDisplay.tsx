@@ -138,7 +138,7 @@ export function ReturnPolicyDisplay({
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border p-4">
         <FileText className="h-5 w-5 text-foreground" />
-        <h3 className="font-semibold text-foreground">{policy.name}</h3>
+        <h3 className="text-foreground">{policy.name}</h3>
       </div>
 
       {/* Content */}

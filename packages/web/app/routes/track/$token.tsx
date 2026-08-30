@@ -102,7 +102,7 @@ function TokenTrackingPage() {
           <div className="mx-auto max-w-2xl">
             <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
               <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-              <h2 className="mt-4 text-lg font-semibold text-red-900">
+              <h2 className="mt-4 text-lg text-red-900">
                 Unable to Load Order
               </h2>
               <p className="mt-2 text-sm text-red-700">
@@ -159,7 +159,7 @@ function TokenTrackingPage() {
                     <StatusIcon className={cn('h-5 w-5', statusConfig.color)} />
                   </div>
                   <div>
-                    <p className={cn('font-semibold', statusConfig.color)}>
+                    <p className={cn('font-medium', statusConfig.color)}>
                       {statusConfig.label}
                     </p>
                     <p className="text-sm text-muted-foreground">
@@ -177,7 +177,7 @@ function TokenTrackingPage() {
             <div className="p-6">
               {/* Timeline */}
               <div className="mb-6">
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                <h3 className="mb-4 text-sm uppercase tracking-wider text-muted-foreground">
                   Order Progress
                 </h3>
                 <TrackingTimeline
@@ -190,7 +190,7 @@ function TokenTrackingPage() {
               {/* Shipping Info */}
               {orderData.tracking && (
                 <div className="border-t border-border pt-6">
-                  <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  <h3 className="mb-4 text-sm uppercase tracking-wider text-muted-foreground">
                     Shipping Details
                   </h3>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -232,7 +232,7 @@ function TokenTrackingPage() {
               {/* Delivery Location */}
               {orderData.shippingAddress?.city && (
                 <div className="mt-6 border-t border-border pt-6">
-                  <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  <h3 className="mb-4 text-sm uppercase tracking-wider text-muted-foreground">
                     Delivery Location
                   </h3>
                   <div className="flex items-start gap-3">
@@ -261,7 +261,7 @@ function TokenTrackingPage() {
 
           {/* Need Help */}
           <div className="mt-6 rounded-xl border border-border bg-muted/30 p-6 text-center">
-            <h3 className="text-sm font-semibold text-foreground">Need Help?</h3>
+            <h3 className="text-sm text-foreground">Need Help?</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               If you have questions about your order, please contact our support team.
             </p>

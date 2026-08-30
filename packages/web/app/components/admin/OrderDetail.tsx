@@ -345,7 +345,7 @@ function SectionHeader({
   return (
     <div className="flex items-center gap-2 border-b border-border pb-3">
       <Icon className="h-5 w-5 text-muted-foreground" />
-      <h3 className="font-semibold text-foreground">{title}</h3>
+      <h3 className="text-foreground">{title}</h3>
     </div>
   )
 }
@@ -464,7 +464,7 @@ function StatusUpdateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-foreground">Update Order Status</h3>
+        <h3 className="text-lg text-foreground">Update Order Status</h3>
 
         <div className="mt-4 space-y-4">
           <div>
@@ -544,7 +544,7 @@ function ShippingUpdateModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-foreground">Update Shipping Details</h3>
+        <h3 className="text-lg text-foreground">Update Shipping Details</h3>
 
         <div className="mt-4 space-y-4">
           <div>
@@ -804,7 +804,7 @@ export function OrderDetail({
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-muted-foreground" />
-                <h3 className="font-semibold text-foreground">Internal Notes</h3>
+                <h3 className="text-foreground">Internal Notes</h3>
               </div>
               {!isEditingNotes && onUpdateNotes && (
                 <button
@@ -966,7 +966,7 @@ export function OrderDetail({
                 <span className="text-muted-foreground">Tax</span>
                 <span>{formatPrice(parseFloat(order.tax))}</span>
               </div>
-              <div className="flex justify-between border-t border-border pt-2 font-semibold text-foreground">
+              <div className="flex justify-between border-t border-border pt-2 font-medium text-foreground">
                 <span>Total</span>
                 <span>{formatPrice(parseFloat(order.total))}</span>
               </div>
@@ -985,7 +985,7 @@ export function OrderDetail({
                       -{formatPrice(parseFloat(order.giftCardAmount!))}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t border-border pt-2 font-semibold text-foreground">
+                  <div className="flex justify-between border-t border-border pt-2 font-medium text-foreground">
                     <span>Charged</span>
                     <span>
                       {formatPrice(

@@ -227,7 +227,7 @@ export function AICreationsList({
     return (
       <div className={cn('rounded-xl border border-red-200 bg-red-50 p-6 text-center', className)}>
         <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-        <h3 className="mt-4 text-lg font-semibold text-red-900">Unable to load creations</h3>
+        <h3 className="mt-4 text-lg text-red-900">Unable to load creations</h3>
         <p className="mt-2 text-sm text-red-700">{error}</p>
       </div>
     )
@@ -587,13 +587,13 @@ function EmptyCreationsState({ className }: EmptyCreationsStateProps) {
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple-100 to-pink-100">
         <Sparkles className="h-8 w-8 text-purple-600" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold text-foreground">No AI creations yet</h3>
+      <h3 className="mt-4 text-lg text-foreground">No AI creations yet</h3>
       <p className="mt-2 text-sm text-muted-foreground">
         Create unique posters with our AI generator and they&apos;ll appear here.
       </p>
       <a
         href="/create"
-        className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-3 text-sm font-semibold text-white transition-all hover:from-purple-600 hover:to-pink-600"
+        className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-3 text-sm font-medium text-white transition-all hover:from-purple-600 hover:to-pink-600"
       >
         <ImagePlus className="h-4 w-4" />
         Create Your First Poster
