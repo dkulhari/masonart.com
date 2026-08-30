@@ -23,14 +23,39 @@
  * `tests/routes/vendor/no-customer-data.test.tsx` asserts nothing is fetched
  * from the artwork endpoint on render.
  *
- * ## The two writes, and no native dialogs
+ * ## The actions come from the matrix, not from this file
  *
- * `sent` and `received` are the only statuses the API will accept from a vendor
- * — passing QC is our verdict to record, not theirs to claim, and amounts are
- * absent from the PATCH schema entirely. Both controls are the two-step inline
- * confirm from `routes/admin/vendors/$id.tsx`: no `window.confirm`, which
- * blocks the browser automation harness and is why nine admin files have no E2E
- * coverage on their destructive paths.
+ * This screen used to hold two hardcoded buttons — "Mark received" and "Mark
+ * ready & sent back" — over a `'sent' | 'received'` literal. Both halves of that
+ * were wrong by Phase 5: `PATCH /api/vendor/jobs/:id` narrows its body with
+ * `z.enum(VENDOR_SETTABLE_STATUSES)`, which is derived from the transition
+ * matrix and reads `['received', 'qc_submitted', 'dispatched']`, so the second
+ * button could only ever produce a 400 while the two statuses a vendor actually
+ * produces had no control at all.
+ *
+ * `VendorJobActions` renders `nextVendorActions(status, guards)` from
+ * `lib/vendor-nav`, which is `nextStatuses(status, 'vendor')` over the same
+ * `@chobii/shared` table the API imports. So the buttons cannot disagree with
+ * what the API will accept, and three rules need no code here because the
+ * matrix already states them: `qc_passed` and `qc_failed` are ours to record
+ * (a verdict with no review row is a verdict with no evidence), `cancelled` is
+ * ours, and `sent` is retired with no edges in either direction.
+ *
+ * A status where the matrix gives a vendor no move renders a sentence rather
+ * than an empty strip — an action bar that simply vanishes is indistinguishable
+ * from one that failed to render.
+ *
+ * Every action is still the two-step inline confirm from
+ * `routes/admin/vendors/$id.tsx`: no `window.confirm`, which blocks the browser
+ * automation harness and is why nine admin files have no E2E coverage on their
+ * destructive paths.
+ *
+ * ## A failed write does not blank a good read
+ *
+ * `actionError` is separate from the page error and renders beside the buttons.
+ * Routing a 409 into the page error would destroy a job that loaded perfectly —
+ * summary, items, artwork and QC history all at once — which is #684 on the
+ * admin side of the same workflow.
  *
  * ## Nothing here invents a number
  *
@@ -43,10 +68,14 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { AlertCircle, ArrowLeft, Download } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
+import type { ProductionJobStatus } from '@chobii/shared'
 import {
   VENDOR_JOBS_SEARCH,
   formatVendorAmount,
   formatVendorDate,
+  nextVendorActions,
+  vendorNoActionReason,
+  type VendorGuardState,
   type VendorJobStage,
   type VendorJobStatus,
 } from '~/lib/vendor-nav'
@@ -73,8 +102,17 @@ export const Route = createFileRoute('/vendor/jobs/$id')({
 export interface VendorJob {
   id: string
   stage: VendorJobStage
-  status: VendorJobStatus
+  /** The pgEnum's type, not the filter's — rows still carry the retired value. */
+  status: ProductionJobStatus
   dueAt: string | null
+  /**
+   * Still selected by `lib/vendor-scope.ts`, and deliberately not rendered.
+   *
+   * It is the timestamp of the retired `sent`, and the line that used to print
+   * it said "Sent back to us" — a sentence about goods returning to our
+   * building, which is a workflow that stopped existing at §4. The column keeps
+   * its history; the portal stops narrating it.
+   */
   sentAt: string | null
   receivedAt: string | null
   amountExpected: string | null
@@ -156,22 +194,32 @@ export async function requestArtworkUrl(
   return (await response.json()) as VendorArtworkResponse
 }
 
+/**
+ * The one write a vendor gets, and it names a TRANSITION rather than a patch.
+ *
+ * The parameter is no longer a `'sent' | 'received'` literal. That literal was
+ * the second copy of a vocabulary the matrix already owns, and it had gone
+ * stale in both directions — it offered a retired status the API answers with a
+ * 400, and it could not name `qc_submitted` or `dispatched`. The only caller is
+ * `VendorJobActions`, whose targets come from `nextVendorActions`, so the set
+ * this can be handed is the matrix's vendor edges by construction.
+ *
+ * The body is ONE field. `receivedAt` and `sentAt` used to be sent from the
+ * browser's clock; `updateJobSchema` has no date field to receive them any
+ * more, and the server stamps `receivedAt`, `qcSubmittedAt` and `dispatchedAt`
+ * itself. A vendor back-dating "I had it three days ago" is not a data-entry
+ * convenience, it is a lie about an SLA clock. No amount field either: amounts
+ * are what we owe, priced from the rate card at assignment.
+ */
 export async function patchVendorJobStatus(
   id: string,
-  status: 'sent' | 'received'
+  status: VendorJobStatus
 ): Promise<VendorJob> {
   const response = await fetch(`${getApiUrl()}/api/vendor/jobs/${id}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    // Status and the matching timestamp. No amount field is sent, and the API's
-    // schema has none to receive: a vendor may not price their own job.
-    body: JSON.stringify({
-      status,
-      ...(status === 'received'
-        ? { receivedAt: new Date().toISOString() }
-        : { sentAt: new Date().toISOString() }),
-    }),
+    body: JSON.stringify({ status }),
   })
 
   if (!response.ok) {
@@ -307,6 +355,109 @@ export function ArtworkDownloadButton({
 }
 
 // ============================================================================
+// The action strip — the matrix, rendered
+// ============================================================================
+
+export interface VendorJobActionsProps {
+  status: ProductionJobStatus
+  onStatus?: (status: VendorJobStatus) => void | Promise<void>
+  /** A write is in flight. Locks every confirm rather than only the pressed one. */
+  busy?: boolean
+  /**
+   * What this screen has managed to find out about the matrix's guards.
+   *
+   * Empty today. #692 fills in `shot-list-complete` from the uploader and #693
+   * fills in `open-transfer-or-order-label` from the transfer card; until then
+   * every offered move is live and the API answers the guard, which is the
+   * correct default — greying out a legal move because the evidence has not
+   * loaded is worse than spending a round trip to find out.
+   */
+  guards?: VendorGuardState
+  /**
+   * A write that failed. It belongs HERE, beside the button that caused it, and
+   * never in the page error: the job below was read successfully, and blanking
+   * a good read because a write failed hides the summary, the items, the
+   * artwork and the QC history all at once (#684).
+   */
+  error?: string | null
+}
+
+/**
+ * Every move a vendor may make on this job, and nothing else.
+ *
+ * `nextVendorActions(status, guards)` is `nextStatuses(status, 'vendor')` over
+ * the shared matrix, so this component holds no vocabulary of its own — which
+ * is the point of the whole ticket. Adding an edge to the matrix adds a button
+ * here; nobody edits this file.
+ */
+export function VendorJobActions({
+  status,
+  onStatus,
+  busy = false,
+  guards,
+  error,
+}: VendorJobActionsProps) {
+  const actions = nextVendorActions(status, guards)
+
+  return (
+    <div
+      data-testid="vendor-job-actions"
+      className="space-y-3 rounded-lg border border-border p-4"
+    >
+      {actions.length === 0 ? (
+        <p
+          data-testid="vendor-job-actions-none"
+          className="text-sm text-muted-foreground"
+        >
+          {vendorNoActionReason(status)}
+        </p>
+      ) : (
+        <ul className="flex flex-wrap items-start gap-x-3 gap-y-2">
+          {actions.map((action) =>
+            action.blockedReason ? (
+              // Shown but not pressable. Hiding the move would make the
+              // workflow unguessable; pressing it would spend a round trip on
+              // a refusal this screen can already predict.
+              <li key={action.to} className="space-y-1">
+                <Button type="button" variant="outline" data-testid={action.testId} disabled>
+                  {action.label}
+                </Button>
+                <p
+                  data-testid={`vendor-job-guard-${action.to}`}
+                  className="max-w-xs text-xs text-muted-foreground"
+                >
+                  {action.blockedReason}
+                </p>
+              </li>
+            ) : (
+              <li key={action.to}>
+                <InlineConfirm
+                  testId={action.testId}
+                  label={action.label}
+                  question={action.question}
+                  busy={busy}
+                  onConfirm={() => onStatus?.(action.to)}
+                />
+              </li>
+            )
+          )}
+        </ul>
+      )}
+
+      {error && (
+        <p
+          data-testid="vendor-job-action-error"
+          role="alert"
+          className="text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
 // The three states
 // ============================================================================
 
@@ -362,10 +513,14 @@ function ItemsEmpty() {
 export interface VendorJobDetailBodyProps {
   data: VendorJobDetailResponse | null
   isLoading: boolean
+  /** A failed READ. It replaces the whole body, because there is no body. */
   error: string | null
   onRetry: () => void
-  onStatus?: (status: 'sent' | 'received') => void | Promise<void>
+  onStatus?: (status: VendorJobStatus) => void | Promise<void>
   busyStatus?: boolean
+  guards?: VendorGuardState
+  /** A failed WRITE. It renders beside the buttons and keeps the job on screen. */
+  actionError?: string | null
 }
 
 /**
@@ -379,6 +534,8 @@ export function VendorJobDetailBody({
   onRetry,
   onStatus,
   busyStatus = false,
+  guards,
+  actionError = null,
 }: VendorJobDetailBodyProps) {
   if (error) return <JobError message={error} onRetry={onRetry} />
   if (isLoading) return <JobSkeleton />
@@ -420,26 +577,17 @@ export function VendorJobDetailBody({
         </div>
       </div>
 
-      {/* The two writes a vendor gets */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-4">
-        <div className="mr-auto text-sm text-muted-foreground">
-          <div>Received by you: {formatVendorDate(job.receivedAt)}</div>
-          <div>Sent back to us: {formatVendorDate(job.sentAt)}</div>
-        </div>
-
-        <InlineConfirm
-          testId="vendor-job-mark-received"
-          label="Mark received"
-          question="Confirm you have this job in hand?"
+      {/* What this vendor can do next, straight off the transition matrix */}
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          In production since: {formatVendorDate(job.receivedAt)}
+        </p>
+        <VendorJobActions
+          status={job.status}
+          onStatus={onStatus}
           busy={busyStatus}
-          onConfirm={() => onStatus?.('received')}
-        />
-        <InlineConfirm
-          testId="vendor-job-mark-sent"
-          label="Mark ready & sent back"
-          question="Confirm the work is done and on its way to us?"
-          busy={busyStatus}
-          onConfirm={() => onStatus?.('sent')}
+          guards={guards}
+          error={actionError}
         />
       </div>
 
@@ -522,6 +670,9 @@ function VendorJobDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyStatus, setBusyStatus] = useState(false)
+  // Kept apart from `error` on purpose — see the file header. A refused
+  // transition must not blank a job that loaded fine.
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -540,16 +691,18 @@ function VendorJobDetailPage() {
     void load()
   }, [load])
 
-  const setStatus = async (status: 'sent' | 'received') => {
+  const setStatus = async (status: VendorJobStatus) => {
     setBusyStatus(true)
     try {
       await patchVendorJobStatus(id, status)
       // Re-read rather than patch local state: the server decides what the job
       // now looks like, and an optimistic edit would show one it does not have.
+      // A 409 body carries `{ error, code, from, to, allowed }`, so the reload
+      // also brings back the status the refusal was measured against.
       await load()
-      setError(null)
+      setActionError(null)
     } catch (patchError) {
-      setError((patchError as Error).message)
+      setActionError((patchError as Error).message)
     } finally {
       setBusyStatus(false)
     }
@@ -578,6 +731,7 @@ function VendorJobDetailPage() {
         onRetry={() => void load()}
         onStatus={setStatus}
         busyStatus={busyStatus}
+        actionError={actionError}
       />
     </div>
   )

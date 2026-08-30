@@ -24,6 +24,15 @@
  * page count to print and none is invented. "Next" is offered when a full page
  * came back, which is the only thing the response actually supports.
  *
+ * ## The status filter is derived, because a hand-written one was wrong
+ *
+ * The options are `VENDOR_JOB_STATUSES` from `lib/vendor-nav`, which is the
+ * closure of the shared transition matrix from `assigned`. The hand-written
+ * tuple it replaced offered "Sent back" — a retired status, so a view empty by
+ * construction — and had no option for `qc_submitted` or `dispatched`, the two
+ * statuses a vendor actually produces. A vendor could not filter to their own
+ * finished work.
+ *
  * ## Three states, and no invented numbers
  *
  * Skeleton, empty and error, mutually exclusive, error winning over both. A
@@ -36,6 +45,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
 import { AlertCircle, RefreshCw } from 'lucide-react'
+import type { ProductionJobStatus } from '@chobii/shared'
 import { cn, getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
 import {
@@ -43,11 +53,11 @@ import {
   VENDOR_JOBS_PAGE_SIZE,
   VENDOR_JOB_STAGES,
   VENDOR_JOB_STATUSES,
-  VENDOR_JOB_STATUS_LABELS,
-  VENDOR_JOB_STATUS_STYLES,
   daysUntil,
   formatVendorAmount,
   formatVendorDate,
+  vendorStatusLabel,
+  vendorStatusStyle,
   type VendorJobStage,
   type VendorJobStatus,
 } from '~/lib/vendor-nav'
@@ -97,7 +107,17 @@ export const Route = createFileRoute('/vendor/')({
 export interface VendorJobListItem {
   id: string
   stage: VendorJobStage
-  status: VendorJobStatus
+  /**
+   * The COLUMN's type, not the filter's.
+   *
+   * `VENDOR_JOB_STATUSES` is what this screen offers as a filter — the matrix
+   * closure, which excludes the retired `sent`. The column is the pgEnum, which
+   * still carries it, because retiring a value in the matrix is a statement
+   * about transitions and not a rewrite of every row. So a read can hand this
+   * screen a status the filter has no option for, and `VendorJobStatusPill` is
+   * what makes that legible instead of blank.
+   */
+  status: ProductionJobStatus
   dueAt: string | null
   sentAt: string | null
   receivedAt: string | null
@@ -117,17 +137,26 @@ export interface VendorJobsResponse {
 // Bits
 // ============================================================================
 
-export function VendorJobStatusPill({ status }: { status: VendorJobStatus }) {
+/**
+ * A status, in words and in colour.
+ *
+ * Both come from `vendor-nav`'s fallback-carrying helpers rather than a blind
+ * index, because rows still carry the retired `sent`: an unfamiliar status
+ * renders its humanised raw value in a neutral dashed pill, which is legible
+ * and obviously not one of ours. An empty badge would read as a bug in the page
+ * rather than as a status nobody has migrated yet.
+ */
+export function VendorJobStatusPill({ status }: { status: ProductionJobStatus }) {
   return (
     // Named in words as well as coloured — a pill that only signals in colour
     // says nothing to a screen reader or a colourblind printer.
     <span
       className={cn(
         'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
-        VENDOR_JOB_STATUS_STYLES[status] ?? 'border-border bg-muted text-muted-foreground'
+        vendorStatusStyle(status)
       )}
     >
-      {VENDOR_JOB_STATUS_LABELS[status] ?? status}
+      {vendorStatusLabel(status)}
     </span>
   )
 }
@@ -400,7 +429,7 @@ function VendorJobsPage() {
             <option value="">Any status</option>
             {VENDOR_JOB_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {VENDOR_JOB_STATUS_LABELS[status]}
+                {vendorStatusLabel(status)}
               </option>
             ))}
           </select>

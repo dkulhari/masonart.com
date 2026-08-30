@@ -18,12 +18,32 @@
  * #606 happened: a failed request rendered a confident `0`. Every error block
  * here is asserted to be DIGIT-FREE, and the payments screen — the one where a
  * wrong zero means "we owe you nothing" — is asserted twice.
+ *
+ * ## And the vocabulary, because it was wrong in production
+ *
+ * `lib/vendor-nav.ts` used to hand-write its status tuple. It listed the
+ * RETIRED `sent` and omitted `qc_submitted` and `dispatched` — the two statuses
+ * a vendor actually produces — so a vendor who finished a shot list watched
+ * their job render a raw enum string through the unknown-pill fallback, under a
+ * filter offering "Sent back" and nothing they could ever reach.
+ *
+ * Every assertion about that vocabulary below is written against
+ * `@chobii/shared/schemas/production-transitions` rather than against a list
+ * repeated here, because a test that restates the answer is a third copy of the
+ * state machine and cannot fail the day the matrix moves.
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import {
+  PRODUCTION_JOB_STATUSES,
+  PRODUCTION_TRANSITIONS,
+  UNREACHABLE_STATUSES,
+  nextStatuses,
+  type ProductionJobStatus,
+} from '@chobii/shared'
 
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (config: unknown) => config,
@@ -57,7 +77,18 @@ import {
   VendorPaymentsBody,
   OutstandingAmount,
 } from '~/routes/vendor/payments'
-import { formatVendorAmount, VENDOR_JOBS_PAGE_SIZE } from '~/lib/vendor-nav'
+import {
+  formatVendorAmount,
+  nextVendorActions,
+  vendorNoActionReason,
+  vendorStatusLabel,
+  vendorStatusStyle,
+  VENDOR_JOBS_PAGE_SIZE,
+  VENDOR_JOB_STATUSES,
+  VENDOR_JOB_STATUS_LABELS,
+  VENDOR_JOB_STATUS_STYLES,
+  VENDOR_UNKNOWN_STATUS_STYLE,
+} from '~/lib/vendor-nav'
 
 afterEach(cleanup)
 
@@ -112,6 +143,191 @@ describe('vendorJobsSearchSchema', () => {
     expect(vendorJobsSearchSchema.parse(asUrlWouldDeliver({ status: 'qc_failed' }))).toMatchObject({
       status: 'qc_failed',
     })
+  })
+
+  /**
+   * The live bug, stated as a URL.
+   *
+   * The filter was built over a hand-written tuple that carried the retired
+   * `sent` and had no option for either status a vendor produces, so
+   * `?status=qc_submitted` — the state a vendor lands in the moment they finish
+   * — degraded to "any status" while `?status=sent` was a view that could only
+   * ever be empty.
+   */
+  it('drops the retired status and keeps the two a vendor actually produces', () => {
+    expect(
+      vendorJobsSearchSchema.parse(asUrlWouldDeliver({ status: 'sent' })).status
+    ).toBeUndefined()
+    expect(
+      vendorJobsSearchSchema.parse(asUrlWouldDeliver({ status: 'qc_submitted' })).status
+    ).toBe('qc_submitted')
+    expect(
+      vendorJobsSearchSchema.parse(asUrlWouldDeliver({ status: 'dispatched' })).status
+    ).toBe('dispatched')
+  })
+})
+
+// ============================================================================
+// The vendor vocabulary — derived from the matrix, written down nowhere
+// ============================================================================
+
+describe('VENDOR_JOB_STATUSES derives from the transition matrix', () => {
+  /**
+   * The closure computed here rather than imported, so this assertion is an
+   * independent second opinion about what a vendor's job can reach. `assigned`
+   * is the seed because it is the moment a vendor first holds the job — before
+   * it, `draft` has no vendor to scope a read to.
+   */
+  const reachableFromAssigned = () => {
+    const seen = new Set<ProductionJobStatus>(['assigned'])
+    const queue: ProductionJobStatus[] = ['assigned']
+    while (queue.length > 0) {
+      const from = queue.shift() as ProductionJobStatus
+      for (const to of Object.keys(PRODUCTION_TRANSITIONS[from]) as ProductionJobStatus[]) {
+        if (seen.has(to)) continue
+        seen.add(to)
+        queue.push(to)
+      }
+    }
+    return seen
+  }
+
+  it('is every status reachable once a vendor holds the job, in enum order', () => {
+    const reachable = reachableFromAssigned()
+    expect([...VENDOR_JOB_STATUSES]).toEqual(
+      PRODUCTION_JOB_STATUSES.filter((status) => reachable.has(status))
+    )
+  })
+
+  it('is the seven the design names, and the two the old tuple was missing', () => {
+    expect([...VENDOR_JOB_STATUSES]).toEqual([
+      'assigned',
+      'received',
+      'qc_submitted',
+      'qc_passed',
+      'qc_failed',
+      'dispatched',
+      'cancelled',
+    ])
+  })
+
+  it('offers nothing retired and nothing from before the job was assigned', () => {
+    for (const retired of UNREACHABLE_STATUSES) {
+      expect(VENDOR_JOB_STATUSES).not.toContain(retired)
+    }
+    expect(VENDOR_JOB_STATUSES).not.toContain('sent')
+    // A draft job has no vendor, so a vendor filtering by it filters to nothing.
+    expect(VENDOR_JOB_STATUSES).not.toContain('draft')
+  })
+
+  it.each([...VENDOR_JOB_STATUSES])('%s has both a label and a style', (status) => {
+    expect(VENDOR_JOB_STATUS_LABELS[status]).toBeTruthy()
+    expect(VENDOR_JOB_STATUS_STYLES[status]).toBeTruthy()
+    expect(vendorStatusLabel(status)).toBe(VENDOR_JOB_STATUS_LABELS[status])
+    expect(vendorStatusStyle(status)).toBe(VENDOR_JOB_STATUS_STYLES[status])
+  })
+
+  it('never tells a vendor the goods come back to us', () => {
+    // They do not. The vendor despatches, and every label that said otherwise
+    // described a workflow that stopped existing at §4.
+    for (const label of Object.values(VENDOR_JOB_STATUS_LABELS)) {
+      expect(label.toLowerCase()).not.toContain('back')
+    }
+  })
+
+  it('renders a row that predates the retirement readably rather than blank', () => {
+    // `db:retire-sent-status` has not run against production data, so rows still
+    // carry `sent`. A pill with no label reads as a rendering fault.
+    expect(vendorStatusLabel('sent')).toBe('Sent')
+    expect(vendorStatusStyle('sent')).toBe(VENDOR_UNKNOWN_STATUS_STYLE)
+    expect(VENDOR_JOB_STATUS_LABELS['sent' as ProductionJobStatus]).toBeUndefined()
+  })
+})
+
+// ============================================================================
+// The actions — read off the matrix, so they cannot disagree with the API
+// ============================================================================
+
+describe('nextVendorActions is the matrix, not a list', () => {
+  it.each([...PRODUCTION_JOB_STATUSES])(
+    'from %s it offers exactly the vendor edges the matrix has',
+    (status) => {
+      expect(nextVendorActions(status).map((action) => action.to)).toEqual(
+        nextStatuses(status, 'vendor')
+      )
+    }
+  )
+
+  it('never offers a verdict or a cancellation, from any status', () => {
+    // Those are ours. A vendor claiming their own QC pass is the bug the review
+    // route exists to prevent, and `PATCH` does not even parse them.
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      const targets = nextVendorActions(status).map((action) => action.to)
+      expect(targets).not.toContain('qc_passed')
+      expect(targets).not.toContain('qc_failed')
+      expect(targets).not.toContain('cancelled')
+    }
+  })
+
+  it('offers the retired status from nowhere, and offers nothing from it', () => {
+    expect(nextVendorActions('sent')).toEqual([])
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      expect(nextVendorActions(status).map((action) => action.to)).not.toContain('sent')
+    }
+  })
+
+  it('gives every action a label, a question and a test id keyed on its target', () => {
+    let seen = 0
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      for (const action of nextVendorActions(status)) {
+        expect(action.label).toBeTruthy()
+        expect(action.question).toBeTruthy()
+        expect(action.testId).toBe(`vendor-job-mark-${action.to}`)
+        seen += 1
+      }
+    }
+    expect(seen).toBeGreaterThan(0)
+  })
+
+  it('never phrases an action as sending the work back', () => {
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      for (const action of nextVendorActions(status)) {
+        expect(`${action.label} ${action.question}`.toLowerCase()).not.toContain('back')
+      }
+    }
+  })
+
+  it('carries the guard the matrix names on the edge, and only that guard', () => {
+    const submit = nextVendorActions('received').find((a) => a.to === 'qc_submitted')
+    expect(submit?.guard).toBe('shot-list-complete')
+    const dispatch = nextVendorActions('qc_passed').find((a) => a.to === 'dispatched')
+    expect(dispatch?.guard).toBe('open-transfer-or-order-label')
+    // `assigned -> received` is unguarded in the matrix, so nothing is invented.
+    expect(nextVendorActions('assigned')[0]?.guard).toBeUndefined()
+  })
+
+  it('blocks an action only when a guard is KNOWN to be unsatisfied', () => {
+    const blocked = nextVendorActions('received', { 'shot-list-complete': false })
+    expect(blocked[0]?.blockedReason).toBeTruthy()
+
+    const ready = nextVendorActions('received', { 'shot-list-complete': true })
+    expect(ready[0]?.blockedReason).toBeUndefined()
+
+    // Unknown is not the same as unsatisfied. Nothing on this screen has read
+    // the shot list yet, and the API remains the authority on the guard.
+    expect(nextVendorActions('received')[0]?.blockedReason).toBeUndefined()
+  })
+
+  it('has a sentence for every status where a vendor has no move', () => {
+    let idle = 0
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      if (nextVendorActions(status).length > 0) continue
+      idle += 1
+      // A real sentence, not a placeholder dash.
+      expect(vendorNoActionReason(status).length).toBeGreaterThan(30)
+      expect(vendorNoActionReason(status).toLowerCase()).not.toContain('back')
+    }
+    expect(idle).toBeGreaterThan(0)
   })
 })
 
@@ -282,16 +498,6 @@ describe('the job detail — the three states and the two writes', () => {
     expect(onStatus).toHaveBeenCalledWith('received')
   })
 
-  it('offers only the two statuses a vendor may set', () => {
-    render(
-      <VendorJobDetailBody data={detail} isLoading={false} error={null} onRetry={() => {}} />
-    )
-    expect(screen.getByTestId('vendor-job-mark-received')).toBeInTheDocument()
-    expect(screen.getByTestId('vendor-job-mark-sent')).toBeInTheDocument()
-    // Passing QC is our verdict to record, not theirs to claim.
-    expect(screen.queryByText(/pass(ed)? qc/i)).not.toBeInTheDocument()
-  })
-
   it('cancel disarms the confirm without acting', () => {
     const onStatus = vi.fn()
     render(
@@ -303,10 +509,141 @@ describe('the job detail — the three states and the two writes', () => {
         onStatus={onStatus}
       />
     )
-    fireEvent.click(screen.getByTestId('vendor-job-mark-sent'))
-    fireEvent.click(screen.getByTestId('vendor-job-mark-sent-cancel'))
+    fireEvent.click(screen.getByTestId('vendor-job-mark-received'))
+    fireEvent.click(screen.getByTestId('vendor-job-mark-received-cancel'))
     expect(onStatus).not.toHaveBeenCalled()
-    expect(screen.getByTestId('vendor-job-mark-sent')).toBeInTheDocument()
+    expect(screen.getByTestId('vendor-job-mark-received')).toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// The action strip — rendered from the matrix, or it is a third copy of it
+// ============================================================================
+
+describe('the job detail action strip', () => {
+  /** Every action control on the page, in the order it renders. */
+  const actionIdsOf = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('[data-testid^="vendor-job-mark-"]'))
+      .map((el) => el.getAttribute('data-testid'))
+      .filter((id): id is string => id !== null && !/-(confirm|cancel)$/.test(id))
+
+  const at = (status: ProductionJobStatus): VendorJobDetailResponse => ({
+    ...detail,
+    job: { ...detail.job, status },
+  })
+
+  it.each([...VENDOR_JOB_STATUSES])(
+    'renders exactly nextVendorActions(%s), in order, and nothing else',
+    (status) => {
+      const { container } = render(
+        <VendorJobDetailBody
+          data={at(status)}
+          isLoading={false}
+          error={null}
+          onRetry={() => {}}
+        />
+      )
+      expect(actionIdsOf(container)).toEqual(
+        nextVendorActions(status).map((action) => action.testId)
+      )
+    }
+  )
+
+  it.each([...VENDOR_JOB_STATUSES, 'sent' as ProductionJobStatus])(
+    'has deleted "Mark ready & sent back" — not present in %s either',
+    (status) => {
+      const { container } = render(
+        <VendorJobDetailBody
+          data={at(status)}
+          isLoading={false}
+          error={null}
+          onRetry={() => {}}
+        />
+      )
+      // The control the API now answers with a 400: `sent` is not in
+      // `VENDOR_SETTABLE_STATUSES`, so pressing this could only ever fail.
+      expect(screen.queryByTestId('vendor-job-mark-sent')).not.toBeInTheDocument()
+      expect(container.textContent ?? '').not.toMatch(/sent back/i)
+      expect(container.textContent ?? '').not.toMatch(/back to us/i)
+    }
+  )
+
+  it.each(
+    [...VENDOR_JOB_STATUSES, 'sent' as ProductionJobStatus].filter(
+      (status) => nextVendorActions(status).length === 0
+    )
+  )('says why there is nothing to do in %s rather than showing an empty strip', (status) => {
+    const { container } = render(
+      <VendorJobDetailBody data={at(status)} isLoading={false} error={null} onRetry={() => {}} />
+    )
+    expect(actionIdsOf(container)).toEqual([])
+    expect(screen.getByTestId('vendor-job-actions-none')).toHaveTextContent(
+      vendorNoActionReason(status)
+    )
+  })
+
+  it('offers the finish-and-submit move once a job is in production', () => {
+    // The exact state the old screen could not express: a vendor holding a job
+    // they are working on, whose only real next move is submitting it to us.
+    const onStatus = vi.fn()
+    render(
+      <VendorJobDetailBody
+        data={at('received')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        onStatus={onStatus}
+      />
+    )
+    fireEvent.click(screen.getByTestId('vendor-job-mark-qc_submitted'))
+    fireEvent.click(screen.getByTestId('vendor-job-mark-qc_submitted-confirm'))
+    expect(onStatus).toHaveBeenCalledWith('qc_submitted')
+  })
+
+  it('renders a readable status for a row the retirement backfill has not reached', () => {
+    render(
+      <VendorJobDetailBody
+        data={at('sent' as ProductionJobStatus)}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    // Legible and obviously unfamiliar, rather than an empty pill that reads as
+    // a rendering fault. Rows still carry this value.
+    expect(screen.getByTestId('vendor-job-detail')).toBeInTheDocument()
+    expect(screen.getByText('Sent')).toBeInTheDocument()
+  })
+
+  it('disables an action whose guard the screen knows is unsatisfied', () => {
+    render(
+      <VendorJobDetailBody
+        data={at('received')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        guards={{ 'shot-list-complete': false }}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-mark-qc_submitted')).toBeDisabled()
+    expect(screen.getByTestId('vendor-job-guard-qc_submitted')).toBeInTheDocument()
+  })
+
+  it('keeps a failed write beside the button instead of blanking the job', () => {
+    // #684: routing a write failure into the page error destroys a read that
+    // succeeded — the summary, the items and the QC history all vanish at once.
+    render(
+      <VendorJobDetailBody
+        data={detail}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        actionError="This job was cancelled, so there is nothing left to do on it."
+      />
+    )
+    expect(screen.getByTestId('vendor-job-detail')).toBeInTheDocument()
+    expect(screen.queryByTestId('vendor-job-error')).not.toBeInTheDocument()
+    expect(screen.getByTestId('vendor-job-action-error')).toHaveTextContent(/cancelled/i)
   })
 })
 

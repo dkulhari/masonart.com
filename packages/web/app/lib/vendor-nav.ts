@@ -13,6 +13,15 @@
  * on this surface it means telling a print shop we owe them nothing.
  */
 
+import {
+  PRODUCTION_JOB_STATUSES,
+  PRODUCTION_TRANSITIONS,
+  guardFor,
+  nextStatuses,
+  type ProductionJobStatus,
+  type TransitionGuard,
+} from '@chobii/shared'
+
 /** Rows per page in the vendor job queue. The API's own default. */
 export const VENDOR_JOBS_PAGE_SIZE = 20
 
@@ -33,39 +42,308 @@ export const VENDOR_JOBS_SEARCH = {
 } as const
 
 /**
- * The job statuses a vendor sees, in the order the work moves.
+ * The job statuses a vendor can ever be looking at, in enum order.
  *
- * `draft` is absent: a draft job has not been assigned to anyone, so it can
- * never appear in a scoped read and offering it as a filter would offer a view
- * that is empty by construction.
+ * DERIVED, and that is the whole point of this block. This used to be a
+ * hand-written six-value tuple, and by Phase 5 every one of its problems was
+ * live: it carried the RETIRED `sent` (as "Sent back") and had no entry at all
+ * for `qc_submitted` or `dispatched` — the two statuses a vendor actually
+ * produces. So a vendor who finished their shot list saw their job render a raw
+ * enum string through the unknown-pill fallback, under a filter whose only
+ * vendor-reachable options were the ones they could no longer reach. The tuple
+ * also claimed to be "in the order the work moves" while listing `sent` before
+ * `received`, contradicting its own labels four lines below it.
+ *
+ * The fix is by construction rather than by correction: this is the closure of
+ * the shared transition matrix from `assigned`, in `PRODUCTION_JOB_STATUSES`
+ * order. Two exclusions fall out of it rather than being asserted here:
+ *
+ * - **`draft`** — nothing transitions INTO it, and a draft job has no vendor,
+ *   so it can never appear in a row-scoped read. Offering it as a filter offers
+ *   a view that is empty by construction.
+ * - **`sent`** — retired, with zero in-edges and zero out-edges, so the closure
+ *   never touches it. It is unreachable and unfilterable here for the same
+ *   reason the API refuses to set it, not because this file remembered to say
+ *   so.
+ *
+ * `assigned` is the seed because it is the moment a vendor first holds the job.
+ * Everything a job of theirs can subsequently become — including the statuses
+ * only WE can move it to, like `qc_passed` — is downstream of it, and a vendor
+ * has to be able to read those even though they cannot write them.
  */
-export const VENDOR_JOB_STATUSES = [
-  'assigned',
-  'sent',
-  'received',
-  'qc_passed',
-  'qc_failed',
-  'cancelled',
-] as const
+function vendorReachableStatuses(): Set<ProductionJobStatus> {
+  const seen = new Set<ProductionJobStatus>(['assigned'])
+  const queue: ProductionJobStatus[] = ['assigned']
 
-export type VendorJobStatus = (typeof VENDOR_JOB_STATUSES)[number]
+  while (queue.length > 0) {
+    const from = queue.shift() as ProductionJobStatus
+    // Actor-agnostic on purpose: an admin cancelling or passing a vendor's job
+    // changes what that vendor SEES, so their vocabulary has to include it.
+    for (const to of Object.keys(PRODUCTION_TRANSITIONS[from]) as ProductionJobStatus[]) {
+      if (seen.has(to)) continue
+      seen.add(to)
+      queue.push(to)
+    }
+  }
 
-export const VENDOR_JOB_STATUS_LABELS: Record<VendorJobStatus, string> = {
-  assigned: 'Assigned to you',
-  sent: 'Sent back',
-  received: 'Received by you',
-  qc_passed: 'Passed QC',
-  qc_failed: 'Failed QC',
-  cancelled: 'Cancelled',
+  return seen
 }
 
-export const VENDOR_JOB_STATUS_STYLES: Record<VendorJobStatus, string> = {
+/**
+ * A list derived from a filter is an array, and `z.enum` needs a non-empty
+ * tuple. Narrowing here rather than casting at the call site means a matrix
+ * that ever stranded `assigned` fails loudly at module load instead of
+ * producing a status filter with no options and no explanation.
+ *
+ * The same guard, for the same reason, as `routes/admin/production/index.tsx`.
+ */
+function nonEmpty<T>(values: readonly T[], what: string): [T, ...T[]] {
+  const [first, ...rest] = values
+  if (first === undefined) throw new Error(`vendor-nav: ${what} derived empty`)
+  return [first, ...rest]
+}
+
+export const VENDOR_JOB_STATUSES = nonEmpty(
+  (() => {
+    const reachable = vendorReachableStatuses()
+    return PRODUCTION_JOB_STATUSES.filter((status) => reachable.has(status))
+  })(),
+  'VENDOR_JOB_STATUSES'
+)
+
+/**
+ * A status a vendor may hold.
+ *
+ * Structurally `ProductionJobStatus`, because the tuple above is derived at
+ * runtime — and honestly so: `GET /api/vendor/jobs` reads a column whose pgEnum
+ * still carries `sent`, so a row CAN arrive with a status outside the derived
+ * list. The formatters below are what make that safe; a narrower type here
+ * would only move the lie from the pill into the type system.
+ */
+export type VendorJobStatus = (typeof VENDOR_JOB_STATUSES)[number]
+
+/**
+ * What each status means to the print shop reading it.
+ *
+ * Not the schema's words, and specifically **nothing about the goods coming
+ * back to us**. They do not: the vendor despatches to the next vendor or to the
+ * courier, and "Sent back" was a label for a workflow that stopped existing at
+ * §4 of the design. Each label names what is true and who is blocked:
+ *
+ * - `assigned` — it is yours and priced; work has not started.
+ * - `received` — you have everything you need and are making it.
+ * - `qc_submitted` — you are finished and it is with US. Nothing to do.
+ * - `qc_passed` — we approved it; the next move is despatch.
+ * - `qc_failed` — we found something; the piece comes back to your bench, not
+ *   to our building.
+ * - `dispatched` — it has left your hands. Terminal.
+ *
+ * Keyed partially and cast, exactly as `routes/admin/production/index.tsx` is:
+ * the retired status gets no entry because no vendor view offers it, and
+ * `vendorStatusLabel` covers the row that carries it anyway. The exhaustiveness
+ * check that buys is a test-time one — `it.each([...VENDOR_JOB_STATUSES])` in
+ * `tests/routes/vendor/vendor-screens.test.tsx` — which is the stronger of the
+ * two here, because the list is derived at runtime and a `Record` over it could
+ * never catch a status the matrix grew after this file was last opened.
+ */
+export const VENDOR_JOB_STATUS_LABELS = {
+  assigned: 'Assigned to you',
+  received: 'In production',
+  qc_submitted: 'Sent for approval',
+  qc_passed: 'Approved — ready to ship',
+  qc_failed: 'Changes needed',
+  dispatched: 'Handed over',
+  cancelled: 'Cancelled',
+} as Record<VendorJobStatus, string>
+
+/**
+ * Colour follows the same reading. Amber is the vendor's own backlog — the two
+ * statuses where the next move is theirs — so scanning the queue for "what do I
+ * work on next" is a glance rather than a read.
+ */
+export const VENDOR_JOB_STATUS_STYLES = {
   assigned: 'bg-amber-50 text-amber-700 border-amber-200',
   received: 'bg-blue-50 text-blue-700 border-blue-200',
-  sent: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  qc_submitted: 'bg-slate-100 text-slate-700 border-slate-300',
   qc_passed: 'bg-green-50 text-green-700 border-green-200',
   qc_failed: 'bg-red-50 text-red-700 border-red-200',
-  cancelled: 'bg-muted text-muted-foreground border-border',
+  dispatched: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  cancelled: 'bg-muted text-muted-foreground border-border line-through',
+} as Record<VendorJobStatus, string>
+
+/**
+ * What a status this file has no label for gets.
+ *
+ * There is one today — `sent`, on rows in any environment where
+ * `db:retire-sent-status` has not run — and there will be another the moment
+ * the enum grows again. Neutral and dashed: legible, and obviously unfamiliar.
+ */
+export const VENDOR_UNKNOWN_STATUS_STYLE =
+  'border-dashed border-border bg-muted text-muted-foreground'
+
+/**
+ * A status in words, for any status at all.
+ *
+ * The fallback is not defensive padding. `sent` is retired in the MATRIX, which
+ * is a statement about which transitions exist — it is not gone from the pgEnum
+ * and it is not gone from the rows, because dropping an enum value means
+ * recreating the type and rewriting every dependent column. So a vendor can
+ * still open a job carrying it, and a blank pill on that job reads as a
+ * rendering fault rather than as a status. The same humanised fallback covers
+ * the next value the enum grows, which is why it is a transform rather than a
+ * second table naming `sent`.
+ */
+export function vendorStatusLabel(status: ProductionJobStatus): string {
+  return (
+    VENDOR_JOB_STATUS_LABELS[status] ??
+    status.replace(/_/g, ' ').replace(/^./, (c: string) => c.toUpperCase())
+  )
+}
+
+/** The pill's classes, with the same fallback and for the same reason. */
+export function vendorStatusStyle(status: ProductionJobStatus): string {
+  return VENDOR_JOB_STATUS_STYLES[status] ?? VENDOR_UNKNOWN_STATUS_STYLE
+}
+
+// ============================================================================
+// The actions — the matrix, in the vendor's words
+// ============================================================================
+
+/**
+ * What this screen knows about the circumstances the API will still check.
+ *
+ * `true` means the screen has read the evidence and it is there; `false` means
+ * it has read it and it is not. **Absent means unknown**, and unknown must not
+ * disable a button: the API evaluates every guard itself, and a screen that
+ * greys out a legal move because it has not loaded the evidence yet is worse
+ * than one that spends a round trip finding out.
+ *
+ * #692 supplies `shot-list-complete` and #693 supplies
+ * `open-transfer-or-order-label`; until they land this map is simply empty and
+ * every offered move is live.
+ */
+export type VendorGuardState = Partial<Record<TransitionGuard, boolean>>
+
+export interface VendorJobAction {
+  /** The status this action moves the job to. */
+  to: VendorJobStatus
+  /** The button. */
+  label: string
+  /** The inline two-step question. Never a native dialog. */
+  question: string
+  /** `data-testid` on the button; `-confirm` and `-cancel` hang off it. */
+  testId: string
+  /** The circumstance the API will check, if the matrix names one on the edge. */
+  guard?: TransitionGuard
+  /** Set only when `guards` says the named guard is NOT satisfied. */
+  blockedReason?: string
+}
+
+/**
+ * The words for each move, keyed on where it LANDS.
+ *
+ * Copy, not vocabulary — the set of moves comes from the matrix and this table
+ * only says them out loud, so a target with no entry here is a bug the tests
+ * catch rather than a silently missing button.
+ *
+ * `received` is reached from two places — `assigned` (start) and `qc_failed`
+ * (rework in place) — and takes one wording deliberately: "everything you need
+ * to start" is as true of a second attempt as of a first, and the QC history
+ * directly below already says which one this is.
+ *
+ * The question on `received` is the one that changed. It used to be "Confirm
+ * you have this job in hand?", which described a physical parcel arriving from
+ * us. §4 re-meant the status: it is now "the vendor has everything needed to
+ * start" — artwork for a print job, the transferred sheet for a frame job — so
+ * the question asks about readiness, not about receipt.
+ */
+const VENDOR_ACTION_COPY: Record<string, { label: string; question: string }> = {
+  received: {
+    label: 'Mark received',
+    question: 'Confirm you have everything you need to start?',
+  },
+  qc_submitted: {
+    label: 'Send for approval',
+    question: 'Confirm the work is finished and ready for us to check?',
+  },
+  dispatched: {
+    label: 'Mark handed over',
+    question: 'Confirm this job has left your hands?',
+  },
+}
+
+/**
+ * Why a guard the screen has evidence against is not satisfied yet.
+ *
+ * The remedy, in the vendor's words — a disabled button with no sentence beside
+ * it is a screen telling someone to guess.
+ */
+const VENDOR_GUARD_UNMET: Partial<Record<TransitionGuard, string>> = {
+  'shot-list-complete':
+    'Every required photo has to be uploaded first — the approval is judged on the shot list.',
+  'open-transfer-or-order-label':
+    'This needs an open transfer to the next workshop, or a courier label on the order, before it can be handed over.',
+}
+
+/**
+ * Every move a vendor may make on a job in `status`, and nothing else.
+ *
+ * Read off `nextStatuses(status, 'vendor')` — the same table
+ * `packages/api/src/lib/production-transitions.ts` builds
+ * `VENDOR_SETTABLE_STATUSES` from and the route's `z.enum` narrows to — so the
+ * buttons on this screen cannot disagree with what the API will accept. That is
+ * the entire reason the matrix moved to `@chobii/shared`: this file WAS the
+ * second copy, and a third would be worse than the first.
+ *
+ * Three things therefore need no rule here, because the matrix already says
+ * them: a vendor is never offered `qc_passed` or `qc_failed` (those edges name
+ * `admin`, and a verdict with no review row is a verdict with no evidence),
+ * never offered `cancelled` (ours), and never offered `sent` (retired, no
+ * edges at all).
+ */
+export function nextVendorActions(
+  status: ProductionJobStatus,
+  guards: VendorGuardState = {}
+): VendorJobAction[] {
+  return nextStatuses(status, 'vendor').map((to) => {
+    const copy = VENDOR_ACTION_COPY[to]
+    const guard = guardFor(status, to)
+    // Only an explicit `false` blocks. `undefined` is "not read yet", and the
+    // API is the authority either way.
+    const unmet = guard !== undefined && guards[guard] === false
+
+    return {
+      to,
+      label: copy?.label ?? `Move to ${vendorStatusLabel(to).toLowerCase()}`,
+      question: copy?.question ?? `Confirm this job is ${vendorStatusLabel(to).toLowerCase()}?`,
+      testId: `vendor-job-mark-${to}`,
+      ...(guard ? { guard } : {}),
+      ...(unmet && guard ? { blockedReason: VENDOR_GUARD_UNMET[guard] } : {}),
+    }
+  })
+}
+
+/**
+ * Why this job has no button on it.
+ *
+ * Every status where `nextVendorActions` is empty needs a sentence, because an
+ * action strip that simply vanishes is indistinguishable from one that failed
+ * to render. There are four such states and they are four different messages:
+ * waiting on us, finished, cancelled, and the retired value a backfill has not
+ * reached yet.
+ */
+export function vendorNoActionReason(status: ProductionJobStatus): string {
+  switch (status) {
+    case 'qc_submitted':
+      return 'This is with us for checking. Nothing to do here until we come to you — you will see the result under Quality checks below.'
+    case 'dispatched':
+      return 'This job has left your hands, which is the end of it for you. If a parcel goes missing we raise a new job rather than reopening this one.'
+    case 'cancelled':
+      return 'This job was cancelled, so there is nothing left to do on it. Stop work on this piece and check your queue for the current one.'
+    default:
+      // `sent`, and anything the enum grows before this file is opened again.
+      return 'There is no action for you on a job in this state. If that looks wrong to you, raise it with us rather than working around it.'
+  }
 }
 
 export const VENDOR_JOB_STAGES = ['print', 'frame'] as const
