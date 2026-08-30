@@ -13,14 +13,13 @@
  * list. `requireAdmin`, not `requireContentManager`, for the same reason: these
  * rows carry what we pay a supplier.
  *
- * **This module defines the job RECORD. production-pipeline defines the
- * WORKFLOW.** `production_job_status` is a vocabulary, not a state machine
- * (schema/production-jobs.ts says so), so PATCH accepts any status without a
- * transition guard, and there are no routing rules, reprint loops or lead-time
- * calculation here. Those are the next sub-project. A missing guard is the
- * design, not an omission.
+ * **This module defines the job RECORD; `lib/production-transitions.ts` holds
+ * the WORKFLOW.** `production_job_status` is a vocabulary; the grammar over it
+ * is that module's matrix, and every write path here asks it rather than
+ * deciding for itself. Both writers — PATCH and assign — take a job by its
+ * from-status and refuse anything the matrix does not allow.
  *
- * Four decisions worth the ink:
+ * Six decisions worth the ink:
  *
  * 1. **Jobs join to `order_items`, never to the order.** A basket holding a
  *    poster and a frame splits into two jobs against two vendors. POST checks
@@ -45,16 +44,37 @@
  *    leave three rows, because that sequence IS the QC history. The table has
  *    no `updated_at` for the same reason.
  *
+ * 5. **A refusal is 409, never 422.** In this router 422 already means "your
+ *    payload names things that do not line up" — `missingOrderItemIds`,
+ *    `unpriced` — which the caller fixes by editing the body. A transition
+ *    conflict is not that: the body is fine and the world moved. The 409 body
+ *    carries `{ error, code, from, to, allowed }` so the UI re-renders its
+ *    buttons without a second round trip.
+ *
+ * 6. **One audit row per act, and the refusal rows have to survive.** A move
+ *    shares the transaction it describes, because a row saying the job moved,
+ *    beside a job that did not, is worse than no row. A refusal does the
+ *    opposite: it records that a transaction was ROLLED BACK, so writing it
+ *    inside that transaction would erase the evidence it exists to preserve.
+ *    See `lib/audit.ts`. `draft -> assigned` produces one `assigned` row and no
+ *    `transitioned` row beside it — two rows for one act would break the "one
+ *    row per transition" property the timeline is read through.
+ *
  * Money arithmetic is `lib/vendor-payables`' throughout — `sumPayable` adds the
  * matched rates in integer paise and `jobPayableAmount` answers
  * `COALESCE(actual, expected)`. A second money implementation in a router is
  * how a ledger starts disagreeing with itself.
+ *
+ * Concurrency is `routes/admin/vendor-payables.ts`' shape, copied deliberately:
+ * `FOR UPDATE` on the read, the predicate REPEATED in the UPDATE's WHERE, and a
+ * row-count mismatch that throws and rolls back rather than returning a 200
+ * over a write that matched nothing.
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "../../database";
 import {
@@ -83,6 +103,12 @@ import {
   jobPayableAmount,
   type PayableJob,
 } from "../../lib/vendor-payables";
+import {
+  assertTransition,
+  ProductionTransitionError,
+  type ProductionJobStatus,
+} from "../../lib/production-transitions";
+import { recordAudit, diffRecords } from "../../lib/audit";
 
 // ============================================================================
 // Constants
@@ -132,13 +158,39 @@ const createJobSchema = z.object({
   dueAt: z.coerce.date().nullish(),
 });
 
-const assignJobSchema = z.object({ vendorId: z.string().uuid() });
+const assignJobSchema = z.object({
+  vendorId: z.string().uuid(),
+  /**
+   * Compare-and-swap on the vendor. Optional, because a first assignment has
+   * nothing to compare against; `null` asserts "I believe this job is
+   * unassigned". A mismatch is answered with the vendor that ACTUALLY holds the
+   * job, so the losing screen can name who took it rather than say "version
+   * mismatch".
+   */
+  expectedVendorId: z.string().uuid().nullable().optional(),
+});
+
+/**
+ * Reachable only through `POST /:jobId/reviews`: a verdict with no review row is
+ * a verdict with no evidence, and the review is the evidence.
+ */
+const VERDICT_ONLY_STATUSES: readonly ProductionJobStatus[] = ["qc_passed", "qc_failed"];
+
+/**
+ * Subtracted from the enum rather than listed out, so a status added to the
+ * vocabulary is patchable by default and only the two verdicts stay out. The
+ * matrix still decides whether any particular move is legal — this is the
+ * narrower question of what PATCH will even parse.
+ */
+const patchableStatuses = productionJobStatusEnum.enumValues.filter(
+  (status) => !VERDICT_ONLY_STATUSES.includes(status)
+) as [ProductionJobStatus, ...ProductionJobStatus[]];
 
 const updateJobSchema = z
   .object({
     /** The negotiated price. Print shops negotiate; hiding that invites workarounds. */
     amountActual: decimalString.nullable().optional(),
-    status: z.enum(productionJobStatusEnum.enumValues).optional(),
+    status: z.enum(patchableStatuses).optional(),
     dueAt: z.coerce.date().nullable().optional(),
     sentAt: z.coerce.date().nullable().optional(),
     receivedAt: z.coerce.date().nullable().optional(),
@@ -165,11 +217,91 @@ function failed(action: string, error: unknown) {
   return { error: `Failed to ${action}: ${message}` } as const;
 }
 
+/** Thrown out of a transaction so the read that found nothing still rolls back. */
+class JobNotFound extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JobNotFound";
+  }
+}
+
+/**
+ * A refusal this router raises itself, as opposed to one the matrix raises.
+ *
+ * Carries its own status because the two kinds are genuinely different: 409 for
+ * "the world moved" (settled, stale vendor, lost race) and 422 for "your
+ * payload names things that do not line up" (no items, nothing priced).
+ */
+class JobWriteRefused extends Error {
+  readonly httpStatus: 409 | 422;
+  readonly body: Record<string, unknown>;
+
+  constructor(httpStatus: 409 | 422, body: Record<string, unknown>) {
+    super(typeof body.error === "string" ? body.error : "Production job write refused");
+    this.name = "JobWriteRefused";
+    this.httpStatus = httpStatus;
+    this.body = body;
+  }
+}
+
+type ProductionContext = Context<{ Variables: AuthVariables }>;
+
+/**
+ * The response for a refused write, and the audit row that outlives it.
+ *
+ * The row is written with NO transaction, deliberately: it records that a
+ * transaction was rolled back, so writing it inside that transaction would roll
+ * the evidence back too. Returns `null` for anything that is not a refusal, so
+ * the caller can fall through to its 500.
+ */
+async function refusedResponse(
+  c: ProductionContext,
+  jobId: string,
+  error: unknown
+): Promise<Response | null> {
+  if (error instanceof JobNotFound) {
+    // No entity, so nothing to refuse — the audit middleware's floor row is the
+    // right level of detail for a 404.
+    return c.json({ error: error.message }, 404);
+  }
+
+  const refusal =
+    error instanceof ProductionTransitionError
+      ? { status: error.httpStatus, body: error.toResponseBody() as Record<string, unknown> }
+      : error instanceof JobWriteRefused
+        ? { status: error.httpStatus, body: error.body }
+        : null;
+
+  if (!refusal) return null;
+
+  await recordAudit(c, {
+    action: "production_job.transition_refused",
+    entityType: "production_job",
+    entityId: jobId,
+    summary: error instanceof Error ? error.message : "Production job write refused",
+    outcome: "failure",
+    metadata: refusal.body,
+  });
+
+  return c.json(refusal.body, refusal.status);
+}
+
 interface PricedItem {
   orderItemId: string;
+  /**
+   * The order line's quantity. A rate is charged per PIECE, so a line of three
+   * posters is three of them — this module used to add one rate per item ROW
+   * and underpay the vendor for every line above one.
+   */
+  units: number;
   longestEdge: number | null;
   size: string | null;
   rate: RateRow | null;
+}
+
+/** Absent or nonsensical is one piece; `order_items.quantity` is NOT NULL DEFAULT 1. */
+function unitsOf(quantity: number | null | undefined): number {
+  return quantity != null && Number.isFinite(quantity) && quantity > 0 ? Math.trunc(quantity) : 1;
 }
 
 /**
@@ -180,6 +312,7 @@ interface PricedItem {
 function priceItems(
   items: Array<{
     orderItemId: string;
+    quantity: number | null;
     widthInches: number | null;
     heightInches: number | null;
   }>,
@@ -188,10 +321,12 @@ function priceItems(
   at: Date
 ): PricedItem[] {
   return items.map((item) => {
+    const units = unitsOf(item.quantity);
+
     if (item.widthInches == null || item.heightInches == null) {
       // No dimensions is a miss, not a zero: the variant is gone and we cannot
       // say what size was made.
-      return { orderItemId: item.orderItemId, longestEdge: null, size: null, rate: null };
+      return { orderItemId: item.orderItemId, units, longestEdge: null, size: null, rate: null };
     }
 
     const longestEdge = longestEdgeInches({
@@ -201,6 +336,7 @@ function priceItems(
 
     return {
       orderItemId: item.orderItemId,
+      units,
       longestEdge,
       size: `${item.widthInches}x${item.heightInches}`,
       rate: selectRateInForce(rates, { longestEdge, kind, finish: null, at }),
@@ -400,108 +536,213 @@ adminProductionApp.post(
   zValidator("json", assignJobSchema),
   async (c) => {
     const { jobId } = c.req.valid("param");
-    const { vendorId } = c.req.valid("json");
+    const { vendorId, expectedVendorId } = c.req.valid("json");
 
     try {
-      const [job] = await db
-        .select()
-        .from(productionJobs)
-        .where(eq(productionJobs.id, jobId))
-        .limit(1);
+      const result = await db.transaction(async (tx) => {
+        // FOR UPDATE: two admins assigning one job serialise here, and the row
+        // read is the row the write is guarded against.
+        const [job] = await tx
+          .select()
+          .from(productionJobs)
+          .where(eq(productionJobs.id, jobId))
+          .limit(1)
+          .for("update");
 
-      if (!job) return c.json({ error: "Production job not found" }, 404);
+        if (!job) throw new JobNotFound("Production job not found");
 
-      const [vendor] = await db
-        .select({ id: vendors.id, name: vendors.name })
-        .from(vendors)
-        .where(eq(vendors.id, vendorId))
-        .limit(1);
+        const [vendor] = await tx
+          .select({ id: vendors.id, name: vendors.name })
+          .from(vendors)
+          .where(eq(vendors.id, vendorId))
+          .limit(1);
 
-      if (!vendor) return c.json({ error: "Vendor not found" }, 404);
+        if (!vendor) throw new JobNotFound("Vendor not found");
 
-      const items = await db
-        .select({
-          orderItemId: productionJobItems.orderItemId,
-          widthInches: productVariants.widthInches,
-          heightInches: productVariants.heightInches,
-        })
-        .from(productionJobItems)
-        .leftJoin(orderItems, eq(productionJobItems.orderItemId, orderItems.id))
-        .leftJoin(productVariants, eq(orderItems.variantId, productVariants.id))
-        .where(eq(productionJobItems.jobId, jobId));
+        const from = job.status;
 
-      if (items.length === 0) {
-        return c.json(
-          {
+        // Settled jobs are frozen. Payables are DERIVED with no stored total, so
+        // re-pricing one after settlement makes the settlement's amount disagree
+        // with the sum of its jobs, silently.
+        if (job.settlementId !== null) {
+          throw new JobWriteRefused(409, {
+            error: "This job is already settled and cannot be assigned or re-priced.",
+            code: "JOB_SETTLED",
+            from,
+            to: "assigned",
+            allowed: [],
+            settlementId: job.settlementId,
+          });
+        }
+
+        // The guard this route never had. It did not read `job.status` at all,
+        // so a cancelled, dispatched or qc_passed job was freely assignable.
+        assertTransition(from, "assigned", "admin");
+
+        // Compare-and-swap on the vendor. Answered with the vendor that ACTUALLY
+        // holds the job, so the losing screen names who took it.
+        if (
+          expectedVendorId !== undefined &&
+          (job.vendorId ?? null) !== (expectedVendorId ?? null)
+        ) {
+          throw new JobWriteRefused(409, {
+            error:
+              `This job is held by ${job.vendorId ?? "nobody"}, not by the vendor this ` +
+              `request expected. Reload before reassigning it.`,
+            code: "VENDOR_MISMATCH",
+            from,
+            to: "assigned",
+            allowed: [],
+            currentVendorId: job.vendorId,
+            currentStatus: job.status,
+          });
+        }
+
+        const items = await tx
+          .select({
+            orderItemId: productionJobItems.orderItemId,
+            // A rate is charged per piece, so the line's quantity is part of the
+            // question. Without it a line of three was priced as one.
+            quantity: orderItems.quantity,
+            widthInches: productVariants.widthInches,
+            heightInches: productVariants.heightInches,
+          })
+          .from(productionJobItems)
+          .leftJoin(orderItems, eq(productionJobItems.orderItemId, orderItems.id))
+          .leftJoin(productVariants, eq(orderItems.variantId, productVariants.id))
+          .where(eq(productionJobItems.jobId, jobId));
+
+        if (items.length === 0) {
+          throw new JobWriteRefused(422, {
             error: "Cannot assign a job with no items",
             unpriced: [],
-          },
-          422
-        );
-      }
+          });
+        }
 
-      const rateRows = await db
-        .select()
-        .from(vendorRates)
-        .where(eq(vendorRates.vendorId, vendorId));
+        const rateRows = await tx
+          .select()
+          .from(vendorRates)
+          .where(eq(vendorRates.vendorId, vendorId));
 
-      // ONE instant for the whole job. Taken before the loop so a slow loop
-      // cannot price two items on opposite sides of a scheduled rate change.
-      const at = new Date();
-      const priced = priceItems(items, rateRows as RateRow[], job.stage, at);
+        // ONE instant for the whole job. Taken before the loop so a slow loop
+        // cannot price two items on opposite sides of a scheduled rate change.
+        const at = new Date();
+        const priced = priceItems(items, rateRows as RateRow[], job.stage, at);
 
-      const unpriced = priced
-        .filter((p) => p.rate === null)
-        .map((p) => ({
-          orderItemId: p.orderItemId,
-          longestEdge: p.longestEdge,
-          size: p.size,
-        }));
+        const unpriced = priced
+          .filter((p) => p.rate === null)
+          .map((p) => ({
+            orderItemId: p.orderItemId,
+            longestEdge: p.longestEdge,
+            size: p.size,
+          }));
 
-      if (unpriced.length > 0) {
-        // Nothing is written. A zero here would be an unbillable job with no
-        // record of why it is unbillable.
-        return c.json(
-          {
+        if (unpriced.length > 0) {
+          // Nothing is written. A zero here would be an unbillable job with no
+          // record of why it is unbillable.
+          throw new JobWriteRefused(422, {
             error: `${vendor.name} has no rate covering ${unpriced.length} item(s) on this job`,
             unpriced,
-          },
-          422
+          });
+        }
+
+        // Summed in integer paise by the payables module rather than by a float
+        // add here — the amounts are decimals precisely so they stay exact. One
+        // entry per PIECE: three posters on one line are three rates.
+        const amountExpected = sumPayable(
+          priced.flatMap((p) =>
+            Array.from({ length: p.units }, (_unit, index) => ({
+              id: `${p.orderItemId}#${index}`,
+              amountExpected: p.rate?.amount ?? null,
+              amountActual: null,
+              settlementId: null,
+            }))
+          )
         );
-      }
 
-      // Summed in integer paise by the payables module rather than by a float
-      // add here — the amounts are decimals precisely so they stay exact.
-      const amountExpected = sumPayable(
-        priced.map((p) => ({
-          id: p.orderItemId,
-          amountExpected: p.rate?.amount ?? null,
-          amountActual: null,
-          settlementId: null,
-        }))
-      );
+        // The predicate is repeated rather than trusted from the read, and the
+        // row count below turns a lost race into a rollback rather than a 200
+        // over a write that matched nothing.
+        const written = await tx
+          .update(productionJobs)
+          .set({
+            vendorId,
+            amountExpected,
+            assignedAt: at,
+            status: "assigned",
+            updatedAt: at,
+          })
+          .where(
+            and(
+              eq(productionJobs.id, jobId),
+              eq(productionJobs.status, from),
+              isNull(productionJobs.settlementId)
+            )
+          )
+          .returning();
 
-      const [updated] = await db
-        .update(productionJobs)
-        .set({
-          vendorId,
-          amountExpected,
-          assignedAt: at,
-          status: "assigned",
-          updatedAt: at,
-        })
-        .where(eq(productionJobs.id, jobId))
-        .returning();
+        const [updated] = written;
 
-      if (!updated) return c.json({ error: "Production job not found" }, 404);
+        if (written.length !== 1 || !updated) {
+          throw new JobWriteRefused(409, {
+            error: `Expected to assign 1 job but matched ${written.length}; nothing was recorded`,
+            code: "CONCURRENT_MODIFICATION",
+            from,
+            to: "assigned",
+            allowed: [],
+          });
+        }
+
+        // ONE row for one act. `draft -> assigned` does not also get a
+        // `transitioned` row: the action that names what happened is the
+        // assignment, and `assigned -> assigned` is a legal self-edge whose
+        // whole content is the vendor change.
+        const reassignment = job.vendorId !== null;
+
+        await recordAudit(
+          c,
+          {
+            action: reassignment
+              ? "production_job.reassigned"
+              : "production_job.assigned",
+            entityType: "production_job",
+            entityId: jobId,
+            summary: reassignment
+              ? `Production job reassigned to ${vendor.name} at ${amountExpected}`
+              : `Production job assigned to ${vendor.name} at ${amountExpected}`,
+            ...diffRecords(job, updated, [
+              "status",
+              "vendorId",
+              "amountExpected",
+              "assignedAt",
+            ]),
+            metadata: {
+              from,
+              to: "assigned",
+              // NOT `vendorId`: `recordAudit` reserves that key for the shop a
+              // VENDOR request was written for, and an admin acts for nobody.
+              assignedVendorId: vendorId,
+              previousVendorId: job.vendorId,
+              pricedAt: at.toISOString(),
+            },
+          },
+          // Shares the transaction: a row saying a vendor now owes us this work,
+          // beside a job that was never assigned, is worse than no row.
+          tx
+        );
+
+        return { job: updated, amountExpected, at };
+      });
 
       return c.json({
         message: "Production job assigned",
-        job: updated,
-        amountExpected,
-        pricedAt: at.toISOString(),
+        job: result.job,
+        amountExpected: result.amountExpected,
+        pricedAt: result.at.toISOString(),
       });
     } catch (error) {
+      const refused = await refusedResponse(c, jobId, error);
+      if (refused) return refused;
       return c.json(failed("assign production job", error), 500);
     }
   }
@@ -520,16 +761,113 @@ adminProductionApp.patch(
     const body = c.req.valid("json");
 
     try {
-      // No transition guard on `status`. See the header: the state machine is
-      // production-pipeline's, and inventing half of one here would have to be
-      // unpicked when the real one lands.
-      const [job] = await db
-        .update(productionJobs)
-        .set({ ...body, updatedAt: new Date() })
-        .where(eq(productionJobs.id, jobId))
-        .returning();
+      const job = await db.transaction(async (tx) => {
+        // Read first, and lock. The 404 comes from here rather than from an
+        // empty `returning()`, the guard needs the from-status, and `diffRecords`
+        // needs a `before` that is a row rather than an inference.
+        const [before] = await tx
+          .select()
+          .from(productionJobs)
+          .where(eq(productionJobs.id, jobId))
+          .limit(1)
+          .for("update");
 
-      if (!job) return c.json({ error: "Production job not found" }, 404);
+        if (!before) throw new JobNotFound("Production job not found");
+
+        const from = before.status;
+        const to = body.status ?? from;
+
+        // A settled job is frozen here, not merely protected from amount edits:
+        // payables are DERIVED with no stored total, so an edit after settlement
+        // makes the settlement disagree with the sum of its jobs silently — and
+        // the `settlement_id IS NULL` that keeps the write honest would match no
+        // row anyway.
+        if (before.settlementId !== null) {
+          throw new JobWriteRefused(409, {
+            error: "This job is already settled and can no longer be edited here.",
+            code: "JOB_SETTLED",
+            from,
+            to,
+            allowed: [],
+            settlementId: before.settlementId,
+          });
+        }
+
+        // The matrix decides; this route only asks. A self-edge is legal and
+        // lands below as a no-op with no audit row.
+        if (body.status !== undefined) assertTransition(from, body.status, "admin");
+
+        const written = await tx
+          .update(productionJobs)
+          .set({ ...body, updatedAt: new Date() })
+          .where(
+            and(
+              eq(productionJobs.id, jobId),
+              // Repeated, not trusted from the read: an admin who moved the job
+              // between the two statements wins, and we match nothing.
+              eq(productionJobs.status, from),
+              isNull(productionJobs.settlementId)
+            )
+          )
+          .returning();
+
+        const [after] = written;
+
+        if (written.length !== 1 || !after) {
+          throw new JobWriteRefused(409, {
+            error: `Expected to update 1 job but matched ${written.length}; nothing was recorded`,
+            code: "CONCURRENT_MODIFICATION",
+            from,
+            to,
+            allowed: [],
+          });
+        }
+
+        // One row per TRANSITION, so a self-edge writes none: nothing moved.
+        if (to !== from) {
+          await recordAudit(
+            c,
+            {
+              action: "production_job.transitioned",
+              entityType: "production_job",
+              entityId: jobId,
+              summary: `Production job moved from ${from} to ${to}`,
+              ...diffRecords(before, after, [
+                "status",
+                "dueAt",
+                "sentAt",
+                "receivedAt",
+              ]),
+              metadata: { from, to },
+            },
+            tx
+          );
+        }
+
+        // A separate act, and a separate category: what we OWE a supplier is
+        // money, not fulfilment.
+        if (
+          body.amountActual !== undefined &&
+          (before.amountActual ?? null) !== (after.amountActual ?? null)
+        ) {
+          await recordAudit(
+            c,
+            {
+              action: "production_job.amount_overridden",
+              entityType: "production_job",
+              entityId: jobId,
+              summary:
+                `Vendor amount overridden from ${before.amountActual ?? "none"} ` +
+                `to ${after.amountActual ?? "none"}`,
+              ...diffRecords(before, after, ["amountActual", "amountExpected"]),
+              metadata: { from, to },
+            },
+            tx
+          );
+        }
+
+        return after;
+      });
 
       return c.json({
         message: "Production job updated",
@@ -537,6 +875,8 @@ adminProductionApp.patch(
         payableAmount: jobPayableAmount(job as unknown as PayableJob),
       });
     } catch (error) {
+      const refused = await refusedResponse(c, jobId, error);
+      if (refused) return refused;
       return c.json(failed("update production job", error), 500);
     }
   }
