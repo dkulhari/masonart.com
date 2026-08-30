@@ -42,6 +42,15 @@
  * no job for the piece at all. Confirming an arrival is therefore only reachable
  * from here, which is also the screen a vendor lands on.
  *
+ * **Because it is the only place, the confirmable set is read in full.** One
+ * unfiltered page of twenty rows ordered `created_at DESC` across both
+ * directions is not a strip, it is a cap: a print shop despatches more than it
+ * receives, so twenty outbound legs push the parcel actually sitting on its
+ * bench off the page, and there is nowhere else to confirm it from. The
+ * actionable rows therefore come from a `direction=inbound` walk with no
+ * truncation (`fetchInboundAwaitingArrival`) and sort first; a page of recent
+ * history follows them, because nothing on those rows is a control.
+ *
  * What the strip says about the other end is **the direction and nothing else**.
  * No vendor name, no vendor id, no order, no cost — `lib/vendor-scope.ts`
  * computes `direction` as a SQL `case` over the caller's own id precisely so
@@ -331,23 +340,60 @@ export interface VendorTransferPanelState {
   busyId?: string | null
   /** A failed WRITE, keyed by the parcel that caused it. */
   rowErrors?: Record<string, string>
+  /**
+   * The walk for confirmable parcels stopped at its page cap, so there may be
+   * older ones below this list. Said out loud rather than swallowed: this strip
+   * is the only place an arrival can be confirmed, and a silent partial answer
+   * to "everything you have to confirm" is the defect it was widened to fix.
+   */
+  olderNotListed?: boolean
 }
 
 /**
- * The parcels still on their way TO this vendor.
+ * Is this parcel one this vendor can confirm the arrival of?
+ *
+ * Three conditions, and the third is the one that was missing: **inbound**
+ * (`received_at` is settable only by the receiving end — the API answers the
+ * sender 404), **not already arrived**, and **actually despatched**.
+ *
+ * `dispatched_at IS NULL` is a first-class transfer state, not a null nobody
+ * produces: `routes/admin/transfers.ts#transferState` names it `pending` and
+ * filters on it, and an admin can create the parcel before the sending
+ * workshop hands it to a courier. A parcel in that state has not left anyone's
+ * bench, so it cannot have reached this one, and `lib/vendor-scope.ts` refuses
+ * the confirmation with a 409 `TRANSFER_NOT_DISPATCHED`. A control whose only
+ * possible outcome is a refusal is a support ticket rather than an affordance —
+ * the same rule that decides the upload window and the action strip.
+ *
+ * The same predicate answers "is something on its way to me", because those are
+ * the same parcels: in transit is exactly despatched-and-not-yet-arrived.
+ */
+export function transferAwaitsArrival(transfer: VendorTransfer): boolean {
+  return (
+    transfer.direction === 'inbound' &&
+    transfer.dispatchedAt !== null &&
+    transfer.receivedAt === null
+  )
+}
+
+/**
+ * The parcels genuinely on their way TO this vendor.
  *
  * `null`/`undefined` — the parcels have not been read — is deliberately EMPTY
  * rather than "waiting". The screens use this to decide whether to say a job is
  * blocked on a parcel, and a page that announces an inbound parcel because a
  * request has not come back yet is inventing one.
+ *
+ * A parcel nobody has despatched is EMPTY for the same reason it gets no
+ * confirm button: announcing "something is in transit to you" about a box still
+ * on the sender's bench sends a vendor to look for a courier who was never
+ * called.
  */
-export function unreceivedInboundTransfers(
+export function inboundAwaitingArrival(
   transfers: VendorTransfer[] | null | undefined
 ): VendorTransfer[] {
   if (!transfers) return []
-  return transfers.filter(
-    (transfer) => transfer.direction === 'inbound' && transfer.receivedAt === null
-  )
+  return transfers.filter(transferAwaitsArrival)
 }
 
 /** `3 pieces`, `1 piece`. A count nobody has to decode. */
@@ -356,11 +402,12 @@ function piecesLabel(count: number): string {
 }
 
 export async function fetchVendorTransfers(
-  opts: { direction?: 'inbound' | 'outbound'; limit?: number } = {}
+  opts: { direction?: 'inbound' | 'outbound'; limit?: number; offset?: number } = {}
 ): Promise<VendorTransfersResponse> {
   const query = new URLSearchParams()
   if (opts.direction) query.set('direction', opts.direction)
   if (opts.limit) query.set('limit', String(opts.limit))
+  if (opts.offset) query.set('offset', String(opts.offset))
 
   const response = await fetch(
     `${getApiUrl()}/api/vendor/transfers${query.toString() ? `?${query.toString()}` : ''}`,
@@ -373,6 +420,90 @@ export async function fetchVendorTransfers(
   }
 
   return (await response.json()) as VendorTransfersResponse
+}
+
+/**
+ * The API's clamp, asked for by name. `?limit=101` is answered with 100 rows,
+ * so asking for more than this only wastes the round trip's honesty.
+ */
+export const VENDOR_TRANSFERS_MAX_LIMIT = 100
+
+/**
+ * How many parcels of recent HISTORY the strip shows alongside the actionable
+ * ones. The API's own default page, and nothing on these rows is a control.
+ */
+export const VENDOR_TRANSFERS_RECENT_LIMIT = 20
+
+/**
+ * The runaway guard on the walk below. Ten pages of a hundred is a thousand
+ * inbound legs — far past any real print shop — and it exists so a server that
+ * ignored `offset` would cost ten requests rather than an infinite loop.
+ */
+export const VENDOR_TRANSFERS_MAX_PAGES = 10
+
+/**
+ * EVERY parcel still awaiting this vendor's confirmation, however old.
+ *
+ * This is the one read on the portal that has to be complete rather than
+ * recent, and the reason is that `/vendor` is the ONLY place an arrival can be
+ * confirmed. The strip used to be a single unfiltered page: twenty rows,
+ * `created_at DESC`, across both directions. A print shop that despatches more
+ * than it receives — which is what a print shop is — fills all twenty with its
+ * own outbound legs, and the inbound parcel sitting on its bench is then
+ * confirmable from nowhere at all, while the job screen goes on telling them to
+ * confirm it on their job list. A dead end with no "load more" is worse than a
+ * missing feature, because the vendor can see they are being asked for
+ * something and cannot find where.
+ *
+ * So the actionable set is fetched on its own terms: `direction=inbound`, so
+ * outbound legs cannot crowd it out of the page, and paged to exhaustion rather
+ * than truncated, so age cannot either. Only the parcels a vendor can act on
+ * survive the walk — an inbound parcel already confirmed, or not yet
+ * despatched, is history or somebody else's move, and both are covered by the
+ * recent page the strip shows underneath.
+ *
+ * `truncated` is not decoration. If the walk hits its page cap there may be
+ * older parcels it never saw, and the strip says so; silently showing a partial
+ * answer to "everything you have to confirm" is the same lie one page down.
+ */
+export async function fetchInboundAwaitingArrival(): Promise<{
+  items: VendorTransfer[]
+  truncated: boolean
+}> {
+  const items: VendorTransfer[] = []
+
+  for (let page = 0; page < VENDOR_TRANSFERS_MAX_PAGES; page++) {
+    const { items: batch } = await fetchVendorTransfers({
+      direction: 'inbound',
+      limit: VENDOR_TRANSFERS_MAX_LIMIT,
+      offset: page * VENDOR_TRANSFERS_MAX_LIMIT,
+    })
+
+    items.push(...batch.filter(transferAwaitsArrival))
+
+    // A short page is the end of the list — the only end-of-list signal this
+    // endpoint gives, since it returns no total.
+    if (batch.length < VENDOR_TRANSFERS_MAX_LIMIT) return { items, truncated: false }
+  }
+
+  return { items, truncated: true }
+}
+
+/**
+ * The actionable parcels first, then recent history, and nothing twice.
+ *
+ * Order is the point: the rows a vendor has to DO something about are the
+ * reason the strip exists, and a parcel that has been waiting a fortnight sorts
+ * below yesterday's despatch under `created_at DESC`. Deduplicated on id
+ * because the two reads overlap on purpose — a parcel that is both recent and
+ * awaiting confirmation is one parcel.
+ */
+export function mergeTransferRows(
+  awaiting: VendorTransfer[],
+  recent: VendorTransfer[]
+): VendorTransfer[] {
+  const already = new Set(awaiting.map((transfer) => transfer.id))
+  return [...awaiting, ...recent.filter((transfer) => !already.has(transfer.id))]
 }
 
 /**
@@ -461,11 +592,20 @@ function TransfersEmpty() {
  * apart, and it is the ONLY thing said about the other end — never a name,
  * never an id, never which order the parcel belongs to.
  *
- * "Confirm arrival" is offered on an inbound parcel that has not arrived and
- * nowhere else. `received_at` is settable only by the receiving end — the API
- * answers the sending vendor with a 404, not a 403, so as not to confirm the
- * row — and a control whose only possible outcome is a refusal is a support
- * ticket rather than an affordance.
+ * "Confirm arrival" is offered on a parcel `transferAwaitsArrival` accepts and
+ * nowhere else: inbound, despatched, not already confirmed. Each of the three
+ * is a refusal the API would otherwise hand back — a 404 to the sending end
+ * (`received_at` is settable only by the receiving one, and the status does not
+ * confirm the row exists), a 409 `TRANSFER_ALREADY_RECEIVED`, and a 409
+ * `TRANSFER_NOT_DISPATCHED` on a parcel still on the sender's bench. A control
+ * whose only possible outcome is a refusal is a support ticket rather than an
+ * affordance.
+ *
+ * A parcel that has not been despatched says so instead, in both of its dates
+ * and in a sentence where the button would be. `pending` is a real state of the
+ * row — `routes/admin/transfers.ts` names and filters it — so the strip printing
+ * "Left on —" above "In transit, due —" was not a null-handling wobble, it was
+ * the screen asserting a despatch that has not happened.
  *
  * Skeleton, error and empty are mutually exclusive with error winning, and the
  * error block carries no digits: an empty state after a failed read says "no
@@ -477,91 +617,128 @@ export function VendorTransferStrip({
 }: {
   transfers: VendorTransferPanelState
 }) {
-  const { data, isLoading, error, onRetry, onReceived, busyId, rowErrors } = transfers
+  const { data, isLoading, error, onRetry, onReceived, busyId, rowErrors, olderNotListed } =
+    transfers
 
   if (error) return <TransfersError message={error} onRetry={onRetry} />
   if (isLoading) return <TransfersSkeleton />
   if (!data || data.length === 0) return <TransfersEmpty />
 
   return (
-    <ul
-      data-testid="vendor-transfers"
-      className="divide-y divide-border rounded-lg border border-border"
-    >
-      {data.map((transfer) => {
-        const inbound = transfer.direction === 'inbound'
-        const arrived = transfer.receivedAt !== null
-        const rowError = rowErrors?.[transfer.id]
+    <>
+      <ul
+        data-testid="vendor-transfers"
+        className="divide-y divide-border rounded-lg border border-border"
+      >
+        {data.map((transfer) => {
+          const inbound = transfer.direction === 'inbound'
+          const arrived = transfer.receivedAt !== null
+          const despatched = transfer.dispatchedAt !== null
+          const rowError = rowErrors?.[transfer.id]
 
-        return (
-          <li
-            key={transfer.id}
-            data-testid={`vendor-transfer-row-${transfer.id}`}
-            className="space-y-2 px-4 py-3"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-medium">
-                    {/* Never a blank cell: a parcel can genuinely leave before
-                        the carrier issues a docket. */}
-                    {transfer.reference ?? (
-                      <span className="font-sans text-muted-foreground">No docket reference</span>
-                    )}
-                  </span>
-                  <span
-                    data-testid={`vendor-transfer-direction-${transfer.id}`}
-                    className={cn(
-                      'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
-                      inbound
-                        ? 'border-blue-200 bg-blue-50 text-blue-700'
-                        : 'border-border bg-muted text-muted-foreground'
-                    )}
-                  >
-                    {/* The whole of what a vendor learns about the other end. */}
-                    {inbound ? 'Coming to you' : 'Sent by you'}
-                  </span>
+          return (
+            <li
+              key={transfer.id}
+              data-testid={`vendor-transfer-row-${transfer.id}`}
+              className="space-y-2 px-4 py-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-sm font-medium">
+                      {/* Never a blank cell: a parcel can genuinely leave before
+                          the carrier issues a docket. */}
+                      {transfer.reference ?? (
+                        <span className="font-sans text-muted-foreground">No docket reference</span>
+                      )}
+                    </span>
+                    <span
+                      data-testid={`vendor-transfer-direction-${transfer.id}`}
+                      className={cn(
+                        'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
+                        inbound
+                          ? 'border-blue-200 bg-blue-50 text-blue-700'
+                          : 'border-border bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {/* The whole of what a vendor learns about the other end. */}
+                      {inbound ? 'Coming to you' : 'Sent by you'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {transfer.carrier ?? 'Carrier not recorded'} · {piecesLabel(transfer.pieceCount)}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {transfer.carrier ?? 'Carrier not recorded'} · {piecesLabel(transfer.pieceCount)}
+
+                <div
+                  data-testid={`vendor-transfer-dates-${transfer.id}`}
+                  className="text-xs text-muted-foreground sm:text-right"
+                >
+                  {/* Not "Left on —". A parcel nobody has despatched has no
+                      departure date to print, and a dash under that label reads
+                      as a missing value rather than as a state of the row. */}
+                  <div>
+                    {despatched ? `Left on ${formatVendorDate(transfer.dispatchedAt)}` : 'Not sent yet'}
+                  </div>
+                  <div>
+                    {arrived
+                      ? `Arrived ${formatVendorDate(transfer.receivedAt)}`
+                      : despatched
+                        ? `In transit, due ${formatVendorDate(transfer.expectedBy)}`
+                        : 'Still with the sending workshop'}
+                  </div>
                 </div>
               </div>
 
-              <div className="text-xs text-muted-foreground sm:text-right">
-                <div>Left on {formatVendorDate(transfer.dispatchedAt)}</div>
-                <div>
-                  {arrived
-                    ? `Arrived ${formatVendorDate(transfer.receivedAt)}`
-                    : `In transit, due ${formatVendorDate(transfer.expectedBy)}`}
-                </div>
-              </div>
-            </div>
+              {inbound && !arrived && !despatched && (
+                // The strip never simply drops a control without saying why —
+                // an absent button is indistinguishable from one that failed to
+                // render, which is the same rule the action strip follows.
+                <p
+                  data-testid={`vendor-transfer-pending-${transfer.id}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  This has not been sent yet, so there is nothing to confirm. It
+                  will be here to confirm once it is on its way.
+                </p>
+              )}
 
-            {inbound && !arrived && onReceived && (
-              <InlineConfirm
-                testId={`vendor-transfer-received-${transfer.id}`}
-                label="Confirm arrival"
-                question="Confirm this parcel is on your bench?"
-                busy={busyId === transfer.id}
-                onConfirm={() => onReceived(transfer.id)}
-              />
-            )}
+              {transferAwaitsArrival(transfer) && onReceived && (
+                <InlineConfirm
+                  testId={`vendor-transfer-received-${transfer.id}`}
+                  label="Confirm arrival"
+                  question="Confirm this parcel is on your bench?"
+                  busy={busyId === transfer.id}
+                  onConfirm={() => onReceived(transfer.id)}
+                />
+              )}
 
-            {rowError && (
-              <p
-                data-testid={`vendor-transfer-error-${transfer.id}`}
-                role="alert"
-                className="text-sm text-destructive"
-              >
-                {/* On the ROW. One refused confirmation must not take the rest
-                    of the strip down with it. */}
-                {rowError}
-              </p>
-            )}
-          </li>
-        )
-      })}
-    </ul>
+              {rowError && (
+                <p
+                  data-testid={`vendor-transfer-error-${transfer.id}`}
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
+                  {/* On the ROW. One refused confirmation must not take the rest
+                      of the strip down with it. */}
+                  {rowError}
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+
+      {olderNotListed && (
+        <p
+          data-testid="vendor-transfers-older-not-listed"
+          className="mt-2 text-xs text-muted-foreground"
+        >
+          There may be older parcels than the ones listed here. If one you are
+          waiting to confirm is missing, tell us and we will find it.
+        </p>
+      )}
+    </>
   )
 }
 
@@ -743,6 +920,7 @@ function VendorJobsPage() {
   const [transfersError, setTransfersError] = useState<string | null>(null)
   const [busyTransferId, setBusyTransferId] = useState<string | null>(null)
   const [transferErrors, setTransferErrors] = useState<Record<string, string>>({})
+  const [olderNotListed, setOlderNotListed] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -760,16 +938,41 @@ function VendorJobsPage() {
     }
   }, [search])
 
+  /**
+   * Two reads, because the strip answers two different questions.
+   *
+   * **What must I confirm** has to be complete: this screen is the only place
+   * an arrival can be confirmed (`jobs/$id.tsx` deliberately offers no control
+   * and points here), so a parcel that falls off the end of a page is
+   * confirmable from nowhere. A single unfiltered page of twenty, ordered
+   * `created_at DESC` across BOTH directions, is exactly how that happens to a
+   * print shop: its own outbound legs fill the page and the box on its bench is
+   * not on it. So `fetchInboundAwaitingArrival` walks `direction=inbound` to
+   * exhaustion and keeps only the actionable rows.
+   *
+   * **What has been moving lately** is recent by nature and stays one page.
+   * Nothing on those rows is a control, so a row falling off the bottom costs a
+   * vendor nothing they cannot get by asking.
+   *
+   * `Promise.all` rather than two independent states: they render as one list,
+   * and a strip that showed half of itself beside an error would be claiming
+   * the other half is empty.
+   */
   const loadTransfers = useCallback(async () => {
     setTransfersLoading(true)
     try {
-      // No `direction`: both ends, which is the API's own default and the only
-      // one that shows a vendor all of their own legs.
-      const { items } = await fetchVendorTransfers()
-      setTransfers(items)
+      const [awaiting, recent] = await Promise.all([
+        fetchInboundAwaitingArrival(),
+        // No `direction` here: both ends, which is the API's own default and
+        // the only read that shows a vendor their own outbound legs at all.
+        fetchVendorTransfers({ limit: VENDOR_TRANSFERS_RECENT_LIMIT }),
+      ])
+      setTransfers(mergeTransferRows(awaiting.items, recent.items))
+      setOlderNotListed(awaiting.truncated)
       setTransfersError(null)
     } catch (transfersLoadError) {
       setTransfers(null)
+      setOlderNotListed(false)
       setTransfersError((transfersLoadError as Error).message)
     } finally {
       setTransfersLoading(false)
@@ -886,6 +1089,7 @@ function VendorJobsPage() {
             onReceived: confirmArrival,
             busyId: busyTransferId,
             rowErrors: transferErrors,
+            olderNotListed,
           }}
         />
       </section>

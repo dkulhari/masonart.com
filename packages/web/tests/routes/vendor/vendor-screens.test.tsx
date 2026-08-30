@@ -70,9 +70,14 @@ import {
   VendorJobsListBody,
   DueCell,
   VendorTransferStrip,
+  VENDOR_TRANSFERS_MAX_LIMIT,
+  VENDOR_TRANSFERS_MAX_PAGES,
+  fetchInboundAwaitingArrival,
   fetchVendorTransfers,
+  inboundAwaitingArrival,
   markVendorTransferReceived,
-  unreceivedInboundTransfers,
+  mergeTransferRows,
+  transferAwaitsArrival,
   type VendorJobListItem,
   type VendorTransfer,
   type VendorTransferPanelState,
@@ -86,7 +91,9 @@ import {
   VendorQcShotList,
   mergeQcShots,
   missingRequiredQcSlots,
+  missingShotsFor,
   patchVendorJobStatus,
+  qcSlotLabel,
   uploadVendorQcPhoto,
   withdrawVendorQcPhoto,
   type VendorJobDetailResponse,
@@ -113,6 +120,7 @@ import {
   VENDOR_JOB_STATUS_LABELS,
   VENDOR_JOB_STATUS_STYLES,
   VENDOR_UNKNOWN_STATUS_STYLE,
+  vendorJobIsOpen,
   vendorMayUploadPhotos,
   type VendorJobStage,
 } from '~/lib/vendor-nav'
@@ -675,6 +683,89 @@ describe('the job detail action strip', () => {
 })
 
 // ============================================================================
+// "In production since" is present tense, so it renders only where it is true
+// ============================================================================
+
+/**
+ * The line rendered unconditionally, `formatVendorDate(job.receivedAt)` and all.
+ * On an `assigned` job that is "In production since: —", which reads as a
+ * broken field rather than as a fact; on `dispatched` and `cancelled` it is a
+ * present-tense claim about a job nobody is working on.
+ *
+ * The condition is derived — `vendorJobIsOpen` is `isTerminalStatus` and
+ * `UNREACHABLE_STATUSES` off the shared matrix — so the statuses are written
+ * here as expectations rather than as the rule.
+ */
+describe('vendorJobIsOpen', () => {
+  it('is false for the statuses nothing leaves, and for the retired one', () => {
+    // Longhand, deliberately: recomputing `isTerminalStatus` here would agree
+    // with any implementation, including one that got it backwards.
+    expect(vendorJobIsOpen('dispatched')).toBe(false)
+    expect(vendorJobIsOpen('cancelled')).toBe(false)
+    expect(vendorJobIsOpen('sent')).toBe(false)
+  })
+
+  it('is true for every status still in play', () => {
+    for (const status of [
+      'draft',
+      'assigned',
+      'received',
+      'qc_submitted',
+      'qc_passed',
+      'qc_failed',
+    ] as const) {
+      expect(vendorJobIsOpen(status)).toBe(true)
+    }
+  })
+})
+
+describe('the in-production line', () => {
+  const at = (
+    status: ProductionJobStatus,
+    receivedAt: string | null
+  ): VendorJobDetailResponse => ({
+    ...detail,
+    job: { ...detail.job, status, receivedAt },
+  })
+
+  const renderAt = (status: ProductionJobStatus, receivedAt: string | null) =>
+    render(
+      <VendorJobDetailBody
+        data={at(status, receivedAt)}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+
+  it('says when production started on a job that is in production', () => {
+    renderAt('received', '2026-08-20T06:00:00.000Z')
+    expect(screen.getByTestId('vendor-job-in-production-since')).toHaveTextContent(/2026/)
+  })
+
+  it('says nothing on a job that was never received', () => {
+    // "In production since: —" under a label is a broken field, not a date.
+    renderAt('assigned', null)
+    expect(screen.queryByTestId('vendor-job-in-production-since')).not.toBeInTheDocument()
+  })
+
+  it('says nothing once the job has been handed over', () => {
+    renderAt('dispatched', '2026-08-20T06:00:00.000Z')
+    expect(screen.queryByTestId('vendor-job-in-production-since')).not.toBeInTheDocument()
+  })
+
+  it('says nothing on a cancelled job', () => {
+    renderAt('cancelled', '2026-08-20T06:00:00.000Z')
+    expect(screen.queryByTestId('vendor-job-in-production-since')).not.toBeInTheDocument()
+  })
+
+  it('says nothing rather than an em dash when the timestamp will not parse', () => {
+    renderAt('received', 'not-a-date')
+    expect(screen.queryByTestId('vendor-job-in-production-since')).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
 // The shot list — QC_SHOT_LIST rendered, and the photos hung off it
 // ============================================================================
 
@@ -1096,11 +1187,40 @@ describe('the refusal a vendor can act on', () => {
       const label = QC_SHOT_LIST.print.find((shot) => shot.slot === slot)?.label
       expect(label).toBeDefined()
       expect(named).toHaveTextContent(label as string)
-      // The key too: it is what the audit row and the API's own sentence use.
-      expect(named).toHaveTextContent(slot)
+      // The KEY is not printed. It is the response's own string, and printing
+      // it is how our schema — or whoever's, after a regression — gets read
+      // out on a supplier's screen. The words come from `QC_SHOT_LIST`.
+      expect(named).not.toHaveTextContent(slot)
     }
     // And a shot that is NOT missing is not named.
     expect(named).not.toHaveTextContent('The whole print, flat and front-on')
+  })
+
+  it('counts a slot it has no words for rather than reading the response out', () => {
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, stage: 'print', status: 'received' } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        actionError="This job cannot go to QC until every required photograph is uploaded."
+        // Deliberately hostile, and deliberately not a slot: today's API builds
+        // this list from the same shared constant, so this cannot happen — but
+        // "cannot happen" is a property of the API, and the point of this
+        // boundary is that the vendor's screen does not depend on one.
+        actionMissingSlots={['print_colour_reference', 'pg_catalog.pg_tables']}
+      />
+    )
+
+    expect(screen.getByTestId('vendor-job-action-missing-slots')).not.toHaveTextContent(
+      'pg_catalog'
+    )
+    expect(document.body.innerHTML).not.toContain('pg_catalog')
+    // Counted, though — a refusal naming something we cannot name back is not
+    // a refusal to swallow silently.
+    expect(screen.getByTestId('vendor-job-action-missing-unnamed')).toHaveTextContent(
+      /one more check/i
+    )
   })
 
   it('names nothing when the refusal was not about the shot list', () => {
@@ -1114,6 +1234,23 @@ describe('the refusal a vendor can act on', () => {
       />
     )
     expect(screen.queryByTestId('vendor-job-action-missing-slots')).not.toBeInTheDocument()
+  })
+
+  it('qcSlotLabel answers null for a slot this stage does not ask for', () => {
+    // Null, not the key. Falling back to the key made every caller a printer of
+    // whatever string arrived, which is how `missingShotsFor` came to echo the
+    // response verbatim.
+    expect(qcSlotLabel('print', 'pg_catalog.pg_tables')).toBeNull()
+    const [first] = QC_SHOT_LIST.print
+    expect(qcSlotLabel('print', first.slot)).toBe(first.label)
+  })
+
+  it('missingShotsFor separates what it can say from what it can only count', () => {
+    const [first] = QC_SHOT_LIST.print
+    expect(missingShotsFor('print', [first.slot, 'not_a_slot', 'nor_this'])).toEqual({
+      named: [{ slot: first.slot, label: first.label }],
+      unnamed: 2,
+    })
   })
 })
 
@@ -1670,6 +1807,25 @@ const arrivedParcel: VendorTransfer = {
   receivedAt: '2026-08-22T11:30:00.000Z',
 }
 
+/**
+ * A parcel that exists and has NOT been sent — `pending`, in the admin screens'
+ * vocabulary (`routes/admin/transfers.ts#transferState`), which names and
+ * filters it as one of four first-class states.
+ *
+ * No fixture in either vendor suite had `dispatchedAt: null` until this one,
+ * which is exactly why the strip could offer "Confirm arrival" on a box still
+ * on the sender's bench for a whole phase: every test agreed with the code
+ * about a null nobody produced. The API does not agree — it answers 409
+ * `TRANSFER_NOT_DISPATCHED`.
+ */
+const pendingParcel: VendorTransfer = {
+  ...inboundParcel,
+  id: 'bbbbbbbb-8888-4888-8888-888888888888',
+  dispatchedAt: null,
+  expectedBy: null,
+  receivedAt: null,
+}
+
 const transferPanel = (
   over: Partial<VendorTransferPanelState> = {}
 ): VendorTransferPanelState => ({
@@ -1780,6 +1936,69 @@ describe('the inbound parcel strip', () => {
     )
   })
 
+  it('offers it on NEITHER a parcel nobody has despatched yet', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [pendingParcel], onReceived: () => {} })}
+      />
+    )
+    // `lib/vendor-scope.ts` answers this exact press with a 409
+    // `TRANSFER_NOT_DISPATCHED`: the parcel has not been sent, so it cannot
+    // have arrived. The refusal is predictable from the row itself.
+    expect(
+      screen.queryByTestId(`vendor-transfer-received-${pendingParcel.id}`)
+    ).not.toBeInTheDocument()
+  })
+
+  it('says WHY there is nothing to confirm rather than dropping the control silently', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [pendingParcel], onReceived: () => {} })}
+      />
+    )
+    // A missing button is indistinguishable from one that failed to render.
+    const said = screen.getByTestId(`vendor-transfer-pending-${pendingParcel.id}`).textContent ?? ''
+    expect(said).toMatch(/not been sent/i)
+    expect(said).toMatch(/nothing to confirm/i)
+  })
+
+  it('claims no departure and no transit for a parcel that has not been sent', () => {
+    render(<VendorTransferStrip transfers={transferPanel({ data: [pendingParcel] })} />)
+
+    const dates = screen.getByTestId(`vendor-transfer-dates-${pendingParcel.id}`).textContent ?? ''
+    // The old strip printed "Left on —" above "In transit, due —". Both are
+    // assertions about a despatch that has not happened, and the em dash reads
+    // as a missing value rather than as the state of the row.
+    expect(dates).not.toMatch(/left on/i)
+    expect(dates).not.toMatch(/in transit/i)
+    expect(dates).toMatch(/not sent yet/i)
+  })
+
+  it('still says when a despatched parcel left and when it is due', () => {
+    // The counterpart of the case above: the dates that ARE true still print,
+    // so "say nothing" was not the fix.
+    render(<VendorTransferStrip transfers={transferPanel({ data: [inboundParcel] })} />)
+    const dates = screen.getByTestId(`vendor-transfer-dates-${inboundParcel.id}`).textContent ?? ''
+    expect(dates).toMatch(/left on/i)
+    expect(dates).toMatch(/in transit/i)
+  })
+
+  it('says older parcels may exist when the walk could not reach the end', () => {
+    render(
+      <VendorTransferStrip transfers={transferPanel({ olderNotListed: true })} />
+    )
+    // This strip is the only place an arrival can be confirmed, so a partial
+    // answer to "everything you have to confirm" has to say it is partial.
+    expect(screen.getByTestId('vendor-transfers-older-not-listed')).toHaveTextContent(
+      /older parcels/i
+    )
+  })
+
+  it('says nothing of the sort when the walk did reach the end', () => {
+    render(<VendorTransferStrip transfers={transferPanel()} />)
+    expect(screen.queryByTestId('vendor-transfers-older-not-listed')).not.toBeInTheDocument()
+  })
+
   it('asks before confirming an arrival, and only then calls through', () => {
     const onReceived = vi.fn()
     render(<VendorTransferStrip transfers={transferPanel({ onReceived })} />)
@@ -1809,16 +2028,59 @@ describe('the inbound parcel strip', () => {
   })
 })
 
-describe('unreceivedInboundTransfers', () => {
-  it('is the inbound parcels with no arrival stamp, and nothing else', () => {
+describe('transferAwaitsArrival', () => {
+  /**
+   * Written longhand, one case per condition, rather than as a loop over the
+   * fixtures: the whole defect this predicate exists to close was a missing
+   * clause, and a table-driven test written from the same reading as the code
+   * would have had the same clause missing.
+   */
+  it('accepts a despatched inbound parcel that has not arrived', () => {
+    expect(transferAwaitsArrival(inboundParcel)).toBe(true)
+  })
+
+  it('refuses an outbound parcel — the sending end is answered 404', () => {
+    expect(transferAwaitsArrival(outboundParcel)).toBe(false)
+  })
+
+  it('refuses one already confirmed — the API answers 409 TRANSFER_ALREADY_RECEIVED', () => {
+    expect(transferAwaitsArrival(arrivedParcel)).toBe(false)
+  })
+
+  it('refuses one nobody has despatched — the API answers 409 TRANSFER_NOT_DISPATCHED', () => {
+    expect(transferAwaitsArrival(pendingParcel)).toBe(false)
+  })
+})
+
+describe('inboundAwaitingArrival', () => {
+  it('is the despatched inbound parcels with no arrival stamp, and nothing else', () => {
     expect(
-      unreceivedInboundTransfers([inboundParcel, outboundParcel, arrivedParcel])
+      inboundAwaitingArrival([inboundParcel, outboundParcel, arrivedParcel, pendingParcel])
     ).toEqual([inboundParcel])
   })
 
   it('is empty when the parcels have not been read — unknown is not waiting', () => {
-    expect(unreceivedInboundTransfers(null)).toEqual([])
-    expect(unreceivedInboundTransfers(undefined)).toEqual([])
+    expect(inboundAwaitingArrival(null)).toEqual([])
+    expect(inboundAwaitingArrival(undefined)).toEqual([])
+  })
+})
+
+describe('mergeTransferRows', () => {
+  it('puts what has to be acted on above what merely happened', () => {
+    // `created_at DESC` sorts a fortnight-old parcel below yesterday's
+    // despatch, and the old one is the one with a button on it.
+    expect(mergeTransferRows([inboundParcel], [outboundParcel])).toEqual([
+      inboundParcel,
+      outboundParcel,
+    ])
+  })
+
+  it('lists a parcel that is both recent and awaiting confirmation once', () => {
+    const merged = mergeTransferRows([inboundParcel], [outboundParcel, inboundParcel])
+    expect(merged.map((transfer) => transfer.id)).toEqual([
+      inboundParcel.id,
+      outboundParcel.id,
+    ])
   })
 })
 
@@ -1851,7 +2113,7 @@ describe('waiting on an inbound parcel', () => {
         isLoading={false}
         error={null}
         onRetry={() => {}}
-        transfers={transferPanel()}
+        inboundInTransit={[inboundParcel]}
       />
     )
     expect(screen.getByTestId('vendor-job-awaiting-inbound')).toHaveTextContent(
@@ -1866,9 +2128,26 @@ describe('waiting on an inbound parcel', () => {
         isLoading={false}
         error={null}
         onRetry={() => {}}
-        transfers={transferPanel({ data: [arrivedParcel] })}
+        inboundInTransit={[arrivedParcel]}
       />
     )
+    expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
+  })
+
+  it('does not announce a parcel still sitting on the sender’s bench', () => {
+    render(
+      <VendorJobDetailBody
+        data={frameAt('assigned')}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        inboundInTransit={[pendingParcel]}
+      />
+    )
+    // "Something is in transit to you" about a `pending` parcel sends a vendor
+    // to look for a courier nobody has called, and then to a confirm control
+    // the API answers 409. Both halves of that came from the same missing
+    // clause, which is why one predicate now answers both.
     expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
   })
 
@@ -1879,7 +2158,7 @@ describe('waiting on an inbound parcel', () => {
         isLoading={false}
         error={null}
         onRetry={() => {}}
-        transfers={transferPanel()}
+        inboundInTransit={[inboundParcel]}
       />
     )
     expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
@@ -1892,7 +2171,7 @@ describe('waiting on an inbound parcel', () => {
         isLoading={false}
         error={null}
         onRetry={() => {}}
-        transfers={transferPanel({ data: null, isLoading: true })}
+        inboundInTransit={null}
       />
     )
     expect(screen.queryByTestId('vendor-job-awaiting-inbound')).not.toBeInTheDocument()
@@ -1905,7 +2184,7 @@ describe('waiting on an inbound parcel', () => {
         isLoading={false}
         error={null}
         onRetry={() => {}}
-        transfers={transferPanel()}
+        inboundInTransit={[inboundParcel]}
       />
     )
     const note = screen.getByTestId('vendor-job-awaiting-inbound').textContent ?? ''
@@ -2004,15 +2283,72 @@ describe('the label handover card', () => {
     expect(container.querySelectorAll('iframe, embed, object').length).toBe(0)
   })
 
-  it('tells the page the guard is satisfied once a label has actually been issued', async () => {
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const onIssued = vi.fn()
-    respondWithLabel()
+  it('does not revoke the blob in the same tick it hands it over', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+      respondWithLabel()
 
-    render(<VendorLabelHandoverCard jobId={detail.job.id} onIssued={onIssued} />)
+      render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+      fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+      // Drain the promises without advancing the clock: the anchor has been
+      // clicked, so the browser is reading the blob for the save right now.
+      await vi.advanceTimersByTimeAsync(0)
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+      // Revoking here is a known way to abort an `<a download>` — Safari
+      // always, Chrome once the PDF is big enough that the write has not
+      // started by the time the task queue drains.
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+
+      // But it IS revoked. A blob held for the life of the tab is a leak of a
+      // customer's address into the page's memory.
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('renders OUR words on a 5xx, not the body’s', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      // `failed()` returns a fixed string today, so nothing leaks — which is
+      // exactly the problem: the protection lived in the API, and this
+      // boundary's whole position is that it lives here.
+      json: async () => ({
+        error: 'Failed to issue label: relation "order_shipments" does not exist',
+      }),
+    })
+
+    const { container } = render(<VendorLabelHandoverCard jobId={detail.job.id} />)
     fireEvent.click(screen.getByTestId('vendor-job-label'))
 
-    await waitFor(() => expect(onIssued).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByTestId('vendor-job-label-error')).toBeInTheDocument())
+    for (const leak of ['order_shipments', 'relation', 'does not exist', 'Failed to issue']) {
+      expect(container.innerHTML).not.toContain(leak)
+    }
+    expect(screen.getByTestId('vendor-job-label-error').textContent ?? '').toMatch(
+      /try again/i
+    )
+  })
+
+  it('renders OUR words on a 503 that lost its code in a proxy', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      // The seam's status without the seam's `code` — one proxy or one
+      // error-shape change away, and the card used to print this verbatim.
+      json: async () => ({ error: 'upstream connect error: label_object_token' }),
+    })
+
+    const { container } = render(<VendorLabelHandoverCard jobId={detail.job.id} />)
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+
+    await waitFor(() => expect(screen.getByTestId('vendor-job-label-error')).toBeInTheDocument())
+    expect(container.innerHTML).not.toContain('label_object_token')
+    expect(container.innerHTML).not.toContain('upstream')
   })
 
   it('renders the 503 seam honestly, and repeats no database detail', async () => {
@@ -2091,6 +2427,12 @@ describe('the label handover card', () => {
     // whole component exists to avoid.
     expect(container.innerHTML).not.toContain('X-Amz-Signature')
     expect(container.querySelectorAll('a[href]').length).toBe(0)
+    // And the sentence is the REMEDY, not the exception. "Label fetch failed
+    // (403)" is a status code shown to a print shop; pressing the button again
+    // signs afresh, which is the thing they can actually do.
+    const said = screen.getByTestId('vendor-job-label-error').textContent ?? ''
+    expect(said).not.toMatch(/403|fetch failed/i)
+    expect(said).toMatch(/press the button again/i)
   })
 })
 
@@ -2099,16 +2441,37 @@ describe('the label handover card', () => {
 // ============================================================================
 
 describe('the handover card follows the transition matrix', () => {
-  /** The statuses whose vendor edge the label actually gates. */
-  const handoverStatuses = [...VENDOR_JOB_STATUSES, 'sent' as ProductionJobStatus].filter(
-    (status) =>
-      nextVendorActions(status).some(
-        (action) => action.guard === 'open-transfer-or-order-label'
-      )
-  )
+  /**
+   * WRITTEN OUT, not recomputed.
+   *
+   * This used to be `VENDOR_JOB_STATUSES.filter(status => nextVendorActions(...)
+   * .some(action => action.guard === 'open-transfer-or-order-label'))` — the
+   * same expression the card's placement uses. That agrees with today's matrix
+   * and with any other, including one where the placement had been replaced by
+   * the literal `job.status === 'qc_passed'` the derivation exists to prevent.
+   * A test that recomputes what it is checking passes whatever the code does;
+   * `packages/shared/tests/schemas/production-transitions.test.ts` writes its
+   * expectations longhand for exactly this reason.
+   *
+   * `qc_passed` is the one status the matrix gates on a label: it is the only
+   * `from` with a `dispatched` edge, and that edge carries
+   * `open-transfer-or-order-label`.
+   */
+  const handoverStatuses: ProductionJobStatus[] = ['qc_passed']
 
-  it('the matrix names at least one such status, or every case below is vacuous', () => {
-    expect(handoverStatuses.length).toBeGreaterThan(0)
+  it('the matrix still gates exactly these statuses on the label', () => {
+    // The bridge between the literal above and the table. If the matrix moves
+    // that edge, this fails and the literal gets updated deliberately —
+    // rather than the whole block quietly re-deriving itself into agreement.
+    const gated = PRODUCTION_JOB_STATUSES.filter((from) =>
+      PRODUCTION_JOB_STATUSES.some((to) => {
+        const edge = PRODUCTION_TRANSITIONS[from][to]
+        return (
+          edge?.guard === 'open-transfer-or-order-label' && edge.actors.includes('vendor')
+        )
+      })
+    )
+    expect(gated).toEqual(handoverStatuses)
   })
 
   it.each([...VENDOR_JOB_STATUSES, 'sent' as ProductionJobStatus])(
@@ -2127,7 +2490,7 @@ describe('the handover card follows the transition matrix', () => {
     }
   )
 
-  it('disables the handover move when the screen knows the guard is unsatisfied', () => {
+  it('leaves the handover move live, because nothing can observe its guard', () => {
     const [status] = handoverStatuses
     render(
       <VendorJobDetailBody
@@ -2135,14 +2498,46 @@ describe('the handover card follows the transition matrix', () => {
         isLoading={false}
         error={null}
         onRetry={() => {}}
-        guards={{ 'open-transfer-or-order-label': false }}
       />
     )
-    expect(screen.getByTestId('vendor-job-mark-dispatched')).toBeDisabled()
-    expect(screen.getByTestId('vendor-job-guard-dispatched')).toBeInTheDocument()
+    // `open-transfer-or-order-label` is a disjunction over an open transfer OR
+    // a label on the order, and a browser can see neither: probing the label
+    // route signs a customer's address and writes an audit row, and
+    // `GET /transfers` withholds the order a parcel belongs to. Absent means
+    // UNKNOWN, and the API evaluates the guard either way.
+    expect(screen.getByTestId('vendor-job-mark-dispatched')).not.toBeDisabled()
+    expect(screen.queryByTestId('vendor-job-guard-dispatched')).not.toBeInTheDocument()
   })
 
-  it('leaves the move live while the guard is merely unknown', () => {
+  /**
+   * The chain that used to feed this guard is gone, and this is why.
+   *
+   * The label card raised `onIssued`, the page set `labelIssued`, and the body
+   * passed `{ 'open-transfer-or-order-label': true }`. But `nextVendorActions`
+   * blocks only on an explicit `false`, and the chain was upward-only by
+   * construction — so it rendered identically to passing nothing at all, from
+   * the day it was written. Three props, a piece of state and a sentence of
+   * guard copy, none of which could change a pixel.
+   */
+  it('is not fed a guard by pressing the label button', async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:vendor-label')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jobId: detail.job.id,
+          url: 'https://r2.example.com/l.pdf?X-Amz-Signature=deadbeef',
+          expiresInSeconds: 300,
+          expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: async () => new Blob(['%PDF']) })
+
     const [status] = handoverStatuses
     render(
       <VendorJobDetailBody
@@ -2152,10 +2547,79 @@ describe('the handover card follows the transition matrix', () => {
         onRetry={() => {}}
       />
     )
-    // Absent means UNKNOWN, and the API evaluates the guard either way. Greying
-    // out a legal move because the evidence has not loaded is worse than a
-    // round trip.
+
+    fireEvent.click(screen.getByTestId('vendor-job-label'))
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1))
+
+    // Identical before and after, which is the whole finding: the move was
+    // live because the guard is unknown, and issuing a label did not and could
+    // not change that.
     expect(screen.getByTestId('vendor-job-mark-dispatched')).not.toBeDisabled()
+
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+})
+
+// ============================================================================
+// A known-unsatisfied guard always says why
+// ============================================================================
+
+/**
+ * `blockedReason` is what renders a button disabled, so a guard with no copy
+ * must not fall through to `undefined` — that turns "we know this will be
+ * refused" back into a live button, silently, which is the defect class the
+ * upload window and the parcel strip were both fixed for.
+ *
+ * This matters more now that there is one entry in the copy table rather than
+ * two. Deleting the `open-transfer-or-order-label` sentence, which was dead,
+ * must not have made a `false` for it render as a live control.
+ */
+describe('every guard the matrix names has a sentence when it is known unmet', () => {
+  /** Every guard on a vendor edge, off the matrix rather than off a list. */
+  const vendorGuardedEdges = PRODUCTION_JOB_STATUSES.flatMap((from) =>
+    PRODUCTION_JOB_STATUSES.flatMap((to) => {
+      const edge = PRODUCTION_TRANSITIONS[from][to]
+      return edge?.guard && edge.actors.includes('vendor')
+        ? [{ from, to, guard: edge.guard }]
+        : []
+    })
+  )
+
+  it('the matrix names some, or every case below is vacuous', () => {
+    expect(vendorGuardedEdges.length).toBeGreaterThan(0)
+  })
+
+  it.each(vendorGuardedEdges)(
+    '$from -> $to ($guard) is disabled with a reason, never disabled in silence',
+    ({ from, to, guard }) => {
+      const [action] = nextVendorActions(from, { [guard]: false }).filter(
+        (candidate) => candidate.to === to
+      )
+      expect(action).toBeDefined()
+      expect(action?.blockedReason).toBeTruthy()
+      // A sentence, not a key: the remedy is what a vendor needs, and the
+      // guard's name is our vocabulary.
+      expect(action?.blockedReason).not.toContain(guard)
+    }
+  )
+
+  it('renders that reason beside the disabled button', () => {
+    // The shot-list guard is the one this portal can actually answer `false`
+    // for, so this case is the reachable one rather than an invented state.
+    render(
+      <VendorJobDetailBody
+        data={{ ...detail, job: { ...detail.job, status: 'received' } }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+        guards={{ 'shot-list-complete': false }}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-mark-qc_submitted')).toBeDisabled()
+    expect(screen.getByTestId('vendor-job-guard-qc_submitted')).toHaveTextContent(
+      /every required photo/i
+    )
   })
 })
 
@@ -2190,6 +2654,119 @@ describe('the parcel fetchers', () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ items: [], limit: 20, offset: 0 }) })
     await fetchVendorTransfers({ direction: 'inbound' })
     expect(fetchMock.mock.calls[0][0]).toContain('direction=inbound')
+  })
+
+  it('sends an offset when there is one, and no offset when there is not', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ items: [], limit: 20, offset: 0 }) })
+    await fetchVendorTransfers({ offset: 40 })
+    expect(fetchMock.mock.calls[0][0]).toContain('offset=40')
+
+    fetchMock.mockClear()
+    await fetchVendorTransfers()
+    expect(fetchMock.mock.calls[0][0]).not.toContain('offset')
+  })
+})
+
+// ============================================================================
+// Everything awaiting confirmation is reachable, however old
+// ============================================================================
+
+/**
+ * The strip is the ONLY place an arrival can be confirmed, so the read behind
+ * it has to be complete rather than recent.
+ *
+ * It was neither. One page, no `direction`, no `limit`: the API's default of
+ * twenty rows ordered `created_at DESC` across BOTH ends. A print shop
+ * despatches more than it receives, so twenty of its own outbound legs push the
+ * parcel actually on its bench off the page — and `jobs/$id.tsx` goes on telling
+ * it to confirm that parcel on the job list. There was no "load more".
+ */
+describe('the parcels awaiting confirmation are all reachable', () => {
+  const fetchMock = vi.fn()
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  /** A page of `count` parcels, each of them inbound and confirmable. */
+  const pageOf = (count: number, from = 0): VendorTransfer[] =>
+    Array.from({ length: count }, (_, index) => ({
+      ...inboundParcel,
+      id: `page-${from + index}`,
+    }))
+
+  const respondWith = (...pages: VendorTransfer[][]) => {
+    for (const items of pages) {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items, limit: VENDOR_TRANSFERS_MAX_LIMIT, offset: 0 }),
+      })
+    }
+  }
+
+  it('asks for one END, at the biggest page the API will serve', async () => {
+    respondWith([inboundParcel])
+    await fetchInboundAwaitingArrival()
+
+    const [url] = fetchMock.mock.calls[0] as [string]
+    // `direction=inbound` is what stops outbound legs crowding the actionable
+    // rows out of the page — a client-side filter over a mixed page cannot.
+    expect(url).toContain('direction=inbound')
+    expect(url).toContain(`limit=${VENDOR_TRANSFERS_MAX_LIMIT}`)
+  })
+
+  it('stops at the first short page — that is the only end-of-list this endpoint gives', async () => {
+    respondWith(pageOf(VENDOR_TRANSFERS_MAX_LIMIT - 1))
+    const { items, truncated } = await fetchInboundAwaitingArrival()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(items).toHaveLength(VENDOR_TRANSFERS_MAX_LIMIT - 1)
+    expect(truncated).toBe(false)
+  })
+
+  it('walks past a full page to reach a parcel no first page could hold', async () => {
+    const older = { ...inboundParcel, id: 'the-old-one' }
+    respondWith(pageOf(VENDOR_TRANSFERS_MAX_LIMIT), [older])
+
+    const { items, truncated } = await fetchInboundAwaitingArrival()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect((fetchMock.mock.calls[1] as [string])[0]).toContain(
+      `offset=${VENDOR_TRANSFERS_MAX_LIMIT}`
+    )
+    // The whole point: a parcel a hundred rows down is still confirmable.
+    expect(items.map((transfer) => transfer.id)).toContain('the-old-one')
+    expect(truncated).toBe(false)
+  })
+
+  it('keeps only what a vendor can actually act on', async () => {
+    respondWith([inboundParcel, arrivedParcel, pendingParcel])
+    const { items } = await fetchInboundAwaitingArrival()
+
+    // An arrived parcel is history and a pending one is somebody else's move;
+    // both still appear in the recent page the strip shows underneath.
+    expect(items).toEqual([inboundParcel])
+  })
+
+  it('says so rather than silently truncating when the walk hits its cap', async () => {
+    respondWith(...Array.from({ length: VENDOR_TRANSFERS_MAX_PAGES }, () =>
+      pageOf(VENDOR_TRANSFERS_MAX_LIMIT)
+    ))
+
+    const { truncated } = await fetchInboundAwaitingArrival()
+
+    // The cap is a runaway guard, not a page size: a server that ignored
+    // `offset` costs ten requests rather than an unbounded loop.
+    expect(fetchMock).toHaveBeenCalledTimes(VENDOR_TRANSFERS_MAX_PAGES)
+    // A partial answer to "everything you have to confirm" that does not say it
+    // is partial is the same dead end one page down.
+    expect(truncated).toBe(true)
   })
 
   it('confirms an arrival with NO body at all', async () => {

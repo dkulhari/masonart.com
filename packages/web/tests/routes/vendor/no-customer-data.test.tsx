@@ -625,24 +625,19 @@ describe('the carrier label is handed to the OS, never rendered', () => {
         error={null}
         onRetry={() => {}}
         qc={{ data: pollutedPhotos, isLoading: false, error: null, onRetry: () => {} }}
-        transfers={{
-          data: [
-            {
-              id: '88888888-8888-4888-8888-888888888888',
-              reference: 'BLR-DKT-99120',
-              carrier: 'Delhivery',
-              pieceCount: 3,
-              dispatchedAt: '2026-08-20T06:00:00.000Z',
-              expectedBy: '2026-08-23T06:00:00.000Z',
-              receivedAt: null,
-              direction: 'inbound',
-              ...POLLUTION,
-            } as VendorTransfer,
-          ],
-          isLoading: false,
-          error: null,
-          onRetry: () => {},
-        }}
+        inboundInTransit={[
+          {
+            id: '88888888-8888-4888-8888-888888888888',
+            reference: 'BLR-DKT-99120',
+            carrier: 'Delhivery',
+            pieceCount: 3,
+            dispatchedAt: '2026-08-20T06:00:00.000Z',
+            expectedBy: '2026-08-23T06:00:00.000Z',
+            receivedAt: null,
+            direction: 'inbound',
+            ...POLLUTION,
+          } as VendorTransfer,
+        ]}
       />
     )
 
@@ -666,22 +661,43 @@ describe('the carrier label is handed to the OS, never rendered', () => {
 // ============================================================================
 
 /**
- * The source-level half of R2, and the reason it exists.
+ * The source-level half of R2, and — precisely — what it does and does not
+ * prove.
  *
  * Every assertion above is a statement about a screen a test chose to render.
  * That is not enough here, and this suite found out the hard way: an
  * `<iframe>` planted behind a prop nobody passes — a "label preview" panel, say
- * — passes ALL of them, because no test renders the branch it lives in. The
- * rule R2 states is not "no embed appears in the states we happen to check", it
- * is that the vendor portal has no inline viewer for a customer document at
- * all, and only a scan of the source says that.
+ * — passes ALL of them, because no test renders the branch it lives in. So the
+ * source of all five files is scanned too, reachable branches and not.
  *
- * So: no `<iframe>`, `<embed>` or `<object>` anywhere in the four screens or
- * their layout, in any branch, reachable or not. The same shape and the same
- * five files as the native-dialog scan in `vendor-screens.test.tsx`, and
- * comments are stripped first for the same reason — every one of these files
- * explains why it embeds nothing, and an assertion that trips over its own
- * rationale teaches the next person to delete the rationale.
+ * ## What this scan actually catches
+ *
+ * A **textual** reintroduction, in these five files, of an embed element or a
+ * raw-HTML sink: `<iframe src={…}>`, `<object data={…}>`, `<embed>`,
+ * `dangerouslySetInnerHTML`, and `createElement('iframe', …)`. That is the
+ * naive reintroduction, and it is the one that actually happens — somebody adds
+ * a viewer because a vendor asked to see the label before printing it.
+ *
+ * ## What it does NOT catch, stated plainly so nobody mistakes it for a proof
+ *
+ * It is a regex over five files, not a type system and not a taint analysis.
+ * A component indirected through a variable (`const V = 'iframe'; <V …/>`), a
+ * tag name assembled from pieces, or an inline viewer written in
+ * `app/components/` and merely IMPORTED here all leave every case below green.
+ * It follows no imports and understands no dataflow.
+ *
+ * That is why it is the LAST line rather than the only one. The rule is held
+ * primarily by the rendered-DOM assertions above (which check the real markup
+ * of a fully-populated screen, whatever produced it) and by the design of
+ * `handLabelToOs`, which never puts the signature anywhere a viewer could read
+ * it. This scan exists to make the obvious regression loud. Widening it into
+ * something that could be called a proof means a real AST pass over the whole
+ * `app/` tree, and that is a different piece of work from this one.
+ *
+ * Comments are stripped first, for the same reason as the native-dialog scan in
+ * `vendor-screens.test.tsx`: every one of these files explains why it embeds
+ * nothing, and an assertion that trips over its own rationale teaches the next
+ * person to delete the rationale.
  */
 describe('the vendor tree contains no embed element in any branch', () => {
   const files = [
@@ -692,7 +708,23 @@ describe('the vendor tree contains no embed element in any branch', () => {
     'app/routes/vendor/payments.tsx',
   ]
 
-  const EMBEDS = /<\s*(iframe|embed|object)\b/i
+  /**
+   * Three shapes, because JSX is not the only way to write an iframe.
+   *
+   * - The literal element, which is what a hand-written viewer looks like.
+   * - `dangerouslySetInnerHTML`, which is a viewer with the markup in a string
+   *   — and the string can be concatenated, so no pattern over the HTML itself
+   *   would find it. The prop is the thing to forbid.
+   * - `createElement('iframe', …)`, the same element one indirection away, as
+   *   any compiled or hand-written non-JSX branch would spell it. The three tag
+   *   names are repeated rather than matching every `createElement` with a
+   *   string in it, because `handLabelToOs` legitimately builds an anchor with
+   *   `document.createElement('a')` — and an exemption for that call would be a
+   *   hole shaped exactly like the thing being forbidden, while naming the tags
+   *   catches the DOM spelling of the hazard as well as React's.
+   */
+  const EMBEDS =
+    /<\s*(iframe|embed|object)\b|dangerouslySetInnerHTML|createElement\s*\(\s*['"](iframe|embed|object)\b/i
 
   const codeOf = (file: string) =>
     readFileSync(join(process.cwd(), file), 'utf-8')
@@ -712,6 +744,19 @@ describe('the vendor tree contains no embed element in any branch', () => {
     expect('<iframe src="x" />').toMatch(EMBEDS)
     expect('<object data="x" />').toMatch(EMBEDS)
     expect('<embed src="x" />').toMatch(EMBEDS)
+    expect('<div dangerouslySetInnerHTML={{ __html: pdf }} />').toMatch(EMBEDS)
+    // Split across a concatenation on purpose: the markup is unrecognisable,
+    // the prop is not, which is why the prop is what the pattern names.
+    expect('el.props = { __html: `<ifra` + `me src="x">` }').not.toMatch(EMBEDS)
+    expect("React.createElement('iframe', { src: url })").toMatch(EMBEDS)
+    // The DOM spelling of the same hazard, which a `React.`-anchored pattern
+    // would have missed.
+    expect("document.createElement('iframe')").toMatch(EMBEDS)
+    expect('React.createElement(Fragment, null)').not.toMatch(EMBEDS)
+    // The anchor `handLabelToOs` builds to hand the file to the OS. If this
+    // ever matched, the only way to green the suite would be to stop handing
+    // the label to the operating system — which is the mechanism R2 relies on.
+    expect("const anchor = document.createElement('a')").not.toMatch(EMBEDS)
     expect('<img src="x" /><button>Get the carrier label</button>').not.toMatch(EMBEDS)
   })
 })

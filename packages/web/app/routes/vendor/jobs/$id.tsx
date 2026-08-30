@@ -126,6 +126,13 @@
  * `/vendor` — reconstructing the join here would mean asking the API to widen
  * exactly what it narrows.
  *
+ * "Still in transit" means despatched and not yet confirmed, never merely
+ * unconfirmed: a parcel with `dispatched_at IS NULL` is on the SENDER's bench,
+ * and announcing it here sent a vendor looking for a courier nobody called. And
+ * the read is made only on a FRAME job, because that is the only job the
+ * sentence can appear on — nothing is couriered to a print shop, so on a print
+ * job the request bought a result the render throws away.
+ *
  * ## A failed write does not blank a good read
  *
  * `actionError` is separate from the page error and renders beside the buttons.
@@ -156,6 +163,7 @@ import {
   formatVendorAmount,
   formatVendorDate,
   nextVendorActions,
+  vendorJobIsOpen,
   vendorMayUploadPhotos,
   vendorNoActionReason,
   type VendorGuardState,
@@ -166,10 +174,9 @@ import {
   DueCell,
   InlineConfirm,
   VendorJobStatusPill,
-  fetchVendorTransfers,
-  unreceivedInboundTransfers,
+  fetchInboundAwaitingArrival,
+  inboundAwaitingArrival,
   type VendorTransfer,
-  type VendorTransferPanelState,
 } from '~/routes/vendor/index'
 
 // ============================================================================
@@ -599,9 +606,18 @@ export function missingRequiredQcSlots(
     .map((shot) => shot.slot)
 }
 
-/** A slot in the vendor's words, falling back to the key itself. */
-export function qcSlotLabel(stage: VendorJobStage, slot: string): string {
-  return (qcShotsForStage(stage as QcStage) ?? []).find((shot) => shot.slot === slot)?.label ?? slot
+/**
+ * A slot in the vendor's words, or null when this stage's shot list has none.
+ *
+ * Null rather than the key, and the difference is the whole of `missingShotsFor`
+ * below: `slot` is a `text` column with no enum under it, so the string in it
+ * came from somewhere, and "somewhere" is not a vocabulary this screen is
+ * willing to read out. A caller that wants to print it has to decide to.
+ */
+export function qcSlotLabel(stage: VendorJobStage, slot: string): string | null {
+  return (
+    (qcShotsForStage(stage as QcStage) ?? []).find((shot) => shot.slot === slot)?.label ?? null
+  )
 }
 
 export interface VendorMissingShot {
@@ -609,12 +625,38 @@ export interface VendorMissingShot {
   label: string
 }
 
-/** The slots a refusal named, each with the sentence the vendor was shown. */
+/**
+ * The slots a refusal named, split into the ones we can say out loud and a
+ * count of the ones we cannot.
+ *
+ * The API answers an incomplete shot list with `missingSlots`, and that list is
+ * the only part of the refusal a vendor can act on — so it has to reach them.
+ * But it reaches them **through our shot list**, not verbatim. Every entry is
+ * matched against `QC_SHOT_LIST` from `@chobii/shared` and rendered as the
+ * sentence the uploader already showed for it; anything the list does not know
+ * is counted, never printed.
+ *
+ * That is not paranoia about today's response, which is generated from the same
+ * shared constant and can only contain slots we named first. It is that the
+ * protection then lives entirely in the API, and this boundary's whole position
+ * is the inverse — a supplier's screen renders our words about our schema, so
+ * that a regression on the other side of the wire cannot narrate it to them.
+ * The same reason the label card's two refusals are phrased here.
+ */
 export function missingShotsFor(
   stage: VendorJobStage,
   slots: readonly string[]
-): VendorMissingShot[] {
-  return slots.map((slot) => ({ slot, label: qcSlotLabel(stage, slot) }))
+): { named: VendorMissingShot[]; unnamed: number } {
+  const named: VendorMissingShot[] = []
+  let unnamed = 0
+
+  for (const slot of slots) {
+    const label = qcSlotLabel(stage, slot)
+    if (label === null) unnamed++
+    else named.push({ slot, label })
+  }
+
+  return { named, unnamed }
 }
 
 /**
@@ -1238,6 +1280,22 @@ export async function requestJobLabel(jobId: string): Promise<VendorLabelRespons
 }
 
 /**
+ * How long the object URL outlives the click that used it.
+ *
+ * Not zero, which is what this was. Revoking on the next macrotask is a known
+ * way to abort an `<a download>` save — Safari consistently, Chrome once the
+ * blob is large enough that the write has not started by the time the task
+ * queue drains — and a carrier label is a PDF, not a line of text. A second is
+ * the usual mitigation and costs nothing: the tab holds the bytes for that long
+ * and then does not, and every path through this function revokes.
+ *
+ * Unobservable today, because the route 503s in every environment. It surfaces
+ * the day the dispatch seam lands, which is precisely when nobody will be
+ * looking at this function.
+ */
+const LABEL_BLOB_REVOKE_DELAY_MS = 1_000
+
+/**
  * Fetch the bytes and hand the FILE to the operating system.
  *
  * Not `window.open(url)`, not an `<a href={url}>`, and above all not an
@@ -1267,9 +1325,10 @@ async function handLabelToOs(url: string, filename: string): Promise<void> {
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  // Revoked on the next tick rather than synchronously: revoking while the
-  // browser is still reading the blob for the save aborts the download.
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+  // Revoked LATER rather than synchronously or on the next tick: revoking
+  // while the browser is still reading the blob for the save aborts the
+  // download. See the constant.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), LABEL_BLOB_REVOKE_DELAY_MS)
 }
 
 /**
@@ -1292,6 +1351,17 @@ async function handLabelToOs(url: string, filename: string): Promise<void> {
  * distinguish them on purpose. The card must not put the distinction back, so
  * it says there is no label for this job and stops.
  *
+ * ## And on every OTHER path too
+ *
+ * Those two used to be the only ones. Everything else — a 500, a 503 that lost
+ * its `code` crossing a proxy, a byte fetch that 403s on an expired signature —
+ * rendered `body.error` verbatim on a supplier's screen. Nothing leaked, but
+ * only because `failed()` happens to return a fixed string: the protection sat
+ * in the API, which is precisely the inversion this component was built to
+ * correct. Now all four paths are our sentences, split where the REMEDY splits
+ * — ask the office, there is no label, try again shortly, press again for a
+ * fresh link — and none of them is the response's.
+ *
  * ## What is never rendered
  *
  * No `iframe`, `embed` or `object`, and no signed URL in any attribute — not
@@ -1300,14 +1370,7 @@ async function handLabelToOs(url: string, filename: string): Promise<void> {
  * close. `tests/routes/vendor/no-customer-data.test.tsx` asserts both over the
  * whole job screen.
  */
-export function VendorLabelHandoverCard({
-  jobId,
-  onIssued,
-}: {
-  jobId: string
-  /** Called once a label has ACTUALLY been issued — the guard's only evidence. */
-  onIssued?: () => void
-}) {
+export function VendorLabelHandoverCard({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [unavailable, setUnavailable] = useState<string | null>(null)
@@ -1338,9 +1401,6 @@ export function VendorLabelHandoverCard({
             const label = await requestJobLabel(jobId)
             // Same tick, and the URL is never stored in state or in an href.
             await handLabelToOs(label.url, `label-${jobId.slice(0, 8)}.pdf`)
-            // Only now: a signature that was fetched and then failed to become
-            // a file is not evidence that a label is ready to hand over.
-            onIssued?.()
           } catch (labelError) {
             if (
               labelError instanceof VendorLabelError &&
@@ -1355,8 +1415,26 @@ export function VendorLabelHandoverCard({
                 'There is no courier label for you on this job. If you are ' +
                   'holding the finished piece, tell us and we will sort it out.'
               )
+            } else if (labelError instanceof VendorLabelError) {
+              // OUR words on this path too, and that is the fix rather than a
+              // flourish. A 500 from `failed()` is a fixed string today, and a
+              // 503 that lost its `code` in a proxy is one line of config away
+              // — but the protection then lives in the API, which is the exact
+              // inversion this boundary exists to correct. What reaches a
+              // supplier's screen is decided here.
+              setError(
+                'We could not get you a label for this job just now. Nothing is ' +
+                  'wrong with the work — try again in a moment, and tell us if ' +
+                  'it keeps happening.'
+              )
             } else {
-              setError((labelError as Error).message)
+              // The signature was fine; the bytes or the save were not. A fresh
+              // press signs again, which is the whole remedy — and the reason
+              // this is a separate sentence rather than the one above.
+              setError(
+                'The label did not save. The link we get for it only lasts a few ' +
+                  'minutes, so press the button again for a fresh one.'
+              )
             }
           } finally {
             setBusy(false)
@@ -1398,11 +1476,13 @@ export interface VendorJobActionsProps {
   /**
    * What this screen has managed to find out about the matrix's guards.
    *
-   * Empty today. #692 fills in `shot-list-complete` from the uploader and #693
-   * fills in `open-transfer-or-order-label` from the transfer card; until then
-   * every offered move is live and the API answers the guard, which is the
-   * correct default — greying out a legal move because the evidence has not
-   * loaded is worse than spending a round trip to find out.
+   * One entry, ever: `shot-list-complete`, answered from the photographs the
+   * panel below has already read. `open-transfer-or-order-label` is left absent
+   * on purpose and permanently — the edge is satisfied by an open transfer OR a
+   * label on the order and a browser can see neither, so the honest answer is
+   * "unknown", which leaves the move live and the API deciding. Greying out a
+   * legal move because the evidence is unreachable would strand a vendor
+   * holding a finished piece.
    */
   guards?: VendorGuardState
   /**
@@ -1417,10 +1497,11 @@ export interface VendorJobActionsProps {
    *
    * A refusal you cannot act on is a support ticket. The API answers an
    * incomplete shot list with `missingSlots`, and this is where that list turns
-   * back into the sentences the uploader shows — the raw keys ride along too,
-   * because they are what the API's own message and the audit row use.
+   * back into the sentences the uploader shows — matched against `QC_SHOT_LIST`
+   * rather than printed as it arrived, with anything unmatched counted instead.
+   * See `missingShotsFor`.
    */
-  missingShots?: VendorMissingShot[]
+  missingShots?: { named: VendorMissingShot[]; unnamed: number }
 }
 
 /**
@@ -1496,23 +1577,37 @@ export function VendorJobActions({
             {error}
           </p>
 
-          {missingShots && missingShots.length > 0 && (
+          {missingShots && missingShots.named.length > 0 && (
             <ul
               data-testid="vendor-job-action-missing-slots"
               className="flex flex-wrap gap-2"
               aria-label="The shots still to take"
             >
-              {missingShots.map((shot) => (
+              {missingShots.named.map((shot) => (
                 <li
                   key={shot.slot}
                   data-testid="vendor-job-action-missing-slot"
                   className="rounded-full border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-xs"
                 >
-                  <span>{shot.label}</span>{' '}
-                  <span className="font-mono opacity-70">{shot.slot}</span>
+                  {/* The LABEL only. The slot key is the response's string, and
+                      printing it is how a schema — ours today, whoever's
+                      tomorrow — gets read out on a supplier's screen. It is
+                      still the React key, where nothing renders it. */}
+                  {shot.label}
                 </li>
               ))}
             </ul>
+          )}
+
+          {missingShots && missingShots.unnamed > 0 && (
+            // Counted, not quoted. The refusal named something this stage's
+            // shot list has no words for, and guessing at it out loud would be
+            // worse than admitting we cannot.
+            <p data-testid="vendor-job-action-missing-unnamed" className="text-xs text-muted-foreground">
+              {missingShots.unnamed === 1
+                ? 'One more check was named that we do not have a name for here. Tell us and we will sort it out.'
+                : `${missingShots.unnamed} more checks were named that we do not have names for here. Tell us and we will sort it out.`}
+            </p>
           )}
         </div>
       )}
@@ -1596,14 +1691,18 @@ export interface VendorJobDetailBodyProps {
   /**
    * This vendor's parcels, used here for ONE sentence.
    *
-   * The strip itself lives on `/vendor` — a parcel is a fact about the vendor,
-   * not about this job, and the API withholds the link on purpose (see the note
-   * on the waiting sentence below). All this screen takes from it is whether
-   * something is still in transit.
+   * A plain list rather than the strip's panel state, which is what this used
+   * to take: the loading flag, the read error and the retry went in and nothing
+   * on this screen could render any of them, so three of the four fields were
+   * dead the moment they were passed. The strip itself lives on `/vendor` — a
+   * parcel is a fact about the vendor, not about this job, and the API withholds
+   * the link on purpose (see the note on the waiting sentence below). All this
+   * screen takes from it is whether something is genuinely on its way.
+   *
+   * `null` is "not read, or not read yet", and it is deliberately the same as
+   * "none": announcing a parcel because a request has not come back invents one.
    */
-  transfers?: VendorTransferPanelState
-  /** Raised when the handover card actually issued a label. */
-  onLabelIssued?: () => void
+  inboundInTransit?: VendorTransfer[] | null
 }
 
 /**
@@ -1621,8 +1720,7 @@ export function VendorJobDetailBody({
   actionError = null,
   actionMissingSlots,
   qc,
-  transfers,
-  onLabelIssued,
+  inboundInTransit,
 }: VendorJobDetailBodyProps) {
   if (error) return <JobError message={error} onRetry={onRetry} />
   if (isLoading) return <JobSkeleton />
@@ -1690,12 +1788,35 @@ export function VendorJobDetailBody({
    * what it narrows. So the sentence names no docket, no carrier and no other
    * end, and points at the queue, where the parcel can actually be confirmed.
    *
-   * Not shown while the parcels are merely unread: `unreceivedInboundTransfers`
+   * Not shown while the parcels are merely unread: `inboundAwaitingArrival`
    * answers empty for a null read, so "we have not looked" never renders as "a
    * parcel is coming".
+   *
+   * Nor is it shown for a parcel nobody has despatched. `dispatched_at IS NULL`
+   * is a real state of the row — the admin screens call it `pending` — and this
+   * sentence used to fire on one, telling a vendor something was in transit
+   * about a box still on the sender's bench and sending them to confirm an
+   * arrival the API answers 409. `transferAwaitsArrival` is the single predicate
+   * behind both the sentence and that control, so they cannot disagree.
    */
   const awaitingInbound =
-    job.stage === 'frame' && unreceivedInboundTransfers(transfers?.data).length > 0
+    job.stage === 'frame' && inboundAwaitingArrival(inboundInTransit).length > 0
+
+  /**
+   * When production started, or nothing at all.
+   *
+   * Three conditions, and each removes a sentence that was being printed
+   * untrue: the job has actually been received, the date parses (a `—` under a
+   * label is a broken field, not a fact), and the job is still in play —
+   * "in production since" is present tense, and a handed-over or cancelled job
+   * is not in production. `vendorJobIsOpen` reads the shared matrix rather than
+   * naming statuses here.
+   */
+  const inProductionSince = (() => {
+    if (!job.receivedAt || !vendorJobIsOpen(job.status)) return null
+    const formatted = formatVendorDate(job.receivedAt)
+    return formatted === '—' ? null : formatted
+  })()
 
   return (
     <div className="space-y-6" data-testid="vendor-job-detail">
@@ -1747,9 +1868,17 @@ export function VendorJobDetailBody({
 
       {/* What this vendor can do next, straight off the transition matrix */}
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          In production since: {formatVendorDate(job.receivedAt)}
-        </p>
+        {/* Only where the sentence is TRUE. It is present tense, so a job that
+            has been handed over or cancelled makes it false rather than stale,
+            and one that was never received has nothing to print — it rendered
+            "In production since: —", which reads as a broken field. `receivedAt`
+            answers the second; `vendorJobIsOpen`, off the shared matrix,
+            answers the first without this file listing statuses. */}
+        {inProductionSince && (
+          <p data-testid="vendor-job-in-production-since" className="text-sm text-muted-foreground">
+            In production since: {inProductionSince}
+          </p>
+        )}
         <VendorJobActions
           status={job.status}
           onStatus={onStatus}
@@ -1763,9 +1892,7 @@ export function VendorJobDetailBody({
 
         {/* The evidence for the button directly above it, and the only place a
             customer's details ever reach a vendor — as a file, never as data. */}
-        {handoverAction && (
-          <VendorLabelHandoverCard jobId={job.id} onIssued={onLabelIssued} />
-        )}
+        {handoverAction && <VendorLabelHandoverCard jobId={job.id} />}
       </div>
 
       {/* The shot list — what we judge the work on */}
@@ -1872,25 +1999,9 @@ function VendorJobDetailPage() {
   const [slotErrors, setSlotErrors] = useState<Record<string, string>>({})
   const [supersededSlots, setSupersededSlots] = useState<Record<string, string | null>>({})
 
-  // The parcels still coming TO this vendor, and nothing else: the outbound
-  // legs belong on `/vendor`, where they can be acted on. `?direction=inbound`
-  // rather than a client-side filter so the request asks for what it needs.
+  // The parcels genuinely on their way TO this vendor, and nothing else: the
+  // outbound legs belong on `/vendor`, where they can be acted on.
   const [inbound, setInbound] = useState<VendorTransfer[] | null>(null)
-  const [inboundLoading, setInboundLoading] = useState(true)
-  const [inboundError, setInboundError] = useState<string | null>(null)
-
-  /**
-   * The one guard this screen can answer about the handover, and only upward.
-   *
-   * `true` once a label has actually been issued. It is never set to `false`:
-   * the edge is satisfied by an open transfer OR a label on the order, and the
-   * screen can see neither — the label route signs and audits, so probing it is
-   * out of the question, and `GET /transfers` withholds the order the parcel
-   * belongs to. Absent therefore means UNKNOWN, which `nextVendorActions` leaves
-   * live and the API answers itself. Greying out a legal handover because this
-   * page cannot see the evidence would strand a vendor holding a finished piece.
-   */
-  const [labelIssued, setLabelIssued] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -1920,27 +2031,55 @@ function VendorJobDetailPage() {
     }
   }, [id])
 
-  const loadInbound = useCallback(async () => {
-    setInboundLoading(true)
-    try {
-      const { items } = await fetchVendorTransfers({ direction: 'inbound' })
-      setInbound(items)
-      setInboundError(null)
-    } catch (transfersError) {
-      // Its own failure, kept off the job. A parcel list that would not read
-      // must never blank a job that did.
-      setInbound(null)
-      setInboundError((transfersError as Error).message)
-    } finally {
-      setInboundLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     void load()
     void loadPhotos()
-    void loadInbound()
-  }, [load, loadPhotos, loadInbound])
+  }, [load, loadPhotos])
+
+  const stage = data?.job.stage ?? null
+
+  /**
+   * The parcels, read only when they can change what this screen says.
+   *
+   * Gated on the job's own stage, which is why it waits for the job rather than
+   * running beside it. The waiting sentence is FRAME-ONLY by construction —
+   * nothing is couriered TO a print shop, the sheet travels print → frame — so
+   * on a print job this request was spent on a result the render could not use.
+   * Every job open paid for it.
+   *
+   * A failure is not stored, because nothing on this screen could render it:
+   * there is no strip here and no retry (the strip and the confirm both live on
+   * `/vendor`, where a parcel can actually be acted on), so the loading flag,
+   * the error string and the retry were three dead props. What a failed read
+   * means here is that we do not know, and `inboundAwaitingArrival` already
+   * treats not knowing as saying nothing.
+   *
+   * `fetchInboundAwaitingArrival` rather than a single page, and for the same
+   * reason `/vendor` uses it: the parcel a frame job is waiting on is the OLD
+   * one, and a page of the twenty newest inbound legs is exactly where an old
+   * one is not.
+   */
+  useEffect(() => {
+    if (stage !== 'frame') {
+      setInbound(null)
+      return
+    }
+
+    let abandoned = false
+    void (async () => {
+      try {
+        const { items } = await fetchInboundAwaitingArrival()
+        if (!abandoned) setInbound(items)
+      } catch {
+        // Unknown, which this screen renders as silence rather than as news.
+        if (!abandoned) setInbound(null)
+      }
+    })()
+
+    return () => {
+      abandoned = true
+    }
+  }, [stage, id])
 
   const uploadPhoto = async (slot: string, file: File) => {
     setBusySlot(slot)
@@ -2048,17 +2187,11 @@ function VendorJobDetailPage() {
           slotErrors,
           supersededSlots,
         }}
-        transfers={{
-          data: inbound,
-          isLoading: inboundLoading,
-          error: inboundError,
-          onRetry: () => void loadInbound(),
-          // No `onReceived`: a parcel is confirmed on the job list, where the
-          // strip that shows it lives. Offering the control here would imply a
-          // link between this job and that parcel which the API does not make.
-        }}
-        guards={labelIssued ? { 'open-transfer-or-order-label': true } : undefined}
-        onLabelIssued={() => setLabelIssued(true)}
+        // No confirm control travels with this: a parcel is confirmed on the
+        // job list, where the strip that shows it lives. Offering it here would
+        // imply a link between THIS job and THAT parcel which the API does not
+        // make and this screen cannot check.
+        inboundInTransit={inbound}
       />
     </div>
   )

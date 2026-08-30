@@ -16,7 +16,9 @@
 import {
   PRODUCTION_JOB_STATUSES,
   PRODUCTION_TRANSITIONS,
+  UNREACHABLE_STATUSES,
   guardFor,
+  isTerminalStatus,
   nextStatuses,
   type ProductionJobStatus,
   type TransitionGuard,
@@ -218,9 +220,16 @@ export function vendorStatusStyle(status: ProductionJobStatus): string {
  * greys out a legal move because it has not loaded the evidence yet is worse
  * than one that spends a round trip finding out.
  *
- * #692 supplies `shot-list-complete` and #693 supplies
- * `open-transfer-or-order-label`; until they land this map is simply empty and
- * every offered move is live.
+ * Exactly ONE guard is ever supplied today, and that is a statement about what
+ * a vendor's browser can see rather than about unfinished work.
+ * `shot-list-complete` is answered from the photographs already on the job
+ * screen, in both directions. `open-transfer-or-order-label` is answered by
+ * nobody: it is a disjunction over an OPEN TRANSFER or a label on the ORDER, and
+ * the client can observe neither end of it — probing the label route both signs
+ * a customer's address and writes a `production_job.label_issued` audit row, and
+ * `GET /transfers` withholds the order a parcel belongs to on purpose (R1). So
+ * that guard stays absent, which leaves the move live and the API deciding,
+ * which is the correct answer rather than a placeholder for a better one.
  */
 export type VendorGuardState = Partial<Record<TransitionGuard, boolean>>
 
@@ -277,13 +286,33 @@ const VENDOR_ACTION_COPY: Record<string, { label: string; question: string }> = 
  *
  * The remedy, in the vendor's words — a disabled button with no sentence beside
  * it is a screen telling someone to guess.
+ *
+ * One entry, because one guard is all this portal can ever answer `false` for.
+ * There was a second — `open-transfer-or-order-label` — and it was dead copy
+ * from the day it was written: the only chain that fed that guard set it `true`
+ * and never `false` (a label the vendor just downloaded), and `false` is not
+ * observable from a browser at all, so the sentence could not render. Copy for a
+ * state the code cannot reach reads, to the next person, as proof the state
+ * happens. A guard with no entry here still gets a sentence, from the fallback
+ * below, so deleting this one cannot silently un-disable a button.
  */
 const VENDOR_GUARD_UNMET: Partial<Record<TransitionGuard, string>> = {
   'shot-list-complete':
     'Every required photo has to be uploaded first — the approval is judged on the shot list.',
-  'open-transfer-or-order-label':
-    'This needs an open transfer to the next workshop, or a courier label on the order, before it can be handed over.',
 }
+
+/**
+ * The sentence for a known-unsatisfied guard this file has no words for.
+ *
+ * `blockedReason` is what makes a button render disabled, so a guard with no
+ * copy must not fall through to `undefined` — that would turn "we know this
+ * will be refused" back into a live button, which is the defect class the
+ * upload window and the parcel strip were both fixed for. Generic and honest:
+ * it says something is outstanding and points at the one party who can see
+ * what, rather than guessing on the vendor's behalf.
+ */
+const VENDOR_GUARD_UNMET_FALLBACK =
+  'Something this move needs is not in place yet. Ask us what is outstanding rather than trying again.'
 
 /**
  * Every move a vendor may make on a job in `status`, and nothing else.
@@ -318,7 +347,9 @@ export function nextVendorActions(
       question: copy?.question ?? `Confirm this job is ${vendorStatusLabel(to).toLowerCase()}?`,
       testId: `vendor-job-mark-${to}`,
       ...(guard ? { guard } : {}),
-      ...(unmet && guard ? { blockedReason: VENDOR_GUARD_UNMET[guard] } : {}),
+      ...(unmet && guard
+        ? { blockedReason: VENDOR_GUARD_UNMET[guard] ?? VENDOR_GUARD_UNMET_FALLBACK }
+        : {}),
     }
   })
 }
@@ -379,6 +410,27 @@ export const VENDOR_PHOTO_UPLOAD_STATUSES: readonly ProductionJobStatus[] =
  */
 export function vendorMayUploadPhotos(status: ProductionJobStatus): boolean {
   return VENDOR_PHOTO_UPLOAD_STATUSES.includes(status)
+}
+
+/**
+ * Is this job still in play — for the vendor, for us, for anybody?
+ *
+ * The screens use it for sentences in the PRESENT TENSE. "In production since
+ * the 3rd" is a claim about now, and a job that has been handed over or
+ * cancelled makes it false rather than merely stale; on a job that was never
+ * received it has nothing to print at all and renders as an em dash under a
+ * label, which reads as a broken field.
+ *
+ * Both halves come off the shared matrix and neither is listed here.
+ * `isTerminalStatus` is "reachable, with nowhere to go" — `dispatched` and
+ * `cancelled` today. `UNREACHABLE_STATUSES` is "no edges in either direction" —
+ * the retired `sent`, where what moves the job next is a backfill rather than a
+ * workshop, so a sentence about production is not true of it either. Writing
+ * the three out here instead would be the third copy of the state machine, and
+ * `sent` is the standing proof of what those cost.
+ */
+export function vendorJobIsOpen(status: ProductionJobStatus): boolean {
+  return !isTerminalStatus(status) && !UNREACHABLE_STATUSES.includes(status)
 }
 
 export const VENDOR_JOB_STAGES = ['print', 'frame'] as const
