@@ -377,7 +377,7 @@ This document covers manual testing of the chobii.art user account dashboard:
 3. View recent orders
 
 **Expected Result**:
-- Order numbers visible (e.g., "MA-20240115-0001")
+- Order numbers visible (e.g., "CA-2026-000123")
 - Each order has unique number
 - Numbers formatted consistently
 

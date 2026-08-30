@@ -93,7 +93,7 @@
 **Expected Result**:
 - Status code: 201 Created
 - Response contains:
-  - Order with unique order number (format: ORD-XXXXXXXX)
+  - Order with unique order number (format: CA-YYYY-NNNNNN)
   - Order status: "pending"
   - Payment status: "pending"
   - Order items matching cart contents
@@ -390,12 +390,12 @@
 1. Authenticate as user
 2. Create multiple orders (3-5 orders)
 3. Verify each has unique order number
-4. Check order number format: ORD-XXXXXXXX
+4. Check order number format: CA-YYYY-NNNNNN
 
 **Expected Result**:
 - All order numbers are unique
-- Format: ORD- followed by 8 alphanumeric characters
-- Order numbers are sequential or random but never duplicate
+- Format: `CA-` followed by the 4-digit year and a 6-digit sequence (e.g. CA-2026-000123)
+- The sequence counts orders under every prefix issued that year, so it does not restart at 000001 across the rebrand (#361)
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -965,7 +965,7 @@
 - Admin users have additional permissions for order management
 - Phone numbers must be in E.164 format: `+[country][number]`
 - Indian pincodes are 6 digits
-- Order numbers format: `ORD-XXXXXXXX`
+- Order numbers format: `CA-YYYY-NNNNNN`; `MA-` numbers predate the rebrand and still resolve (#361)
 - GST rate: 18%
 - Currency: INR (₹) with 2 decimal places
 - Valid order statuses: pending, confirmed, processing, shipped, delivered, cancelled, refunded

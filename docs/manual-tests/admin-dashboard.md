@@ -277,7 +277,7 @@ This document covers manual testing of the Admin Dashboard page (`/admin/dashboa
 **Description**: Verify order numbers display correctly
 
 **Expected Result**:
-- Format: MA-YYYYMMDD-XXX
+- Format: CA-YYYY-NNNNNN (e.g. CA-2026-000123)
 - Clickable (links to order detail)
 
 **Actual Result**:

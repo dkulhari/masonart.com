@@ -94,7 +94,7 @@ This document covers manual testing of Admin Orders Management:
 2. Verify data formatting
 
 **Expected Result**:
-- Order number format: MA-YYYYMMDD-XXX
+- Order number format: CA-YYYY-NNNNNN (e.g. CA-2026-000123)
 - Customer name and email
 - Date formatted (e.g., Jan 15, 2024)
 - Total with currency (₹)
@@ -225,11 +225,13 @@ This document covers manual testing of Admin Orders Management:
 **Description**: Verify search by order number
 
 **Steps**:
-1. Enter order number (e.g., "MA-2024")
+1. Enter order number (e.g., "CA-2026")
 2. Verify results
+3. Repeat with a legacy number (e.g., "MA-2024")
 
 **Expected Result**:
 - Matching orders shown
+- Orders numbered under the pre-rebrand `MA-` prefix are still found (#361)
 - Partial match supported
 - URL updated with search param
 

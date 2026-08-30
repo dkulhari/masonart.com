@@ -41,7 +41,7 @@ This document covers manual testing of the chobii.art order confirmation page, i
 
 **Steps**:
 1. Complete a successful payment
-2. Navigate to /checkout/success?orderNumber=ORD-XXXX
+2. Navigate to /checkout/success?orderNumber=CA-2026-000123
 3. Observe header section
 
 **Expected Result**:

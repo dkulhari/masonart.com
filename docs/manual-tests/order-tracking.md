@@ -142,14 +142,14 @@ This document covers manual testing of the chobii.art guest order tracking featu
 **Description**: Verify input values preserved when switching tabs
 
 **Steps**:
-1. Enter order number "MA-2024-001"
+1. Enter order number "CA-2026-000123"
 2. Enter email "test@example.com"
 3. Switch to Phone tab
 4. Enter phone "9876543210"
 5. Switch back to Email tab
 
 **Expected Result**:
-- Order number still shows "MA-2024-001"
+- Order number still shows "CA-2026-000123"
 - Email still shows "test@example.com"
 - Phone value preserved when switching back
 
@@ -378,7 +378,7 @@ This document covers manual testing of the chobii.art guest order tracking featu
 **Description**: Verify handling of non-existent order
 
 **Steps**:
-1. Enter non-existent order number (e.g., "MA-9999-999999")
+1. Enter non-existent order number (e.g., "CA-9999-999999")
 2. Enter any email
 3. Click "Track Order"
 

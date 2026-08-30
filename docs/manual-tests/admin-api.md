@@ -557,7 +557,7 @@ This document covers manual testing of Admin API routes:
 
 **Description**: Verify orders can be searched
 
-**Endpoint**: `GET /api/admin/orders?search=MA-2024`
+**Endpoint**: `GET /api/admin/orders?search=CA-2026`
 
 **Test Cases**:
 - Search by order number
@@ -622,12 +622,13 @@ This document covers manual testing of Admin API routes:
 
 **Description**: Verify admin can get order by order number
 
-**Endpoint**: `GET /api/admin/orders/MA-20240115-001`
+**Endpoint**: `GET /api/admin/orders/CA-2026-000123`
 
 **Expected Result**:
 - Status: 200
 - Returns order details
 - Order number matches
+- A legacy `MA-` number resolves the same way; the route accepts both prefixes (#361)
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
