@@ -25,7 +25,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../database'
 import { reviewMedia } from '../database/schema'
 import { logger } from '../lib/logger'
-import { createRedisConnection, redis } from '../lib/redis'
+import { BULLMQ_PREFIX, createRedisConnection, redis } from '../lib/redis'
 import { getFile, uploadFile, REVIEW_MEDIA_LIMITS } from '../lib/storage'
 import {
   extractPosterFrame,
@@ -80,6 +80,9 @@ export const reviewMediaQueue = new Queue<ReviewMediaJobData>(
   REVIEW_MEDIA_QUEUE_NAME,
   {
     connection: redis,
+    // Every queue honours the same override, so a test run that takes its own
+    // corner of the keyspace takes all of it — see BULLMQ_PREFIX (#656).
+    prefix: BULLMQ_PREFIX,
     defaultJobOptions: DEFAULT_JOB_OPTIONS,
   }
 )
@@ -290,6 +293,7 @@ export function startReviewMediaWorker(): Worker<ReviewMediaJobData> {
     processReviewMediaJob,
     {
       connection: createRedisConnection(),
+      prefix: BULLMQ_PREFIX,
       concurrency,
     }
   )

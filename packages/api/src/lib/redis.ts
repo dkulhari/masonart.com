@@ -53,6 +53,28 @@ export const redisConnectionOptions = {
   connection: redis,
 };
 
+/**
+ * The prefix BullMQ puts in front of every key it owns.
+ *
+ * `bull` is BullMQ's own default and is what production uses; the override
+ * exists so a test run can take a corner of the keyspace nobody else is in.
+ * Several agents share one machine and one Redis container here, and two
+ * concurrent runs of the queue suites used to add, count and delete each
+ * other's jobs — which is why the set of failing tests changed between
+ * identical runs (#656).
+ *
+ * A queue's identity is `<prefix>:<name>`, so overriding the prefix isolates
+ * the whole keyspace (jobs, counters, events, worker locks) while leaving
+ * `AI_GENERATION_QUEUE_NAME` the real production name. Suffixing the *name*
+ * instead would isolate just as well but would make a production constant
+ * depend on the environment it is read in.
+ *
+ * Read once at module load: BullMQ instances are created at import time, so a
+ * test must set `BULLMQ_PREFIX` before importing the queue module (see the
+ * `vi.hoisted` block in tests/queues/ai.test.ts).
+ */
+export const BULLMQ_PREFIX = process.env.BULLMQ_PREFIX || 'bull';
+
 // ============================================================================
 // Cache Utilities
 // ============================================================================

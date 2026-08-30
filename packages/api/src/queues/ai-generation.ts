@@ -9,7 +9,7 @@
 
 import { Queue, Worker, Job, QueueEvents } from "bullmq";
 import { eq } from "drizzle-orm";
-import { redis, createRedisConnection, CacheKeys } from "../lib/redis";
+import { redis, createRedisConnection, CacheKeys, BULLMQ_PREFIX } from "../lib/redis";
 import { uploadAIGeneration } from "../lib/storage";
 import { db } from "../database";
 import {
@@ -118,6 +118,7 @@ export const aiGenerationQueue = new Queue<AIGenerationJobData, AIGenerationJobR
   AI_GENERATION_QUEUE_NAME,
   {
     connection: redis,
+    prefix: BULLMQ_PREFIX,
     defaultJobOptions: DEFAULT_JOB_OPTIONS,
   }
 );
@@ -127,6 +128,7 @@ export const aiGenerationQueue = new Queue<AIGenerationJobData, AIGenerationJobR
  */
 export const aiGenerationQueueEvents = new QueueEvents(AI_GENERATION_QUEUE_NAME, {
   connection: createRedisConnection(),
+  prefix: BULLMQ_PREFIX,
 });
 
 // ============================================================================
@@ -506,6 +508,7 @@ export const aiGenerationWorker = new Worker<AIGenerationJobData, AIGenerationJo
   processAIGenerationJob,
   {
     connection: createRedisConnection(),
+    prefix: BULLMQ_PREFIX,
     concurrency: 2, // Process up to 2 jobs simultaneously
     limiter: {
       max: 10, // Max 10 jobs per minute
@@ -614,6 +617,13 @@ export async function cancelAIGenerationJob(jobId: string): Promise<boolean> {
 
 /**
  * Get queue statistics
+ *
+ * `waiting` counts prioritized jobs as well as plain waiting ones. BullMQ v5
+ * keeps jobs that carry a priority in a separate `prioritized` ZSET, and
+ * `getWaitingCount()` does not look at it — while `addAIGenerationJob` gives
+ * *every* job a priority (`?? 100`). So the two sets do not overlap here at
+ * all: without the second count, `waiting` is structurally always 0 no matter
+ * how deep the backlog is (#656).
  */
 export async function getQueueStats(): Promise<{
   waiting: number;
@@ -622,15 +632,16 @@ export async function getQueueStats(): Promise<{
   failed: number;
   delayed: number;
 }> {
-  const [waiting, active, completed, failed, delayed] = await Promise.all([
+  const [waiting, prioritized, active, completed, failed, delayed] = await Promise.all([
     aiGenerationQueue.getWaitingCount(),
+    aiGenerationQueue.getPrioritizedCount(),
     aiGenerationQueue.getActiveCount(),
     aiGenerationQueue.getCompletedCount(),
     aiGenerationQueue.getFailedCount(),
     aiGenerationQueue.getDelayedCount(),
   ]);
 
-  return { waiting, active, completed, failed, delayed };
+  return { waiting: waiting + prioritized, active, completed, failed, delayed };
 }
 
 /**

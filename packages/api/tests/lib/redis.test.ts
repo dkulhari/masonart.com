@@ -13,12 +13,30 @@
  * 6. Connection Management - Test initRedis, closeRedis, isRedisConnected
  * 7. Runtime Tests - Test actual Redis connectivity (requires Redis running)
  *
- * Runtime tests can be skipped by setting SKIP_REDIS_RUNTIME_TESTS=true
+ * The runtime tests use the real Redis container, and every key they touch
+ * lives under `KEY` — a `test:redis:<pid>:` namespace this run owns alone.
+ * Nothing else may be written and nothing else may be deleted: several agents
+ * share this machine, and the fixed `test:*` keys this suite used to use meant
+ * two concurrent runs overwrote and deleted each other's values, so which
+ * tests failed changed between identical runs (#656).
+ *
+ * Redis is not optional. Without it the suite FAILS rather than skipping —
+ * see tests/helpers/live-redis.ts. `ALLOW_MISSING_REDIS=true` skips out loud
+ * (the same opt-out the gift-card rate-limit suite uses; it replaces the
+ * suite-local SKIP_REDIS_RUNTIME_TESTS).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import Redis from 'ioredis';
 import '../setup';
+import {
+  assertLiveRedisReachable,
+  closeLiveRedis,
+  connectLiveRedis,
+  deleteKeysByPrefix,
+  liveRedisOptional,
+  testKeyPrefix,
+} from '../helpers/live-redis';
 
 // Import Redis module - these should work even without Redis running
 import * as redisModule from '../../src/lib/redis';
@@ -40,53 +58,87 @@ import {
   isRedisConnected,
 } from '../../src/lib/redis';
 
+/**
+ * The only key namespace this run may write to or delete from.
+ *
+ * Read it as a prefix on every literal below: `${KEY}string`, never
+ * `test:string`. The helpers that build their own key from what you pass —
+ * `checkRateLimit` (`rate-limit:…`) and the session trio (`session:…`) — land
+ * one level out, which is why cleanup walks a list rather than one prefix.
+ */
+const KEY = testKeyPrefix('redis');
+const OWNED_PREFIXES = [
+  KEY,
+  `${CacheKeys.RATE_LIMIT}${KEY}`,
+  `${CacheKeys.SESSION}${KEY}`,
+];
+
+/** Delete everything this run owns, and nothing else. */
+async function deleteOwnedKeys(): Promise<void> {
+  for (const prefix of OWNED_PREFIXES) {
+    await deleteKeysByPrefix(testClient ?? undefined, prefix);
+  }
+}
+
 // Helper to check if Redis is available
 let isRedisAvailable = false;
 let testClient: Redis | null = null;
 
 beforeAll(async () => {
-  // Check if we should skip runtime tests
-  if (process.env.SKIP_REDIS_RUNTIME_TESTS === 'true') {
-    console.log('Skipping Redis runtime tests (SKIP_REDIS_RUNTIME_TESTS=true)');
-    return;
-  }
+  const connection = await connectLiveRedis();
+  testClient = connection.reachable ? connection.client : null;
+  isRedisAvailable = connection.reachable;
 
-  // Try to connect to Redis
-  try {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6380';
-    testClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1,
-      enableReadyCheck: false,
-      lazyConnect: false,
-      connectTimeout: 3000,
-      retryStrategy: () => null, // Don't retry for tests
-    });
+  if (!isRedisAvailable) return;
 
-    await testClient.ping();
-    isRedisAvailable = true;
-    console.log('Redis connection available for runtime tests');
-  } catch (error) {
-    console.log('Redis not available, skipping runtime tests');
-    isRedisAvailable = false;
-    if (testClient) {
-      try {
-        await testClient.quit();
-      } catch {
-        // Ignore cleanup errors
-      }
-      testClient = null;
-    }
-  }
+  /**
+   * Connect the module singleton explicitly.
+   *
+   * `redis` is `lazyConnect`, and every cache helper returns early unless
+   * `status === 'ready'` — so the runtime tests used to depend on an earlier
+   * *signature* test having incidentally issued a command (`checkRateLimit`
+   * does not guard on status) and on that connection winning a race against
+   * the next few tests. Under load it lost, and the first runtime test — 'set
+   * and get string value' — read null from a client that had not finished
+   * connecting (#656).
+   */
+  await initRedis();
+
+  // Start from a clean namespace even if a previous run was killed mid-flight.
+  await deleteOwnedKeys();
 });
 
 afterAll(async () => {
-  if (testClient) {
+  // Leave nothing behind: repeated runs must not accumulate, and a stale
+  // rate-limit ZSET outliving its run is what made a second run of this suite
+  // see 3 requests where it expected 4.
+  await deleteOwnedKeys();
+  await closeLiveRedis(testClient ?? undefined);
+
+  // `closeRedis()` sends QUIT, which queues behind ioredis' reconnect loop and
+  // never resolves when nothing is listening — a teardown that hangs until the
+  // hook timeout rather than one that fails. Only ask for the graceful close
+  // when there is something to close gracefully.
+  if (isRedisAvailable) {
     try {
-      await testClient.quit();
+      await closeRedis();
     } catch {
-      // Ignore cleanup errors
+      // Already closed
     }
+  } else {
+    redis.disconnect();
   }
+});
+
+describe('Live Redis', () => {
+  it('is reachable', () => {
+    assertLiveRedisReachable(isRedisAvailable);
+    if (liveRedisOptional() && !isRedisAvailable) {
+      console.log(
+        'ALLOW_MISSING_REDIS=true — Redis runtime assertions were NOT checked'
+      );
+    }
+  });
 });
 
 // ============================================================================
@@ -314,7 +366,7 @@ describe('Cache Operations (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = getCached('test-key');
+      const result = getCached(`${KEY}key`);
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -326,7 +378,7 @@ describe('Cache Operations (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = setCached('test-key', 'test-value');
+      const result = setCached(`${KEY}key`, 'test-value');
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -337,7 +389,7 @@ describe('Cache Operations (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = deleteCached('test-key');
+      const result = deleteCached(`${KEY}key`);
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -348,7 +400,7 @@ describe('Cache Operations (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = deleteCachedPattern('test:*');
+      const result = deleteCachedPattern(`${KEY}*`);
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -366,7 +418,7 @@ describe('Rate Limiting (Configuration)', () => {
 
     it('should return a Promise', () => {
       // When Redis is not connected, function still returns a Promise
-      const result = checkRateLimit('test-key', 10, 60);
+      const result = checkRateLimit(`${KEY}key`, 10, 60);
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -391,7 +443,7 @@ describe('Session Management (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = setSession('session-id', { userId: '123' });
+      const result = setSession(`${KEY}session-id`, { userId: '123' });
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -402,7 +454,7 @@ describe('Session Management (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = getSession('session-id');
+      const result = getSession(`${KEY}session-id`);
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -413,7 +465,7 @@ describe('Session Management (Configuration)', () => {
     });
 
     it('should return a Promise', () => {
-      const result = deleteSession('session-id');
+      const result = deleteSession(`${KEY}session-id`);
       expect(result).toBeInstanceOf(Promise);
     });
   });
@@ -462,7 +514,7 @@ describe('Redis Runtime Tests', () => {
       return;
     }
     // Clear test keys before each test
-    const keys = await testClient.keys('test:*');
+    const keys = await testClient.keys(`${KEY}*`);
     if (keys.length > 0) {
       await testClient.del(...keys);
     }
@@ -475,8 +527,8 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      await setCached('test:string', 'hello world');
-      const value = await getCached<string>('test:string');
+      await setCached(`${KEY}string`, 'hello world');
+      const value = await getCached<string>(`${KEY}string`);
       expect(value).toBe('hello world');
     });
 
@@ -487,8 +539,8 @@ describe('Redis Runtime Tests', () => {
       }
 
       const obj = { name: 'Test', value: 123 };
-      await setCached('test:object', obj);
-      const value = await getCached<typeof obj>('test:object');
+      await setCached(`${KEY}object`, obj);
+      const value = await getCached<typeof obj>(`${KEY}object`);
       expect(value).toEqual(obj);
     });
 
@@ -499,8 +551,8 @@ describe('Redis Runtime Tests', () => {
       }
 
       const arr = [1, 2, 3, 4, 5];
-      await setCached('test:array', arr);
-      const value = await getCached<number[]>('test:array');
+      await setCached(`${KEY}array`, arr);
+      const value = await getCached<number[]>(`${KEY}array`);
       expect(value).toEqual(arr);
     });
 
@@ -510,7 +562,7 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      const value = await getCached('test:nonexistent');
+      const value = await getCached(`${KEY}nonexistent`);
       expect(value).toBeNull();
     });
 
@@ -520,12 +572,12 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      await setCached('test:delete', 'to be deleted');
-      const before = await getCached('test:delete');
+      await setCached(`${KEY}delete`, 'to be deleted');
+      const before = await getCached(`${KEY}delete`);
       expect(before).toBe('to be deleted');
 
-      await deleteCached('test:delete');
-      const after = await getCached('test:delete');
+      await deleteCached(`${KEY}delete`);
+      const after = await getCached(`${KEY}delete`);
       expect(after).toBeNull();
     });
 
@@ -535,15 +587,15 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      await setCached('test:pattern:1', 'value1');
-      await setCached('test:pattern:2', 'value2');
-      await setCached('test:pattern:3', 'value3');
+      await setCached(`${KEY}pattern:1`, 'value1');
+      await setCached(`${KEY}pattern:2`, 'value2');
+      await setCached(`${KEY}pattern:3`, 'value3');
 
-      await deleteCachedPattern('test:pattern:*');
+      await deleteCachedPattern(`${KEY}pattern:*`);
 
-      const v1 = await getCached('test:pattern:1');
-      const v2 = await getCached('test:pattern:2');
-      const v3 = await getCached('test:pattern:3');
+      const v1 = await getCached(`${KEY}pattern:1`);
+      const v2 = await getCached(`${KEY}pattern:2`);
+      const v3 = await getCached(`${KEY}pattern:3`);
 
       expect(v1).toBeNull();
       expect(v2).toBeNull();
@@ -571,8 +623,8 @@ describe('Redis Runtime Tests', () => {
         metadata: null,
       };
 
-      await setCached('test:complex', complex);
-      const value = await getCached<typeof complex>('test:complex');
+      await setCached(`${KEY}complex`, complex);
+      const value = await getCached<typeof complex>(`${KEY}complex`);
       expect(value).toEqual(complex);
     });
   });
@@ -590,8 +642,8 @@ describe('Redis Runtime Tests', () => {
         createdAt: new Date().toISOString(),
       };
 
-      await setSession('test-session-1', sessionData);
-      const retrieved = await getSession('test-session-1');
+      await setSession(`${KEY}session-1`, sessionData);
+      const retrieved = await getSession(`${KEY}session-1`);
       expect(retrieved).toEqual(sessionData);
     });
 
@@ -601,12 +653,12 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      await setSession('test-session-2', { userId: 'user-456' });
-      const before = await getSession('test-session-2');
+      await setSession(`${KEY}session-2`, { userId: 'user-456' });
+      const before = await getSession(`${KEY}session-2`);
       expect(before).not.toBeNull();
 
-      await deleteSession('test-session-2');
-      const after = await getSession('test-session-2');
+      await deleteSession(`${KEY}session-2`);
+      const after = await getSession(`${KEY}session-2`);
       expect(after).toBeNull();
     });
 
@@ -616,7 +668,7 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      const session = await getSession('nonexistent-session');
+      const session = await getSession(`${KEY}nonexistent-session`);
       expect(session).toBeNull();
     });
   });
@@ -628,7 +680,7 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      const result = await checkRateLimit('test:rate:user1', 5, 60);
+      const result = await checkRateLimit(`${KEY}rate:user1`, 5, 60);
       expect(result.success).toBe(true);
       expect(result.remaining).toBe(4);
     });
@@ -640,9 +692,9 @@ describe('Redis Runtime Tests', () => {
       }
 
       // Make 3 requests
-      await checkRateLimit('test:rate:user2', 5, 60);
-      await checkRateLimit('test:rate:user2', 5, 60);
-      const result = await checkRateLimit('test:rate:user2', 5, 60);
+      await checkRateLimit(`${KEY}rate:user2`, 5, 60);
+      await checkRateLimit(`${KEY}rate:user2`, 5, 60);
+      const result = await checkRateLimit(`${KEY}rate:user2`, 5, 60);
 
       expect(result.success).toBe(true);
       expect(result.remaining).toBe(2);
@@ -655,12 +707,12 @@ describe('Redis Runtime Tests', () => {
       }
 
       // Exhaust 3 request limit
-      await checkRateLimit('test:rate:user3', 3, 60);
-      await checkRateLimit('test:rate:user3', 3, 60);
-      await checkRateLimit('test:rate:user3', 3, 60);
+      await checkRateLimit(`${KEY}rate:user3`, 3, 60);
+      await checkRateLimit(`${KEY}rate:user3`, 3, 60);
+      await checkRateLimit(`${KEY}rate:user3`, 3, 60);
 
       // 4th request should be denied
-      const result = await checkRateLimit('test:rate:user3', 3, 60);
+      const result = await checkRateLimit(`${KEY}rate:user3`, 3, 60);
       expect(result.success).toBe(false);
       expect(result.remaining).toBe(0);
     });
@@ -671,11 +723,11 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      await checkRateLimit('test:rate:userA', 5, 60);
-      await checkRateLimit('test:rate:userA', 5, 60);
+      await checkRateLimit(`${KEY}rate:userA`, 5, 60);
+      await checkRateLimit(`${KEY}rate:userA`, 5, 60);
 
-      const resultA = await checkRateLimit('test:rate:userA', 5, 60);
-      const resultB = await checkRateLimit('test:rate:userB', 5, 60);
+      const resultA = await checkRateLimit(`${KEY}rate:userA`, 5, 60);
+      const resultB = await checkRateLimit(`${KEY}rate:userB`, 5, 60);
 
       expect(resultA.remaining).toBe(2); // 3rd request for userA
       expect(resultB.remaining).toBe(4); // 1st request for userB
@@ -687,7 +739,7 @@ describe('Redis Runtime Tests', () => {
         return;
       }
 
-      const result = await checkRateLimit('test:rate:user4', 5, 60);
+      const result = await checkRateLimit(`${KEY}rate:user4`, 5, 60);
       expect(typeof result.resetIn).toBe('number');
       expect(result.resetIn).toBeGreaterThan(0);
       expect(result.resetIn).toBeLessThanOrEqual(60);
@@ -704,7 +756,7 @@ describe('Error Handling', () => {
     it('getCached should return null gracefully', async () => {
       // When Redis is not connected, getCached should return null
       // This tests the error handling in the function
-      const result = await getCached('any-key');
+      const result = await getCached(`${KEY}any-key`);
       // Should not throw, should return null or value
       expect(result === null || result !== undefined).toBe(true);
     });
@@ -713,7 +765,7 @@ describe('Error Handling', () => {
       // Should complete without throwing - just await and verify no exception
       let error: Error | undefined;
       try {
-        await setCached('test-key', 'value');
+        await setCached(`${KEY}key`, 'value');
       } catch (e) {
         error = e as Error;
       }
@@ -723,7 +775,7 @@ describe('Error Handling', () => {
     it('deleteCached should not throw', async () => {
       let error: Error | undefined;
       try {
-        await deleteCached('test-key');
+        await deleteCached(`${KEY}key`);
       } catch (e) {
         error = e as Error;
       }
@@ -733,7 +785,7 @@ describe('Error Handling', () => {
     it('deleteCachedPattern should not throw', async () => {
       let error: Error | undefined;
       try {
-        await deleteCachedPattern('test:*');
+        await deleteCachedPattern(`${KEY}*`);
       } catch (e) {
         error = e as Error;
       }
@@ -755,14 +807,14 @@ describe('Integration Tests', () => {
 
     const operations = [];
     for (let i = 0; i < 10; i++) {
-      operations.push(setCached(`test:concurrent:${i}`, { index: i }));
+      operations.push(setCached(`${KEY}concurrent:${i}`, { index: i }));
     }
 
     await Promise.all(operations);
 
     const reads = [];
     for (let i = 0; i < 10; i++) {
-      reads.push(getCached(`test:concurrent:${i}`));
+      reads.push(getCached(`${KEY}concurrent:${i}`));
     }
 
     const results = await Promise.all(reads);
@@ -780,15 +832,15 @@ describe('Integration Tests', () => {
     }
 
     // Set initial value
-    await setCached('test:consistency', { count: 0 });
+    await setCached(`${KEY}consistency`, { count: 0 });
 
     // Update multiple times
     for (let i = 1; i <= 5; i++) {
-      await setCached('test:consistency', { count: i });
+      await setCached(`${KEY}consistency`, { count: i });
     }
 
     // Final value should be 5
-    const result = await getCached<{ count: number }>('test:consistency');
+    const result = await getCached<{ count: number }>(`${KEY}consistency`);
     expect(result?.count).toBe(5);
   });
 });
@@ -807,7 +859,7 @@ describe('Performance', () => {
     const start = Date.now();
 
     for (let i = 0; i < 50; i++) {
-      await setCached(`test:perf:${i}`, `value-${i}`);
+      await setCached(`${KEY}perf:${i}`, `value-${i}`);
     }
 
     const duration = Date.now() - start;
@@ -825,7 +877,7 @@ describe('Performance', () => {
     const start = Date.now();
 
     const operations = Array.from({ length: 50 }, (_, i) =>
-      setCached(`test:bulk:${i}`, `value-${i}`)
+      setCached(`${KEY}bulk:${i}`, `value-${i}`)
     );
 
     await Promise.all(operations);
@@ -859,8 +911,8 @@ describe('TypeScript Types', () => {
       value: number;
     }
 
-    await setCached('test:typed', { id: 'test', value: 42 });
-    const result = await getCached<TestType>('test:typed');
+    await setCached(`${KEY}typed`, { id: 'test', value: 42 });
+    const result = await getCached<TestType>(`${KEY}typed`);
 
     if (result) {
       expect(result.id).toBe('test');

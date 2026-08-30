@@ -11,7 +11,25 @@
  * 7. Queue Management Functions - Test queue operations
  * 8. Runtime Tests - Test actual queue operations (requires Redis)
  *
- * Runtime tests can be skipped by setting SKIP_REDIS_RUNTIME_TESTS=true
+ * The runtime tests drive the real BullMQ queue against the real Redis
+ * container. Two things keep them from tripping over other runs and over
+ * themselves (#656):
+ *
+ *   1. **A queue keyspace this run owns.** `BULLMQ_PREFIX` is set to
+ *      `bull-test-ai-<pid>` before the queue module is imported, so a job this
+ *      run adds is invisible to any other run's counts, `getJob` and cleanup.
+ *      Under the shared default `bull` prefix, two agents running this file at
+ *      once counted each other's jobs and deleted each other's keys, and which
+ *      tests failed changed between identical runs.
+ *   2. **A paused worker.** `aiGenerationWorker` starts consuming the moment
+ *      the module is imported, so the jobs these tests add were being picked
+ *      up mid-assertion — `job.remove()` then failed with "locked by another
+ *      worker" and job states raced between `waiting` and `active`. The worker
+ *      is paused for the whole file; do not resume it in a test.
+ *
+ * Redis is not optional. Without it the suite FAILS rather than skipping — see
+ * tests/helpers/live-redis.ts. `ALLOW_MISSING_REDIS=true` skips out loud (it
+ * replaces the suite-local SKIP_REDIS_RUNTIME_TESTS).
  *
  * Note: When Redis is not available, BullMQ instances emit connection errors.
  * These are suppressed in tests to prevent false negatives.
@@ -20,7 +38,29 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { Queue, Worker, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
+
+/**
+ * Claim this run's BullMQ keyspace before anything imports the queue module.
+ *
+ * The Queue, Worker and QueueEvents are constructed at import time and read
+ * the prefix once, so the assignment has to happen above the imports —
+ * `vi.hoisted` is the only placement that survives both module hoisting and
+ * an import-sorting tool.
+ */
+const { bullPrefix } = vi.hoisted(() => {
+  const prefix = `bull-test-ai-${process.pid}`;
+  process.env.BULLMQ_PREFIX = prefix;
+  return { bullPrefix: prefix };
+});
+
 import '../setup';
+import {
+  assertLiveRedisReachable,
+  closeLiveRedis,
+  connectLiveRedis,
+  deleteKeysByPrefix,
+  liveRedisOptional,
+} from '../helpers/live-redis';
 
 // Suppress unhandled errors from BullMQ when Redis is not available
 // These are expected connection errors and don't affect test results
@@ -62,53 +102,32 @@ let isRedisAvailable = false;
 let testClient: Redis | null = null;
 
 beforeAll(async () => {
-  // Check if we should skip runtime tests
-  if (process.env.SKIP_REDIS_RUNTIME_TESTS === 'true') {
-    console.log('Skipping Redis runtime tests (SKIP_REDIS_RUNTIME_TESTS=true)');
-    return;
-  }
+  const connection = await connectLiveRedis();
+  testClient = connection.reachable ? connection.client : null;
+  isRedisAvailable = connection.reachable;
 
-  // Try to connect to Redis
-  try {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6380';
-    testClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: 1,
-      enableReadyCheck: false,
-      lazyConnect: false,
-      connectTimeout: 3000,
-      retryStrategy: () => null, // Don't retry for tests
-    });
+  if (!isRedisAvailable) return;
 
-    await testClient.ping();
-    isRedisAvailable = true;
-    console.log('Redis connection available for runtime tests');
-  } catch (error) {
-    console.log('Redis not available, skipping runtime tests');
-    isRedisAvailable = false;
-    if (testClient) {
-      try {
-        await testClient.quit();
-      } catch {
-        // Ignore cleanup errors
-      }
-      testClient = null;
-    }
-  }
+  // Stop the module-level worker from eating the jobs these tests assert on.
+  // Nothing has been added yet, so there is no in-flight job to drain.
+  await aiGenerationWorker.pause();
+
+  // Start clean even if a previous run with this pid was killed mid-flight.
+  await deleteKeysByPrefix(testClient, `${bullPrefix}:`);
 });
 
 afterAll(async () => {
   // Clean up test Redis client
   if (testClient) {
     try {
-      // Clean up test keys
-      const keys = await testClient.keys('bull:ai-generation:*');
-      if (keys.length > 0) {
-        await testClient.del(...keys);
-      }
-      await testClient.quit();
+      // Only this run's keyspace. The old `KEYS bull:ai-generation:*` deleted
+      // every concurrent run's jobs too, which is half of why the failures
+      // moved around (#656).
+      await deleteKeysByPrefix(testClient, `${bullPrefix}:`);
     } catch {
       // Ignore cleanup errors
     }
+    await closeLiveRedis(testClient);
   }
 
   // Close the BullMQ instances to prevent "Connection is closed" errors
@@ -127,6 +146,36 @@ afterAll(async () => {
   } catch {
     // Ignore cleanup errors - expected when Redis is not available
   }
+});
+
+// ============================================================================
+// Run Isolation
+// ============================================================================
+
+describe('Run isolation', () => {
+  it('has a reachable Redis', () => {
+    assertLiveRedisReachable(isRedisAvailable);
+    if (liveRedisOptional() && !isRedisAvailable) {
+      console.log(
+        'ALLOW_MISSING_REDIS=true — BullMQ runtime assertions were NOT checked'
+      );
+    }
+  });
+
+  it('gives the queue, worker and events a keyspace this run owns alone', () => {
+    // The queue *name* stays the production one — it is the prefix that is
+    // per-run, so `<prefix>:ai-generation:*` cannot be reached by another
+    // agent's run of this same file.
+    expect(bullPrefix).toBe(`bull-test-ai-${process.pid}`);
+    expect(aiGenerationQueue.opts.prefix).toBe(bullPrefix);
+    expect(aiGenerationWorker.opts.prefix).toBe(bullPrefix);
+    expect(aiGenerationQueueEvents.opts.prefix).toBe(bullPrefix);
+  });
+
+  it('keeps the worker paused so it cannot consume the jobs under test', () => {
+    if (!isRedisAvailable) return;
+    expect(aiGenerationWorker.isPaused()).toBe(true);
+  });
 });
 
 // ============================================================================
@@ -1329,7 +1378,10 @@ describe('Runtime Tests', () => {
 
       expect(status).not.toBeNull();
       expect(status?.state).toBeDefined();
-      expect(['waiting', 'delayed', 'active']).toContain(status?.state);
+      // `prioritized` is where BullMQ v5 parks a queued job that carries a
+      // priority — which is every job, since addAIGenerationJob defaults to
+      // 100. With the worker paused it is the only state this can be.
+      expect(['waiting', 'prioritized', 'delayed', 'active']).toContain(status?.state);
 
       // Clean up
       await job.remove();
@@ -1422,9 +1474,9 @@ describe('Runtime Tests', () => {
         return;
       }
 
-      // Pause worker to prevent processing
-      await aiGenerationWorker.pause();
-
+      // The worker is already paused for the whole file (see beforeAll) —
+      // pausing and *resuming* here is what let it start consuming again and
+      // race the tests that follow.
       const statsBefore = await getQueueStats();
       const beforeWaiting = statsBefore.waiting;
 
@@ -1449,7 +1501,6 @@ describe('Runtime Tests', () => {
 
       // Clean up
       await job.remove();
-      await aiGenerationWorker.resume();
     });
   });
 });
@@ -1550,9 +1601,7 @@ describe('Integration Tests', () => {
       return;
     }
 
-    // Pause worker
-    await aiGenerationWorker.pause();
-
+    // Worker stays paused for the whole file — see beforeAll.
     const jobs = [];
     const jobCount = 5;
 
@@ -1585,9 +1634,6 @@ describe('Integration Tests', () => {
     for (const job of jobs) {
       await job.remove();
     }
-
-    // Resume worker
-    await aiGenerationWorker.resume();
   });
 });
 

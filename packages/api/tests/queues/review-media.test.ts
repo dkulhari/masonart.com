@@ -76,6 +76,9 @@ vi.mock('bullmq', () => ({
 vi.mock('../../src/lib/redis', () => ({
   redis: { __fake: 'shared-redis' },
   createRedisConnection: () => ({ __fake: 'worker-redis' }),
+  // Production default. This suite mocks BullMQ itself, so the prefix is only
+  // ever read into the recorded options — see BULLMQ_PREFIX (#656).
+  BULLMQ_PREFIX: 'bull',
 }))
 
 vi.mock('../../src/database', () => ({
