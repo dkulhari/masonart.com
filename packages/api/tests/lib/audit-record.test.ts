@@ -38,6 +38,8 @@ vi.mock('../../src/lib/logger', () => ({
   createChildLogger: vi.fn(),
 }));
 
+import { adminAuditLog } from '../../src/database/schema/audit-log';
+
 const { recordAudit } = await import('../../src/lib/audit');
 
 /** Minimal stand-in for the Hono context recordAudit reads. */
@@ -364,6 +366,208 @@ describe('recordAudit — the vendor a row was written for', () => {
     expect(alertCritical).toHaveBeenCalled();
     // Claimed BEFORE the insert: a failed insert must not let the middleware
     // write a misleading floor row in its place. A missing row beats a lie.
+    expect((c as unknown as { get: (k: string) => unknown }).get('audited')).toBe(true);
+  });
+});
+
+
+/**
+ * A shared transaction shares its failures — #679 follow-up.
+ *
+ * The `tx` parameter documented on `recordAudit` made "never throws" load-bearing
+ * in a place it cannot hold. In Postgres a failed statement aborts the WHOLE
+ * transaction: swallowing the error lets the caller's callback return cleanly,
+ * drizzle issue a COMMIT, and Postgres execute that COMMIT as a ROLLBACK —
+ * quietly. The business write is gone, the handler answers 200, and the alert
+ * says "the action itself succeeded", which is the one thing that did not happen.
+ *
+ * So the two paths are genuinely different failures and are reported as such.
+ */
+describe('recordAudit — a failure inside a shared transaction', () => {
+  /** A table that is not the audit table; only its identity matters here. */
+  const productionJobs = { _name: 'production_jobs' } as unknown;
+
+  /**
+   * Postgres's real transaction semantics, which are the whole reason the
+   * shared-`tx` path cannot swallow:
+   *
+   * - a failed statement poisons the transaction;
+   * - every later statement in it fails;
+   * - the COMMIT drizzle issues when the callback returns is executed as a
+   *   ROLLBACK, raising nothing.
+   *
+   * Which means a callback that returns normally is NOT evidence that anything
+   * committed. That is what these tests assert against: `durable`, not "did the
+   * function throw".
+   */
+  function transactionHarness() {
+    const durable: Array<{ table: unknown; row: Record<string, unknown> }> = [];
+    let staged: Array<{ table: unknown; row: Record<string, unknown> }> = [];
+    let poisoned = false;
+    let auditInsertFails = false;
+
+    const tx = {
+      insert: vi.fn((table: unknown) => ({
+        values: async (row: Record<string, unknown>) => {
+          if (poisoned) {
+            throw new Error(
+              'current transaction is aborted, commands ignored until end of transaction block'
+            );
+          }
+          if (table === adminAuditLog && auditInsertFails) {
+            // What the append-only trigger raises (0021_admin_audit_log.sql),
+            // and what a NOT NULL raises: an error from INSIDE the transaction.
+            poisoned = true;
+            throw new Error('admin_audit_log is append-only: UPDATE is not permitted');
+          }
+          staged.push({ table, row });
+        },
+      })),
+    };
+
+    return {
+      tx,
+      durable,
+      failTheAuditInsert() {
+        auditInsertFails = true;
+      },
+      /** Stand-in for `db.transaction(cb)`. */
+      async run(cb: (handle: typeof tx) => Promise<void>) {
+        try {
+          await cb(tx);
+        } catch (error) {
+          staged = []; // ROLLBACK
+          throw error;
+        }
+        // drizzle issues COMMIT here. Postgres silently downgrades it to a
+        // ROLLBACK when the transaction is poisoned — no error, no signal.
+        if (poisoned) {
+          staged = [];
+          return;
+        }
+        durable.push(...staged);
+        staged = [];
+      },
+    };
+  }
+
+  const vendorContext = () =>
+    contextStub({
+      user: { id: 'vu1', email: 'printer@shop.example', role: 'vendor' },
+      vendorId: 'vendor_9',
+      method: 'POST',
+      path: '/api/vendor/jobs/j1/transition',
+    });
+
+  const transition = {
+    action: 'production_job.transitioned',
+    entityType: 'production_job',
+    entityId: 'j1',
+  } as const;
+
+  /**
+   * The control. Without it, "durable is empty" would prove nothing, because a
+   * harness that never commits anything would satisfy every assertion below.
+   */
+  it('commits the business write and the row together when the insert succeeds', async () => {
+    const h = transactionHarness();
+
+    await h.run(async (tx) => {
+      await tx.insert(productionJobs).values({ id: 'j1', status: 'qc_passed' });
+      await recordAudit(vendorContext(), transition, tx as never);
+    });
+
+    expect(h.durable).toHaveLength(2);
+    expect(h.durable[0]?.row).toMatchObject({ status: 'qc_passed' });
+    expect(h.durable[1]?.row).toMatchObject({ action: 'production_job.transitioned' });
+  });
+
+  it('rethrows, so the caller learns its transaction is doomed', async () => {
+    const h = transactionHarness();
+    h.failTheAuditInsert();
+
+    await expect(
+      h.run(async (tx) => {
+        await tx.insert(productionJobs).values({ id: 'j1', status: 'qc_passed' });
+        await recordAudit(vendorContext(), transition, tx as never);
+      })
+    ).rejects.toThrow(/append-only/);
+
+    // The load-bearing half: the job move is NOT durable. It was never durable
+    // — that was true before the fix too. What changed is that the caller is
+    // now told, instead of returning 200 over a write Postgres threw away.
+    expect(h.durable).toHaveLength(0);
+  });
+
+  it('is swallowed instead when the row is written independently', async () => {
+    insertValues.mockRejectedValueOnce(new Error('deadlock detected'));
+
+    // No `tx`: the business write already committed in its own transaction and
+    // there is nothing left for a throw to protect. Unchanged behaviour.
+    await expect(
+      recordAudit(vendorContext(), {
+        action: 'production_job.transition_refused',
+        entityType: 'production_job',
+        entityId: 'j1',
+        outcome: 'failure',
+      })
+    ).resolves.toBeUndefined();
+
+    expect(logError).toHaveBeenCalled();
+    expect(alertCritical).toHaveBeenCalled();
+  });
+
+  it('alerts differently on each path, and neither claims a success it did not have', async () => {
+    // Independent: the action really did already succeed.
+    insertValues.mockRejectedValueOnce(new Error('deadlock detected'));
+    await recordAudit(contextStub({ user: { id: 'u1', email: 'a@b.c', role: 'admin' } }), {
+      action: 'return.refund_processed',
+      entityType: 'return',
+      entityId: 'r1',
+    });
+    const independent = alertCritical.mock.calls.at(-1) as [string, string, unknown];
+
+    // Shared: the action did not.
+    const h = transactionHarness();
+    h.failTheAuditInsert();
+    await expect(
+      h.run(async (tx) => {
+        await tx.insert(productionJobs).values({ id: 'j1', status: 'qc_passed' });
+        await recordAudit(vendorContext(), transition, tx as never);
+      })
+    ).rejects.toThrow();
+    const shared = alertCritical.mock.calls.at(-1) as [string, string, unknown];
+
+    expect(shared[0]).not.toBe(independent[0]);
+    expect(shared[1]).not.toBe(independent[1]);
+
+    // The independent alert may say the action succeeded, because it did.
+    expect(independent[1]).toMatch(/the action itself succeeded/);
+
+    // The shared alert may not. Telling whoever is paged that the action
+    // survived, when the action is precisely what was lost, sends them looking
+    // for a missing audit row instead of a missing job transition.
+    expect(shared[1]).not.toMatch(/succe/i);
+    expect(shared[1]).toMatch(/did NOT take effect/);
+  });
+
+  /**
+   * Claimed BEFORE the insert on this path too. The handler will now fail, and
+   * `middleware/audit.ts` runs its floor in a `finally` — without the flag it
+   * would write a coarse `vendor.request` row for a transition that never
+   * happened. A missing row beats a misleading one.
+   */
+  it('still claims the request before the insert it is about to fail', async () => {
+    const h = transactionHarness();
+    h.failTheAuditInsert();
+    const c = vendorContext();
+
+    await expect(
+      h.run(async (tx) => {
+        await recordAudit(c, transition, tx as never);
+      })
+    ).rejects.toThrow();
+
     expect((c as unknown as { get: (k: string) => unknown }).get('audited')).toBe(true);
   });
 });

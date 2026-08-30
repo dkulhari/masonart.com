@@ -196,12 +196,27 @@ type AuditWriter = { insert: typeof db.insert };
 /**
  * Record one audited action.
  *
- * ## Never throws
+ * ## Never throws — except back into a transaction it was handed
  *
  * A refund that already moved money must not be rolled back because an INSERT
  * into the audit table deadlocked. Failures are logged with the request id and
  * escalated through `alertCritical` — a silently-dropped audit row is worse than
  * a loud one, because the gap is invisible at exactly the moment it matters.
+ *
+ * That contract is only coherent for an INDEPENDENT write, where the business
+ * write has already committed and the trail is the only thing left to lose. It
+ * cannot hold when `tx` is supplied. In Postgres a failed statement aborts the
+ * WHOLE transaction, so by the time this catch runs the caller's write is
+ * already doomed: returning normally lets the callback finish, drizzle issue a
+ * COMMIT, and Postgres execute that COMMIT as a ROLLBACK — silently, with no
+ * error anywhere and a 200 on the wire over a business write that never
+ * happened. So a shared-`tx` failure is logged, alerted as its own distinct
+ * thing, and RETHROWN. Only the caller owns that transaction and only the
+ * caller can decide what to do about it.
+ *
+ * This scopes "never throws" rather than contradicting it: swallowing protects
+ * a committed action from its own audit row, and there is no committed action
+ * to protect once the audit row and the action share a fate.
  *
  * ## Claims the request
  *
@@ -240,6 +255,11 @@ type AuditWriter = { insert: typeof db.insert };
  *
  * Rule of thumb: `tx` when the row asserts something the transaction must make
  * true; no `tx` when the row asserts something about the transaction itself.
+ *
+ * Sharing the transaction also means sharing its failures: a `tx` write that
+ * fails throws out of here, and the caller must let it abort the transaction
+ * rather than catching it to "keep going". Catching it would recreate exactly
+ * the silent rollback described above.
  */
 export async function recordAudit(
   c: AuditContext,
@@ -288,7 +308,7 @@ export async function recordAudit(
       userAgent: c.req.header("user-agent") ?? null,
     });
   } catch (error) {
-    // Loud, but not fatal. The business action already happened.
+    // Loud on both paths. Fatal on only one of them.
     logger.error(
       {
         err: error,
@@ -298,15 +318,38 @@ export async function recordAudit(
         entityId: entry.entityId,
         actorUserId: user?.id ?? null,
         vendorId,
+        // Which of the two failures this is, without reading the message.
+        sharedTransaction: tx !== undefined,
       },
-      "audit write failed"
+      tx ? "audit write failed inside the caller's transaction" : "audit write failed"
     );
+
+    const subject = `${entry.action} on ${entry.entityType ?? "unknown"} ${
+      entry.entityId ?? ""
+    }`.trim();
+
+    if (tx) {
+      // This insert did not fail on its own: it aborted the CALLER'S
+      // transaction. Every later statement in it will fail and the COMMIT
+      // drizzle issues when the callback returns is executed by Postgres as a
+      // ROLLBACK. Swallowing here would hand the handler a clean return over a
+      // business write that never landed — a 200 for nothing, and an alert
+      // saying the action succeeded when it is precisely what was lost.
+      alertCritical(
+        "Audit write failed inside a shared transaction",
+        `Could not record ${subject}. The row shared the caller's transaction, ` +
+          `so that transaction is aborted and the action did NOT take effect. ` +
+          `Rethrowing, so the caller sees the failure instead of a silent rollback.`,
+        { action: entry.action, requestId: requestId ?? "unknown" }
+      );
+
+      throw error;
+    }
 
     alertCritical(
       "Audit write failed",
-      `Could not record ${entry.action} on ${entry.entityType ?? "unknown"} ${
-        entry.entityId ?? ""
-      }. The action itself succeeded; the trail did not.`,
+      `Could not record ${subject}. This row was written independently of the ` +
+        `action, so the action itself succeeded; only the trail did not.`,
       { action: entry.action, requestId: requestId ?? "unknown" }
     );
   }
