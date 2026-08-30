@@ -74,6 +74,9 @@
  * @see packages/api/src/lib/vendor-scope.ts
  */
 
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -304,6 +307,16 @@ const qcKey = (jobId: string, slot = 'print_full') =>
 
 const PAST = new Date('2026-01-01T00:00:00Z')
 
+/**
+ * The carrier label's random token, and the key it becomes.
+ *
+ * Hoisted out of Property 4 because the route table needs the same value: the
+ * label route's row fixture IS the token — `getVendorJobLabelKey` selects one
+ * column and nothing else — and Property 3 reads back the key the route signed.
+ */
+const LABEL_TOKEN = '9f3c1b7a5e2d4c8b1f0a6d3e7c2b8a45'
+const LABEL_KEY = `fulfilment/labels/${LABEL_TOKEN}.pdf`
+
 function sessionFor(role: string, id = 'vendor-b-user') {
   const now = new Date()
   return {
@@ -523,6 +536,20 @@ const ROUTE_TABLE: RouteCase[] = [
     theirs: () => [`/api/vendor/jobs/${A_JOB_ID}/artwork/${A_ITEM_ID}`, undefined],
     okStatus: 200,
     scope: 'artwork',
+  },
+  {
+    pattern: '/jobs/:id/label',
+    method: 'GET',
+    mine: () => [`/api/vendor/jobs/${B_JOB_ID}/label`, undefined],
+    theirs: () => [`/api/vendor/jobs/${A_JOB_ID}/label`, undefined],
+    okStatus: 200,
+    scope: 'label',
+    rows: {
+      // `getVendorJobLabelKey` selects ONE column — the seam's token — with all
+      // three authorisation conditions in the WHERE, so the shared job fixture
+      // (a whole job row, no token on it) is not what this read returns.
+      'select:production_jobs': [[{ token: LABEL_TOKEN }]],
+    },
   },
   {
     pattern: '/jobs/:id/photos',
@@ -1174,6 +1201,25 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
 // PROPERTY 3 — every signature is short-lived, and lands in exactly one scope
 // ============================================================================
 
+/**
+ * The scope vocabulary, and the two readings of it every signing property
+ * needs. Module-level rather than inside Property 3 because Property 4 asks the
+ * same two questions of the label route — which scope did this key land in, and
+ * what did the whole surface hand a presigner — and a second private copy of
+ * the matcher is a second thing that can go quietly wrong.
+ */
+const SCOPES = Object.keys(VENDOR_SIGNING_SCOPES) as VendorSigningScope[]
+
+function scopesMatching(key: string): VendorSigningScope[] {
+  return SCOPES.filter((scope) =>
+    VENDOR_SIGNING_SCOPES[scope].some((prefix) => key.startsWith(prefix))
+  )
+}
+
+/** Every key handed to EITHER presigner — downloads and uploads alike. */
+const signedKeys = () =>
+  [...mockPresign.mock.calls, ...mockUploadPresign.mock.calls].map((call) => call[0] as string)
+
 describe('property 3: every vendor signature is short-lived and single-scoped', () => {
   const ARTWORK = ROUTE_TABLE.find((r) => r.pattern === '/jobs/:id/artwork/:itemId')!
 
@@ -1332,20 +1378,6 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
   // R3: the allow-list is the enforcement, and the scopes are disjoint
   // --------------------------------------------------------------------------
 
-  const SCOPES = Object.keys(VENDOR_SIGNING_SCOPES) as VendorSigningScope[]
-
-  function scopesMatching(key: string): VendorSigningScope[] {
-    return SCOPES.filter((scope) =>
-      VENDOR_SIGNING_SCOPES[scope].some((prefix) => key.startsWith(prefix))
-    )
-  }
-
-  /** Every key handed to EITHER presigner — downloads and uploads alike. */
-  const signedKeys = () =>
-    [...mockPresign.mock.calls, ...mockUploadPresign.mock.calls].map(
-      (call) => call[0] as string
-    )
-
   it('every key ever handed to a presigner falls in EXACTLY ONE scope', async () => {
     // Not "in some scope". Exactly one — because a key matching two scopes
     // means the prefixes overlap, and an overlap is how the label scope's
@@ -1468,15 +1500,18 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
  * below as an explicit ORDER BY, because "deterministic" is not observable in a
  * single-row fixture.
  *
- * There is no route here yet — `GET /api/vendor/jobs/:id/label` is #687 — so
- * this asserts the scoped module directly. The route-table property above will
- * pick the route up the moment it is registered.
+ * Asserted in two layers, because a green test proves nothing about the ORDER
+ * two calls happen in. The scoped module is asserted directly — one query, the
+ * three predicates, the identity-free key — and `GET /api/vendor/jobs/:id/label`
+ * is then driven end to end through the route table. The layer that ties them
+ * together is a SOURCE SCAN: a handler that signed first and threw the URL away
+ * on a `null` would pass every fixture below, because a discarded signature is
+ * invisible from the outside. It is visible in the code, so the code is what is
+ * read.
  */
 describe('property 4: the carrier label reaches only the consolidator, or is never signed', () => {
   /** Never appears in a label key. Present so the test can prove that. */
   const ORDER_ID = '55555555-5555-4555-8555-555555555555'
-  const LABEL_TOKEN = '9f3c1b7a5e2d4c8b1f0a6d3e7c2b8a45'
-  const LABEL_KEY = `fulfilment/labels/${LABEL_TOKEN}.pdf`
 
   /** The row the seam's narrow select returns: the token, and nothing else. */
   const tokenRow = (token: unknown = LABEL_TOKEN) => ({ token })
@@ -1627,6 +1662,19 @@ describe('property 4: the carrier label reaches only the consolidator, or is nev
       '..',
       '',
       '   ',
+      // The same traversal, URL-ENCODED. `objectKeyForScope` only decodes a
+      // full URL, so a raw `%2e%2e` would survive to the key — the token gate
+      // is what refuses it, one layer earlier, on the character class.
+      '%2e%2e/%2e%2e/avatars/user-9/avatar',
+      // Bucket-qualified and scheme-qualified forms, refused for the same
+      // reason: a token is one path SEGMENT and these are not.
+      'poster-app-dev/fulfilment/labels/tok',
+      's3://poster-app-dev/fulfilment/labels/tok',
+      'https://cdn.example.com/avatars/user-9/avatar',
+      // Case variants of the prefix. `startsWith` is case-SENSITIVE, so
+      // `Fulfilment/` is outside the scope; the token gate refuses the slash
+      // first, and `objectKeyForScope` would refuse the key after it.
+      'Fulfilment/labels/tok',
     ]) {
       queries.length = 0
       rowQueues.clear()
@@ -1677,5 +1725,365 @@ describe('property 4: the carrier label reaches only the consolidator, or is nev
     expect(Object.keys(got!).sort()).toEqual(['jobId', 'key'])
     expect(forbiddenKeysIn(got)).toEqual([])
     expect(JSON.stringify(got)).not.toContain(ORDER_ID)
+  })
+
+  // --------------------------------------------------------------------------
+  // The route: GET /api/vendor/jobs/:id/label
+  // --------------------------------------------------------------------------
+
+  describe('the route hands over bytes behind a signature, and only to the consolidator', () => {
+    const LABEL = ROUTE_TABLE.find((r) => r.pattern === '/jobs/:id/label')!
+    const ARTWORK = ROUTE_TABLE.find((r) => r.pattern === '/jobs/:id/artwork/:itemId')!
+
+    /**
+     * A customer, planted where a customer actually lives: the shipment row the
+     * label token is read from. `order_shipments` sits beside the address the
+     * carrier printed, and the recording db returns whatever a fixture queues —
+     * so this is the shape of the leak that would happen if the seam's select
+     * ever widened from one column to the row.
+     */
+    const PLANTED_ROW = {
+      token: LABEL_TOKEN,
+      customerName: 'Asha Menon',
+      shippingAddress: '221B Nehru Place, New Delhi 110019',
+      phone: '+919812345678',
+      email: 'asha.menon@example.com',
+      orderId: ORDER_ID,
+    }
+
+    it('answers { jobId, url, expiresInSeconds, expiresAt } and nothing else', async () => {
+      seedFor(LABEL)
+      const [path, init] = LABEL.mine()
+      const { res, body } = await run(path, init)
+
+      expect(res.status).toBe(200)
+      expect(Object.keys(body).sort()).toEqual([
+        'expiresAt',
+        'expiresInSeconds',
+        'jobId',
+        'url',
+      ])
+      expect(body.jobId).toBe(B_JOB_ID)
+      expect(body.url).toBe(SIGNED_URL)
+
+      // R1, on the one route that exists to move customer data. The PII is
+      // inside the PDF the vendor will fetch; not one field of it is here.
+      expect(forbiddenKeysIn(body).sort()).toEqual([])
+      // The key itself never leaves either — only the signature over it.
+      expect(JSON.stringify(body)).not.toContain(LABEL_KEY)
+    })
+
+    it('signs the LABEL key, through the label scope, and signs it once', async () => {
+      seedFor(LABEL)
+      const [path, init] = LABEL.mine()
+      await run(path, init)
+
+      expect(mockPresign).toHaveBeenCalledTimes(1)
+      expect(mockPresign.mock.calls[0][0]).toBe(LABEL_KEY)
+      expect(scopesMatching(LABEL_KEY)).toEqual(['label'])
+      // A permanent public path to a customer's address would be the whole
+      // incident in one line.
+      expect(mockPublicUrl).not.toHaveBeenCalled()
+      expect(mockUploadPresign).not.toHaveBeenCalled()
+    })
+
+    it('expires in 300 seconds — the SAME number as artwork, not a second one', async () => {
+      seedFor(LABEL)
+      const [labelPath, labelInit] = LABEL.mine()
+      const { body } = await run(labelPath, labelInit)
+      const labelTtl = mockPresign.mock.calls[0][1] as number
+
+      expect(labelTtl).toBe(300)
+      expect(body.expiresInSeconds).toBe(labelTtl)
+      // `expiresAt` is the same fact in the other unit, so a client cannot read
+      // the two and disagree with itself.
+      expect(
+        Math.abs(Date.parse(body.expiresAt) - (Date.now() + labelTtl * 1000))
+      ).toBeLessThan(5_000)
+
+      // One number, not three that drift. Property 3's "expires in minutes, not
+      // days" extends over this route unchanged because the TTL is artwork's.
+      queries.length = 0
+      rowQueues.clear()
+      mockPresign.mockClear()
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      seedFor(ARTWORK)
+      const [artPath, artInit] = ARTWORK.mine()
+      await run(artPath, artInit)
+      expect(mockPresign.mock.calls[0][1]).toBe(labelTtl)
+    })
+
+    it('a NON-CONSOLIDATOR gets 404 and the presigner is NEVER CALLED', async () => {
+      // The consolidator predicate lives in the WHERE, so the row does not come
+      // back at all. Nothing downstream of the read ever runs.
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      queueRows({ 'select:production_jobs': [[]] })
+
+      const [path, init] = LABEL.mine()
+      const { res, body } = await run(path, init)
+
+      expect(res.status).toBe(404)
+      // Not "the response was a 404". A signed URL that is generated and then
+      // withheld has still been generated, and lives in whatever log, trace or
+      // crash dump saw it.
+      expect(
+        mockPresign,
+        'a carrier label was signed for a vendor who is not the consolidator'
+      ).not.toHaveBeenCalled()
+      expect(mockPublicUrl).not.toHaveBeenCalled()
+      // And no row claims a label was issued.
+      expect(queries.filter((q) => q.op !== 'select')).toEqual([])
+      expect(JSON.stringify(body)).not.toContain(LABEL_TOKEN)
+    })
+
+    it("asks for another vendor's job with BOTH vendor predicates bound to the caller", async () => {
+      // The recording db is blind to the WHERE — it answers whatever a fixture
+      // queued — so "queue A's token and watch the route refuse it" would be a
+      // test of the mock, not of the code, and would go green on a route with
+      // no scoping at all. What IS observable is the predicate the route sends,
+      // and it is the predicate that makes the empty result real in Postgres.
+      // The 404 half is Property 1's `theirs` case, on an empty read.
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      queueRows({ 'select:production_jobs': [[]] })
+
+      const [path, init] = LABEL.theirs!()
+      const { res } = await run(path, init)
+
+      expect(res.status).toBe(404)
+      expect(mockPresign).not.toHaveBeenCalled()
+
+      const read = queries.find((q) => q.op === 'select' && q.table === 'production_jobs')!
+      const where = sqlText(read.where)
+      // TWO different columns, both compared to the caller. `params` cannot tell
+      // them apart — they bind the same uuid — so the columns are read off the
+      // rendered SQL: the job is theirs, AND they are the consolidator.
+      expect(where, 'the job is not scoped to this vendor').toContain(
+        '"production_jobs"."vendor_id"'
+      )
+      expect(where, 'the consolidator is not checked at all').toContain(
+        '"order_consolidation"."vendor_id"'
+      )
+      expect(params(read.where)).toContain(VENDOR_B)
+      expect(params(read.where)).toContain(A_JOB_ID)
+      expect(params(read.where)).not.toContain(VENDOR_A)
+    })
+
+    it('a customer planted in the shipment row reaches NO JSON', async () => {
+      seedFor(LABEL)
+      queueRows({ 'select:production_jobs': [[PLANTED_ROW]] })
+
+      const [path, init] = LABEL.mine()
+      const { res, body } = await run(path, init)
+
+      expect(res.status).toBe(200)
+      expect(forbiddenKeysIn(body).sort()).toEqual([])
+      const serialised = JSON.stringify(body)
+      for (const secret of [
+        PLANTED_ROW.customerName,
+        PLANTED_ROW.shippingAddress,
+        PLANTED_ROW.phone,
+        PLANTED_ROW.email,
+        PLANTED_ROW.orderId,
+      ]) {
+        expect(serialised, `the label body echoed ${secret}`).not.toContain(secret)
+      }
+
+      // The audit row is JSON too, written on the same request, and it is the
+      // other place a row could be copied wholesale into.
+      const audit = queries.find((q) => q.op === 'insert' && q.table === 'admin_audit_log')
+      expect(audit, 'the label was issued without an audit row').toBeDefined()
+      const auditText = JSON.stringify(audit?.values ?? {})
+      for (const secret of [
+        PLANTED_ROW.customerName,
+        PLANTED_ROW.shippingAddress,
+        PLANTED_ROW.phone,
+        PLANTED_ROW.email,
+        PLANTED_ROW.orderId,
+      ]) {
+        expect(auditText, `the audit row recorded ${secret}`).not.toContain(secret)
+      }
+    })
+
+    it('the plant is one the walker WOULD catch — this property is not vacuous', () => {
+      // Without this, "the planted name reached no JSON" and "the plant was
+      // never in the fixture" produce identical green. Four reviews of this
+      // feature have found tests that could not fail.
+      expect(forbiddenKeysIn(PLANTED_ROW).sort()).toEqual([
+        'customername',
+        'email',
+        'orderid',
+        'phone',
+        'shippingaddress',
+      ])
+      expect(JSON.stringify(PLANTED_ROW)).toContain('Asha Menon')
+    })
+
+    it('records production_job.label_issued on success, for this vendor', async () => {
+      seedFor(LABEL)
+      const [path, init] = LABEL.mine()
+      await run(path, init)
+
+      const audit = queries.find((q) => q.op === 'insert' && q.table === 'admin_audit_log')
+      expect(audit, 'no audit row for a customer document leaving the building').toBeDefined()
+      const values = audit!.values as Record<string, unknown>
+      expect(values.action).toBe('production_job.label_issued')
+      expect(values.entityType).toBe('production_job')
+      expect(values.entityId).toBe(B_JOB_ID)
+      expect(values.outcome).toBe('success')
+      // §8's property: every audit row written under /api/vendor/* names the
+      // shop it was written for.
+      expect((values.metadata as Record<string, unknown>).vendorId).toBe(VENDOR_B)
+    })
+
+    it('claims no disclosure when the signature never happened', async () => {
+      // The row says a customer's name and address left the building. If the
+      // presigner throws, nothing left it, and a row saying otherwise is worse
+      // than no row — it is the shape an auditor would trust.
+      seedFor(LABEL)
+      mockPresign.mockRejectedValueOnce(new Error('R2 unreachable'))
+
+      const [path, init] = LABEL.mine()
+      const { res, body } = await run(path, init)
+
+      expect(res.status).toBe(500)
+      expect(
+        queries.filter((q) => q.op === 'insert' && q.table === 'admin_audit_log'),
+        'a label_issued row survived a label that was never issued'
+      ).toEqual([])
+      // And the failure says nothing about the customer either.
+      expect(forbiddenKeysIn(body).sort()).toEqual([])
+      expect(JSON.stringify(body)).not.toContain(LABEL_TOKEN)
+    })
+
+    it('is the ONLY door to the label scope on the whole vendor surface', async () => {
+      // The narrow exception R2 grants is only as narrow as the number of
+      // routes that can produce a key inside it. Asserted over every route in
+      // the table, so a second door added later fails here rather than being
+      // reviewed for.
+      for (const route of ROUTE_TABLE) {
+        queries.length = 0
+        rowQueues.clear()
+        mockPresign.mockClear()
+        mockUploadPresign.mockClear()
+        queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+        seedFor(route)
+
+        const [path, init] = route.mine()
+        await run(path, init)
+
+        const labelKeys = signedKeys().filter((k) => scopesMatching(k).includes('label'))
+        if (route === LABEL) {
+          expect(labelKeys, 'the label route signed no label').toEqual([LABEL_KEY])
+        } else {
+          expect(
+            labelKeys,
+            `${label(route)} signed a carrier label — the exception is now a hole`
+          ).toEqual([])
+        }
+      }
+    })
+
+    // ------------------------------------------------------------------------
+    // The ordering, read off the CODE
+    // ------------------------------------------------------------------------
+
+    /**
+     * `routes/vendor.ts`, comments removed so a scan judges CODE and not prose.
+     *
+     * Every fixture above is blind to the one failure that matters most: a
+     * handler that signs the URL, then discovers the caller is not the
+     * consolidator and returns 404 anyway, answers exactly what these tests
+     * expect while the signature it discarded already exists. `mockPresign` is
+     * only ever called on the paths a fixture can reach, and the dangerous path
+     * is one where the answer looks identical. So the order is asserted where it
+     * is actually decided.
+     */
+    const VENDOR_SOURCE = readFileSync(
+      resolve(__dirname, '../../../src/routes/vendor.ts'),
+      'utf8'
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+
+    /** The label handler alone: from its path literal to the next registration. */
+    const LABEL_HANDLER = (() => {
+      const at = VENDOR_SOURCE.indexOf('"/jobs/:id/label"')
+      if (at === -1) return ''
+      const rest = VENDOR_SOURCE.slice(at)
+      const next = rest.indexOf('vendorApp.', 1)
+      return next === -1 ? rest : rest.slice(0, next)
+    })()
+
+    const firstIndexOf = (needle: string) => LABEL_HANDLER.indexOf(needle)
+
+    it('AUTHORISES BEFORE IT SIGNS — in the code, not only in the fixture', () => {
+      expect(LABEL_HANDLER, 'no /jobs/:id/label handler found to scan').not.toBe('')
+
+      const authorised = firstIndexOf('getVendorJobLabelKey')
+      const refused = firstIndexOf('404')
+      const signed = firstIndexOf('getPresignedDownloadUrl')
+
+      // Each is present at all — a scan over the wrong slice would report -1
+      // for everything and pass every ordering comparison it made.
+      expect(authorised, 'the handler never calls the scoped module').toBeGreaterThan(-1)
+      expect(refused, 'the handler has no 404 path').toBeGreaterThan(-1)
+      expect(signed, 'the handler never signs anything').toBeGreaterThan(-1)
+
+      expect(authorised, 'the handler signs before it authorises').toBeLessThan(signed)
+      expect(refused, 'the 404 is returned after the URL was already signed').toBeLessThan(
+        signed
+      )
+    })
+
+    it('audits AFTER the signature exists, and shares no transaction', () => {
+      const signed = firstIndexOf('getPresignedDownloadUrl')
+      const audited = firstIndexOf('recordAudit')
+
+      expect(audited, 'the label issue is not audited at all').toBeGreaterThan(-1)
+      // "On first success" means after the URL is real. A row written before the
+      // presigner claims a label was issued that a throw would then unissue.
+      expect(audited, 'the audit row is written before the URL exists').toBeGreaterThan(signed)
+      // No transaction exists on this path — §8's rule — so none is invented,
+      // and `recordAudit` therefore cannot rethrow into a handler that has
+      // already handed the vendor a working URL.
+      expect(LABEL_HANDLER, 'the label handler invented a transaction').not.toMatch(/\btx\b/)
+      expect(LABEL_HANDLER).not.toContain('transaction')
+    })
+
+    it('the ordering comparator can actually fail — this property is not vacuous', () => {
+      // The two assertions above are `<` over indexes into a string. If the
+      // slice were empty both sides would be -1 and every comparison would be
+      // trivially satisfied, which is the exact shape of a test that cannot go
+      // red. So the comparator is shown deciding both ways.
+      const signsFirst = 'const url = await getPresignedDownloadUrl(k); const r = await getVendorJobLabelKey(v);'
+      expect(signsFirst.indexOf('getVendorJobLabelKey')).toBeGreaterThan(
+        signsFirst.indexOf('getPresignedDownloadUrl')
+      )
+      expect(LABEL_HANDLER.indexOf('getVendorJobLabelKey')).toBeLessThan(
+        LABEL_HANDLER.indexOf('getPresignedDownloadUrl')
+      )
+    })
+
+    it('reaches no table outside the vocabulary Property 1 examines', async () => {
+      // Property 1 is an ALLOW-LIST, and an allow-list fails SILENTLY: a table
+      // nobody listed is not judged unscoped, it is not examined at all. That
+      // silence has been found five times on this boundary — most recently
+      // `orders`, which sat unexamined for two tickets. So the label route's
+      // tables are enumerated here rather than assumed.
+      seedFor(LABEL)
+      const [path, init] = LABEL.mine()
+      await run(path, init)
+
+      const read = queries.find((q) => q.op === 'select' && q.table === 'production_jobs')!
+      expect([read.table, ...read.joins].sort()).toEqual([
+        'order_consolidation',
+        'order_shipments',
+        'production_jobs',
+      ])
+      // Every one of them is in SCOPED_TABLES, so the assertion below is a
+      // judgement rather than a shrug.
+      expect([read.table, ...read.joins].filter((t) => !SCOPED_TABLES.includes(t!))).toEqual([])
+      expect(unscopedReads(queries, VENDOR_B), 'the label read is not vendor-scoped').toEqual([])
+    })
   })
 })

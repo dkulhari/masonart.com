@@ -387,9 +387,15 @@ export async function getVendorJobArtwork(
  * Written as a SQL fragment rather than a drizzle column for exactly that
  * reason — inventing the column in `schema/shipping.ts` would put this feature's
  * name on another sub-project's table and produce a migration nobody owns.
- * Until that column lands, this query throws; nothing calls it yet (the route is
- * #687), and throwing is the correct failure for a missing seam. Replace this
- * fragment with `orderShipments.labelObjectToken` the day it exists.
+ * Until that column lands, this query throws. `GET /api/vendor/jobs/:id/label`
+ * calls it as of #687 and turns that throw into a 500 — deliberately, and NOT
+ * into a 404: "the label is not ready" and "the column this feature reads does
+ * not exist" are different facts, and answering the second with the first would
+ * make a missing seam look like an ordinary empty state for as long as nobody
+ * checked. What must never happen is a FALLBACK — substituting the order id, or
+ * any other handle that names a person, would put it in the path of a signed
+ * URL where no assertion about JSON keys can see it. Replace this fragment with
+ * `orderShipments.labelObjectToken` the day it exists.
  *
  * A random token, following the `production_approvals.approval_token`
  * precedent, and NOT the order id. See `getVendorJobLabelKey`.

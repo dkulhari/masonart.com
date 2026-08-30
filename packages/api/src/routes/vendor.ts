@@ -5,6 +5,7 @@
  * - GET    /api/vendor/jobs/:id   one job, its items and its QC history
  * - PATCH  /api/vendor/jobs/:id   the transition a vendor may take
  * - GET    /api/vendor/jobs/:id/artwork/:itemId   a short-lived signed download
+ * - GET    /api/vendor/jobs/:id/label             the carrier PDF, signed
  * - GET    /api/vendor/jobs/:id/photos            my shot list, signed
  * - POST   /api/vendor/jobs/:id/photos/presign    authorise a direct-to-R2 PUT
  * - POST   /api/vendor/jobs/:id/photos/complete   record what landed
@@ -80,12 +81,27 @@
  *    `cost_amount` has no field in either direction — we pay the leg because we
  *    chose the routing.
  *
- * Zero customer data crosses this boundary — no name, address, phone, email or
- * person-linked order reference. Every response here is built from the scoped
- * module's explicit column lists, which is what makes that an absolute rather
- * than a habit. The one document that will ever carry customer data is the
- * carrier label (#687), and it arrives as rendered bytes behind a signature,
- * never as fields.
+ * 6. **The carrier label is the ONE exception, and it is not an exception to
+ *    R1.** Vendors despatch directly now, so the label the courier honours
+ *    carries the customer's name, address and phone — there is no version of
+ *    this feature where a vendor never touches that. What is still absolute is
+ *    HOW: rendered bytes behind a five-minute signature, handed to the operating
+ *    system, never as fields and never composed here. `GET /jobs/:id/label`
+ *    answers `{ jobId, url, expiresInSeconds, expiresAt }` and the customer is
+ *    inside the PDF, never beside it. `getVendorJobLabelKey` puts all three
+ *    authorisation conditions in ONE WHERE — the job is theirs, they are the
+ *    order's consolidator, a label exists — so a vendor who holds a job on the
+ *    order but is not despatching it gets `null`, a 404, AND NO SIGNATURE. The
+ *    ordering is the requirement, not the status code: a signed URL that is
+ *    generated and then withheld has still been generated, and lives in
+ *    whatever log, trace or crash dump saw it.
+ *
+ * Zero customer data crosses this boundary AS DATA — no name, address, phone,
+ * email or person-linked order reference in any response body. Every response
+ * here is built from the scoped module's explicit column lists, which is what
+ * makes that an absolute rather than a habit. The one document that carries
+ * customer data is the carrier label, and it arrives as rendered bytes behind a
+ * signature, never as fields.
  *
  * `tests/routes/vendor/isolation.test.ts` asserts all of that as PROPERTIES
  * over a route table rather than per handler, so a route added below without a
@@ -119,6 +135,7 @@ import {
   listVendorSettlements,
   getVendorPayableTotal,
   getVendorJobArtwork,
+  getVendorJobLabelKey,
   listVendorJobPhotos,
   assertVendorMayUploadQcPhoto,
   recordVendorQcPhoto,
@@ -160,6 +177,18 @@ const ARTWORK_URL_TTL_SECONDS = 300;
  * is one number rather than three that drift.
  */
 const QC_PHOTO_URL_TTL_SECONDS = 300;
+
+/**
+ * How long a CARRIER LABEL link lives. Five minutes — artwork's number, chosen
+ * because it is artwork's number and not because a label deserves its own.
+ *
+ * This is the one URL on this boundary that resolves to a customer's name,
+ * address and phone. Every argument for keeping the artwork link short applies
+ * here with more force, and none for lengthening it survives contact with what
+ * is inside the PDF: a vendor clicks it and prints; nobody needs it an hour
+ * later, and by then it is a dead link rather than an open one.
+ */
+const LABEL_URL_TTL_SECONDS = 300;
 
 /**
  * How long the UPLOAD signature lives. Fifteen minutes, matching
@@ -416,6 +445,114 @@ vendorApp.get(
     }
   }
 );
+
+// ============================================================================
+// GET /api/vendor/jobs/:id/label
+// ============================================================================
+
+/**
+ * The carrier's shipping label, as bytes, for the vendor despatching the order.
+ *
+ * ## Why this route is allowed to exist at all
+ *
+ * `lib/vendor-scope.ts` used to state an absolute — no return value on this
+ * boundary contains customer data — and it was assertable for exactly one
+ * reason: dispatch was in-house. That premise is dead. The courier collects from
+ * the vendor's own facility now, so the label they hand over necessarily carries
+ * the customer's name, address and phone. What replaced the absolute is not a
+ * softer version of it but three clauses a machine checks:
+ *
+ * - **R1 — the JSON stays clean, absolutely.** The body below is `{ jobId, url,
+ *   expiresInSeconds, expiresAt }`. No name, no address, no phone, no email, no
+ *   order reference, at any depth. R1 took NO exception when dispatch moved out
+ *   of house, and this route does not ask for one: the customer is inside the
+ *   PDF the vendor fetches, never in a field beside it.
+ * - **R2 — customer data reaches a vendor only as opaque rendered bytes, behind
+ *   a short-lived signature**, and only by handing that file to the operating
+ *   system. Never composed by us, never rendered into the portal's own DOM.
+ * - **R3 — the allow-list is the enforcement.** The key resolves through the
+ *   `label` scope of `VENDOR_SIGNING_SCOPES` and no other; a `products/…` or
+ *   `production-qc/…` key cannot arrive here, and a label key cannot be signed
+ *   by the artwork route — which performs no consolidator check.
+ *
+ * ## The order of the two calls IS the security property
+ *
+ * `getVendorJobLabelKey` runs FIRST and answers `null` unless all three
+ * conditions hold, which it puts in one WHERE rather than in three branches:
+ * the job is this vendor's, the order's consolidator is this vendor, and a label
+ * token exists. Only the consolidator, because only they hold the parcel —
+ * everyone else on the order shipped their piece onward by transfer and has no
+ * business with the customer's address.
+ *
+ * A miss ends the request at the 404 below, BEFORE `getPresignedDownloadUrl` is
+ * reached. That is the requirement, not the status code. A signed URL that is
+ * generated and then withheld has still been generated, and lives in whatever
+ * log, trace, metric or crash dump saw it; checking authorisation after signing
+ * gives the same answer on the happy path and the wrong one every other time.
+ *
+ * ## The key never leaves, and never named a person in the first place
+ *
+ * The response carries the signature and its expiry — no key, no public path, no
+ * order reference. And the key it signs is `fulfilment/labels/<random token>.pdf`,
+ * identity-free BY CONSTRUCTION rather than by filtering: an order id in a URL
+ * path is a stable person-linked handle living in the one place an assertion
+ * about JSON *keys* can never reach, since the object key rides in the path of
+ * the signed URL as a value.
+ *
+ * ## The audit row
+ *
+ * `production_job.label_issued`, written on SUCCESS — after the URL exists, so
+ * no row ever claims a disclosure a throw then unmade — and with NO `tx`,
+ * because no transaction exists on this path and inventing one would give
+ * `recordAudit` something to rethrow into a handler that has already produced a
+ * working signature. The row records that a customer document crossed to a
+ * vendor; `recordAudit` adds the actor and the `vendorId` itself.
+ */
+vendorApp.get("/jobs/:id/label", zValidator("param", jobParamSchema), async (c) => {
+  const vendorId = c.get("vendorId");
+  const { id } = c.req.valid("param");
+
+  try {
+    // FIRST, and the whole point. Covers all of: no such job, not your job, you
+    // are not the consolidator, no label bought yet. None of them is worth
+    // distinguishing to the caller — and 404, never 403, because 403 confirms
+    // the order exists and names somebody else's parcel.
+    const labelRef = await getVendorJobLabelKey(vendorId, id);
+    if (!labelRef) return c.json({ error: "Label not found" }, 404);
+
+    // Only now. Nothing above this line produced a signature.
+    const url = await getPresignedDownloadUrl(
+      labelRef.key,
+      LABEL_URL_TTL_SECONDS
+    );
+
+    await recordAudit(c, {
+      action: "production_job.label_issued",
+      entityType: "production_job",
+      entityId: labelRef.jobId,
+      summary: "Vendor was issued a signed carrier label for the order they consolidate",
+      after: {
+        // Identity-free by construction, exactly like the QC photo keys the
+        // `photos_submitted` row records, so naming the object costs nothing
+        // under R1 and lets a dispute say WHICH label was handed over — which
+        // matters on an order whose label was voided and re-bought.
+        key: labelRef.key,
+        expiresInSeconds: LABEL_URL_TTL_SECONDS,
+      },
+    });
+
+    return c.json({
+      jobId: labelRef.jobId,
+      url,
+      expiresInSeconds: LABEL_URL_TTL_SECONDS,
+      expiresAt: new Date(
+        Date.now() + LABEL_URL_TTL_SECONDS * 1000
+      ).toISOString(),
+    });
+  } catch (error) {
+    return c.json(failed("sign label URL", error), 500);
+  }
+});
 
 // ============================================================================
 // QC photographs
