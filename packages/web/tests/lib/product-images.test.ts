@@ -11,6 +11,7 @@ import {
   MIN_SOURCE_LONG_EDGE,
   PRODUCT_IMAGE_TYPE_OPTIONS,
   isLowResSource,
+  isAltTextMissing,
   reorderImages,
   applyImageType,
   renumberImages,
@@ -115,5 +116,18 @@ describe('renumberImages', () => {
   it('rewrites sortOrder to array position', () => {
     const images = [img('a', 'main', 4), img('b', 'detail', 2)]
     expect(renumberImages(images).map((i) => i.sortOrder)).toEqual([0, 1])
+  })
+})
+
+describe('isAltTextMissing (#664)', () => {
+  it('is true for undefined, empty and whitespace-only alt text', () => {
+    expect(isAltTextMissing(undefined)).toBe(true)
+    expect(isAltTextMissing('')).toBe(true)
+    expect(isAltTextMissing('   ')).toBe(true)
+  })
+
+  it('is false once the alt text has any non-whitespace content', () => {
+    expect(isAltTextMissing('A framed print')).toBe(false)
+    expect(isAltTextMissing(' x ')).toBe(false)
   })
 })

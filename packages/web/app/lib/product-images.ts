@@ -32,6 +32,13 @@ export const PRODUCT_IMAGE_TYPE_OPTIONS: ReadonlyArray<{
 export const isLowResSource = (width: number, height: number): boolean =>
   Math.max(width, height) < MIN_SOURCE_LONG_EDGE
 
+/**
+ * Alt text is wanted on every image but is not a save blocker: the API accepts
+ * an empty value and older rows carry one. The form warns instead of refusing.
+ */
+export const isAltTextMissing = (altText: string | null | undefined): boolean =>
+  !altText || altText.trim().length === 0
+
 /** Rewrite sortOrder to array position, 0..n-1. */
 export function renumberImages<T extends { sortOrder: number }>(
   images: readonly T[]

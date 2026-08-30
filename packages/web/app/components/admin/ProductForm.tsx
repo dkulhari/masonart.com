@@ -29,6 +29,7 @@ import { cn, getApiUrl } from '~/lib/utils'
 import {
   PRODUCT_IMAGE_TYPE_OPTIONS,
   isLowResSource,
+  isAltTextMissing,
   reorderImages,
   renumberImages,
   applyImageType,
@@ -280,6 +281,26 @@ function FormSection({
         <div className="border-t border-border px-6 pb-6 pt-4">{children}</div>
       )}
     </div>
+  )
+}
+
+// ============================================================================
+// Alt Text Warning
+// ============================================================================
+
+/**
+ * Missing alt text costs SEO and screen-reader users, but the API accepts it
+ * and older rows carry it, so it is reported and never enforced (#664).
+ */
+function AltTextWarning() {
+  return (
+    <p
+      data-testid="alt-text-warning"
+      className="mt-1 flex items-start gap-1 text-xs text-amber-700"
+    >
+      <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+      No alt text — hurts SEO and screen readers
+    </p>
   )
 }
 
@@ -974,15 +995,15 @@ export function ProductForm({
                     </button>
                   </div>
 
-                  {/* Alt text (required by the ProductImage contract) */}
+                  {/* Alt text: wanted, never a save blocker (#664) */}
                   <input
                     type="text"
-                    required
                     placeholder="Alt text"
                     value={image.altText || ''}
                     onChange={(e) => updateImage(image.id, { altText: e.target.value })}
                     className="mt-2 w-full rounded border border-border bg-background px-2 py-1 text-xs"
                   />
+                  {isAltTextMissing(image.altText) && <AltTextWarning />}
                 </div>
               ))}
             </div>
@@ -1043,7 +1064,6 @@ export function ProductForm({
                     </div>
                     <input
                       type="text"
-                      required
                       placeholder="Alt text"
                       value={pending.altText}
                       onChange={(e) =>
@@ -1051,6 +1071,7 @@ export function ProductForm({
                       }
                       className="mt-2 w-full rounded border border-border bg-background px-2 py-1 text-xs"
                     />
+                    {isAltTextMissing(pending.altText) && <AltTextWarning />}
                   </div>
                 ))}
               </div>

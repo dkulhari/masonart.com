@@ -3,7 +3,7 @@
  *
  * The admin image grid must expose per-row metadata controls for the square
  * contract: a type selector enforcing exactly one `main`, drag reordering that
- * renumbers sortOrder contiguously, and a required alt text input.
+ * renumbers sortOrder contiguously, and an alt text input.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -58,10 +58,12 @@ describe('ProductForm media rows', () => {
     expect(within(after[1]).getByLabelText(/image type/i)).toHaveValue('main')
   })
 
-  it('marks the alt text input required', () => {
+  // Alt text is never `required`: it would block the submit natively and, in a
+  // collapsed section, silently. See ProductForm.alt-text.test.tsx (#664).
+  it('renders an alt text input on every row', () => {
     renderForm()
     const rows = mediaRows()
-    expect(within(rows[0]).getByPlaceholderText(/alt text/i)).toBeRequired()
+    expect(within(rows[0]).getByPlaceholderText(/alt text/i)).toHaveValue('alt img-a')
   })
 
   it('has a drag handle on every row', () => {
