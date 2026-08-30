@@ -52,7 +52,7 @@ export * from "./gift-cards";
 // Vendors, contacts, capabilities and rate cards
 export * from "./vendors";
 
-// Production jobs, their items, QC reviews and vendor settlements
+// Production jobs, their items, QC reviews, QC photos and vendor settlements
 export * from "./production-jobs";
 
 // Which vendor a vendor-role user belongs to (exactly one)

@@ -18,10 +18,12 @@ import {
   uuid,
   pgEnum,
   index,
+  uniqueIndex,
+  integer,
   decimal,
   unique,
 } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { users } from './users'
 import { orders, orderItems } from './orders'
 import { vendors } from './vendors'
@@ -191,6 +193,102 @@ export const productionJobReviews = pgTable(
   })
 )
 
+/**
+ * One QC photograph. Append-only, like production_job_reviews above.
+ *
+ * Design: docs/superpowers/specs/2026-08-30-production-pipeline-design.md §7
+ *
+ * A vendor photographs the finished piece against a fixed shot list before we
+ * will accept the work. `superseded_at` plus the partial unique index below
+ * gives exactly one LIVE photo per slot while keeping every earlier attempt:
+ * a reshoot after a failed inspection supersedes, it does not overwrite, so a
+ * dispute can still see what was originally submitted.
+ *
+ * `slot` is `text`, NOT a pgEnum, and that is not laziness. `schema/shipping.ts`
+ * records that a *value* import from the ESM-only `@chobii/shared` inside
+ * `schema/` breaks `drizzle-kit generate` outright, so the vocabulary cannot
+ * live beside the table. It lives in `@chobii/shared/schemas/production-qc` as
+ * `QC_SHOT_LIST`, where the vendor portal and the API read one copy, and
+ * `qcSlotSchema` checks it at every write. The database checks nothing here.
+ *
+ * No CHECK constraint enforces that either. Zero CHECKs exist in this repo, and
+ * `tests/database/raw-sql-objects.test.ts` scans migrations only for
+ * FUNCTION|TRIGGER|POLICY — one added here would be silently absent from any
+ * database built with `db:push`, which is the exact shape of #663.
+ */
+export const productionJobPhotos = pgTable(
+  'production_job_photos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /**
+     * cascade, unlike productionJobs.orderId: a photograph of a job is not a
+     * financial record and means nothing without the job. It does leave the R2
+     * objects orphaned, which is why the 400-day retention sweep calls
+     * `deleteByPrefix('production-qc/<jobId>/')` BEFORE deleting rows — a
+     * cascade cannot reach into object storage.
+     */
+    jobId: uuid('job_id')
+      .references(() => productionJobs.id, { onDelete: 'cascade' })
+      .notNull(),
+    /** A key from `QC_SHOT_LIST`. See the note above on why this is text. */
+    slot: text('slot').notNull(),
+    /**
+     * The R2 object KEY — `production-qc/<jobId>/<slot>/<filename>`, built by
+     * `StoragePaths.productionQcPhoto`. NEVER a URL.
+     *
+     * `approval_photos.url` is the counter-example this deliberately does not
+     * copy: a stored URL cannot be re-signed when it expires, and it puts the
+     * object outside the signing-scope allow-list, so the URL itself becomes
+     * the capability. A key can always be signed again, and only for a caller
+     * the allow-list permits.
+     */
+    objectKey: text('object_key').notNull(),
+    /**
+     * Recorded at `complete`, not trusted from `presign`. The two calls are
+     * minutes apart, so what was promised and what landed can differ.
+     */
+    contentType: text('content_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    /** set null, never cascade: deleting a vendor user must not delete the work. */
+    uploadedBy: text('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+    uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+    /**
+     * NULL is the definition of live — the partial unique index keys on it.
+     * Set when a newer photo takes this slot; the row is never deleted, and
+     * there is no `updated_at` because nothing else about it ever changes.
+     */
+    supersededAt: timestamp('superseded_at'),
+    /**
+     * The review that judged this photograph, stamped onto every live photo
+     * when a verdict is recorded. Nullable until then, and set null rather
+     * than cascade so losing a review never destroys the evidence it saw.
+     */
+    reviewId: uuid('review_id').references(() => productionJobReviews.id, {
+      onDelete: 'set null',
+    }),
+  },
+  (table) => ({
+    jobIdIdx: index('production_job_photos_job_id_idx').on(table.jobId),
+    /**
+     * Exactly one live photo per slot, with the full history kept.
+     *
+     * Partial, following gift_card_standalone_purchase_order_unique (0018): a
+     * blanket unique would REFUSE the reshoot after a failed inspection, which
+     * is the one moment this table exists to record.
+     *
+     * The predicate is a timestamp test and names no enum value on purpose.
+     * #673 added `qc_submitted`, `dispatched` and `fulfilment`, and
+     * `drizzle-kit migrate` replays the whole pending batch in ONE transaction
+     * — so any use of a new value here, even though it lives in a different
+     * migration file, dies on a fresh database with "unsafe use of new value".
+     * See tests/database/migration-enum-literals.test.ts.
+     */
+    liveSlotUnique: uniqueIndex('production_job_photos_live_slot_unique')
+      .on(table.jobId, table.slot)
+      .where(sql`${table.supersededAt} IS NULL`),
+  })
+)
+
 export const productionJobsRelations = relations(productionJobs, ({ one, many }) => ({
   order: one(orders, { fields: [productionJobs.orderId], references: [orders.id] }),
   vendor: one(vendors, { fields: [productionJobs.vendorId], references: [vendors.id] }),
@@ -200,6 +298,7 @@ export const productionJobsRelations = relations(productionJobs, ({ one, many })
   }),
   items: many(productionJobItems),
   reviews: many(productionJobReviews),
+  photos: many(productionJobPhotos),
 }))
 
 export const productionJobItemsRelations = relations(productionJobItems, ({ one }) => ({
@@ -210,9 +309,26 @@ export const productionJobItemsRelations = relations(productionJobItems, ({ one 
   }),
 }))
 
-export const productionJobReviewsRelations = relations(productionJobReviews, ({ one }) => ({
-  job: one(productionJobs, { fields: [productionJobReviews.jobId], references: [productionJobs.id] }),
-  reviewer: one(users, { fields: [productionJobReviews.reviewerId], references: [users.id] }),
+export const productionJobReviewsRelations = relations(
+  productionJobReviews,
+  ({ one, many }) => ({
+    job: one(productionJobs, {
+      fields: [productionJobReviews.jobId],
+      references: [productionJobs.id],
+    }),
+    reviewer: one(users, { fields: [productionJobReviews.reviewerId], references: [users.id] }),
+    /** The shots this verdict judged. */
+    photos: many(productionJobPhotos),
+  })
+)
+
+export const productionJobPhotosRelations = relations(productionJobPhotos, ({ one }) => ({
+  job: one(productionJobs, { fields: [productionJobPhotos.jobId], references: [productionJobs.id] }),
+  uploader: one(users, { fields: [productionJobPhotos.uploadedBy], references: [users.id] }),
+  review: one(productionJobReviews, {
+    fields: [productionJobPhotos.reviewId],
+    references: [productionJobReviews.id],
+  }),
 }))
 
 export const vendorSettlementsRelations = relations(vendorSettlements, ({ one, many }) => ({
@@ -226,6 +342,8 @@ export type ProductionJobItem = typeof productionJobItems.$inferSelect
 export type NewProductionJobItem = typeof productionJobItems.$inferInsert
 export type ProductionJobReview = typeof productionJobReviews.$inferSelect
 export type NewProductionJobReview = typeof productionJobReviews.$inferInsert
+export type ProductionJobPhoto = typeof productionJobPhotos.$inferSelect
+export type NewProductionJobPhoto = typeof productionJobPhotos.$inferInsert
 export type VendorSettlement = typeof vendorSettlements.$inferSelect
 export type NewVendorSettlement = typeof vendorSettlements.$inferInsert
 export type ProductionJobStage = (typeof productionJobStageEnum.enumValues)[number]

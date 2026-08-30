@@ -169,6 +169,13 @@
       "when": 1786406880000,
       "tag": "0023_production_pipeline_statuses",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788096128301,
+      "tag": "0024_production_job_photos",
+      "breakpoints": true
     }
   ]
 }
