@@ -176,6 +176,13 @@
       "when": 1788096128301,
       "tag": "0024_production_job_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788097010096,
+      "tag": "0025_production_transfers",
+      "breakpoints": true
     }
   ]
 }

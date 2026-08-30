@@ -23,6 +23,7 @@ import {
   decimal,
   unique,
 } from 'drizzle-orm/pg-core'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
 import { users } from './users'
 import { orders, orderItems } from './orders'
@@ -106,19 +107,59 @@ export const productionJobs = pgTable(
     vendorId: uuid('vendor_id').references(() => vendors.id, { onDelete: 'restrict' }),
     status: productionJobStatusEnum('status').default('draft').notNull(),
 
+    /**
+     * These four, plus createdAt/updatedAt below, are bare `timestamp` and stay
+     * that way. Converting them is recorded debt (§11), not this ticket: they
+     * predate the feature and hold rows. Every column ADDED by
+     * production-pipeline is `timestamptz`, so that a server timezone change
+     * cannot desynchronise a job from the `admin_audit_log` row describing it.
+     */
     assignedAt: timestamp('assigned_at'),
     sentAt: timestamp('sent_at'),
     dueAt: timestamp('due_at'),
     receivedAt: timestamp('received_at'),
+
+    /**
+     * Work finished and the shot list uploaded: the moment the ball moved to
+     * our court. The admin QC queue sorts on it.
+     */
+    qcSubmittedAt: timestamp('qc_submitted_at', { withTimezone: true }),
+    /**
+     * This vendor's custody ended — one column, not two, because
+     * parcel-to-next-vendor and parcel-to-courier are the same fact.
+     */
+    dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
+    /**
+     * Set on a job created to replace one lost in transit.
+     *
+     * Without it, two print jobs against one order item read as a
+     * duplicate-entry mistake. `set null`, never cascade: deleting the original
+     * must not delete the work that replaced it. The original also KEEPS its
+     * payable and stays `dispatched` — we owe vendor A for work they genuinely
+     * did, and the parcel is what vanished, not the work. Moving it to
+     * `qc_failed` would slander their QC record and pollute the defect history
+     * future scorecards read.
+     */
+    replacesJobId: uuid('replaces_job_id').references((): AnyPgColumn => productionJobs.id, {
+      onDelete: 'set null',
+    }),
 
     /** Computed from the rate card live at assignment. */
     amountExpected: decimal('amount_expected', { precision: 10, scale: 2 }),
     /** The override. Print shops negotiate; making that invisible is worse. */
     amountActual: decimal('amount_actual', { precision: 10, scale: 2 }),
 
-    /** NULL is the definition of unsettled — the payables query keys on it. */
+    /**
+     * NULL is the definition of unsettled — the payables query keys on it.
+     *
+     * `restrict`, not `set null` (#675). Under `set null`, deleting a
+     * settlement did not merely drop a pointer: every job it paid for went back
+     * to `settlement_id IS NULL` and reappeared as owed, with nothing left in
+     * the record to say the money had already moved. Unwinding a settlement has
+     * to be a deliberate act that re-points its jobs first.
+     */
     settlementId: uuid('settlement_id').references(() => vendorSettlements.id, {
-      onDelete: 'set null',
+      onDelete: 'restrict',
     }),
 
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -251,13 +292,21 @@ export const productionJobPhotos = pgTable(
     sizeBytes: integer('size_bytes').notNull(),
     /** set null, never cascade: deleting a vendor user must not delete the work. */
     uploadedBy: text('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
-    uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+    /**
+     * timestamptz, like every column production-pipeline adds. #674 landed this
+     * and `superseded_at` as bare `timestamp`; 0025 alters both, which is free
+     * because the table was new and empty. The point is comparability with
+     * `admin_audit_log.created_at`, which is already timestamptz — a QC dispute
+     * reads a photo row and an audit row side by side, and a server timezone
+     * change must not silently pull them apart.
+     */
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }).defaultNow().notNull(),
     /**
      * NULL is the definition of live — the partial unique index keys on it.
      * Set when a newer photo takes this slot; the row is never deleted, and
      * there is no `updated_at` because nothing else about it ever changes.
      */
-    supersededAt: timestamp('superseded_at'),
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
     /**
      * The review that judged this photograph, stamped onto every live photo
      * when a verdict is recorded. Nullable until then, and set null rather
