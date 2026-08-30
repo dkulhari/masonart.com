@@ -1,0 +1,39 @@
+ticket_number: 687
+title: Vendor Portal API - the signed label and the rewritten isolation properties
+description: |-
+  ## Task
+  Add GET /api/vendor/jobs/:id/label returning { jobId, url, expiresInSeconds, expiresAt }. Rewrite the isolation and no-customer-data suites around R1/R2/R3.
+
+  ## Context
+  Feature: production-pipeline. Phase 4 of 7. Depends on #pp06.
+
+  Five tests are affected, not two: packages/api/tests/routes/vendor/{isolation,jobs,artwork}.test.ts and packages/web/tests/routes/vendor/{no-customer-data,vendor-screens,layout-guard}.test.tsx.
+
+  Design constraints:
+  - isolation.test.ts Property 1 (route-table coverage) is UNCHANGED, so every new route needs a ROUTE_TABLE entry or the suite fails.
+  - Property 2 is unchanged in MECHANISM - FORBIDDEN_KEYS, collectKeys, the wholesale-select ban and the SELECT-projection assertion all stay byte-for-byte - and is retitled 'no customer data crosses the vendor boundary AS DATA'.
+  - Property 3 generalises from 'artwork URLs' to all signatures, and asserts the scopes PAIRWISE DISJOINT AND NON-SUBSTITUTABLE. That is the property that stops the label hole widening into a general signer.
+  - New Property 4: every presign call matches exactly one scope; the label route's JSON passes the walker clean; a planted customer name in shipment metadata appears in no JSON; a non-consolidator gets 404 AND mockPresign was never called.
+  - The web test's one-line mechanical replacement for the dead absolute: assert no iframe/embed/object in the container, and no 'X-Amz-Signature' in innerHTML. Rendering the PDF inline would put the customer's address into the vendor portal's own DOM, which is exactly what R2 forbids.
+  - Keep the existing 'the walker actually finds a planted key - the suite is not vacuous' guard.
+  - production_job.label_issued is audited on first success, WITHOUT tx (no transaction exists).
+feature: production-pipeline
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.640Z'
+last_updated: '2026-08-30T12:02:20.640Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - vendor-portal
+  - security
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,38 @@
+ticket_number: 694
+title: E2E - two-vendor consolidation happy path and the access-denied cases
+description: |-
+  ## Task
+  Write tests/e2e/production-pipeline.spec.ts covering the full two-vendor round trip and the refusal cases.
+
+  ## Context
+  Feature: production-pipeline. Phase 7 of 7. Depends on every prior phase.
+
+  Happy path: admin creates two jobs across two vendors -> sets the consolidator -> vendor A marks received, uploads the shot list, submits -> admin passes QC -> A dispatches a transfer -> B receives it -> B marks received, uploads, submits -> admin passes -> readiness flips true -> the label signs -> B confirms handover.
+
+  Refusal cases in the same spec (vendor-management's #622 precedent): a non-consolidator fetching the label; a vendor submitting with an incomplete shot list; a vendor attempting qc_passed; a frame job dispatching before its print passed.
+
+  Design constraints:
+  - Run against the CORRECT PORT. :5173 is a DIFFERENT APP and makes the suite pass vacuously.
+  - Do not run admin suites in parallel with other admin suites.
+  - Playwright test titles must be static.
+  - Build the database with db:migrate, never db:push (#663).
+  - No window.confirm anywhere in the paths under test.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.918Z'
+last_updated: '2026-08-30T12:02:20.918Z'
+time_spent_minutes: 0
+labels:
+  - e2e
+  - testing
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

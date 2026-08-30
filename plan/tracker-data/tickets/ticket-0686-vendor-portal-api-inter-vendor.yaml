@@ -1,0 +1,36 @@
+ticket_number: 686
+title: Vendor Portal API - inter-vendor transfers, dispatch and receipt
+description: |-
+  ## Task
+  Add GET /transfers, GET /transfers/:id, POST /transfers and POST /transfers/:id/received to the vendor portal, scoped through lib/vendor-scope.ts.
+
+  ## Context
+  Feature: production-pipeline. Phase 4 of 7. Depends on #pp03, #pp12.
+
+  Design constraints:
+  - What vendor B is told about an inbound parcel: { id, reference, carrier, pieceCount, dispatchedAt, expectedBy, receivedAt }. NO vendor names, NO order id, NO customer anything.
+  - B does not learn the parcel came from A. Surfacing another vendor's row through vendor-scope would break the isolation suite's first property, which is a hard, already-tested boundary. If B needs to chase, an admin chases - the admin sees both ends.
+  - received_at is settable only by to_vendor_id; a transfer is created only by from_vendor_id.
+  - A job is on at most one transfer, ever (unique index). A lost transfer produces a replacement job instead.
+  - cost_amount is NOT set by the vendor - we pay the leg, and we chose the routing.
+  - production_transfer.dispatched and .received are audited with the job ids and the reference, sharing the transaction.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.607Z'
+last_updated: '2026-08-30T12:02:20.607Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - vendor-portal
+  - transfers
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

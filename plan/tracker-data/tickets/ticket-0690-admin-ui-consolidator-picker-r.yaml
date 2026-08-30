@@ -1,0 +1,33 @@
+ticket_number: 690
+title: Admin UI - consolidator picker, readiness blockers and transfers on the order panel
+description: |-
+  ## Task
+  Rewrite OrderProductionPanel around the real orderId filter, and add the consolidator picker, the readiness blocker list and the order's transfers.
+
+  ## Context
+  Feature: production-pipeline. Phase 5 of 7. Depends on #pp10, #pp11.
+
+  Design constraints:
+  - scanOrderProductionJobs collapses to one ?orderId= request. MAX_SCAN_PAGES, SCAN_PAGE_SIZE, the truncated flag, the truncated prop and the whole admin-order-production-truncated branch are DELETED, along with the tests that cover them.
+  - The readiness panel renders BLOCKERS, never a bare 'not ready'. A confident answer over an incomplete read is the #602/#606 failure mode this panel already guards against - a slow or failed readiness query must render an error, never an optimistic 'ready to ship'.
+  - The consolidator picker shows whether the current value was a system default or an admin decision, and refuses (409) once the first transfer has dispatched.
+  - unassignedOrderItems keeps its job: it is the only surface where invisible work appears.
+feature: production-pipeline
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.750Z'
+last_updated: '2026-08-30T12:02:20.750Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

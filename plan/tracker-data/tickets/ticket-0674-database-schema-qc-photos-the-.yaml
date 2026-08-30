@@ -1,0 +1,38 @@
+ticket_number: 674
+title: Database Schema - QC photos, the shot list contract and storage paths
+description: |-
+  ## Task
+  Add `production_job_photos` (job_id, slot, object_key, content_type, size_bytes, uploaded_by, uploaded_at, superseded_at, review_id) with a partial unique index on (job_id, slot) WHERE superseded_at IS NULL. Add `QC_SHOT_LIST` to packages/shared/src/schemas/production-qc.ts and a `StoragePaths.productionQcPhoto` key builder.
+
+  ## Context
+  Feature: production-pipeline. Phase 1 of 7.
+
+  Shot list - print: whole print flat and front-on, print beside the colour reference, raking light across the surface, optional detail. Frame: framed piece front-on, raking light across the glazing, all four corners, back showing the hanging fixture, optional detail.
+
+  Design constraints:
+  - `slot` is `text`, NOT a pgEnum. packages/api/src/database/schema/shipping.ts records that a VALUE import from the ESM-only @chobii/shared inside schema/ breaks `drizzle-kit generate` outright. The vocabulary lives in shared so the portal and API read one copy.
+  - `superseded_at` plus the partial unique index gives exactly one live photo per slot WITH full history - the same append-only philosophy as production_job_reviews.
+  - The index predicate must use no enum literal, so it is safe under the migration rule in #pp01.
+  - Store the R2 object KEY, never a URL. approval_photos.url is the counter-example this must not copy.
+  - Keys are `production-qc/<jobId>/<slot>/<filename>` via the existing sanitizeKeySegment. Identity-free: a job id is a production handle, not a person-linked one.
+  - Partial unique index precedent: schema/gift-cards.ts:154-158, migrated by 0018.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.141Z'
+last_updated: '2026-08-30T12:02:20.141Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+  - storage
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

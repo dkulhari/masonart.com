@@ -1,0 +1,34 @@
+ticket_number: 693
+title: Vendor Portal UI - inbound transfers and the label handover card
+description: |-
+  ## Task
+  Add the inbound-transfer strip and the label handover card to the vendor portal.
+
+  ## Context
+  Feature: production-pipeline. Phase 6 of 7. Depends on #pp14, #pp15.
+
+  Design constraints:
+  - The label control is a BUTTON, fetched at click, used in the same tick. NEVER an iframe, embed or object - rendering the PDF inline would put the customer's address into the vendor portal's own DOM, which R2 forbids and the web test now asserts against.
+  - No signed URL is parked in the DOM. No 'X-Amz-Signature' may appear in innerHTML.
+  - The inbound strip shows reference, carrier, piece count and expected date. No vendor names, no order id, no customer anything.
+  - A frame job whose order has an un-received inbound transfer shows 'waiting on an inbound parcel'.
+  - 'Confirm handover' is available only from qc_passed, and only when a transfer or a label exists.
+feature: production-pipeline
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.884Z'
+last_updated: '2026-08-30T12:02:20.884Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - vendor-portal
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,38 @@
+ticket_number: 679
+title: Access Control - recordAudit carries vendorId, and the refusal transaction rule
+description: |-
+  ## Task
+  Make `recordAudit` read `c.get('vendorId')` itself and merge it into metadata. Register the new production actions and their categories. Write the transaction rule into lib/audit.ts's doc comment.
+
+  ## Context
+  Feature: production-pipeline. Phase 2 of 7. Related: #667 (reconcile), #671 (declared-but-dead guard), #668/#669/#670 (the dangling vendor actions - DEPEND, do not re-file).
+
+  New actions. money: production_job.assigned, .reassigned, .amount_overridden, production_transfer.declared_lost. fulfilment: production_job.created, .transitioned, .transition_refused, .photos_submitted, .qc_approved, .qc_rejected, .label_issued, production_transfer.dispatched, .received, order.consolidator_set.
+
+  Design constraints:
+  - recordAudit reads vendorId ITSELF, not the call sites. The module's entire design is that a caller cannot get a context fact wrong: category is derived, and ip/user-agent/request-id/method/path are captured. requireVendor already sets c.set('vendorId') and nothing has ever read it. Per call site means the first vendor route added next year forgets.
+  - Merge vendorId AFTER the caller's metadata so a caller cannot overwrite it. Bonus: it retro-improves every existing vendor.request floor row.
+  - SHARE the transaction when the audit row would be a LIE if the business write rolled back.
+  - NEVER share the transaction for a refusal. A refusal row records that a transaction was rolled back; writing it inside that transaction erases the very evidence it exists to preserve. This is the sharpest trap in the design and the natural instinct is wrong.
+  - No recordAudit call site in the repo passes tx today - all 40 omit it. This feature is the first, so the rule must be documented, not assumed.
+  - #667 says all production_job.* go under `money`. Reconcile by what the row is ABOUT, not by table, and mark #667 superseded-in-part.
+  - Declare NOTHING for order-dispatch-tracking to emit later: #671 fails the build on any action nothing emits. An action is declared in the same phase as its emitter, or not at all.
+  - No separate production_job.cancelled action - a cancellation is a transition, keeping 'one row per transition' true.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.335Z'
+last_updated: '2026-08-30T12:02:20.335Z'
+time_spent_minutes: 0
+labels:
+  - audit
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

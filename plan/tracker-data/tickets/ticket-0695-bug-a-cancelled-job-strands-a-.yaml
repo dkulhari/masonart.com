@@ -1,0 +1,37 @@
+ticket_number: 695
+title: Bug - a cancelled job strands a phantom payable in the vendor's own portal
+description: |-
+  ## Task
+  Add `status <> 'cancelled'` to the three payables queries: routes/admin/vendor-payables.ts:172, :308, and lib/vendor-scope.ts getVendorPayableTotal.
+
+  ## Context
+  Feature: production-pipeline. Filed alongside the phases, following vendor-management's #623/#624 precedent.
+
+  All three filter on `settlement_id IS NULL` alone and never look at status. A cancelled job that carries an amount_expected therefore still shows as owed - and the vendor sees it in their own portal, permanently, with no way to clear it.
+
+  This is latent today only because cancellation is not reachable: nothing creates jobs and the state machine does not exist. This feature makes cancellation a real, routine transition, so the bug goes live here.
+
+  Design constraints:
+  - 'cancelled' is an EXISTING enum value used in application code, not migration SQL, so the enum-literal rule does not apply.
+  - The admin payables UI and the vendor payments screen must render `status`, so a cancelled zero-rupee line is legible rather than mysterious.
+  - Cancelling from draft or assigned should also null the amounts; cancelling from a later state PRESERVES the payable, because the vendor did work. That kill fee is stated explicitly by an admin, not inferred.
+  - Regression test: getVendorPayableTotal and the admin payables total must agree over one row set - the assertion carried over from #611.
+feature: production-pipeline
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.955Z'
+last_updated: '2026-08-30T12:02:20.955Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - money
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

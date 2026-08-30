@@ -1,0 +1,35 @@
+ticket_number: 682
+title: Admin API - consolidator selection, the orderId filter and the readiness endpoint
+description: |-
+  ## Task
+  Add the `orderId` filter to GET /api/admin/production, POST /api/admin/orders/:orderId/consolidator, and GET /api/admin/orders/:orderId/production-readiness.
+
+  ## Context
+  Feature: production-pipeline. Phase 3 of 7. Depends on #pp05.
+
+  Design constraints:
+  - The orderId filter is one field on listQuerySchema and one eq() condition; index production_jobs_order_id_idx already exists.
+  - OrderProductionPanel.tsx currently pages the queue and matches CLIENT-SIDE with MAX_SCAN_PAGES because this filter does not exist. Its own header predicts this ticket: 'the day it learns the filter this narrows the scan to nothing.'
+  - Consolidator override is refused with 409 once the first transfer on the order has dispatched - the goods are already moving.
+  - decided_by NULL means 'system default'; a non-null value means an admin confirmed. Making an arbitrary choice a CONFIRMED proposal keeps it visible and auditable rather than silently arbitrary.
+  - The readiness endpoint returns the blocker list, not just a boolean, so the screen can explain itself.
+  - order.consolidator_set is audited whether set explicitly or by default.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.443Z'
+last_updated: '2026-08-30T12:02:20.443Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

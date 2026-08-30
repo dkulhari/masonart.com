@@ -1,0 +1,35 @@
+ticket_number: 689
+title: Admin UI - photo QC review with per-slot verdict and defects
+description: |-
+  ## Task
+  Add the photo review grid to /admin/production/$id: the shot list with each live photo, the verdict form, defect chips, and a transition panel driven by the matrix.
+
+  ## Context
+  Feature: production-pipeline. Phase 5 of 7. Depends on #pp09.
+
+  Design constraints:
+  - The status control is currently a plain <select> over all 7 statuses. It becomes a control over nextStatuses(job.status, 'admin'), with the terminal case rendering a sentence rather than an empty dropdown.
+  - A fail requires at least one defect before the form can submit - the API refuses it anyway, but a client that lets you try is a client that wastes a round trip on a verdict the vendor cannot act on.
+  - Show the rework history: production_job_reviews is multi-row per job by design, and the second verdict overturning the first is a real event that must be visible.
+  - A 409 renders the blocking reason inline, including which transition was attempted and what was allowed.
+  - Skeleton, empty and error states on every list. Only 4 of 13 existing admin lists have all three.
+feature: production-pipeline
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.711Z'
+last_updated: '2026-08-30T12:02:20.711Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - admin
+  - qc
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

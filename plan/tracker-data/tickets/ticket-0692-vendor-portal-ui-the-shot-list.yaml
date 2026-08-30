@@ -1,0 +1,35 @@
+ticket_number: 692
+title: Vendor Portal UI - the shot-list uploader and the QC verdict banner
+description: |-
+  ## Task
+  Add the shot-list uploader and the QC verdict banner to /vendor/jobs/$id.
+
+  ## Context
+  Feature: production-pipeline. Phase 6 of 7. Depends on #pp13.
+
+  Design constraints:
+  - The uploader renders QC_SHOT_LIST from shared, so the portal shows exactly what the API validates.
+  - 'Submit for approval' is enabled only when every required slot has a live photo. The API refuses an incomplete list anyway; the button must not pretend otherwise.
+  - The verdict banner shows defect chips on a fail, so the vendor knows what to redo without a phone call.
+  - Re-uploading a slot supersedes rather than deletes - the vendor sees the current shot, the history stays in the table.
+  - Upload goes direct to R2 via presign; bytes never route through our API.
+feature: production-pipeline
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.847Z'
+last_updated: '2026-08-30T12:02:20.847Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - vendor-portal
+  - qc
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

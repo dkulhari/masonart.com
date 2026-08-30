@@ -1,0 +1,39 @@
+ticket_number: 673
+title: Database Schema - production job workflow statuses and the fulfilment audit category
+description: |-
+  ## Task
+  Add `qc_submitted` and `dispatched` to `production_job_stage`'s sibling enum `production_job_status`, and add `fulfilment` to `audit_category`. Retire `sent` in code only. Migration is `ALTER TYPE ... ADD VALUE` statements and nothing else.
+
+  ## Context
+  Feature: production-pipeline. Phase 1 of 7. Depends on vendor-management (done).
+
+  The `sent`-retirement backfill of existing rows is a SCRIPT, not part of this migration.
+
+  Three code sites move with the audit category: `auditCategorySchema` (packages/shared/src/schemas/audit-log.ts), `auditCategoryEnum` (packages/api/src/database/schema/audit-log.ts), and `CATEGORIES` in packages/web/app/routes/admin/audit-log/index.tsx.
+
+  Design constraints:
+  - NO new enum value may appear as a literal in ANY migration, ever. 0018:6-8 records that drizzle-kit replays the whole pending batch in one transaction, so splitting ADD VALUE and its first use across two files does not help a fresh database.
+  - `sent` is retired in code, NOT dropped from the Postgres type. Dropping a value means recreating the type and rewriting every dependent column.
+  - `qc_submitted` means work done, photos up, blocked on US. `dispatched` means this vendor's custody ended - one status, not two, because parcel-to-next-vendor and parcel-to-courier are the same fact about the job.
+  - Build databases with `db:migrate`, never `db:push` (#663).
+  - No CHECK constraints anywhere in this feature: zero exist in the repo and tests/database/raw-sql-objects.test.ts scans only FUNCTION|TRIGGER|POLICY, so one would be silently absent from every push-built database.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.090Z'
+last_updated: '2026-08-30T12:02:20.090Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+  - audit
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,35 @@
+ticket_number: 688
+title: Admin UI - the production queue reshaped around the new statuses
+description: |-
+  ## Task
+  Update /admin/production for the new status set, add multi-select assign-to-vendor, and re-export the status tuple from shared instead of copying it.
+
+  ## Context
+  Feature: production-pipeline. Phase 5 of 7. Depends on #pp08.
+
+  Design constraints:
+  - PRODUCTION_STATUSES is a verbatim copy today and the file's own comment admits it ('A vocabulary, not a state machine ... this screen offers every value as a filter and makes no claim about which follows which'). Re-export the shared tuple.
+  - STATUS_LABELS currently says 'Sent'/'Received', which is what let the sent/received ambiguity survive. Relabel for the new vocabulary; `sent` disappears from the filter.
+  - Multi-select assign is D2's answer to 'no batch entity': tick N jobs, assign to one vendor in one action, but each job stays independent. Per-job atomic, batch-level partial - one unpriced job must not block nine good ones.
+  - The result panel lists refusals per job with their unpriced items, mirroring AssignmentFailure, which already names the item and its size rather than degrading to a banner.
+  - No native confirm()/alert() - they block the automation harness outright (reviews.tsx:269 documents why).
+  - List state in the URL via validateSearch, with the repo caveat that router.tsx overrides TanStack's search serialisation: schemas MUST coerce numbers and split comma-joined arrays or the route error-boundaries to a blank page.
+feature: production-pipeline
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.669Z'
+last_updated: '2026-08-30T12:02:20.669Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
