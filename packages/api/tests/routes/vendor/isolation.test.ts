@@ -29,6 +29,20 @@
  * the same vocabulary, so a convenience field invented in a handler is caught
  * too.
  *
+ * **The allow-list is an ACCOUNT, not a list of hopes.** Property 1 fails
+ * silently — a table nobody listed is not judged unscoped, it is not examined —
+ * and that silence has been found six times on this boundary, most recently
+ * `order_items`, which this file used to name out loud as uncovered while the
+ * artwork route was already joining it. So the vocabularies are enumerated and
+ * compared against the tables the route table ACTUALLY touches: an unlisted
+ * table is now a failure rather than an absence.
+ *
+ * **§8's audit property lives here too**, and only here: every audit row written
+ * under `/api/vendor/*` carries `metadata.vendorId`. The per-route suites mock
+ * `recordAudit` away, so they can only see what a call site passed — and the
+ * `vendorId` is merged inside `recordAudit`, from the context, last. This is the
+ * one suite where the real one runs and the insert is recorded.
+ *
  * ## The rule this suite enforces, and why it is three clauses now
  *
  * It used to be one sentence. `lib/vendor-scope.ts` said "no return value here
@@ -767,6 +781,24 @@ const FORBIDDEN_KEYS = [
   'addressLine1',
   'addressLine2',
   'postalCode',
+  // §6 names this one in as many words — *"Vendors need no pickup address and
+  // no delivery pincode … stated explicitly so nobody adds one"* — and the
+  // vocabulary that was supposed to enforce it did not contain it. `postalCode`
+  // is the same field spelled the way nobody in this codebase spells it.
+  'pincode',
+  'postcode',
+  // A delivery is TO somebody. These are what a carrier's label calls that
+  // somebody, and each of them is the customer's name under another word.
+  'recipient',
+  'consignee',
+  'deliveryTo',
+  // The courier's handles on a customer's parcel. `ORDER_HAS_LABEL` reads all
+  // three today and answers a BOOLEAN, which is the whole point of it — a
+  // projection that answered the VALUE instead would have walked clean past
+  // this vocabulary until they were in it.
+  'awbNumber',
+  'trackingNumber',
+  'shipmentId',
   'orderNumber',
   'orderId',
   'orderItemId',
@@ -775,23 +807,79 @@ const FORBIDDEN_KEYS = [
   'phone',
 ].map((k) => k.toLowerCase())
 
-/** Every key in the structure, at every depth, lowercased. */
-function collectKeys(value: unknown, out: string[] = []): string[] {
+/**
+ * Words that name a CUSTOMER here and something innocent elsewhere.
+ *
+ * `name` is the one that matters: on this boundary a bare `name` is whoever the
+ * payload is about, and the only people a vendor payload is about are our
+ * customers. But a vendor has a name, and so does a carrier, and dropping the
+ * word for that reason would leave the vocabulary unable to see the single most
+ * likely field on a shipping label.
+ *
+ * So it is qualified rather than dropped, and the qualification is the OWNER —
+ * the key the value hangs under, or the table a projection reads from. A
+ * `carrier: { name }` names a courier; a bare `name`, or one under any other
+ * owner, is presumed to be a person's. Anything that needs to say otherwise
+ * says so by qualifying itself (`carrierName`, `vendorName`), which is a whole
+ * key and not in this list at all.
+ */
+const AMBIGUOUS_KEYS = ['name', 'city', 'line1', 'line2'].map((k) => k.toLowerCase())
+
+/** The owners under which an ambiguous word names something that is not a person. */
+const NAMED_OWNERS = ['vendor', 'carrier', 'courier', 'facility'].map((k) => k.toLowerCase())
+
+/** The tables whose `name` column is the CALLER'S OWN shop, not a customer's. */
+const NAMED_OWNER_TABLES = ['vendors', 'vendor_users']
+
+interface FoundKey {
+  key: string
+  /** The key this one hangs under, lowercased. `null` at the top level. */
+  owner: string | null
+}
+
+/** Every key in the structure, at every depth, lowercased, with its owner. */
+function collectKeys(
+  value: unknown,
+  owner: string | null = null,
+  out: FoundKey[] = []
+): FoundKey[] {
   if (Array.isArray(value)) {
-    for (const entry of value) collectKeys(entry, out)
+    // An element inherits the key that named the array: `carriers: [{ name }]`
+    // is still a carrier's name.
+    for (const entry of value) collectKeys(entry, owner, out)
     return out
   }
   if (value && typeof value === 'object') {
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-      out.push(key.toLowerCase())
-      collectKeys(child, out)
+      out.push({ key: key.toLowerCase(), owner })
+      collectKeys(child, key.toLowerCase(), out)
     }
   }
   return out
 }
 
+function isForbidden(found: FoundKey): boolean {
+  if (FORBIDDEN_KEYS.includes(found.key)) return true
+  return AMBIGUOUS_KEYS.includes(found.key) && !NAMED_OWNERS.includes(found.owner ?? '')
+}
+
 function forbiddenKeysIn(value: unknown): string[] {
-  return [...new Set(collectKeys(value))].filter((k) => FORBIDDEN_KEYS.includes(k))
+  return [...new Set(collectKeys(value).filter(isForbidden).map((f) => f.key))]
+}
+
+/**
+ * The forbidden columns a SELECT asked the database for.
+ *
+ * The same vocabulary, judged against the TABLE rather than against a parent
+ * key: a projection has no enclosing object, so `vendors.name` is the caller's
+ * own shop and `orders.name` is a customer.
+ */
+function forbiddenColumnsIn(q: RecordedQuery): string[] {
+  return (q.fields ?? []).filter((f) => {
+    const key = f.toLowerCase()
+    if (FORBIDDEN_KEYS.includes(key)) return true
+    return AMBIGUOUS_KEYS.includes(key) && !NAMED_OWNER_TABLES.includes(q.table ?? '')
+  })
 }
 
 /** Tables whose rows belong to exactly one vendor, so a read must name it. */
@@ -864,6 +952,16 @@ const JOB_KEYED_TABLES = [
   // through a job we scoped or a transfer we scoped, both of which name the
   // caller in their own WHERE.
   'production_transfer_jobs',
+  /**
+   * The SIXTH table, and the one this file used to assert the gap about rather
+   * than close. `getVendorJobArtwork` joins `order_items` for one JSON field,
+   * and that table holds `order_id`, `customizations` and the whole snapshot —
+   * more customer data than anything else on this boundary except `orders`
+   * itself. It has no vendor column, so it cannot be SCOPED; it is reachable
+   * only behind `getVendorJob`, which is exactly what job-keyed means, and the
+   * gate assertion below is what makes that a check instead of a claim.
+   */
+  'order_items',
 ]
 
 /**
@@ -875,6 +973,36 @@ const JOB_KEYED_TABLES = [
  * that only ever knew about `production_jobs` would have called that unproven.
  */
 const GATE_TABLES = ['production_jobs', 'production_transfers']
+
+/**
+ * The scope lookup itself, and it is not a vendor-facing read.
+ *
+ * `requireVendor` resolves WHICH vendor is asking by reading `vendor_users`
+ * joined to `vendors`, filtered on the SESSION USER — so there is no caller id
+ * to bind yet; binding one would be assuming the answer. Excluded deliberately,
+ * and named here rather than being two more tables nothing examines.
+ */
+const MIDDLEWARE_TABLES = ['vendor_users', 'vendors']
+
+/** Written, never read back on this boundary. */
+const WRITE_ONLY_TABLES = ['admin_audit_log']
+
+/**
+ * Every table any vendor route may touch, in ONE list.
+ *
+ * Property 1 is an allow-list and an allow-list fails silently, so its cost is
+ * that a table nobody listed is not judged — it is skipped. This closes that:
+ * the account is compared against what the route table actually queries, so an
+ * unlisted table is a failure rather than an absence.
+ */
+const ACCOUNTED_TABLES = [
+  ...VENDOR_OWNED_TABLES,
+  ...ORDER_KEYED_TABLES,
+  ...TRANSFER_TABLES,
+  ...JOB_KEYED_TABLES,
+  ...MIDDLEWARE_TABLES,
+  ...WRITE_ONLY_TABLES,
+]
 
 /** Every scoped table one query touches, in its FROM or in any of its JOINs. */
 function scopedTablesTouched(q: RecordedQuery): string[] {
@@ -925,6 +1053,33 @@ function unscopedReads(qs: readonly RecordedQuery[], vendorId: string): Recorded
       !params(q.where).includes(vendorId) &&
       !(q.op !== 'select' && bindsVendorInValues(q.values, vendorId))
   )
+}
+
+/** Every table this query touches, in its FROM or in any of its JOINs. */
+const tablesTouched = (q: RecordedQuery): string[] =>
+  [q.table, ...q.joins].filter((t): t is string => t !== null)
+
+/**
+ * Job-keyed rows read with no scoped gate read to hang off.
+ *
+ * Factored out for the reason `unscopedReads` was: a rule nobody has watched
+ * fail is indistinguishable from a rule that examines nothing. A job-keyed
+ * table carries no vendor column, so the ONLY thing that makes reading it safe
+ * is that a `production_jobs` or `production_transfers` row was read with the
+ * caller's id FIRST. Without that read the join proves nothing.
+ */
+function jobKeyedWithoutGate(qs: readonly RecordedQuery[], vendorId: string): string[] {
+  const touched = qs.filter((q) => tablesTouched(q).some((t) => JOB_KEYED_TABLES.includes(t)))
+  if (touched.length === 0) return []
+
+  const gated = qs.some(
+    (q) =>
+      q.op === 'select' &&
+      q.table !== null &&
+      GATE_TABLES.includes(q.table) &&
+      params(q.where).includes(vendorId)
+  )
+  return gated ? [] : touched.map((q) => `${q.op}:${q.table}`)
 }
 
 /** `OWNED_ROWS`, with whatever the route's own entry layers over it. */
@@ -995,19 +1150,10 @@ describe('property 1: a vendor reaches only their own rows', () => {
       // Job-keyed tables are safe only because a job — or a parcel — was scoped
       // first. JOINS count: a table reached only through a join is exactly the
       // position #678's two tables were in when nothing examined them.
-      const touchedJobKeyed = queries.some((q) =>
-        [q.table, ...q.joins].some((t) => t !== null && JOB_KEYED_TABLES.includes(t))
-      )
-      if (touchedJobKeyed) {
-        const scopedGateRead = queries.some(
-          (q) =>
-            q.op === 'select' &&
-            q.table !== null &&
-            GATE_TABLES.includes(q.table) &&
-            params(q.where).includes(VENDOR_B)
-        )
-        expect(scopedGateRead, 'job-keyed rows were read without a scoped gate read').toBe(true)
-      }
+      expect(
+        jobKeyedWithoutGate(queries, VENDOR_B),
+        'job-keyed rows were read without a scoped gate read'
+      ).toEqual([])
     }
   )
 
@@ -1123,11 +1269,80 @@ describe('property 1: a vendor reaches only their own rows', () => {
     // ...and it clears the same reads once they name the caller, so it is a
     // check and not a blanket refusal.
     expect(unscopedReads(planted.map((p) => ({ ...p, where: scoped })), VENDOR_B)).toEqual([])
+  })
 
-    // A table nobody listed is genuinely not covered. Stated out loud, because
-    // it is the property's cost: the next table to cross this boundary has to
-    // be added to ORDER_KEYED_TABLES or it enjoys the same silence.
-    expect(unscopedReads([q({ table: 'order_items' })], VENDOR_B)).toEqual([])
+  it('the job-keyed rule actually catches an ungated read — not vacuous either', () => {
+    const q = (over: Partial<RecordedQuery>): RecordedQuery => ({
+      op: 'select',
+      table: null,
+      fields: ['id'],
+      joins: [],
+      orderBy: [],
+      ...over,
+    })
+    const scopedJob = q({
+      table: 'production_jobs',
+      where: sql`"production_jobs"."vendor_id" = ${VENDOR_B}`,
+    })
+
+    // `order_items` used to be the table this file named OUT LOUD as uncovered
+    // — "the next table to cross this boundary has to be added or it enjoys the
+    // same silence" — while `getVendorJobArtwork` was already joining it. It is
+    // job-keyed now, so an ungated read of it is a finding rather than a
+    // shrug...
+    expect(jobKeyedWithoutGate([q({ table: 'order_items' })], VENDOR_B)).toEqual([
+      'select:order_items',
+    ])
+    expect(
+      jobKeyedWithoutGate([q({ table: 'production_job_items', joins: ['order_items'] })], VENDOR_B)
+    ).toEqual(['select:production_job_items'])
+
+    // ...and it clears once the gate read that makes it safe is there, which is
+    // what `getVendorJobArtwork` does: `getVendorJob` first, item join second.
+    expect(jobKeyedWithoutGate([scopedJob, q({ table: 'order_items' })], VENDOR_B)).toEqual([])
+    // A gate read for the WRONG vendor is not a gate.
+    expect(
+      jobKeyedWithoutGate(
+        [
+          q({ table: 'production_jobs', where: sql`"x" = ${VENDOR_A}` }),
+          q({ table: 'order_items' }),
+        ],
+        VENDOR_B
+      )
+    ).toEqual(['select:order_items'])
+  })
+
+  it('every table this boundary touches is in one of the vocabularies', async () => {
+    // The allow-list's cost, turned into a check. Property 1 fails SILENTLY: a
+    // table nobody listed is not judged unscoped, it is not examined — the
+    // silence that has now been found six times on this surface
+    // (`order_consolidation`, `order_shipments`, `production_job_photos`,
+    // `production_transfers`, `orders`, `order_items`). Enumerating the
+    // vocabularies and comparing them against what the routes ACTUALLY touch is
+    // what stops there being a seventh: the next table lands here, by name, on
+    // the commit that first queries it.
+    const touched = new Set<string>()
+    for (const route of ROUTE_TABLE) {
+      queries.length = 0
+      rowQueues.clear()
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      seedFor(route)
+      const [path, init] = route.mine()
+      await run(path, init)
+      for (const q of queries) for (const t of tablesTouched(q)) touched.add(t)
+    }
+
+    expect(
+      [...touched].filter((t) => !ACCOUNTED_TABLES.includes(t)).sort(),
+      'a table crossed the vendor boundary that no vocabulary in this file examines'
+    ).toEqual([])
+
+    // ...and the account is not vacuous: the routes really were driven, and
+    // every table listed above really is reached by one of them.
+    expect(touched.size).toBeGreaterThanOrEqual(10)
+    for (const listed of [...SCOPED_TABLES, ...JOB_KEYED_TABLES]) {
+      expect(touched.has(listed), `${listed} is listed but no route touches it`).toBe(true)
+    }
   })
 })
 
@@ -1166,11 +1381,7 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
       // absent from today's shape.
       const offenders = queries
         .filter((q) => q.op === 'select')
-        .flatMap((q) =>
-          (q.fields ?? [])
-            .filter((f) => FORBIDDEN_KEYS.includes(f.toLowerCase()))
-            .map((f) => `${q.table}.${f}`)
-        )
+        .flatMap((q) => forbiddenColumnsIn(q).map((f) => `${q.table}.${f}`))
       expect([...new Set(offenders)].sort()).toEqual([])
     }
   )
@@ -1198,6 +1409,154 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
       'customeremail',
     ])
     expect(forbiddenKeysIn({ id: 1, amountExpected: '10.00' })).toEqual([])
+  })
+
+  it('the widened vocabulary finds the words §6 actually names', () => {
+    // Same guard as above, over the words that were missing while the header
+    // claimed the vocabulary was complete. `pincode` is the one §6 forbids by
+    // name; the three carrier handles are what `ORDER_HAS_LABEL` reads as a
+    // boolean and a widened projection would return as a value.
+    expect(forbiddenKeysIn({ shipping: { pincode: '110019' } })).toEqual(['pincode'])
+    expect(forbiddenKeysIn({ label: { awbNumber: 'DL1' } })).toEqual(['awbnumber'])
+    expect(forbiddenKeysIn({ trackingNumber: 'X', shipmentId: 'Y' }).sort()).toEqual([
+      'shipmentid',
+      'trackingnumber',
+    ])
+    expect(forbiddenKeysIn({ parcel: { recipient: 'Asha', consignee: 'Asha' } }).sort()).toEqual([
+      'consignee',
+      'recipient',
+    ])
+  })
+
+  it('the ambiguous words are qualified by their OWNER, not dropped', () => {
+    // A bare `name` on this boundary is a person's, and it is caught...
+    expect(forbiddenKeysIn({ name: 'Asha Menon' })).toEqual(['name'])
+    expect(
+      forbiddenKeysIn({ delivery: { name: 'Asha', city: 'Delhi', line1: '221B' } }).sort()
+    ).toEqual(['city', 'line1', 'name'])
+
+    // ...and a carrier's or a vendor's is not, because it names neither a
+    // person nor a place a person lives. That exemption is what lets the word
+    // stay in the vocabulary at all: dropping `name` to avoid the false
+    // positive is how the most likely field on a shipping label goes unwatched.
+    expect(forbiddenKeysIn({ carrier: { name: 'Delhivery' } })).toEqual([])
+    expect(forbiddenKeysIn({ vendor: { name: 'Bengaluru Print Co', city: 'Bengaluru' } })).toEqual(
+      []
+    )
+    // A qualified key is a different word and was never ambiguous.
+    expect(forbiddenKeysIn({ carrierName: 'Delhivery', vendorName: 'Print Co' })).toEqual([])
+
+    // The projection half asks the same question of the TABLE.
+    const column = (table: string, ...fields: string[]): RecordedQuery => ({
+      op: 'select',
+      table,
+      fields,
+      joins: [],
+      orderBy: [],
+    })
+    expect(forbiddenColumnsIn(column('vendors', 'id', 'name'))).toEqual([])
+    expect(forbiddenColumnsIn(column('orders', 'id', 'name'))).toEqual(['name'])
+    expect(forbiddenColumnsIn(column('order_shipments', 'awbNumber'))).toEqual(['awbNumber'])
+  })
+})
+
+// ============================================================================
+// §8 — every audit row on this boundary names the shop it was written for
+// ============================================================================
+
+/** `routes/vendor.ts`, comments removed so a scan judges CODE and not prose. */
+const VENDOR_ROUTE_SOURCE = readFileSync(
+  resolve(__dirname, '../../../src/routes/vendor.ts'),
+  'utf8'
+)
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '')
+
+/**
+ * *"Property test: every audit row written under `/api/vendor/*` carries
+ * `metadata.vendorId`."* — §8, verbatim.
+ *
+ * It lives HERE and not in the per-route suites because `jobs.test.ts` and
+ * `photos.test.ts` mock `recordAudit` outright: they assert what the call site
+ * passed, which is exactly the half of the merge that is NOT in question. The
+ * `vendorId` is added inside `recordAudit`, last, from the context — so it is
+ * only observable where the real one runs and the insert is recorded, which is
+ * this file. Three of the six vendor actions were covered; the property is
+ * about all six, and universality is the whole claim.
+ */
+describe('§8: every audit row names the vendor', () => {
+  const auditRows = () =>
+    queries
+      .filter((q) => q.op === 'insert' && q.table === 'admin_audit_log')
+      .map((q) => (q.values ?? {}) as Record<string, unknown>)
+
+  it('across every route in the table, and on the refusal path too', async () => {
+    const seen: string[] = []
+
+    const check = (where: string) => {
+      for (const row of auditRows()) {
+        const metadata = (row.metadata ?? {}) as Record<string, unknown>
+        seen.push(String(row.action))
+        expect(
+          metadata.vendorId,
+          `${where} wrote ${String(row.action)} without naming the vendor`
+        ).toBe(VENDOR_B)
+      }
+    }
+
+    for (const route of ROUTE_TABLE) {
+      queries.length = 0
+      rowQueues.clear()
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      seedFor(route)
+      const [path, init] = route.mine()
+      await run(path, init)
+      check(label(route))
+    }
+
+    // The sixth action is a REFUSAL, which no entitled request produces, so it
+    // is driven on purpose: `received -> dispatched` is not a vendor edge.
+    queries.length = 0
+    rowQueues.clear()
+    queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+    queueRows(OWNED_ROWS)
+    const refused = await run(
+      `/api/vendor/jobs/${B_JOB_ID}`,
+      jsonInit({ status: 'dispatched' })
+    )
+    expect(refused.res.status).toBe(409)
+    check('PATCH /jobs/:id (refused)')
+
+    // Not vacuous, and not partial: the six actions `routes/vendor.ts` can emit
+    // are the six this property was asserted over. A seventh added later is
+    // either driven here or fails this list.
+    expect([...new Set(seen)].sort()).toEqual([
+      'production_job.label_issued',
+      'production_job.photos_submitted',
+      'production_job.transition_refused',
+      'production_job.transitioned',
+      'production_transfer.dispatched',
+      'production_transfer.received',
+    ])
+  })
+
+  it('the route file emits no audit action this property has not seen', () => {
+    // The list above is written down, so it can go stale. This is what stops
+    // it: every `action:` literal in the router, compared against the six.
+    const emitted = [
+      ...new Set(
+        [...VENDOR_ROUTE_SOURCE.matchAll(/action:\s*["']([^"']+)["']/g)].map((m) => m[1])
+      ),
+    ].sort()
+
+    expect(emitted).toEqual([
+      'production_job.label_issued',
+      'production_job.photos_submitted',
+      'production_job.transition_refused',
+      'production_job.transitioned',
+      'production_transfer.dispatched',
+      'production_transfer.received',
+    ])
   })
 })
 
@@ -2002,70 +2361,153 @@ describe('property 4: the carrier label reaches only the consolidator, or is nev
      * is one where the answer looks identical. So the order is asserted where it
      * is actually decided.
      */
-    const VENDOR_SOURCE = readFileSync(
-      resolve(__dirname, '../../../src/routes/vendor.ts'),
-      'utf8'
-    )
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '')
+    const VENDOR_SOURCE = VENDOR_ROUTE_SOURCE
 
-    /** The label handler alone: from its path literal to the next registration. */
-    const LABEL_HANDLER = (() => {
-      const at = VENDOR_SOURCE.indexOf('"/jobs/:id/label"')
+    /**
+     * ONE handler, delimited by BALANCED PARENTHESES from its registration.
+     *
+     * This used to slice from the path literal to the next `vendorApp.`, which
+     * is a hundred lines further on: the label handler ends and three QC
+     * helpers follow before the next route is registered. So every assertion
+     * over the slice — `not.toMatch(/\btx\b/)` in particular — was judging a
+     * region the handler does not own, and would have gone red for something
+     * another function did. A scan whose slice is wrong is not a weaker check,
+     * it is a check of something else.
+     */
+    function handlerFor(pathLiteral: string): string {
+      const at = VENDOR_SOURCE.indexOf(pathLiteral)
       if (at === -1) return ''
-      const rest = VENDOR_SOURCE.slice(at)
-      const next = rest.indexOf('vendorApp.', 1)
-      return next === -1 ? rest : rest.slice(0, next)
-    })()
+      const open = VENDOR_SOURCE.lastIndexOf('(', at)
+      if (open === -1) return ''
 
-    const firstIndexOf = (needle: string) => LABEL_HANDLER.indexOf(needle)
+      let depth = 0
+      for (let i = open; i < VENDOR_SOURCE.length; i += 1) {
+        if (VENDOR_SOURCE[i] === '(') depth += 1
+        else if (VENDOR_SOURCE[i] === ')') {
+          depth -= 1
+          if (depth === 0) return VENDOR_SOURCE.slice(open, i + 1)
+        }
+      }
+      return ''
+    }
+
+    const LABEL_HANDLER = handlerFor('"/jobs/:id/label"')
+
+    /**
+     * The ways a handler can sign a customer's label before it has decided the
+     * caller may have one.
+     *
+     * The old version compared three `indexOf`s: authorise, `404`, sign. All
+     * three are satisfied by hoisting `const notFound = () => c.json({...},
+     * 404)` above an UNCONDITIONAL sign — the 404 appears early, the
+     * authorising call appears early, and the signature happens anyway. What
+     * cannot be faked by hoisting is a `return` BETWEEN the answer and the
+     * signature, because that is the refusal path itself.
+     */
+    function signsBeforeAuthorising(handler: string): string[] {
+      const authorised = handler.indexOf('getVendorJobLabelKey')
+      const signed = handler.indexOf('getPresignedDownloadUrl')
+
+      // Present at all: a scan over the wrong slice reports -1 for everything
+      // and passes every ordering comparison it makes.
+      const missing: string[] = []
+      if (handler === '') missing.push('no handler found to scan')
+      if (authorised === -1) missing.push('the handler never calls the scoped module')
+      if (signed === -1) missing.push('the handler never signs anything')
+      if (missing.length > 0) return missing
+
+      if (authorised > signed) return ['the handler signs before it authorises']
+
+      const between = handler.slice(authorised, signed)
+      if (!/\breturn\b/.test(between)) {
+        return ['nothing returns between authorising and signing — the signature is unconditional']
+      }
+      if (!/return[^\n]*404/.test(between) && !/return\s+\w*[Nn]ot[Ff]ound\s*\(/.test(between)) {
+        return ['the answer between authorising and signing is not a refusal']
+      }
+      return []
+    }
+
+    it('the scan reads the label handler and NOTHING else', () => {
+      expect(LABEL_HANDLER, 'no /jobs/:id/label handler found to scan').not.toBe('')
+      expect(LABEL_HANDLER.startsWith('(')).toBe(true)
+      expect(LABEL_HANDLER.endsWith(')')).toBe(true)
+      expect(LABEL_HANDLER).toContain('"/jobs/:id/label"')
+      expect(LABEL_HANDLER).toContain('getVendorJobLabelKey')
+
+      // It stops where the handler stops. The naive slice below is what this
+      // file used to scan, and it swallows the QC helpers that follow — which
+      // is how an assertion about the label handler ended up covering
+      // `qcPhotoExtension`.
+      const naive = (() => {
+        const at = VENDOR_SOURCE.indexOf('"/jobs/:id/label"')
+        const rest = VENDOR_SOURCE.slice(at)
+        const next = rest.indexOf('vendorApp.', 1)
+        return next === -1 ? rest : rest.slice(0, next)
+      })()
+      expect(naive, 'the naive slice no longer overshoots — check this test').toContain(
+        'qcPhotoExtension'
+      )
+      expect(LABEL_HANDLER).not.toContain('qcPhotoExtension')
+      expect(LABEL_HANDLER).not.toContain('"/jobs/:id/photos"')
+      expect(LABEL_HANDLER.length).toBeLessThan(naive.length)
+    })
 
     it('AUTHORISES BEFORE IT SIGNS — in the code, not only in the fixture', () => {
-      expect(LABEL_HANDLER, 'no /jobs/:id/label handler found to scan').not.toBe('')
+      expect(signsBeforeAuthorising(LABEL_HANDLER)).toEqual([])
+    })
 
-      const authorised = firstIndexOf('getVendorJobLabelKey')
-      const refused = firstIndexOf('404')
-      const signed = firstIndexOf('getPresignedDownloadUrl')
+    it('the ordering scan can actually fail — this property is not vacuous', () => {
+      // Three handlers that must be rejected, one per way the index comparison
+      // this replaces was satisfiable while the route leaked.
+      expect(
+        signsBeforeAuthorising(
+          '(async (c) => { const url = await getPresignedDownloadUrl(k); const r = await getVendorJobLabelKey(v); })'
+        )
+      ).toEqual(['the handler signs before it authorises'])
 
-      // Each is present at all — a scan over the wrong slice would report -1
-      // for everything and pass every ordering comparison it made.
-      expect(authorised, 'the handler never calls the scoped module').toBeGreaterThan(-1)
-      expect(refused, 'the handler has no 404 path').toBeGreaterThan(-1)
-      expect(signed, 'the handler never signs anything').toBeGreaterThan(-1)
+      // THE ONE THE OLD SCAN PASSED: a hoisted refusal helper puts `404` near
+      // the top, so "the 404 comes before the signature" was true while the
+      // signature was produced for everybody.
+      expect(
+        signsBeforeAuthorising(`(async (c) => {
+          const notFound = () => c.json({ error: "Label not found" }, 404);
+          const labelRef = await getVendorJobLabelKey(vendorId, id);
+          const url = await getPresignedDownloadUrl(labelRef.key, TTL);
+          if (!labelRef) return notFound();
+        })`)
+      ).toEqual([
+        'nothing returns between authorising and signing — the signature is unconditional',
+      ])
 
-      expect(authorised, 'the handler signs before it authorises').toBeLessThan(signed)
-      expect(refused, 'the 404 is returned after the URL was already signed').toBeLessThan(
-        signed
-      )
+      expect(signsBeforeAuthorising('')).toContain('no handler found to scan')
+
+      // ...and it clears a handler that refuses in between, so it is a check
+      // and not a blanket refusal.
+      expect(
+        signsBeforeAuthorising(`(async (c) => {
+          const labelRef = await getVendorJobLabelKey(vendorId, id);
+          if (!labelRef) return c.json({ error: "Label not found" }, 404);
+          const url = await getPresignedDownloadUrl(labelRef.key, TTL);
+        })`)
+      ).toEqual([])
     })
 
     it('audits AFTER the signature exists, and shares no transaction', () => {
-      const signed = firstIndexOf('getPresignedDownloadUrl')
-      const audited = firstIndexOf('recordAudit')
+      const signed = LABEL_HANDLER.indexOf('getPresignedDownloadUrl')
+      const audited = LABEL_HANDLER.indexOf('recordAudit')
 
+      expect(signed, 'the handler never signs anything').toBeGreaterThan(-1)
       expect(audited, 'the label issue is not audited at all').toBeGreaterThan(-1)
       // "On first success" means after the URL is real. A row written before the
       // presigner claims a label was issued that a throw would then unissue.
       expect(audited, 'the audit row is written before the URL exists').toBeGreaterThan(signed)
       // No transaction exists on this path — §8's rule — so none is invented,
       // and `recordAudit` therefore cannot rethrow into a handler that has
-      // already handed the vendor a working URL.
+      // already handed the vendor a working URL. Over the handler's OWN text
+      // now, which is the only region that claim is about.
       expect(LABEL_HANDLER, 'the label handler invented a transaction').not.toMatch(/\btx\b/)
       expect(LABEL_HANDLER).not.toContain('transaction')
-    })
-
-    it('the ordering comparator can actually fail — this property is not vacuous', () => {
-      // The two assertions above are `<` over indexes into a string. If the
-      // slice were empty both sides would be -1 and every comparison would be
-      // trivially satisfied, which is the exact shape of a test that cannot go
-      // red. So the comparator is shown deciding both ways.
-      const signsFirst = 'const url = await getPresignedDownloadUrl(k); const r = await getVendorJobLabelKey(v);'
-      expect(signsFirst.indexOf('getVendorJobLabelKey')).toBeGreaterThan(
-        signsFirst.indexOf('getPresignedDownloadUrl')
-      )
-      expect(LABEL_HANDLER.indexOf('getVendorJobLabelKey')).toBeLessThan(
-        LABEL_HANDLER.indexOf('getPresignedDownloadUrl')
-      )
     })
 
     it('reaches no table outside the vocabulary Property 1 examines', async () => {

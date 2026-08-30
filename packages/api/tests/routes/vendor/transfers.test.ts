@@ -15,6 +15,13 @@
  *    first property, which is a hard, already-tested boundary. If B needs to
  *    chase a parcel, an admin chases it — the admin sees both ends.
  *
+ *    Asserted on the PROJECTION — the columns the module asked the database for
+ *    — and not only on the response. The rows come from `transferRow()`, a
+ *    fixture in this file, so `Object.keys(body.transfer)` compares the fixture
+ *    to a list of the fixture's own keys and agrees with itself whatever the
+ *    module does. `toVendorId` added to `vendorTransferColumns` is the leak this
+ *    property exists for, and only `columnsOf` can see it.
+ *
  * 2. **The two writes belong to opposite ends and neither end may borrow the
  *    other's.** `received_at` is settable only by `to_vendor_id`; a transfer is
  *    created only by `from_vendor_id`. Neither is a check in application code:
@@ -53,6 +60,12 @@
  *    read off the real insert — including `metadata.vendorId`, which the
  *    recorder captures because the middleware put it on the context.
  *
+ *    And SURVIVING is asserted, not only `inTx`. §8 asks for each mutating
+ *    handler to be run against a transaction that throws at COMMIT, with no
+ *    success row surviving and the refusal row surviving; `failCommit` is what
+ *    makes that reachable, since a callback that throws is a case the response
+ *    already gives away.
+ *
  * Harness: the recording query builder from `jobs.test.ts` / `photos.test.ts`.
  * `src/database` records the WHERE that actually reached the driver, `src/auth`
  * is mocked so each test picks the caller, and the REAL `requireVendor`,
@@ -69,6 +82,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildRouteApp } from '../../helpers/route-app'
 import { vendorSessionFor } from '../../helpers/vendor-session'
+import type { RecordedQuery } from '../../helpers/query-recorder'
 import '../../setup'
 
 import { productionJobs } from '../../../src/database/schema/production-jobs'
@@ -136,6 +150,36 @@ const TRANSFER_KEYS = [
   'receivedAt',
   'reference',
 ]
+
+/**
+ * The columns a query actually asked the database for.
+ *
+ * The load-bearing helper in this file, and the one it did not have. Every
+ * seven-field claim below used to read `Object.keys(body.transfer)` — the keys
+ * of `transferRow()`, a fixture this file writes — so it compared the fixture to
+ * a list of the fixture's own keys and agreed with itself. `toVendorId` added to
+ * `vendorTransferColumns` in `lib/vendor-scope.ts` would have shipped vendor B
+ * the identity of vendor A with every suite in this feature green.
+ *
+ * The projection is where that is decidable, because it is what the module asked
+ * for rather than what a fixture chose to answer with. `null` means the read was
+ * WHOLESALE — `db.select()` with no argument, which returns every column of
+ * every joined row — and is a failure in itself, so it is refused here rather
+ * than silently sorted into an empty list.
+ */
+function columnsOf(q: RecordedQuery | undefined, what: string): string[] {
+  expect(q, `${what}: no such query was issued`).toBeDefined()
+  expect(q!.fields, `${what} selected the table WHOLESALE`).not.toBeNull()
+  return [...(q!.fields ?? [])].sort()
+}
+
+/** The same, for the `.returning({...})` of an INSERT or an UPDATE. */
+function returnedColumnsOf(q: RecordedQuery | undefined, what: string): string[] {
+  expect(q, `${what}: no such query was issued`).toBeDefined()
+  expect(q!.returning, `${what} returned the row WHOLESALE`).not.toBeNull()
+  expect(q!.returning, `${what} returned nothing at all`).toBeDefined()
+  return [...(q!.returning ?? [])].sort()
+}
 
 /** A transfer row as the scoped module's column list returns it. */
 function transferRow(over: Record<string, unknown> = {}) {
@@ -346,6 +390,14 @@ describe('GET /transfers', () => {
     const res = await buildApp().request('/api/vendor/transfers')
     const body = await readJson<{ items: Array<Record<string, unknown>> }>(res)
 
+    // THE PROJECTION, not the fixture. `body.items[0]` is `transferRow()`, which
+    // this file wrote, so its keys prove nothing about what was asked for.
+    expect(
+      columnsOf(ops('select', productionTransfers)[0], 'the transfer list read'),
+      'the vendor-facing transfer projection changed shape'
+    ).toEqual(TRANSFER_KEYS)
+    // ...and the two agree, which is what makes the body assertion meaningful
+    // rather than circular.
     expect(Object.keys(body.items[0]!).sort()).toEqual(TRANSFER_KEYS)
     expect(body.items[0]!.direction).toBe('inbound')
 
@@ -408,7 +460,15 @@ describe('GET /transfers/:id', () => {
 
     expect(res.status).toBe(200)
     expect(body.jobIds).toEqual([JOB_A, JOB_B])
+    expect(
+      columnsOf(ops('select', productionTransfers)[0], 'the single-transfer read')
+    ).toEqual(TRANSFER_KEYS)
     expect(Object.keys(body.transfer).sort()).toEqual(TRANSFER_KEYS)
+
+    // The manifest read asks for the job ID and NOTHING else — a second column
+    // here would be a handle on the sender's work, which is the smaller version
+    // of the sender's name.
+    expect(columnsOf(ops('select', productionJobs)[0], 'the manifest read')).toEqual(['id'])
 
     // The join is entered from the caller's own jobs. A receiving vendor holds
     // none of the jobs on the parcel — they belong to the sender — so B gets an
@@ -444,12 +504,24 @@ describe('POST /transfers', () => {
     const body = await readJson<{ transfer: Record<string, unknown>; jobIds: string[] }>(res)
 
     expect(res.status).toBe(201)
+    // The created parcel is answered straight out of `.returning({...})`, so
+    // THAT is the projection this response's shape is decided by.
+    expect(
+      returnedColumnsOf(ops('insert', productionTransfers)[0], 'the transfer insert'),
+      'the created-transfer projection changed shape'
+    ).toEqual(TRANSFER_KEYS)
     expect(Object.keys(body.transfer).sort()).toEqual(TRANSFER_KEYS)
     expect(body.jobIds.sort()).toEqual([JOB_A, JOB_B].sort())
     expect(forbiddenIn(body)).toEqual([])
 
     expect(recorder.tx.commits).toBe(1)
     expect(recorder.tx.rollbacks).toBe(0)
+    // The other half of the rollback property: on a COMMITTED transaction the
+    // rows that were issued are the rows that survive. Without this, the
+    // "nothing survived" assertions below would also pass against a recorder
+    // that marked everything rolled back.
+    expect(recorder.survivors('insert', productionTransfers)).toHaveLength(1)
+    expect(recorder.survivors('update', productionJobs)).toHaveLength(1)
   })
 
   it('writes from_vendor_id from the SESSION and to_vendor_id from the consolidator', async () => {
@@ -709,7 +781,62 @@ describe('POST /transfers', () => {
 
     // A transfer whose jobs never moved is exactly the state this ordering
     // exists to make impossible, so the insert goes back with everything else.
+    // ISSUED and SURVIVING are different facts here, and only the second one is
+    // the property: the parcel row WAS written — the guard reads it, which is
+    // why the insert comes first — and it is gone afterwards. Asserting
+    // `rollbacks` alone proved only that the callback threw.
+    expect(ops('insert', productionTransfers)).toHaveLength(1)
+    expect(
+      recorder.survivors('insert', productionTransfers),
+      'the parcel survived a transaction that rolled back'
+    ).toEqual([])
+    expect(recorder.survivors('insert', productionTransferJobs)).toEqual([])
     expect(ops('update', productionJobs)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+  })
+
+  it('takes the whole parcel back when a write fails part-way through', async () => {
+    seedDispatchable()
+    // The jobs move LAST, so a driver failure there is the worst-placed one:
+    // everything before it has already been written.
+    recorder.failNext('update:production_jobs')
+
+    const res = await dispatch()
+    expect(res.status).toBe(500)
+
+    expect(ops('insert', productionTransfers)).toHaveLength(1)
+    expect(recorder.survivors('insert', productionTransfers)).toEqual([])
+    expect(recorder.survivors('insert', productionTransferJobs)).toEqual([])
+    expect(recorder.survivors('update', productionJobs)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+  })
+
+  it('leaves NO success row when the transaction throws at COMMIT', async () => {
+    // §8 of the design, in as many words: *"run each mutating handler against a
+    // `tx` that throws at commit; assert no success row survives and the
+    // refusal row does."* The callback runs to the END here — every write is
+    // issued, the audit row included — and then the commit fails, which is the
+    // one shape a callback-throws test cannot reach.
+    seedDispatchable()
+    recorder.failCommit()
+
+    const res = await dispatch()
+    expect(res.status).toBe(500)
+
+    expect(ops('insert', productionTransfers)).toHaveLength(1)
+    expect(ops('update', productionJobs)).toHaveLength(1)
+    expect(recorder.survivors('insert', productionTransfers)).toEqual([])
+    expect(recorder.survivors('update', productionJobs)).toEqual([])
+
+    // The despatch row SHARES the transaction, so it goes back with the parcel
+    // it describes. A row saying "this parcel was despatched" beside a transfer
+    // that never committed is the exact lie the sharing rule exists to prevent.
+    expect(auditRows()).toHaveLength(1)
+    expect(auditRows()[0]!.outcome).toBe('success')
+    expect(recorder.survivors('insert', adminAuditLog)).toEqual([])
+
     expect(recorder.tx.rollbacks).toBe(1)
     expect(recorder.tx.commits).toBe(0)
   })
@@ -785,6 +912,17 @@ describe('POST /transfers/:id/received', () => {
     const body = await readJson<{ transfer: Record<string, unknown> }>(res)
 
     expect(res.status).toBe(200)
+
+    // Two reads of one table, and they are DIFFERENT projections on purpose.
+    // The locked read is internal and needs `lostAt` to decide the refusal; the
+    // re-read that becomes the response must never carry it. Reading both off
+    // the fixture would make that distinction invisible, since the fixture is
+    // what decides which keys come back.
+    const [locked, reread] = ops('select', productionTransfers)
+    expect(columnsOf(locked, 'the locked receipt read')).toContain('lostAt')
+    expect(columnsOf(reread, 'the receipt re-read')).toEqual(TRANSFER_KEYS)
+    expect(columnsOf(reread, 'the receipt re-read')).not.toContain('lostAt')
+
     expect(Object.keys(body.transfer).sort()).toEqual(TRANSFER_KEYS)
     expect(forbiddenIn(body)).toEqual([])
 
@@ -858,6 +996,24 @@ describe('POST /transfers/:id/received', () => {
     expect(sql).toContain('dispatched_at')
     expect(sql).toContain('received_at')
     expect(sql).toContain('lost_at')
+  })
+
+  it('confirms nothing when the transaction throws at COMMIT', async () => {
+    // The second mutating handler, against §8's requirement. A parcel that is
+    // recorded as arrived when the commit failed is the worst version of this:
+    // the sending vendor is off the hook for a parcel nobody has.
+    seedReceivable()
+    recorder.failCommit()
+
+    const res = await confirmReceipt()
+    expect(res.status).toBe(500)
+
+    expect(ops('update', productionTransfers)).toHaveLength(1)
+    expect(recorder.survivors('update', productionTransfers)).toEqual([])
+    expect(auditRows()).toHaveLength(1)
+    expect(recorder.survivors('insert', adminAuditLog)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
   })
 
   it('moves no job — a received parcel is a fact about the parcel', async () => {
@@ -943,6 +1099,11 @@ describe('the audit rows', () => {
     // that transaction it would be rolled back too, erasing the evidence it
     // exists to preserve.
     expect(rows[0]!.inTx).toBe(false)
+    // The other half of §8's pairing, and the half the title claims: it does not
+    // merely sit outside the transaction, it SURVIVES the rollback. `inTx` says
+    // where it was written; this says what is left afterwards.
+    expect(recorder.survivors('insert', adminAuditLog)).toHaveLength(1)
+    expect(recorder.tx.rollbacks).toBe(1)
     expect(rows[0]!.metadata!.vendorId).toBe(VENDOR_ID)
   })
 
@@ -976,19 +1137,19 @@ describe('the audit rows', () => {
 // ============================================================================
 
 describe('the locking clause and the route invariant', () => {
-  it('takes FOR UPDATE on the read every transaction in the module rests on', () => {
-    // The recorder answers `.for('update')` exactly as it answers a plain read,
-    // so a lock dropped in a refactor is invisible to it. Counted against the
-    // TRANSACTIONS rather than fixed at a literal — #685's improvement — so a
-    // transaction added without a lock fails rather than a number needing to be
-    // raised by hand.
-    const source = stripComments(readSource('lib/vendor-scope.ts'))
-    const transactions = source.match(/db\.transaction\(/g) ?? []
-    const locks = source.match(/\.for\(["']update["']\)/g) ?? []
-
-    expect(transactions.length, 'no transaction found — the scan is vacuous').toBeGreaterThan(0)
-    expect(locks).toHaveLength(transactions.length)
-  })
+  /**
+   * `FOR UPDATE` is asserted ONCE, in `jobs.test.ts`, and it is asserted there
+   * as a PAIRING rather than as a count.
+   *
+   * This file used to carry a verbatim copy of the counting version — five
+   * `db.transaction(` against five `.for('update')` — and both copies were
+   * satisfied by two locks in one transaction and none in another, by a lock
+   * taken inside an `if`, and by a lock issued after the write it was supposed
+   * to protect. The scan covers `lib/vendor-scope.ts` whole, so the copy added
+   * no coverage; what it added was a second thing to keep in step. Strengthened
+   * in one place instead: `jobs.test.ts` → "every transaction locks the row it
+   * decides from, before it writes".
+   */
 
   it('keeps routes/vendor.ts free of every database import', () => {
     // The route hands the transaction to `recordAudit` as an opaque insert
@@ -997,5 +1158,133 @@ describe('the locking clause and the route invariant', () => {
     const source = stripComments(readSource('routes/vendor.ts'))
     expect(source).not.toMatch(/from ["'][^"']*\/database/)
     expect(source).not.toMatch(/\bdrizzle-orm\b/)
+  })
+})
+
+// ============================================================================
+// The projection — the only place a column-level property is decidable
+// ============================================================================
+
+/**
+ * Columns no vendor-facing read of this surface may ASK FOR.
+ *
+ * Not a list of keys to strip from a response — a list of values that must
+ * never enter this process, because a value we hold is a value that reaches a
+ * log, a trace or a crash dump whether or not a handler puts it in a body.
+ *
+ * `lostAt` is deliberately NOT here: the locked receipt read needs it to decide
+ * the refusal, and the module's own comment says "READ, NEVER PROJECTED". That
+ * distinction is asserted where it lives — the re-read that becomes the
+ * response is checked not to carry it — rather than by banning the column
+ * outright and forcing the refusal to be decided in application code.
+ */
+const FORBIDDEN_COLUMNS = [
+  'orderId',
+  'order_id',
+  'fromVendorId',
+  'from_vendor_id',
+  'toVendorId',
+  'to_vendor_id',
+  'costAmount',
+  'cost_amount',
+  'lostNote',
+  'createdBy',
+  'customerName',
+  'shippingAddress',
+  'email',
+  'phone',
+].map((c) => c.toLowerCase())
+
+/** Every projection this request asked for — SELECTs and `.returning` alike. */
+const projectionsAsked = (): Array<{ what: string; columns: string[] | null }> =>
+  queries.flatMap((q) => [
+    ...(q.op === 'select' ? [{ what: `select:${q.table}`, columns: q.fields }] : []),
+    ...(q.returning !== undefined
+      ? [{ what: `${q.op}:${q.table} returning`, columns: q.returning }]
+      : []),
+  ])
+
+describe('the vendor-facing projection', () => {
+  it('the recorder actually captures the projection — this property is not vacuous', () => {
+    // Without this guard, "the projection is the seven fields" and "the recorder
+    // throws the projection away" produce identical green — `columnsOf` would
+    // return [] for every query and match nothing. That is not hypothetical:
+    // `select: () => builder('select')` discarded the argument until this
+    // commit, so every column assertion in this file was a fixture agreeing
+    // with itself.
+    reset()
+    const withColumns = recorder.db.select({
+      id: productionTransfers.id,
+      toVendorId: productionTransfers.toVendorId,
+    }) as { from: (t: unknown) => unknown }
+    withColumns.from(productionTransfers)
+    expect(ops('select', productionTransfers)[0]!.fields).toEqual(['id', 'toVendorId'])
+
+    reset()
+    const wholesale = recorder.db.select() as { from: (t: unknown) => unknown }
+    wholesale.from(productionTransfers)
+    // `null` is WHOLESALE, and it is a different fact from "no columns" — which
+    // is why `columnsOf` refuses it rather than sorting it into an empty list.
+    expect(ops('select', productionTransfers)[0]!.fields).toBeNull()
+
+    reset()
+  })
+
+  it.each([
+    [
+      'GET /transfers',
+      () => {
+        queueRows({ 'select:production_transfers': [[transferRow()]] })
+        return buildApp().request('/api/vendor/transfers')
+      },
+    ],
+    [
+      'GET /transfers/:id',
+      () => {
+        queueRows({
+          'select:production_transfers': [[transferRow()]],
+          'select:production_jobs': [[{ id: JOB_A }]],
+        })
+        return buildApp().request(`/api/vendor/transfers/${TRANSFER_ID}`)
+      },
+    ],
+    [
+      'POST /transfers',
+      () => {
+        seedDispatchable()
+        return dispatch()
+      },
+    ],
+    [
+      'POST /transfers/:id/received',
+      () => {
+        seedReceivable()
+        return confirmReceipt()
+      },
+    ],
+  ])('%s asks for no counterparty, order or cost column', async (_name, run) => {
+    reset()
+    queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_ID, status: 'active' }]] })
+    await run()
+
+    for (const { what, columns } of projectionsAsked()) {
+      // A wholesale read returns every column of every joined row, which is how
+      // a forbidden one arrives without anybody typing its name.
+      expect(columns, `${what} asked for the row WHOLESALE`).not.toBeNull()
+      expect(
+        (columns ?? []).filter((c) => FORBIDDEN_COLUMNS.includes(c.toLowerCase())),
+        `${what} asked the database for a column this boundary may not hold`
+      ).toEqual([])
+    }
+    // ...and the check saw something, rather than passing over an empty list.
+    expect(projectionsAsked().length).toBeGreaterThan(0)
+  })
+
+  it('the forbidden-column check finds a planted column — this property is not vacuous', () => {
+    const planted = ['id', 'toVendorId'].filter((c) => FORBIDDEN_COLUMNS.includes(c.toLowerCase()))
+    expect(planted).toEqual(['toVendorId'])
+    expect(['id', 'direction'].filter((c) => FORBIDDEN_COLUMNS.includes(c.toLowerCase()))).toEqual(
+      []
+    )
   })
 })

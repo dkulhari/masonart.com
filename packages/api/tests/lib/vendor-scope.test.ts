@@ -71,6 +71,26 @@ describe('vendor-scope module contract', () => {
    */
   const errorTypes = ['LabelSeamNotReady'] as const
 
+  /** Every function this module actually exports, read off the module. */
+  const exportedFunctions = (): string[] =>
+    Object.keys(scope).filter((k) => typeof (scope as any)[k] === 'function')
+
+  /**
+   * The names no vocabulary above accounts for.
+   *
+   * Factored out so the account and its not-vacuous guard share ONE
+   * implementation. They used to be two: the guard declared its own three-name
+   * array and filtered that, so it never touched `scope` at all and passed with
+   * `lib/vendor-scope.ts` deleted — a vacuity guard that was itself vacuous.
+   */
+  const unaccounted = (names: readonly string[]): string[] =>
+    names.filter(
+      (k) =>
+        !scopedFns.includes(k as never) &&
+        !pureHelpers.includes(k as never) &&
+        !errorTypes.includes(k as never)
+    )
+
   it('exports every vendor-facing query', () => {
     for (const fn of scopedFns) {
       expect(typeof (scope as any)[fn], `${fn} missing`).toBe('function')
@@ -93,22 +113,26 @@ describe('vendor-scope module contract', () => {
     // `recordVendorQcPhoto`, so the writes this module exposes were exactly the
     // ones it could not see. An unlisted function was not judged unscoped; it
     // was not examined.
-    const exported = Object.keys(scope).filter((k) => typeof (scope as any)[k] === 'function')
-    const unaccounted = exported.filter(
-      (k) =>
-        !scopedFns.includes(k as any) &&
-        !pureHelpers.includes(k as any) &&
-        !errorTypes.includes(k as any)
-    )
-    expect(unaccounted).toEqual([])
+    expect(unaccounted(exportedFunctions())).toEqual([])
   })
 
   it('the account is not vacuous — a helper that forgot to scope would show up', () => {
-    // Same guard the isolation suite carries on every allow-list it owns.
-    const exported = ['listVendorJobs', 'objectKeyForScope', 'listVendorInvoicesSomeday']
-    const unaccounted = exported.filter(
-      (k) => !scopedFns.includes(k as any) && !pureHelpers.includes(k as any)
+    // Same guard the isolation suite carries on every allow-list it owns, and
+    // it is bound to the REAL export list rather than to a literal beside it.
+    // It used to filter a three-name array declared on the line above, which
+    // meant it passed with `lib/vendor-scope.ts` deleted: the guard against a
+    // vacuous account was itself the vacuous test.
+    const exported = exportedFunctions()
+    expect(exported, 'the module exported nothing — the account is empty').toContain(
+      'listVendorJobs'
     )
-    expect(unaccounted).toEqual(['listVendorInvoicesSomeday'])
+    expect(exported).toContain('objectKeyForScope')
+
+    // The real list, plus one name nobody enrolled. Exactly one finding: the
+    // planted one — which is both halves at once, that the filter SEES an
+    // unenrolled export and that everything really exported is accounted for.
+    expect(unaccounted([...exported, 'listVendorInvoicesSomeday'])).toEqual([
+      'listVendorInvoicesSomeday',
+    ])
   })
 })

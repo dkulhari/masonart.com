@@ -137,6 +137,75 @@ const readSource = (relative: string) =>
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
+// ----------------------------------------------------------------------------
+// Reading a transaction off the source, one transaction at a time
+// ----------------------------------------------------------------------------
+
+/**
+ * Every `db.transaction(...)` call in a source file, as its own text.
+ *
+ * Delimited by BALANCED PARENTHESES from the call's own `(`, not by "the next
+ * occurrence of something that looks like the end". A scan whose slice is wrong
+ * asserts over the wrong region and reports nothing while looking thorough.
+ */
+function transactionBodies(source: string): string[] {
+  const bodies: string[] = []
+  const marker = 'db.transaction('
+
+  for (let at = source.indexOf(marker); at !== -1; at = source.indexOf(marker, at + marker.length)) {
+    const open = at + marker.length - 1
+    let depth = 0
+    for (let i = open; i < source.length; i++) {
+      if (source[i] === '(') depth += 1
+      else if (source[i] === ')') {
+        depth -= 1
+        if (depth === 0) {
+          bodies.push(source.slice(open, i + 1))
+          break
+        }
+      }
+    }
+  }
+
+  return bodies
+}
+
+/** Brace depth at an index — 1 is the callback's own top level. */
+function nestingAt(body: string, index: number): number {
+  let depth = 0
+  for (let i = 0; i < index; i += 1) {
+    if (body[i] === '{') depth += 1
+    else if (body[i] === '}') depth -= 1
+  }
+  return depth
+}
+
+/**
+ * The transactions in this source that do not lock what they decide from.
+ *
+ * Three failures, because the count this replaces was blind to all three: a
+ * transaction with no lock at all, a lock issued after the first write, and a
+ * lock inside a nested block — which is a lock most callers never take.
+ */
+function unlockedTransactions(source: string): string[] {
+  return transactionBodies(source).flatMap((body, index) => {
+    const at = index + 1
+    const lock = body.search(/\.for\(["']update["']\)/)
+    const write = body.search(/\btx\s*\.\s*(update|insert|delete)\s*\(/)
+
+    if (lock === -1) return [`transaction ${at}: no FOR UPDATE at all`]
+
+    const problems: string[] = []
+    if (write !== -1 && lock > write) {
+      problems.push(`transaction ${at}: the lock is taken after the first write`)
+    }
+    if (nestingAt(body, lock) > 1) {
+      problems.push(`transaction ${at}: the lock is conditional — it sits inside a nested block`)
+    }
+    return problems
+  })
+}
+
 /** Every live shot the `print` shot list marks required. */
 const PRINT_REQUIRED_SLOTS = [
   { slot: 'print_full' },
@@ -337,10 +406,13 @@ describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
     // the declared clocks are the SAME set, in both directions.
     expect(Object.keys(VENDOR_STATUS_STAMP).sort()).toEqual([...VENDOR_SETTABLE_STATUSES].sort())
 
-    // And `sentAt` is not among them. `retire-sent-status.ts` leaves `sent_at`
-    // alone because the date the material went out is evidence; nothing here
-    // may overwrite it.
-    expect(Object.values(VENDOR_STATUS_STAMP)).not.toContain('sentAt')
+    // `expect(Object.values(VENDOR_STATUS_STAMP)).not.toContain('sentAt')` used
+    // to sit here and could not fail: `VendorStampColumn` is a three-member
+    // union that excludes `sentAt`, so the typechecker refuses the value before
+    // this ever runs — and `tests/` is typechecked as of #662. The runtime half
+    // of that property — no vendor edge WRITES `sent_at` — is asserted where it
+    // can go red, in the legal-edge loop above, which checks every edge's
+    // UPDATE names its own clock and none of the other three.
   })
 
   // --------------------------------------------------------------------
@@ -439,14 +511,24 @@ describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
 
   it('NO reachable path produces the retired `sent` status', async () => {
     // A property over the whole vocabulary, not one example: for every status a
-    // job can be in, and every status a vendor may ask for, the value written
+    // job can be in, and every status a CLIENT MAY ASK FOR, the value written
     // is never `sent`. `sent` is edgeless in the matrix in both directions and
     // `retire-sent-status.ts` erased it from the rows that carried it; a vendor
     // writing it back would re-create exactly what that backfill removed.
+    //
+    // The inner loop runs over every status in the matrix — `sent` INCLUDED —
+    // and not over `VENDOR_SETTABLE_STATUSES`. That is the whole difference
+    // between a property and a tautology: pinned to the three settable values,
+    // `status !== 'sent'` was true by construction and the route could have
+    // re-declared its own literal vocabulary without this noticing. Asking for
+    // `sent` outright is the request that has to be refused, so it is the
+    // request that is made.
     const everyStatus = Object.keys(PRODUCTION_TRANSITIONS) as ProductionJobStatus[]
+    const settable = new Set<string>(VENDOR_SETTABLE_STATUSES)
+    expect(settable.has('sent'), 'the vocabulary now contains the retired status').toBe(false)
 
     for (const from of everyStatus) {
-      for (const to of VENDOR_SETTABLE_STATUSES) {
+      for (const to of everyStatus) {
         recorder.reset()
         auditSpy.mockReset()
         auditSpy.mockResolvedValue(undefined)
@@ -463,6 +545,15 @@ describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
         })
 
         const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: to }))
+
+        // A status outside the derived tuple never reaches the module at all:
+        // the route's schema is built from `VENDOR_SETTABLE_STATUSES`, so it is
+        // a 400 with no read behind it. This is the assertion `sent` has to
+        // fail, and a second literal list anywhere would break it.
+        if (!settable.has(to)) {
+          expect(res.status, `'${to}' was accepted as a status a vendor may set`).toBe(400)
+          expect(ops('update', productionJobs)).toHaveLength(0)
+        }
 
         for (const write of ops('update', productionJobs)) {
           expect((write.values as Record<string, unknown>).status).not.toBe('sent')
@@ -727,6 +818,41 @@ describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
     expect(recorder.tx.commits).toBe(0)
   })
 
+  it('leaves NO success row when the transaction throws at COMMIT', async () => {
+    // §8's property, on the third mutating handler: *"run each mutating handler
+    // against a `tx` that throws at commit; assert no success row survives and
+    // the refusal row does."* The callback runs to the END here — the UPDATE is
+    // issued and the audit row is handed the transaction — and only then does
+    // the commit fail, which is the one shape a callback-throws fixture cannot
+    // reach.
+    queueRows({
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+    recorder.failCommit()
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(500)
+
+    // ISSUED and SURVIVING are different facts, and only the second is the
+    // property.
+    expect(ops('update', productionJobs)).toHaveLength(1)
+    expect(recorder.survivors('update', productionJobs)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+
+    // The transition row SHARES that transaction, so it goes back with the move
+    // it describes rather than outliving it. `recordAudit` is a spy here, so
+    // the sharing is read off the call it was handed.
+    expect(auditSpy).toHaveBeenCalledTimes(1)
+    const [, entry, sharedTx] = auditSpy.mock.calls[0]!
+    expect(entry.action).toBe('production_job.transitioned')
+    expect(sharedTx, 'the success row did not share the transaction it describes').toBeDefined()
+  })
+
   it('does the read, the guard and the write in ONE transaction', async () => {
     queueRows({
       'select:production_jobs': [
@@ -750,23 +876,65 @@ describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
     expect(ops('select', productionJobs).filter((q) => q.inTx).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('takes FOR UPDATE on the read every transaction in the module rests on', () => {
+  it('locks the row every transaction decides from, before it writes', () => {
     // The one part of the recipe no assertion above can reach: the recorder
     // answers `.for('update')` exactly as it answers a plain read, so a lock
-    // dropped in a refactor is invisible to it. Scanned from the source in the
-    // shape `tests/routes/admin/transfers.test.ts` already uses.
+    // dropped in a refactor is invisible to it.
     //
-    // Counted against the TRANSACTIONS rather than fixed at one. #685 gave the
-    // module two more — recording a QC photograph and withdrawing one — and a
-    // hardcoded `1` would have had to be raised to `3` by hand, which is a
-    // number nobody can check. Every transaction here decides something from a
-    // row it then writes, so every one of them locks that row.
+    // A PAIRING, not a count. This used to be `locks.length === transactions
+    // .length` — five against five — which three different broken modules
+    // satisfy: two locks in one transaction and none in another, a lock taken
+    // inside an `if` so most callers never take it, and a lock issued AFTER the
+    // write it was supposed to serialise. Each transaction is now judged on its
+    // own text, and `unlockedTransactions` is shown below deciding all three
+    // ways.
     const source = stripComments(readSource('lib/vendor-scope.ts'))
-    const transactions = source.match(/db\.transaction\(/g) ?? []
-    const locks = source.match(/\.for\(["']update["']\)/g) ?? []
 
-    expect(transactions.length, 'no transaction found — the scan is vacuous').toBeGreaterThan(0)
-    expect(locks).toHaveLength(transactions.length)
+    expect(
+      transactionBodies(source).length,
+      'no transaction found — the scan is vacuous'
+    ).toBeGreaterThan(0)
+    expect(unlockedTransactions(source)).toEqual([])
+  })
+
+  it('the lock scan can actually fail — this property is not vacuous', () => {
+    // Three planted transactions, one per way the counting version was
+    // satisfiable while the module was wrong.
+    const planted = `
+      db.transaction(async (tx) => {
+        const rows = await tx.select({ id: t.id }).from(t).where(eq(t.id, id)).limit(1)
+        await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+      })
+      db.transaction(async (tx) => {
+        await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+        const rows = await tx.select({ id: t.id }).from(t).limit(1).for('update')
+      })
+      db.transaction(async (tx) => {
+        if (maybe) {
+          const rows = await tx.select({ id: t.id }).from(t).limit(1).for('update')
+        }
+        await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+      })
+    `
+
+    expect(transactionBodies(planted)).toHaveLength(3)
+    expect(unlockedTransactions(planted)).toEqual([
+      'transaction 1: no FOR UPDATE at all',
+      'transaction 2: the lock is taken after the first write',
+      'transaction 3: the lock is conditional — it sits inside a nested block',
+    ])
+
+    // ...and it clears a transaction that does it properly, so it is a check
+    // and not a blanket refusal.
+    expect(
+      unlockedTransactions(`
+        db.transaction(async (tx) => {
+          const rows = await tx.select({ id: t.id }).from(t).limit(1).for('update')
+          if (!rows[0]) throw new Error('gone')
+          await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+        })
+      `)
+    ).toEqual([])
   })
 
   // --------------------------------------------------------------------

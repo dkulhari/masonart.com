@@ -51,6 +51,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { buildRouteApp } from '../../helpers/route-app'
 import { vendorSessionFor } from '../../helpers/vendor-session'
 import '../../setup'
@@ -222,6 +224,29 @@ function expectNoCustomerData(body: unknown) {
   }
 }
 
+const readSource = (relative: string) =>
+  readFileSync(resolve(__dirname, '../../../src', relative), 'utf8')
+
+/** Source with every comment removed, so a scan judges CODE and not prose. */
+const stripComments = (source: string) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+/**
+ * The scoped read that answered "is this job mine", and the predicate it sent.
+ *
+ * Every 404 below is served by an EMPTY result, and the recorder answers empty
+ * for any query nobody queued rows for — so "the response was a 404" is exactly
+ * what a completely unscoped read would also produce. The refusal is only
+ * evidence of scoping if the WHERE is read, which is what this exists for.
+ */
+function expectScopedJobRead(jobId: string) {
+  const read = ops('select', productionJobs)[0]
+  expect(read, 'no job read happened at all — the 404 proves nothing').toBeDefined()
+  expect(render(read?.where).sql).toContain('vendor_id')
+  expect(params(read?.where)).toContain(VENDOR_ID)
+  expect(params(read?.where)).toContain(jobId)
+}
+
 beforeEach(() => {
   recorder.reset()
   auditSpy.mockReset()
@@ -312,6 +337,10 @@ describe('GET /api/vendor/jobs/:id/photos', () => {
     expect(mockDownloadPresign).not.toHaveBeenCalled()
     // The photo table is not even reached.
     expect(ops('select', productionJobPhotos)).toEqual([])
+    // The 404 came from the WHERE, not from an empty fixture. An entirely
+    // unscoped read of somebody else's job answers 404 here too — the rows were
+    // never queued — so the status code alone proves nothing about scoping.
+    expectScopedJobRead(OTHER_JOB_ID)
   })
 
   it('surfaces a live photo in a slot this stage does not ask for, rather than dropping it', async () => {
@@ -382,6 +411,9 @@ describe('POST /api/vendor/jobs/:id/photos/presign', () => {
     const res = await presign({}, OTHER_JOB_ID)
     expect(res.status).toBe(404)
     expect(mockUploadPresign).not.toHaveBeenCalled()
+    // The refusal is only evidence of scoping if the predicate is read: an
+    // unscoped lookup of a job nobody queued rows for answers 404 identically.
+    expectScopedJobRead(OTHER_JOB_ID)
   })
 
   it('refuses a job that is past the point of shooting it, and signs nothing', async () => {
@@ -520,9 +552,14 @@ describe('POST /api/vendor/jobs/:id/photos/complete', () => {
     expect(values.contentType).toBe('image/jpeg')
     expect(values.sizeBytes).toBe(2048)
 
-    // A stored URL cannot be re-signed and puts the object outside the
-    // allow-list. `getPublicUrl` is never reached on this boundary.
-    expect(mockPublicUrl).not.toHaveBeenCalled()
+    // What is stored is a KEY, which is re-signable, and not a URL, which is
+    // the capability itself. `expect(mockPublicUrl).not.toHaveBeenCalled()` used
+    // to stand here instead and could not fail on this path: `getPublicUrl` has
+    // no call site in either source file, so the spy was watching a door
+    // nothing walks through. The property it was reaching for is asserted where
+    // it can go red — see "never builds a permanent public URL" below.
+    expect(String(values.objectKey)).not.toMatch(/^https?:\/\//)
+    expect(String(values.objectKey)).toBe(KEY)
     expectNoCustomerData(await readJson(res))
   })
 
@@ -561,8 +598,13 @@ describe('POST /api/vendor/jobs/:id/photos/complete', () => {
     expect(params(supersede.where)).toEqual(expect.arrayContaining([OLD_PHOTO_ID, JOB_ID]))
     expect(render(supersede.where).sql).toContain('superseded_at')
 
-    // Append-only: the previous shot is history, not rubbish.
-    expect(queries.filter((q) => q.op === 'delete')).toEqual([])
+    // Append-only: the previous shot is history, not rubbish. The write ops on
+    // this table are exactly `update` then `insert` — asserted above — which is
+    // the falsifiable form of it. (`queries.filter(q => q.op === 'delete')`
+    // used to sit here and could not fail: the module contains no `.delete(`
+    // at all, so the filter was empty by construction rather than by conduct.
+    // The absence itself is asserted where it can go red — see "deletes
+    // nothing, ever" below.)
 
     // One transaction, so a failed insert cannot leave the slot empty.
     expect(photoWrites.every((q) => q.inTx)).toBe(true)
@@ -738,8 +780,11 @@ describe('DELETE /api/vendor/jobs/:id/photos/:photoId', () => {
     expect((update?.values as Record<string, unknown>).supersededAt).toBeInstanceOf(Date)
 
     // The row and the object both survive — the 400-day sweep owns their end,
-    // and a DELETE that orphaned the R2 object would break that pairing.
-    expect(queries.filter((q) => q.op === 'delete')).toEqual([])
+    // and a DELETE that orphaned the R2 object would break that pairing. The
+    // route spelled DELETE issues an UPDATE, which is what this asserts; that
+    // NO delete exists anywhere in the module is asserted from the source
+    // below, because a runtime filter over a module with no `.delete(` in it is
+    // empty whatever the handler does.
 
     const body = await readJson(res)
     expect(body.photoId).toBe(PHOTO_ID)
@@ -750,6 +795,10 @@ describe('DELETE /api/vendor/jobs/:id/photos/:photoId', () => {
     const res = await retract(PHOTO_ID, OTHER_JOB_ID)
     expect(res.status).toBe(404)
     expect(queries.filter((q) => q.op !== 'select')).toEqual([])
+    // The locked read names the vendor. Without this the test passes against a
+    // handler that looks the job up by id alone, because the 404 comes from an
+    // empty fixture either way.
+    expectScopedJobRead(OTHER_JOB_ID)
   })
 
   it('answers 404 for a photo that is not live on this job', async () => {
@@ -762,6 +811,16 @@ describe('DELETE /api/vendor/jobs/:id/photos/:photoId', () => {
     expect(res.status).toBe(404)
     expect((await readJson(res)).code).toBe('PHOTO_NOT_FOUND')
     expect(ops('update', productionJobPhotos)).toEqual([])
+
+    // Keyed on the JOB as well as on the photo id, and on the live row. A real
+    // photo id from another job would otherwise be withdrawn by whoever guessed
+    // it — and the empty fixture answers 404 whether or not the job is in the
+    // predicate, so the predicate is what gets asserted.
+    const lookup = ops('select', productionJobPhotos)[0]
+    expect(lookup, 'the photo was never looked up').toBeDefined()
+    expect(params(lookup?.where)).toEqual(expect.arrayContaining([PHOTO_ID, JOB_ID]))
+    expect(render(lookup?.where).sql).toContain('superseded_at')
+    expectScopedJobRead(JOB_ID)
   })
 
   it('refuses once the job is past the point of reshooting it', async () => {
@@ -849,5 +908,135 @@ describe('production_job.photos_submitted', () => {
     const actions = auditSpy.mock.calls.map((c) => (c[1] as { action: string }).action)
     expect(actions).not.toContain('production_job.photos_submitted')
     expect(actions).toContain('production_job.transition_refused')
+  })
+})
+
+// ============================================================================
+// Two absences, asserted where they can go red
+// ============================================================================
+
+/**
+ * A spy that is never called proves the property only where a call site exists
+ * to be avoided. `getPublicUrl` has none, and `lib/vendor-scope.ts` has no
+ * `.delete(` at all, so both facts were previously asserted as runtime absences
+ * that could not become presences: the filter was empty by construction, and a
+ * refactor introducing either would have to also route through a fixture this
+ * suite happens to drive before anything noticed.
+ *
+ * So they are read off the CODE, which is where they are decided, and each scan
+ * is shown finding a planted violation.
+ */
+describe('the two things this boundary never does', () => {
+  const SOURCES = ['lib/vendor-scope.ts', 'routes/vendor.ts'] as const
+
+  it('never builds a permanent public URL', async () => {
+    // The runtime half first, over the path this suite actually drives.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[photoRow()]],
+    })
+    await buildApp().request(photosPath())
+    expect(mockPublicUrl).not.toHaveBeenCalled()
+
+    // ...and the half the runtime cannot see: there is no call site at all, on
+    // any path, reachable by any fixture. `getPublicUrl` returns an
+    // unauthenticated path that stays readable by anyone who ever saw it.
+    for (const file of SOURCES) {
+      expect(
+        stripComments(readSource(file)),
+        `${file} builds a permanent public URL`
+      ).not.toMatch(/\bgetPublicUrl\s*\(/)
+    }
+  })
+
+  it('deletes nothing, ever — the table is append-only in the code, not just in this run', () => {
+    const source = stripComments(readSource('lib/vendor-scope.ts'))
+    expect(source, 'the scoped module issues a DELETE').not.toMatch(/\.delete\s*\(/)
+    // It supersedes instead, which is what the partial unique index means by
+    // "live" and what the 400-day sweep pairs the R2 object with.
+    expect(source).toMatch(/supersededAt:/)
+  })
+
+  it('both scans find a planted violation — these properties are not vacuous', () => {
+    // Without this, "no source calls getPublicUrl" and "the regex matches
+    // nothing ever" produce identical green.
+    expect(stripComments('const u = getPublicUrl(photo.objectKey)')).toMatch(
+      /\bgetPublicUrl\s*\(/
+    )
+    expect(stripComments('await tx.delete(productionJobPhotos).where(eq(x, y))')).toMatch(
+      /\.delete\s*\(/
+    )
+    // ...and both ignore the same words inside a comment, which is the whole
+    // reason the source is stripped before it is judged.
+    expect(stripComments('// getPublicUrl( is mentioned here\n')).not.toMatch(
+      /\bgetPublicUrl\s*\(/
+    )
+    expect(stripComments('/* nothing here calls .delete( ever */\n')).not.toMatch(/\.delete\s*\(/)
+  })
+})
+
+// ============================================================================
+// §8 — the rollback half of the audit rule, on the photo writes
+// ============================================================================
+
+describe('a transaction that throws at COMMIT', () => {
+  const KEY = `production-qc/${JOB_ID}/print_full/1a2b3c.jpg`
+
+  it('records no photograph', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[]],
+      'insert:production_job_photos': [[photoRow({ objectKey: KEY })]],
+    })
+    recorder.failCommit()
+
+    const res = await buildApp().request(
+      `${photosPath()}/complete`,
+      json({ slot: 'print_full', key: KEY, contentType: 'image/jpeg', sizeBytes: 2048 })
+    )
+    expect(res.status).toBe(500)
+
+    // ISSUED and SURVIVING are different facts, and only the second is the
+    // property: the insert ran against the mock and went back with the commit.
+    expect(ops('insert', productionJobPhotos)).toHaveLength(1)
+    expect(recorder.survivors('insert', productionJobPhotos)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+  })
+
+  it('withdraws no photograph', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[{ id: PHOTO_ID, slot: 'print_full' }]],
+      'update:production_job_photos': [[{ id: PHOTO_ID }]],
+    })
+    recorder.failCommit()
+
+    const res = await buildApp().request(`${photosPath()}/${PHOTO_ID}`, { method: 'DELETE' })
+    expect(res.status).toBe(500)
+
+    expect(ops('update', productionJobPhotos)).toHaveLength(1)
+    expect(recorder.survivors('update', productionJobPhotos)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+  })
+
+  it('the survivor check can tell the two apart — this property is not vacuous', async () => {
+    // The same request, committing. Without this the assertions above would
+    // also pass against a recorder that marked every query rolled back.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[]],
+      'insert:production_job_photos': [[photoRow({ objectKey: KEY })]],
+    })
+
+    const res = await buildApp().request(
+      `${photosPath()}/complete`,
+      json({ slot: 'print_full', key: KEY, contentType: 'image/jpeg', sizeBytes: 2048 })
+    )
+    expect(res.status).toBe(201)
+    expect(recorder.survivors('insert', productionJobPhotos)).toHaveLength(1)
+    expect(recorder.tx.commits).toBe(1)
+    expect(recorder.tx.rollbacks).toBe(0)
   })
 })
