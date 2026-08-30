@@ -123,7 +123,12 @@ function ActionMenu({
   onDuplicate,
 }: ActionMenuProps) {
   return (
-    <RowActionsMenu>
+    /*
+     * Named, for the same reason the orders trigger is (#625): an icon-only
+     * button is unreachable by name to a screen reader and to anything
+     * driving this table.
+     */
+    <RowActionsMenu label={`Product actions for ${product.title}`}>
       {(close) => (
         <>
           {onView && (

@@ -426,6 +426,23 @@ describe('the row actions menu', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('names the products trigger too, which it did not before #634', () => {
+    const { container } = render(
+      <ProductsTable
+        products={[makeProduct({ title: 'Alpine Majesty' })]}
+        isLoading={false}
+      />
+    )
+
+    const button = trigger(container)
+    expect(button).toHaveAttribute('aria-label', 'Product actions for Alpine Majesty')
+    expect(button).toHaveAttribute('aria-haspopup', 'menu')
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('runs the handler and closes the menu when an item is chosen', () => {
     const onView = vi.fn()
     const order = makeOrder()
