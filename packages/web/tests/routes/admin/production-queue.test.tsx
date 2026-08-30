@@ -1007,19 +1007,30 @@ describe('the retired status is absent from the screen', () => {
     expect(queueSource).toMatch(/UNREACHABLE_STATUSES/)
   })
 
+  /**
+   * This assertion used to render `ProductionQueueBody` and look for the word
+   * in it. There is no filter markup in that component at all — the status
+   * `<select>` lives in `AdminProductionQueuePage`, which this suite never
+   * renders — over a fixture carrying no retired row either, so nothing it
+   * looked for could ever have been present and nothing could ever have turned
+   * it red. The property is worth keeping; the test was not.
+   *
+   * The options are `PRODUCTION_STATUSES.map(...)` and nothing else, so what
+   * that list does not contain is what the filter cannot offer. Asserting
+   * against the list is asserting against the options, and it goes red the day
+   * the retired value is filterable again — whether by an edit here or by an
+   * edge appearing in the shared matrix.
+   */
   it('offers no filter option for it', () => {
-    render(
-      <ProductionQueueBody
-        jobs={JOBS}
-        isLoading={false}
-        error={null}
-        onRetry={noop}
-        selectedIds={new Set()}
-        onToggleJob={noop}
-        onToggleAll={noop}
-      />
-    )
+    expect(queueSource).toMatch(/data-testid="admin-production-filter-status"/)
+    expect(queueSource).toMatch(/\{PRODUCTION_STATUSES\.map\(/)
 
-    expect(screen.queryByText(/^sent$/i)).not.toBeInTheDocument()
+    expect(PRODUCTION_STATUSES).not.toContain('sent')
+    // Not vacuous over an empty or unrelated list: the reachable statuses ARE
+    // offered, and the retired one is the only member of the vocabulary missing.
+    expect(PRODUCTION_STATUSES).toContain('assigned')
+    expect([...PRODUCTION_STATUSES]).toEqual(
+      PRODUCTION_JOB_STATUSES.filter((status) => status !== 'sent')
+    )
   })
 })

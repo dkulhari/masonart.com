@@ -21,14 +21,19 @@
  * - a transfer list that failed to load never reads as an order with no
  *   transfers;
  * - a consolidator whose provenance was not read is UNKNOWN, not a system
- *   default.
+ *   default, and an audit read that FAILED is told apart from a trail with no
+ *   row in it;
+ * - every claim in the consolidator box is wired to the read it depends on:
+ *   the jobs read backs the vendor options and half the name lookup, so a
+ *   failed jobs read must never render "nobody holds a live job on this
+ *   order… assign a job first" over a list nobody read.
  *
  * Each assertion below is mutation-checked: breaking the branch it covers turns
  * it red.
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (config: unknown) => config,
@@ -52,6 +57,7 @@ vi.mock('@tanstack/react-router', () => ({
 import {
   BLOCKER_ACTIONS,
   ConsolidatorPicker,
+  OrderProductionPanel,
   OrderProductionPanelBody,
   OrderReadinessPanel,
   OrderTransfersPanel,
@@ -406,6 +412,30 @@ describe('fetchOrderProductionJobs', () => {
     )
   })
 
+  /**
+   * `undefined > n` is false, so the guard above used to wave through a page
+   * that carried no `total` at all — the one response where completeness is not
+   * merely unmet but unknowable. Unverifiable reads as complete only once.
+   */
+  it('refuses to answer when the page never said how many jobs there are', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ ...JOBS[0], items: undefined }],
+          page: 1,
+          pageSize: 100,
+        }),
+      }))
+    )
+
+    await expect(fetchOrderProductionJobs('order-1')).rejects.toThrow(
+      /did not say how many/i
+    )
+  })
+
   it('surfaces the API error rather than an empty job list', async () => {
     vi.stubGlobal(
       'fetch',
@@ -718,8 +748,14 @@ describe('ConsolidatorPicker', () => {
       <ConsolidatorPicker
         consolidatorVendorId="v1"
         provenance={null}
+        provenanceLoading={false}
+        provenanceError={null}
         options={[{ id: 'v1', name: 'Kolkata Print Works' }]}
+        optionsLoading={false}
+        optionsError={null}
+        onRetryOptions={noop}
         vendorName="Kolkata Print Works"
+        nameLookupComplete={true}
         isLoading={false}
         error={null}
         isSaving={false}
@@ -780,6 +816,48 @@ describe('ConsolidatorPicker', () => {
     ).not.toBeInTheDocument()
   })
 
+  /**
+   * Both are UNKNOWN and neither guesses — but "the trail holds no row" is a
+   * statement about the audit trail, and printing it over a 500 says the trail
+   * was read and found empty when nobody looked at it. Only one of the two is
+   * worth retrying.
+   */
+  it('tells a failed audit read apart from an audit trail with no row', () => {
+    renderPicker({
+      provenance: null,
+      provenanceError: 'Failed to read who chose the consolidator',
+    })
+
+    const failed = screen.getByTestId('admin-order-consolidator-provenance-error')
+    expect(failed.textContent).toMatch(/could not be read/i)
+    expect(failed.textContent).toMatch(/Failed to read who chose the consolidator/)
+    expect(failed.textContent).not.toMatch(/holds no successful/i)
+    expect(
+      screen.queryByTestId('admin-order-consolidator-provenance-unknown')
+    ).not.toBeInTheDocument()
+
+    cleanup()
+
+    renderPicker({ provenance: null })
+    expect(
+      screen.getByTestId('admin-order-consolidator-provenance-unknown').textContent
+    ).toMatch(/holds no successful/i)
+    expect(
+      screen.queryByTestId('admin-order-consolidator-provenance-error')
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not report an empty audit trail while it is still reading one', () => {
+    renderPicker({ provenance: null, provenanceLoading: true })
+
+    expect(
+      screen.getByTestId('admin-order-consolidator-provenance-loading')
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('admin-order-consolidator-provenance-unknown')
+    ).not.toBeInTheDocument()
+  })
+
   it('says plainly when nobody has decided yet', () => {
     renderPicker({ consolidatorVendorId: null, vendorName: null })
 
@@ -795,6 +873,24 @@ describe('ConsolidatorPicker', () => {
     expect(screen.getByTestId('admin-order-consolidator-current').textContent).toMatch(
       /no job or transfer on this order names this vendor/i
     )
+  })
+
+  /**
+   * The name is looked up across the jobs and transfers already on screen, so
+   * "nothing names it" is a claim about two reads. Under a failure they are
+   * both `[]`, which looks exactly like an order whose rows name nobody.
+   */
+  it('does not claim nothing names the vendor when the reads did not complete', () => {
+    renderPicker({ vendorName: null, nameLookupComplete: false })
+
+    const current = screen.getByTestId('admin-order-consolidator-current')
+    expect(current.textContent).not.toMatch(/no job or transfer on this order names/i)
+    expect(
+      screen.getByTestId('admin-order-consolidator-name-unread').textContent
+    ).toMatch(/were not read/i)
+    expect(
+      screen.queryByTestId('admin-order-consolidator-name-none')
+    ).not.toBeInTheDocument()
   })
 
   /** #682 refuses this with a 409. Swallowing it leaves an admin clicking forever. */
@@ -840,6 +936,56 @@ describe('ConsolidatorPicker', () => {
     expect(
       (screen.getByTestId('admin-order-consolidator-select') as HTMLSelectElement).disabled
     ).toBe(true)
+  })
+
+  /**
+   * The defect this file is pinned against, in its own words: `options` is
+   * empty under a FAILED jobs read exactly as it is under an order with no
+   * jobs, and "assign a job first" over the first case sends an admin to raise
+   * a duplicate set of jobs for an order that already has them.
+   */
+  it('does not say nobody holds a job when the job list failed to load', () => {
+    const onRetryOptions = vi.fn()
+    renderPicker({
+      options: [],
+      optionsError: 'Failed to load production jobs: boom',
+      onRetryOptions,
+    })
+
+    expect(
+      screen.queryByTestId('admin-order-consolidator-no-options')
+    ).not.toBeInTheDocument()
+
+    const failed = screen.getByTestId('admin-order-consolidator-options-error')
+    expect(failed.textContent).toMatch(/boom/)
+    expect(failed.textContent).toMatch(/not the same as nobody holding one/i)
+
+    fireEvent.click(screen.getByTestId('admin-order-consolidator-options-retry'))
+    expect(onRetryOptions).toHaveBeenCalled()
+  })
+
+  it('does not say nobody holds a job while the job list is still loading', () => {
+    renderPicker({ options: [], optionsLoading: true })
+
+    expect(
+      screen.getByTestId('admin-order-consolidator-options-loading')
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('admin-order-consolidator-no-options')
+    ).not.toBeInTheDocument()
+  })
+
+  /**
+   * The readiness read still owns the box as a whole: who the consolidator IS
+   * is its answer, and a jobs failure must not blank it.
+   */
+  it('still reports the standing consolidator when only the job list failed', () => {
+    renderPicker({ options: [], optionsError: 'Failed to load production jobs' })
+
+    expect(screen.getByTestId('admin-order-consolidator-current')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('admin-order-consolidator-error')
+    ).not.toBeInTheDocument()
   })
 
   it('renders an error with a retry, and no picker verdict, when the read failed', () => {
@@ -1024,5 +1170,135 @@ describe('fetchConsolidatorProvenance', () => {
     await expect(fetchConsolidatorProvenance('order-1')).rejects.toThrow(
       /audit log unavailable/
     )
+  })
+})
+
+// ============================================================================
+// The panel itself — four reads, and no claim wired to the wrong one
+// ============================================================================
+
+/**
+ * The components above are each honest in isolation; the defect this block
+ * pins was in the WIRING. `options` and the vendor name come off the jobs read,
+ * but the consolidator box took its loading and error state from the readiness
+ * read alone — so a 500 on `GET /api/admin/production?orderId=` rendered the
+ * jobs error correctly and then, immediately below it, a fully confident
+ * "nobody holds a live job on this order… assign a job first" over a list that
+ * was never read.
+ */
+describe('OrderProductionPanel', () => {
+  const stubReads = ({ jobsFail = false }: { jobsFail?: boolean } = {}) => {
+    const fetchMock = vi.fn(async (url: string) => {
+      const target = String(url)
+
+      if (target.includes('/production-readiness')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            orderId: 'order-1',
+            ready: false,
+            consolidatorVendorId: 'v-unnamed',
+            blockers: [{ code: 'no_jobs', message: 'API says: no_jobs' }],
+            blockerCodes: ['no_jobs'],
+          }),
+        }
+      }
+
+      if (target.includes('/api/admin/transfers')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ items: [], total: 0, page: 1, pageSize: 100, totalPages: 0 }),
+        }
+      }
+
+      if (target.includes('/api/admin/audit-log')) {
+        return { ok: true, status: 200, json: async () => ({ entries: [] }) }
+      }
+
+      if (target.includes('/api/admin/production?')) {
+        return jobsFail
+          ? {
+              ok: false,
+              status: 500,
+              json: async () => ({ error: 'Failed to list production jobs: boom' }),
+            }
+          : {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                items: JOBS.map(({ items: _items, ...row }) => row),
+                total: JOBS.length,
+                page: 1,
+                pageSize: 100,
+                totalPages: 1,
+              }),
+            }
+      }
+
+      const jobId = target.split('/').pop() as string
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ items: JOBS.find((job) => job.id === jobId)?.items ?? [] }),
+      }
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('never answers the consolidator question out of a failed job read', async () => {
+    stubReads({ jobsFail: true })
+
+    render(<OrderProductionPanel orderId="order-1" orderItems={ORDER_ITEMS} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-order-production-error')).toBeInTheDocument()
+    })
+
+    // The claim the jobs read backs, and it is NOT made.
+    expect(
+      screen.queryByTestId('admin-order-consolidator-no-options')
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByTestId('admin-order-consolidator-options-error').textContent
+    ).toMatch(/boom/)
+
+    // Nor the other one: naming the vendor needs the jobs read too.
+    expect(
+      screen.getByTestId('admin-order-consolidator-name-unread')
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('admin-order-consolidator-name-none')
+    ).not.toBeInTheDocument()
+
+    // And the reads that DID answer still answer: the blockers are listed, and
+    // the coverage verdict — which the jobs read backs — is not.
+    expect(screen.getByTestId('admin-order-readiness-blockers')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('admin-order-production-all-covered')
+    ).not.toBeInTheDocument()
+  })
+
+  it('does say nobody was read as holding a job once the read succeeded', async () => {
+    stubReads()
+
+    render(<OrderProductionPanel orderId="order-1" orderItems={ORDER_ITEMS} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-order-production-jobs')).toBeInTheDocument()
+    })
+
+    expect(
+      screen.queryByTestId('admin-order-consolidator-options-error')
+    ).not.toBeInTheDocument()
+    // v-unnamed is on no job and no transfer, and now that both were read the
+    // panel is entitled to say so.
+    expect(screen.getByTestId('admin-order-consolidator-name-none')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('admin-order-consolidator-select').querySelectorAll('option')
+    ).toHaveLength(2)
   })
 })

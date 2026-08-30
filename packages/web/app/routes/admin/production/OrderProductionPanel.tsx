@@ -64,6 +64,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertCircle, CheckCircle2, Truck } from 'lucide-react'
+import type { ProductionJobStatus } from '@chobii/shared'
 import { cn, getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
 import {
@@ -98,8 +99,21 @@ export interface OrderProductionPanelItem {
   variant?: { sizeLabel: string } | null
 }
 
-/** Statuses that do NOT mean the item is being made. */
-const NON_COVERING_STATUSES = new Set(['cancelled'])
+/**
+ * Statuses that do NOT mean the item is being made.
+ *
+ * Typed against the shared vocabulary rather than left as bare strings. This is
+ * the one file whose purpose is NOT to write the vocabulary down, and a `Set`
+ * of loose strings hides a typo perfectly: a misspelt status matches no job at
+ * all, so every job counts as coverage, every consolidator option survives, and
+ * the panel's one requirement — showing the items on no job — silently reports
+ * nothing. `Set<ProductionJobStatus>` makes that a compile error; the
+ * `ReadonlySet<string>` annotation keeps `.has()` open to a raw status off the
+ * wire, retired values included.
+ */
+const NON_COVERING_STATUSES: ReadonlySet<string> = new Set<ProductionJobStatus>([
+  'cancelled',
+])
 
 // ============================================================================
 // The gap
@@ -772,14 +786,42 @@ export function OrderReadinessPanel({
 // The consolidator picker
 // ============================================================================
 
+/**
+ * Every claim this section makes is wired to the read it depends on.
+ *
+ * Three different reads back one box. Who the consolidator IS comes from
+ * readiness; who it COULD be comes from the jobs read; how it was decided comes
+ * from the audit trail. Hanging all three off `isLoading`/`error` — which is
+ * what this component used to do — meant a 500 on the jobs read still rendered
+ * "no vendor holds a live job on this order yet, so there is nobody to
+ * consolidate at. Assign a job first", in full confidence, over a list that was
+ * never read. That sentence sends an admin to raise a second set of jobs for an
+ * order that already has them: #602/#606 with a purchase order attached.
+ */
 export interface ConsolidatorPickerProps {
   /** From the readiness read — the only endpoint that reports it. */
   consolidatorVendorId: string | null
   /** Null means the provenance is UNKNOWN, not that the system chose. */
   provenance: ConsolidatorProvenance | null
+  /** The audit read is still running: unknown, and not yet answerable. */
+  provenanceLoading: boolean
+  /** The audit read FAILED, which is a different unknown from "no row". */
+  provenanceError: string | null
+  /** From the jobs read: the vendors holding a live job on this order. */
   options: ConsolidatorOption[]
+  /** The jobs read's own states — `options` is empty under both of them. */
+  optionsLoading: boolean
+  optionsError: string | null
+  onRetryOptions: () => void
   /** Names the vendor id when a job or transfer on screen carries the name. */
   vendorName: string | null
+  /**
+   * Whether BOTH reads that could name the vendor completed. A null
+   * `vendorName` under a failed jobs or transfers read means "not read", not
+   * "nothing on this order names it".
+   */
+  nameLookupComplete: boolean
+  /** The readiness read's states: whether there IS a consolidator. */
   isLoading: boolean
   error: string | null
   isSaving: boolean
@@ -792,8 +834,14 @@ export interface ConsolidatorPickerProps {
 export function ConsolidatorPicker({
   consolidatorVendorId,
   provenance,
+  provenanceLoading,
+  provenanceError,
   options,
+  optionsLoading,
+  optionsError,
+  onRetryOptions,
   vendorName,
+  nameLookupComplete,
   isLoading,
   error,
   isSaving,
@@ -842,9 +890,26 @@ export function ConsolidatorPicker({
               {vendorName ?? (
                 <>
                   <span className="font-mono text-xs">{consolidatorVendorId}</span>{' '}
-                  <span className="font-normal text-muted-foreground">
-                    (no job or transfer on this order names this vendor)
-                  </span>
+                  {/* The name is looked up in the jobs and transfers on screen,
+                      so "nothing names it" is only sayable once both were
+                      read. Under a failed read the id is unnamed, not unnamable. */}
+                  {nameLookupComplete ? (
+                    <span
+                      data-testid="admin-order-consolidator-name-none"
+                      className="font-normal text-muted-foreground"
+                    >
+                      (no job or transfer on this order names this vendor)
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="admin-order-consolidator-name-unread"
+                      className="font-normal text-muted-foreground"
+                    >
+                      (the jobs and transfers on this order were not read, so
+                      this id could not be named — that is not the same as
+                      nothing naming it)
+                    </span>
+                  )}
                 </>
               )}
             </p>
@@ -870,14 +935,36 @@ export function ConsolidatorPicker({
                   </>
                 )}
               </p>
+            ) : provenanceError ? (
+              /* A read that FAILED, told apart from a trail with no row in it.
+                 Both end in "unknown" and neither guesses, but only one of them
+                 is worth retrying, and printing "not recorded" over a 500 says
+                 the audit trail is empty when nobody has looked. #698 is the
+                 standing bill for the missing GET; this is not it. */
+              <p
+                data-testid="admin-order-consolidator-provenance-error"
+                className="mt-1 text-muted-foreground"
+              >
+                How this was decided could not be read — the audit trail read
+                failed: {provenanceError}. Whether the system defaulted to it or
+                an admin confirmed it is unknown, and nothing was found saying
+                otherwise because nothing was read.
+              </p>
+            ) : provenanceLoading ? (
+              <p
+                data-testid="admin-order-consolidator-provenance-loading"
+                className="mt-1 text-muted-foreground"
+              >
+                Reading how this was decided from the audit trail…
+              </p>
             ) : (
               <p
                 data-testid="admin-order-consolidator-provenance-unknown"
                 className="mt-1 text-muted-foreground"
               >
-                How this was decided is not recorded here — the audit trail did not
-                answer. Whether the system defaulted to it or an admin confirmed it
-                is unknown.
+                How this was decided is not recorded here — the audit trail holds
+                no successful order.consolidator_set row for this order. Whether
+                the system defaulted to it or an admin confirmed it is unknown.
               </p>
             )}
           </>
@@ -899,7 +986,7 @@ export function ConsolidatorPicker({
           data-testid="admin-order-consolidator-select"
           className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
           value={selected}
-          disabled={isSaving || options.length === 0}
+          disabled={isSaving || optionsLoading || Boolean(optionsError) || options.length === 0}
           onChange={(event) => setSelected(event.target.value)}
         >
           <option value="">Choose a vendor…</option>
@@ -930,7 +1017,30 @@ export function ConsolidatorPicker({
         </Button>
       </div>
 
-      {options.length === 0 && (
+      {/* `options` is empty three ways, and only ONE of them is "nobody holds
+          a live job". The other two are "not read yet" and "the read failed",
+          and telling an admin to assign a job over either of those is telling
+          them to duplicate the jobs this order already has. */}
+      {optionsError ? (
+        <SectionError
+          testId="admin-order-consolidator-options-error"
+          retryTestId="admin-order-consolidator-options-retry"
+          error={optionsError}
+          hint={
+            'Which vendors hold a live job on this order is unknown — the job ' +
+            'list did not load. That is not the same as nobody holding one, so ' +
+            'do not raise fresh jobs on the strength of this screen.'
+          }
+          onRetry={onRetryOptions}
+        />
+      ) : optionsLoading ? (
+        <p
+          data-testid="admin-order-consolidator-options-loading"
+          className="text-sm text-muted-foreground"
+        >
+          Reading which vendors hold a live job on this order…
+        </p>
+      ) : options.length === 0 ? (
         <p
           data-testid="admin-order-consolidator-no-options"
           className="text-sm text-muted-foreground"
@@ -938,7 +1048,7 @@ export function ConsolidatorPicker({
           No vendor holds a live job on this order yet, so there is nobody to
           consolidate at. Assign a job first.
         </p>
-      )}
+      ) : null}
 
       {/* The refusal is EXPLAINED, not swallowed. A 409 here means the goods
           are already moving, which no amount of retrying changes. */}
@@ -1108,10 +1218,14 @@ export async function fetchOrderProductionJobs(
 
   const data = (await response.json()) as AdminProductionPage
 
-  if (data.total > data.items.length) {
+  // `undefined > n` is false, so a page that carried no `total` used to walk
+  // straight past this guard into a coverage verdict over an unverified list.
+  // Unverifiable is not the same as complete.
+  if (typeof data.total !== 'number' || data.total > data.items.length) {
     throw new Error(
       'This order has more production jobs than this panel reads in one page, ' +
-        'so what is covered cannot be answered here. Check the production queue.'
+        'or the queue did not say how many there are, so what is covered ' +
+        'cannot be answered here. Check the production queue.'
     )
   }
 
@@ -1319,6 +1433,18 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
   const options = useMemo(() => orderVendorOptions(jobs), [jobs])
   const consolidatorVendorId = readinessRead.data?.consolidatorVendorId ?? null
 
+  /**
+   * The vendor's NAME is looked up across two reads, so "nothing names it" is
+   * only sayable when both of them answered. `jobs` and `transfers` are `[]`
+   * under a failure as well as under a genuinely empty order, and the panel
+   * must not read the first as the second.
+   */
+  const nameLookupComplete =
+    !jobsRead.isLoading &&
+    !jobsRead.error &&
+    !transfersRead.isLoading &&
+    !transfersRead.error
+
   const save = useCallback(
     async (vendorId?: string) => {
       setIsSaving(true)
@@ -1376,11 +1502,20 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
           </p>
         </div>
 
+        {/* Each prop below is wired to the read that actually answers it:
+            readiness for who the consolidator is, the jobs read for who it
+            could be, the audit trail for how it was decided. */}
         <ConsolidatorPicker
           consolidatorVendorId={consolidatorVendorId}
           provenance={provenanceRead.data}
+          provenanceLoading={provenanceRead.isLoading}
+          provenanceError={provenanceRead.error}
           options={options}
+          optionsLoading={jobsRead.isLoading}
+          optionsError={jobsRead.error}
+          onRetryOptions={jobsRead.reload}
           vendorName={vendorNameFor(consolidatorVendorId, jobs, transfers)}
+          nameLookupComplete={nameLookupComplete}
           isLoading={readinessRead.isLoading}
           error={readinessRead.error}
           isSaving={isSaving}
