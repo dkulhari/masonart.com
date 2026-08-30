@@ -574,10 +574,18 @@ test.describe('Admin Orders List Page', () => {
     await expect(refreshButton).toBeVisible();
   });
 
-  test('should display Export button', async ({ page }) => {
-    const exportButton = page.locator('button:has-text("Export")');
-    await expect(exportButton).toBeVisible();
-  });
+  /**
+   * There is deliberately no Export button test (#604, #653).
+   *
+   * The header shipped one wired to `alert('Export functionality coming
+   * soon')` — an enabled-looking control that exported nothing, and a blocking
+   * native dialog that froze any E2E run which clicked near it. `f72c9b81`
+   * removed the button; this assertion outlived it and failed the suite for
+   * doing the right thing.
+   *
+   * If orders export comes back as a real feature it needs its own ticket and
+   * its own test against a real download — not a resurrected button.
+   */
 
   test('should display date filter inputs', async ({ page }) => {
     const dateInputs = page.locator('input[type="date"]');
