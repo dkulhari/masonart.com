@@ -457,6 +457,11 @@ adminProductsApp.get(
         hasPreviousPage: page > 1,
       });
     } catch (error) {
+      // Logged, like `/stats` below, because this catch is otherwise a place
+      // where evidence goes to die: #657 was a Postgres 42702 on every single
+      // request to this endpoint, and all a debugger ever saw was the flat
+      // string "Failed to fetch products".
+      console.error("Failed to fetch admin products:", error);
       return c.json({ error: "Failed to fetch products" }, 500);
     }
   }

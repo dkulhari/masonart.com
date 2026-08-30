@@ -50,18 +50,37 @@ export const VOIDED_ORDER_STATUSES = [
 ] as const;
 
 /**
+ * The outer row this subquery correlates against, written so drizzle cannot
+ * un-write it.
+ *
+ * `${products.id}` — the obvious spelling — is a `Column` chunk, and
+ * `PgDialect.buildSelection` rewrites every `Column` chunk of a SELECTED `sql`
+ * template to a bare identifier whenever the query has no joins
+ * (`isSingleTable`). Dropping the qualifier is correct for a top-level column
+ * reference and wrong here: inside the subquery below, `"id"` no longer names
+ * the outer product but is resolved against `order_items` and `orders`, which
+ * both expose an `id`. Postgres answers `column reference "id" is ambiguous`
+ * (42702) and the admin product list 500s — #657.
+ *
+ * A Table chunk plus an explicit identifier renders `"products"."id"` in both
+ * shapes, because neither is a `Column` for the rewrite to reach. The name is
+ * still read off the schema, so a rename cannot leave a stale literal behind.
+ */
+const productIdRef = sql`${products}.${sql.identifier(products.id.name)}`;
+
+/**
  * `coalesce(sum(quantity), 0)` over settled orders for the given product row.
  *
  * Correlates against `products.id`, so it belongs in a query that has
- * `products` in scope. Safe inside a grouped query because `products.id` is
- * the grouping key.
+ * `products` in scope, unaliased. Safe inside a grouped query because
+ * `products.id` is the grouping key.
  */
 export function unitsSoldSql(): SQL<number> {
   return sql<number>`coalesce((
     select sum(order_items.quantity)::int
     from order_items
     join orders on orders.id = order_items.order_id
-    where order_items.product_id = ${products.id}
+    where order_items.product_id = ${productIdRef}
       and orders.payment_status = 'paid'
       and orders.status not in (${sql.join(
         VOIDED_ORDER_STATUSES.map((status) => sql`${status}`),
