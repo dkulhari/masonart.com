@@ -65,6 +65,19 @@
  * own body — `{ error, code, from, to, allowed }`, plus the owning route on a
  * `GUARD_NOT_EVALUABLE_HERE` — so the remedy needs no second round trip.
  *
+ * The verdict form is the same derivation from the other side. `POST
+ * /:jobId/reviews` calls `assertTransition` too, so the form offers exactly the
+ * verdict edges the matrix has FROM the current status — both on a submitted
+ * job, only the overturn on a passed one, and none at all on a draft, an
+ * assigned, a received or a terminal one, where it says so instead of rendering
+ * a control whose every option is a 409. Its refusals render through the same
+ * `TransitionRefusal` as PATCH's, because that route is the only way to
+ * `qc_passed` and `qc_failed` and has nothing to fall back on.
+ *
+ * And a failed WRITE never becomes the page error: the body is gated on a
+ * successful READ, so routing a 401 there would blank a job that loaded fine.
+ * Write failures render beside the control that caused them (#684).
+ *
  * ## 5. The photographs are the evidence, and the stamp runs backwards
  *
  * `QcShotList` renders the stage's shot list with the live photo in each slot.
@@ -611,6 +624,14 @@ export interface TransitionPanelProps {
   /** The target currently being written, or null. Locks every button. */
   pendingStatus: ProductionJobStatus | null
   refusal: TransitionRefusalBody | null
+  /**
+   * A move that failed for a reason no refusal body can carry — an expired
+   * session, a dropped connection, a 500. It belongs HERE, beside the button
+   * that caused it, and not in the page banner: the job below was read
+   * successfully, and destroying a good read because a write failed hides the
+   * summary, the items, the photographs and the QC history all at once (#684).
+   */
+  error: string | null
 }
 
 /**
@@ -639,6 +660,7 @@ export function TransitionPanel({
   onTransition,
   pendingStatus,
   refusal,
+  error,
 }: TransitionPanelProps) {
   const targets = patchableNextStatuses(status, 'admin')
   const verdictTargets = nextStatuses(status, 'admin').filter((to) =>
@@ -711,13 +733,42 @@ export function TransitionPanel({
       )}
 
       <TransitionRefusal refusal={refusal} />
+
+      {error && (
+        <p
+          data-testid="admin-production-transition-error"
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          {error}
+        </p>
+      )}
     </div>
   )
 }
 
 export interface TransitionRefusalProps {
   refusal: TransitionRefusalBody | null
+  /**
+   * Which panel this refusal belongs to. Two can be on screen at once — the
+   * PATCH buttons' and the verdict form's — and one shared id would leave both
+   * unaddressable.
+   */
+  testId?: string
 }
+
+/**
+ * The one code whose `allowed` is an answer rather than a placeholder.
+ *
+ * `ProductionTransitionError.toResponseBody()` fills the field from
+ * `nextStatuses(from, actor)`, so an empty array under this code really does
+ * mean the matrix offers this actor nothing from here. Every other refusal in
+ * `routes/admin/production-jobs.ts` — `GUARD_UNSATISFIED`,
+ * `GUARD_NOT_EVALUABLE_HERE`, `JOB_SETTLED`, `CONCURRENT_MODIFICATION` — writes
+ * `allowed: []` as a literal beside a fact about THIS edge, where it means "not
+ * this way", not "not at all".
+ */
+const ALLOWED_IS_EXHAUSTIVE = 'ILLEGAL_TRANSITION'
 
 /**
  * A refused move, answered inline.
@@ -728,12 +779,15 @@ export interface TransitionRefusalProps {
  * route that owns it — rendering the code and dropping the route would leave an
  * admin with a refusal and no next step.
  */
-export function TransitionRefusal({ refusal }: TransitionRefusalProps) {
+export function TransitionRefusal({
+  refusal,
+  testId = 'admin-production-transition-refusal',
+}: TransitionRefusalProps) {
   if (!refusal) return null
 
   return (
     <div
-      data-testid="admin-production-transition-refusal"
+      data-testid={testId}
       role="alert"
       className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
     >
@@ -754,17 +808,30 @@ export function TransitionRefusal({ refusal }: TransitionRefusalProps) {
       )}
 
       {refusal.allowed.length > 0 ? (
-        <p>
+        <p data-testid="admin-production-refusal-allowed">
           <span className="text-muted-foreground">
             From {statusLabel(refusal.from).toLowerCase()} this job can go to:{' '}
           </span>
           {refusal.allowed.map((to) => statusLabel(to)).join(', ')}
         </p>
-      ) : (
-        <p className="text-muted-foreground">
+      ) : refusal.code === ALLOWED_IS_EXHAUSTIVE ? (
+        <p
+          data-testid="admin-production-refusal-nowhere"
+          className="text-muted-foreground"
+        >
           There is nowhere this job can be moved from{' '}
           {statusLabel(refusal.from).toLowerCase()} — not by an admin, and not with
           this route.
+        </p>
+      ) : (
+        <p
+          data-testid="admin-production-refusal-this-edge"
+          className="text-muted-foreground"
+        >
+          This is a refusal of one move, not a verdict on the job: only an illegal
+          transition answers with the list of moves that would have worked, so the
+          empty list here says nothing about the rest. Whatever else this panel
+          offers from {statusLabel(refusal.from).toLowerCase()} is still open.
         </p>
       )}
     </div>
@@ -1106,9 +1173,53 @@ export interface QcReviewInput {
 }
 
 export interface QcReviewFormProps {
+  /** The job's status NOW. The matrix decides which verdicts it can be given. */
+  status: ProductionJobStatus
   onSubmit: (input: QcReviewInput) => Promise<void> | void
   isSubmitting: boolean
   error: string | null
+}
+
+/**
+ * The verdict word behind a status, or null for a status that is not a verdict.
+ *
+ * `POST /:jobId/reviews` computes `verdict === 'pass' ? 'qc_passed' :
+ * 'qc_failed'`. This is that same correspondence read backwards, so the form can
+ * start from the matrix's statuses — which are the authority on what is legal —
+ * and end at the field the route actually parses.
+ */
+export function verdictForStatus(status: ProductionJobStatus): 'pass' | 'fail' | null {
+  if (status === 'qc_passed') return 'pass'
+  if (status === 'qc_failed') return 'fail'
+  return null
+}
+
+/**
+ * The verdicts this job can actually be given, in the matrix's own edge order.
+ *
+ * `POST /:jobId/reviews` calls `assertTransition(from, to, 'admin')` before it
+ * writes anything, so a verdict the matrix has no edge for is a 409 and nothing
+ * else. The form used to offer Pass and Fail on every status with Pass
+ * preselected, which meant "Record inspection" on a passed job asked for
+ * `qc_passed -> qc_passed` — an edge that does not exist — and on a draft,
+ * assigned, received or terminal job BOTH options were refusals.
+ *
+ * This is the same subtraction `TransitionPanel` makes, from the same side:
+ * what that panel drops because PATCH will not take it, this one keeps for
+ * exactly as long as the matrix does.
+ */
+export function availableVerdicts(
+  status: ProductionJobStatus
+): Array<{ verdict: 'pass' | 'fail'; to: ProductionJobStatus }> {
+  const open: Array<{ verdict: 'pass' | 'fail'; to: ProductionJobStatus }> = []
+
+  for (const to of nextStatuses(status, 'admin')) {
+    if (!VERDICT_ONLY_STATUSES.includes(to)) continue
+    const verdict = verdictForStatus(to)
+    if (verdict) open.push({ verdict, to })
+  }
+
+  return open
 }
 
 /** Free text in, the array the API takes out. Blanks are dropped, not sent. */
@@ -1161,11 +1272,45 @@ export function mergeDefects(chips: readonly string[], raw: string): string[] {
   return merged
 }
 
-export function QcReviewForm({ onSubmit, isSubmitting, error }: QcReviewFormProps) {
-  const [verdict, setVerdict] = useState<'pass' | 'fail'>('pass')
+export function QcReviewForm({
+  status,
+  onSubmit,
+  isSubmitting,
+  error,
+}: QcReviewFormProps) {
+  const [preferred, setPreferred] = useState<'pass' | 'fail' | null>(null)
   const [chips, setChips] = useState<string[]>([])
   const [defects, setDefects] = useState('')
   const [notes, setNotes] = useState('')
+
+  const verdicts = availableVerdicts(status)
+
+  /**
+   * Derived every render, not seeded into `useState`: the job moves UNDER this
+   * form. A pass turns `qc_submitted` into `qc_passed`, where the only verdict
+   * edge left is the overturn — an initial value would go on offering the
+   * verdict the matrix has just withdrawn, and asking for it is a 409.
+   */
+  const verdict =
+    verdicts.find((option) => option.verdict === preferred)?.verdict ??
+    verdicts[0]?.verdict ??
+    null
+
+  if (verdict === null) {
+    return (
+      <p
+        data-testid="admin-production-review-unavailable"
+        className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
+      >
+        No inspection can be recorded on a job in{' '}
+        {statusLabel(status).toLowerCase()}. A verdict IS a transition — the review
+        row and the move are written in one transaction — so it exists only where
+        the matrix has a verdict edge from the status the job is in, and there is
+        none from this one. A submission here would be refused and nothing would be
+        written; the history above stays readable either way.
+      </p>
+    )
+  }
 
   const chosen = mergeDefects(chips, defects)
 
@@ -1208,13 +1353,27 @@ export function QcReviewForm({ onSubmit, isSubmitting, error }: QcReviewFormProp
         <select
           data-testid="admin-production-review-verdict"
           value={verdict}
-          onChange={(e) => setVerdict(e.target.value as 'pass' | 'fail')}
+          onChange={(e) => setPreferred(e.target.value as 'pass' | 'fail')}
           className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
         >
-          <option value="pass">Pass</option>
-          <option value="fail">Fail</option>
+          {verdicts.map((option) => (
+            <option key={option.verdict} value={option.verdict}>
+              {option.verdict === 'pass' ? 'Pass' : 'Fail'}
+            </option>
+          ))}
         </select>
       </label>
+
+      {verdicts.length === 1 && (
+        <p
+          data-testid="admin-production-review-only-verdict"
+          className="text-xs text-muted-foreground"
+        >
+          {statusLabel(verdicts[0]!.to)} is the only verdict the matrix has an edge
+          for from {statusLabel(status).toLowerCase()}, so it is the only one
+          offered. The other would be refused with a 409.
+        </p>
+      )}
 
       <fieldset className="space-y-2">
         <legend className="text-xs font-medium text-muted-foreground">
@@ -1439,6 +1598,7 @@ function AdminProductionJobPage() {
 
   const [isRecording, setIsRecording] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
+  const [reviewRefusal, setReviewRefusal] = useState<TransitionRefusalBody | null>(null)
 
   const [photos, setPhotos] = useState<QcPhotoSet | null>(null)
   const [photosLoading, setPhotosLoading] = useState(true)
@@ -1446,6 +1606,7 @@ function AdminProductionJobPage() {
 
   const [pendingStatus, setPendingStatus] = useState<ProductionJobStatus | null>(null)
   const [refusal, setRefusal] = useState<TransitionRefusalBody | null>(null)
+  const [transitionError, setTransitionError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -1542,6 +1703,7 @@ function AdminProductionJobPage() {
   }) => {
     setIsRecording(true)
     setReviewError(null)
+    setReviewRefusal(null)
 
     try {
       const response = await fetch(`${getApiUrl()}/api/admin/production/${id}/reviews`, {
@@ -1556,7 +1718,29 @@ function AdminProductionJobPage() {
       })
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string }
+        const body = (await response.json().catch(() => ({}))) as Partial<
+          TransitionRefusalBody
+        >
+
+        // This route is the ONLY way to `qc_passed` and `qc_failed`, and it
+        // refuses with the very body PATCH does — `assertTransition` throws the
+        // same `ProductionTransitionError`, and `JOB_SETTLED` /
+        // `CONCURRENT_MODIFICATION` carry `code`, `from` and `to` as well.
+        // Flattening all of that to `body.error` threw the remedy away on the
+        // one route with no alternative to fall back to.
+        if (body.code && body.from && body.to) {
+          setReviewRefusal({
+            error: body.error ?? 'This inspection was refused.',
+            code: body.code,
+            from: body.from,
+            to: body.to,
+            allowed: body.allowed ?? [],
+            guard: body.guard,
+            route: body.route,
+          })
+          return
+        }
+
         throw new Error(body.error ?? 'Failed to record the review')
       }
 
@@ -1578,11 +1762,17 @@ function AdminProductionJobPage() {
    * `{ error, code, from, to, allowed }` and, for `GUARD_NOT_EVALUABLE_HERE`,
    * the route that owns the guard. All of that goes to `TransitionRefusal`
    * beside the buttons, where the remedy is next to the thing that was refused.
-   * Only a response with no recognisable body falls through to the page error.
+   *
+   * A response with no recognisable body — a 401 on an expired session, a 500, a
+   * dropped connection — lands beside the buttons too, as the panel's own error.
+   * It must NOT become the page error: that banner is gated on `!error`, so a
+   * failed WRITE would blank a job that was read perfectly, taking the summary,
+   * the items, the photographs and the QC history with it (#684).
    */
   const handleTransition = async (status: ProductionJobStatus) => {
     setPendingStatus(status)
     setRefusal(null)
+    setTransitionError(null)
 
     try {
       const response = await fetch(`${getApiUrl()}/api/admin/production/${id}`, {
@@ -1615,7 +1805,7 @@ function AdminProductionJobPage() {
 
       await Promise.all([load(), loadPhotos()])
     } catch (updateError) {
-      setError((updateError as Error).message)
+      setTransitionError((updateError as Error).message)
     } finally {
       setPendingStatus(null)
     }
@@ -1741,6 +1931,7 @@ function AdminProductionJobPage() {
                 onTransition={handleTransition}
                 pendingStatus={pendingStatus}
                 refusal={refusal}
+                error={transitionError}
               />
             </div>
           </section>
@@ -1850,9 +2041,14 @@ function AdminProductionJobPage() {
               error={null}
             />
             <QcReviewForm
+              status={job.status}
               onSubmit={handleRecordReview}
               isSubmitting={isRecording}
               error={reviewError}
+            />
+            <TransitionRefusal
+              refusal={reviewRefusal}
+              testId="admin-production-review-refusal"
             />
           </section>
         </div>

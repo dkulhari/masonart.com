@@ -25,10 +25,16 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
 vi.mock('@tanstack/react-router', () => ({
-  createFileRoute: () => (config: unknown) => config,
+  // `Route` IS the config object under this mock, so `Route.component` is the
+  // page and `Route.useParams` has to come from here — the composed page is
+  // rendered at the bottom of this file, and without a params hook it cannot be.
+  createFileRoute: () => (config: Record<string, unknown>) => ({
+    ...config,
+    useParams: () => ({ id: 'job-under-test' }),
+  }),
   useNavigate: () => () => {},
   Link: ({
     children,
@@ -47,14 +53,10 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
-import {
-  PRODUCTION_JOB_STATUSES,
-  VERDICT_ONLY_STATUSES,
-  nextStatuses,
-  patchableNextStatuses,
-} from '@chobii/shared'
+import { PRODUCTION_JOB_STATUSES, type ProductionJobStatus } from '@chobii/shared'
 
 import {
+  Route,
   QcReviewHistory,
   QcReviewForm,
   QcShotList,
@@ -538,7 +540,7 @@ describe('QcReviewHistory', () => {
 describe('QcReviewForm', () => {
   it('submits a pass with notes and no defects', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-notes'), {
       target: { value: 'Looks right.' },
@@ -554,7 +556,7 @@ describe('QcReviewForm', () => {
 
   it('splits the free-text defects into the array the API takes', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
       target: { value: 'fail' },
@@ -573,7 +575,7 @@ describe('QcReviewForm', () => {
 
   it('shows the submit failure instead of swallowing it', () => {
     render(
-      <QcReviewForm onSubmit={asyncNoop} isSubmitting={false} error="Failed to record review" />
+      <QcReviewForm status="qc_submitted" onSubmit={asyncNoop} isSubmitting={false} error="Failed to record review" />
     )
 
     expect(screen.getByTestId('admin-production-review-error').textContent).toMatch(
@@ -582,7 +584,7 @@ describe('QcReviewForm', () => {
   })
 
   it('blocks a double submission while one is in flight', () => {
-    render(<QcReviewForm onSubmit={asyncNoop} isSubmitting error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={asyncNoop} isSubmitting error={null} />)
 
     expect(screen.getByTestId('admin-production-review-submit')).toBeDisabled()
   })
@@ -614,6 +616,7 @@ describe('TransitionPanel', () => {
         onTransition={asyncNoop}
         pendingStatus={null}
         refusal={null}
+        error={null}
         {...overrides}
       />
     )
@@ -623,28 +626,58 @@ describe('TransitionPanel', () => {
       .queryAllByTestId(/^admin-production-transition-to-/)
       .map((node) => node.getAttribute('data-testid')?.replace('admin-production-transition-to-', ''))
 
-  it('offers exactly the matrix edges an admin may take, for every status', () => {
+  /**
+   * What the panel offers, written out longhand.
+   *
+   * The two tests that stood here both derived their expectation from the
+   * component's own expression — one called `patchableNextStatuses(status,
+   * 'admin')`, which is the line under test verbatim, and the other inlined that
+   * function's body, which is the same derivation with the call removed. Either
+   * passes whatever the screen computes; between them they could catch a
+   * hardcoded list and nothing else, least of all a wrong derivation.
+   *
+   * `packages/shared/tests/schemas/production-transitions.test.ts` is the
+   * pattern, and says why: "a test that recomputes what it is checking passes
+   * whatever the code does". This is that table again, one level up, at the
+   * buttons a person can actually press.
+   */
+  const OFFERED_BY_STATUS: Record<ProductionJobStatus, ProductionJobStatus[]> = {
+    draft: ['assigned', 'cancelled'],
+    // The self-edge is reassignment, and it is a real move an admin makes.
+    assigned: ['assigned', 'cancelled'],
+    // Retired: nothing reaches it and nothing leaves it.
+    sent: [],
+    // `received -> qc_submitted` is the vendor's, taken in their portal.
+    received: ['cancelled'],
+    // Both verdicts are legal from here and NEITHER is a button: PATCH does not
+    // parse them, so cancelling is all that is left on this control.
+    qc_submitted: ['cancelled'],
+    // The overturn to `qc_failed` belongs to the verdict form; despatch carries
+    // a guard PATCH does evaluate, so it stays pressable.
+    qc_passed: ['dispatched', 'cancelled'],
+    qc_failed: ['assigned', 'cancelled'],
+    dispatched: [],
+    cancelled: [],
+  }
+
+  it('offers exactly these buttons, status by status', () => {
     for (const status of PRODUCTION_JOB_STATUSES) {
       cleanup()
       renderPanel({ status })
 
-      expect(offered()).toEqual(patchableNextStatuses(status, 'admin'))
+      expect(offered()).toEqual(OFFERED_BY_STATUS[status])
     }
   })
 
   /**
-   * The subtraction, stated the other way round so it cannot pass vacuously:
-   * what is offered is the matrix minus the two verdicts, never a third list.
+   * The table above is only a specification while it covers the vocabulary. A
+   * status added to the pgEnum and to the matrix has to be argued about here,
+   * not silently indexed as `undefined`.
    */
-  it('offers the matrix minus the verdict-only statuses, and nothing else', () => {
-    for (const status of PRODUCTION_JOB_STATUSES) {
-      cleanup()
-      renderPanel({ status })
-
-      expect(offered()).toEqual(
-        nextStatuses(status, 'admin').filter((to) => !VERDICT_ONLY_STATUSES.includes(to))
-      )
-    }
+  it('has a written-out expectation for every status in the enum', () => {
+    expect(Object.keys(OFFERED_BY_STATUS).sort()).toEqual(
+      [...PRODUCTION_JOB_STATUSES].sort()
+    )
   })
 
   it('never offers qc_passed or qc_failed, which belong to the verdict form', () => {
@@ -729,6 +762,20 @@ describe('TransitionPanel', () => {
     expect(screen.getByTestId('admin-production-transition-to-cancelled')).toBeDisabled()
   })
 
+  /**
+   * A write that failed for a reason no refusal body can carry belongs beside
+   * the button that caused it. The page banner is gated on a successful READ, so
+   * putting it there would blank a job that had loaded perfectly.
+   */
+  it('shows a failed write beside the buttons, with the job still offered', () => {
+    renderPanel({ status: 'received', error: 'Unauthorized' })
+
+    expect(screen.getByTestId('admin-production-transition-error').textContent).toMatch(
+      /unauthorized/i
+    )
+    expect(offered()).toEqual(['cancelled'])
+  })
+
   it('uses no native confirm or alert', () => {
     const confirmSpy = vi.spyOn(window, 'confirm')
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
@@ -778,7 +825,17 @@ describe('TransitionRefusal', () => {
     expect(refusal.textContent).toMatch(/cancelled/i)
   })
 
-  it('says so in words when the actor may not move the job at all', () => {
+  /**
+   * The assertion here used to be `toMatch(/nowhere|not|no move/i)`, which every
+   * refusal satisfies: each one opens with "Nothing was written.", and
+   * "Nothing" matches `/not/i`. It passed whichever of the two branches
+   * rendered — and it was the only test guarding the choice between them.
+   *
+   * `ILLEGAL_TRANSITION` is the one code whose `allowed` is computed
+   * (`ProductionTransitionError.toResponseBody()` fills it from
+   * `nextStatuses(from, actor)`), so an empty array under it does mean nowhere.
+   */
+  it('says the job is stuck only when the code enumerates the alternatives', () => {
     render(
       <TransitionRefusal
         refusal={{
@@ -791,8 +848,59 @@ describe('TransitionRefusal', () => {
       />
     )
 
-    const refusal = screen.getByTestId('admin-production-transition-refusal')
-    expect(refusal.textContent).toMatch(/nowhere|not|no move/i)
+    expect(screen.getByTestId('admin-production-refusal-nowhere').textContent).toMatch(
+      /nowhere this job can be moved from dispatched/i
+    )
+    expect(screen.queryByTestId('admin-production-refusal-this-edge')).toBeNull()
+  })
+
+  /**
+   * `assertGuardSatisfied` writes `allowed: []` as a LITERAL beside a fact about
+   * one edge, and it means "not through this edge" — not "nowhere". The
+   * scenario: a `qc_passed` job on no open transfer whose order carries no
+   * label. "Move to dispatched" is live, because PATCH does evaluate
+   * `open-transfer-or-order-label`; pressing it used to make the panel declare
+   * the job permanently stuck while its own "Move to cancelled" button sat two
+   * lines above.
+   */
+  it('does not call the job stuck when the empty list is only about this edge', () => {
+    render(
+      <TransitionRefusal
+        refusal={{
+          error:
+            'This job is on no open transfer and its order carries no shipping label.',
+          code: 'GUARD_UNSATISFIED',
+          guard: 'open-transfer-or-order-label',
+          from: 'qc_passed',
+          to: 'dispatched',
+          allowed: [],
+        }}
+      />
+    )
+
+    expect(screen.queryByTestId('admin-production-refusal-nowhere')).toBeNull()
+    expect(screen.getByTestId('admin-production-refusal-this-edge').textContent).toMatch(
+      /still open/i
+    )
+  })
+
+  /** Two refusals can be on screen at once, so the id has to be addressable. */
+  it('takes the id of the panel it belongs to', () => {
+    render(
+      <TransitionRefusal
+        testId="admin-production-review-refusal"
+        refusal={{
+          error: 'This job is already settled and can no longer be inspected here.',
+          code: 'JOB_SETTLED',
+          from: 'qc_submitted',
+          to: 'qc_passed',
+          allowed: [],
+        }}
+      />
+    )
+
+    expect(screen.getByTestId('admin-production-review-refusal')).toBeInTheDocument()
+    expect(screen.queryByTestId('admin-production-transition-refusal')).toBeNull()
   })
 
   /**
@@ -819,6 +927,8 @@ describe('TransitionRefusal', () => {
     const refusal = screen.getByTestId('admin-production-transition-refusal')
     expect(refusal.textContent).toMatch(/POST \/api\/admin\/production\/:jobId\/assign/)
     expect(refusal.textContent).toMatch(/priced-from-rate-card/)
+    // Its `allowed: []` is a literal about this edge, not a survey of the job.
+    expect(screen.queryByTestId('admin-production-refusal-nowhere')).toBeNull()
   })
 })
 
@@ -960,7 +1070,7 @@ describe('QcReviewForm — defects', () => {
    */
   it('cannot submit a fail with no defect', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
       target: { value: 'fail' },
@@ -975,7 +1085,7 @@ describe('QcReviewForm — defects', () => {
 
   it('lets a pass through with no defect at all', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     expect(screen.getByTestId('admin-production-review-submit')).not.toBeDisabled()
     expect(screen.queryByTestId('admin-production-review-defects-required')).toBeNull()
@@ -986,7 +1096,7 @@ describe('QcReviewForm — defects', () => {
 
   it('submits a fail once a defect chip is chosen', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
       target: { value: 'fail' },
@@ -1006,7 +1116,7 @@ describe('QcReviewForm — defects', () => {
 
   it('toggles a chip back off', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
       target: { value: 'fail' },
@@ -1021,7 +1131,7 @@ describe('QcReviewForm — defects', () => {
   /** Chips are a shortcut over the same array, not a second field. */
   it('merges chips with the free text and drops a duplicate', () => {
     const onSubmit = vi.fn(async () => {})
-    render(<QcReviewForm onSubmit={onSubmit} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
       target: { value: 'fail' },
@@ -1041,7 +1151,7 @@ describe('QcReviewForm — defects', () => {
 
   it('never reaches for a native alert to refuse the submission', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-    render(<QcReviewForm onSubmit={asyncNoop} isSubmitting={false} error={null} />)
+    render(<QcReviewForm status="qc_submitted" onSubmit={asyncNoop} isSubmitting={false} error={null} />)
 
     fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
       target: { value: 'fail' },
@@ -1106,5 +1216,292 @@ describe('QcReviewHistory — an overturn', () => {
 
     expect(screen.getByTestId('admin-production-review-overturn-rev-b')).toBeInTheDocument()
     expect(screen.queryByTestId('admin-production-review-overturn-rev-a')).toBeNull()
+  })
+})
+
+// ============================================================================
+// The verdict form — the OTHER half of the same subtraction
+// ============================================================================
+
+/**
+ * `POST /:jobId/reviews` calls `assertTransition(from, to, 'admin')` before it
+ * writes anything, so a verdict the matrix has no edge for is a 409 and nothing
+ * else. The form used to render on every status with Pass preselected: on a
+ * `qc_passed` job "Record inspection" asked for `qc_passed -> qc_passed`, an
+ * edge that does not exist, and on a draft, assigned, received or terminal job
+ * BOTH options were refusals the screen could have predicted.
+ */
+describe('QcReviewForm — the verdicts the matrix allows', () => {
+  /**
+   * Written out longhand, for the same reason the button table above is: a
+   * derived expectation would agree with whatever `availableVerdicts` computes.
+   */
+  const VERDICTS_BY_STATUS: Record<ProductionJobStatus, Array<'pass' | 'fail'>> = {
+    draft: [],
+    assigned: [],
+    sent: [],
+    // Nothing has been submitted for inspection, so there is nothing to judge.
+    received: [],
+    qc_submitted: ['pass', 'fail'],
+    // Only the overturn. `qc_passed -> qc_passed` is not an edge.
+    qc_passed: ['fail'],
+    // A failed job goes back to the vendor; it is not re-judged from here.
+    qc_failed: [],
+    dispatched: [],
+    cancelled: [],
+  }
+
+  const optionValues = () =>
+    Array.from(
+      screen.getByTestId('admin-production-review-verdict').querySelectorAll('option')
+    ).map((option) => option.getAttribute('value'))
+
+  it('offers exactly these verdicts, status by status', () => {
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      cleanup()
+      render(
+        <QcReviewForm
+          status={status}
+          onSubmit={asyncNoop}
+          isSubmitting={false}
+          error={null}
+        />
+      )
+
+      const expected = VERDICTS_BY_STATUS[status]
+
+      if (expected.length === 0) {
+        expect(screen.queryByTestId('admin-production-review-form')).toBeNull()
+        expect(screen.getByTestId('admin-production-review-unavailable')).toBeInTheDocument()
+      } else {
+        expect(optionValues()).toEqual(expected)
+      }
+    }
+  })
+
+  it('has a written-out expectation for every status in the enum', () => {
+    expect(Object.keys(VERDICTS_BY_STATUS).sort()).toEqual(
+      [...PRODUCTION_JOB_STATUSES].sort()
+    )
+  })
+
+  /**
+   * The default used to be Pass on every status. On a passed job that is the one
+   * verdict the matrix has no edge for, so the untouched form's own submit
+   * button was a 409.
+   */
+  it('never preselects a verdict the matrix has no edge for', () => {
+    const onSubmit = vi.fn(async () => {})
+    render(
+      <QcReviewForm status="qc_passed" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+
+    expect(
+      (screen.getByTestId('admin-production-review-verdict') as HTMLSelectElement).value
+    ).toBe('fail')
+
+    fireEvent.click(screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`))
+    fireEvent.submit(screen.getByTestId('admin-production-review-form'))
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      verdict: 'fail',
+      defects: [QC_DEFECT_CHIPS[0]],
+      notes: '',
+    })
+  })
+
+  it('says which verdict is the only one open, rather than hiding the other', () => {
+    render(
+      <QcReviewForm status="qc_passed" onSubmit={asyncNoop} isSubmitting={false} error={null} />
+    )
+
+    expect(screen.getByTestId('admin-production-review-only-verdict').textContent).toMatch(
+      /QC failed/
+    )
+  })
+
+  it('names the status when nothing can be inspected, instead of a form that 409s', () => {
+    render(
+      <QcReviewForm status="draft" onSubmit={asyncNoop} isSubmitting={false} error={null} />
+    )
+
+    expect(screen.getByTestId('admin-production-review-unavailable').textContent).toMatch(
+      /draft/i
+    )
+  })
+})
+
+// ============================================================================
+// The composed page — where D1, D2 and D4 live
+// ============================================================================
+
+/**
+ * Every suite above renders one exported component. Three of the defects this
+ * file now pins are not IN one: which status the verdict form is handed, how a
+ * refused review is parsed, and where a failed write is put. Rendering
+ * `Route.component` once, over a stubbed `fetch`, closes that whole gap — and
+ * costs less than exporting three handlers to test them in isolation, which
+ * would also stop testing the wiring, which is exactly where the bugs were.
+ */
+const JOB_ID = 'job-under-test'
+
+const Page = (Route as unknown as { component: () => React.ReactElement }).component
+
+const jobDetail = (status: ProductionJobStatus) => ({
+  job: {
+    id: JOB_ID,
+    orderId: 'order-1',
+    stage: 'print',
+    status,
+    vendorId: null,
+    assignedAt: null,
+    sentAt: null,
+    dueAt: null,
+    receivedAt: null,
+    amountExpected: '1200.00',
+    amountActual: null,
+    settlementId: null,
+    createdBy: null,
+    createdAt: '2026-07-01T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+  },
+  items: [
+    {
+      id: 'item-1',
+      orderItemId: 'order-item-1',
+      quantity: 1,
+      widthInches: 12,
+      heightInches: 18,
+      sizeLabel: '12 × 18 in',
+    },
+  ],
+  reviews: [],
+  payableAmount: '1200.00',
+})
+
+const jsonResponse = (ok: boolean, status: number, body: unknown) =>
+  ({ ok, status, json: async () => body }) as Response
+
+/** GETs answer from the fixtures; the one write under test answers from `write`. */
+function stubApi(options: {
+  detail?: () => Response
+  write?: () => Response
+}) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    const method = (init?.method ?? 'GET').toUpperCase()
+
+    if (method !== 'GET') {
+      return options.write?.() ?? jsonResponse(true, 200, {})
+    }
+    if (url.includes('/photos')) {
+      return jsonResponse(true, 200, {
+        jobId: JOB_ID,
+        stage: 'print',
+        status: 'qc_submitted',
+        shots: [],
+        missingRequiredSlots: [],
+        expiresAt: '2026-07-01T00:05:00.000Z',
+      })
+    }
+    if (url.includes('/api/admin/vendors')) {
+      return jsonResponse(true, 200, { items: [] })
+    }
+    return options.detail?.() ?? jsonResponse(true, 200, jobDetail('qc_submitted'))
+  })
+
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+describe('AdminProductionJobPage', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  /**
+   * D4. A session expires; the 401 body carries no `code`/`from`/`to`, so it
+   * falls past the refusal branch. Routing it to the page error blanked the
+   * summary, the items, the photographs and the QC history at once — because
+   * the body is gated on `!error` — despite the job having been read perfectly.
+   */
+  it('keeps a job that loaded fine on screen when a transition write fails', async () => {
+    stubApi({
+      detail: () => jsonResponse(true, 200, jobDetail('received')),
+      write: () => jsonResponse(false, 401, { error: 'Unauthorized' }),
+    })
+
+    render(<Page />)
+    await screen.findByTestId('admin-production-items')
+
+    fireEvent.click(screen.getByTestId('admin-production-transition-to-cancelled'))
+
+    expect(
+      (await screen.findByTestId('admin-production-transition-error')).textContent
+    ).toMatch(/unauthorized/i)
+    expect(screen.getByTestId('admin-production-items')).toBeInTheDocument()
+    expect(screen.queryByTestId('admin-production-detail-error')).toBeNull()
+  })
+
+  /** A failed READ is a different thing, and still takes the job down with it. */
+  it('still blanks the job when the read itself fails', async () => {
+    stubApi({
+      detail: () => jsonResponse(false, 500, { error: 'Failed to load the production job' }),
+    })
+
+    render(<Page />)
+
+    await screen.findByTestId('admin-production-detail-error')
+    expect(screen.queryByTestId('admin-production-items')).toBeNull()
+  })
+
+  /**
+   * D2. The reviews route is the ONLY way to `qc_passed` and `qc_failed`, and it
+   * refuses with the same `{ error, code, from, to, allowed }` PATCH does.
+   * Flattening it to `body.error` left the one route with no alternative as the
+   * one route whose remedy was thrown away.
+   */
+  it('renders a refused verdict with its from, to and allowed, not a bare string', async () => {
+    stubApi({
+      detail: () => jsonResponse(true, 200, jobDetail('qc_submitted')),
+      write: () =>
+        jsonResponse(false, 409, {
+          error: "Cannot move a production job from 'qc_passed' to 'qc_passed' as admin.",
+          code: 'ILLEGAL_TRANSITION',
+          from: 'qc_passed',
+          to: 'qc_passed',
+          allowed: ['qc_failed', 'dispatched', 'cancelled'],
+        }),
+    })
+
+    render(<Page />)
+    fireEvent.submit(await screen.findByTestId('admin-production-review-form'))
+
+    const refusal = await screen.findByTestId('admin-production-review-refusal')
+    expect(refusal.textContent).toMatch(/QC passed/)
+    expect(refusal.textContent).toMatch(/Dispatched by vendor/)
+    expect(screen.queryByTestId('admin-production-review-error')).toBeNull()
+  })
+
+  /** D1, composed: the form is handed the job's live status, not a default. */
+  it('offers no verdict form on a job the matrix has no verdict edge from', async () => {
+    stubApi({ detail: () => jsonResponse(true, 200, jobDetail('received')) })
+
+    render(<Page />)
+
+    await screen.findByTestId('admin-production-review-unavailable')
+    expect(screen.queryByTestId('admin-production-review-form')).toBeNull()
+  })
+
+  it('offers only the overturn on a job that has already passed', async () => {
+    stubApi({ detail: () => jsonResponse(true, 200, jobDetail('qc_passed')) })
+
+    render(<Page />)
+
+    const select = (await screen.findByTestId(
+      'admin-production-review-verdict'
+    )) as HTMLSelectElement
+    await waitFor(() => expect(select.value).toBe('fail'))
+    expect(Array.from(select.querySelectorAll('option')).map((o) => o.value)).toEqual([
+      'fail',
+    ])
   })
 })
