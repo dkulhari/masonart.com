@@ -140,6 +140,7 @@ vi.mock('../../../src/lib/storage', () => ({
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
@@ -225,7 +226,7 @@ describe('GET /api/vendor/jobs/:id/artwork/:itemId', () => {
     const res = await buildApp().request(artworkPath())
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.url).toBe(SIGNED_URL)
     expect(body.itemId).toBe(ITEM_ID)
 
@@ -249,7 +250,7 @@ describe('GET /api/vendor/jobs/:id/artwork/:itemId', () => {
     expect(ttl).toBeGreaterThan(0)
     expect(ttl).toBeLessThanOrEqual(MAX_REASONABLE_TTL_SECONDS)
 
-    const body = await res.json()
+    const body = await readJson(res)
     // The caller is told the same expiry the signature actually carries, so a
     // client cannot cache a URL it believes is still good.
     expect(body.expiresInSeconds).toBe(ttl)
@@ -266,7 +267,7 @@ describe('GET /api/vendor/jobs/:id/artwork/:itemId', () => {
     })
 
     const res = await buildApp().request(artworkPath())
-    const serialised = JSON.stringify(await res.json())
+    const serialised = JSON.stringify(await readJson(res))
 
     // The whole point of signing is defeated if the CDN path rides along.
     expect(serialised).not.toContain(ARTWORK_CDN_URL)
@@ -299,7 +300,7 @@ describe('GET /api/vendor/jobs/:id/artwork/:itemId', () => {
     })
 
     const res = await buildApp().request(artworkPath())
-    const serialised = JSON.stringify(await res.json()).toLowerCase()
+    const serialised = JSON.stringify(await readJson(res)).toLowerCase()
 
     for (const field of ['customer', 'orderid', 'ordernumber', 'address', 'email', 'phone']) {
       expect(serialised, `artwork response leaks ${field}`).not.toContain(`"${field}`)

@@ -143,6 +143,7 @@ import { frames } from "../../src/database/schema/products";
 import { promotions } from "../../src/database/schema/promotions";
 import { invalidateActivePromotions } from "../../src/lib/promotion-pricing";
 import { productsApp } from "../../src/routes/products";
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route("/api/products", productsApp);
@@ -267,7 +268,7 @@ type ProductBody = {
 async function fetchProduct(): Promise<ProductBody> {
   const res = await app.request(`/api/products/${SLUG}`);
   expect(res.status).toBe(200);
-  return (await res.json()) as ProductBody;
+  return (await readJson(res)) as ProductBody;
 }
 
 /** Move the clock without re-entering the fake-timer setup. */

@@ -21,6 +21,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Hono } from "hono";
 import "../setup";
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Constants
@@ -221,7 +222,7 @@ describe("Shipping Input Validation", () => {
       const res = await app.request(`/api/shipping/options/${INVALID_UUID}`);
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Invalid shipping option ID");
     });
 
@@ -330,7 +331,7 @@ describe("Shipping Response Format", () => {
     const res = await app.request(`/api/shipping/options/${INVALID_UUID}`);
     expect(res.status).toBe(400);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty("error");
     expect(typeof json.error).toBe("string");
   });
@@ -352,7 +353,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/shipping/options");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("options");
       expect(Array.isArray(json.options)).toBe(true);
     });
@@ -367,7 +368,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/shipping/options");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("fromCache");
       expect(typeof json.fromCache).toBe("boolean");
     });
@@ -382,7 +383,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/shipping/options");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       // All returned options should be active (isActive not returned to public, but inactive filtered)
       // Options should have expected fields
       for (const option of json.options) {
@@ -406,7 +407,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request(`/api/shipping/options/${nonExistentId}`);
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Shipping option not found");
     });
   });
@@ -422,7 +423,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/shipping/estimate?cartTotal=500");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("cartTotal");
       expect(json).toHaveProperty("options");
       expect(json).toHaveProperty("freeShippingThreshold");
@@ -439,7 +440,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/shipping/estimate?cartTotal=500");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       for (const option of json.options) {
         expect(option).toHaveProperty("id");
         expect(option).toHaveProperty("name");
@@ -462,7 +463,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       );
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.zipCode).toBe("560001");
     });
 
@@ -476,7 +477,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/shipping/estimate?cartTotal=500");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.zipCode).toBeNull();
     });
   });
@@ -525,12 +526,12 @@ describe("Shipping Caching Tests", () => {
     // First request - should be cache miss
     const res1 = await app.request("/api/shipping/options");
     expect(res1.status).toBe(200);
-    const json1 = await res1.json();
+    const json1 = await readJson(res1);
 
     // Second request - may be from cache
     const res2 = await app.request("/api/shipping/options");
     expect(res2.status).toBe(200);
-    const json2 = await res2.json();
+    const json2 = await readJson(res2);
 
     // Data should be the same
     expect(json1.options.length).toBe(json2.options.length);

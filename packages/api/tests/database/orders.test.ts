@@ -18,7 +18,6 @@ import {
   users,
   products,
   productVariants,
-  frames,
   orders,
   orderItems,
 } from '../../src/db/schema';
@@ -238,7 +237,6 @@ beforeEach(async () => {
 describe('Orders Table Schema', () => {
   let testUserId: string;
   let testProductId: string;
-  let testVariantId: string;
 
   beforeEach(async () => {
     if (shouldSkip() || !db) return;
@@ -267,7 +265,7 @@ describe('Orders Table Schema', () => {
     }).returning();
     testProductId = product.id;
 
-    const [variant] = await db.insert(productVariants).values({
+    await db.insert(productVariants).values({
       productId: testProductId,
       sizeLabel: '12x16 inches',
       widthInches: '12.00',
@@ -275,7 +273,6 @@ describe('Orders Table Schema', () => {
       price: '129.99',
       stockQuantity: 50,
     }).returning();
-    testVariantId = variant.id;
   });
 
   describe('Table Structure', () => {

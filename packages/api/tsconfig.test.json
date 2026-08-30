@@ -1,0 +1,38 @@
+{
+  // Typechecks the tests/ tree, which tsconfig.json cannot reach.
+  //
+  // tsconfig.json is the *build* config: rootDir ./src with composite +
+  // declaration, so widening its `include` to cover tests fails with TS6059
+  // ("not under rootDir") on every test file. Hence a second config, run as a
+  // second command in the `typecheck` script.
+  //
+  // Two deliberate deviations from the root config, both scoped to tests only:
+  //
+  //   noUncheckedIndexedAccess: false
+  //     `result.images[0]` is not a real risk in a test that has just asserted
+  //     the array has two entries. Several hundred of the original 1244 errors
+  //     were this and nothing else. The flag stays ON for src.
+  //
+  //   types: []
+  //     NOT a tidiness choice. Naming a package that does not resolve (e.g.
+  //     "vitest/globals") makes tsc emit TS2688 and then silently suppress
+  //     every other error in the program — the config then reports clean on
+  //     genuinely broken code. That cost real time in #633. Tests import
+  //     describe/it/expect from 'vitest' explicitly, so no ambient types are
+  //     needed.
+  //
+  // If you edit this file, self-test it: add a reference to an undefined
+  // identifier in any test and confirm this config reports it. A config that
+  // reports zero errors is indistinguishable from one that is not looking.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noUncheckedIndexedAccess": false,
+    "types": []
+  },
+  "include": ["tests/**/*", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

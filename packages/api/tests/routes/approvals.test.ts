@@ -17,9 +17,10 @@
  * @see packages/api/src/routes/approvals.ts
  */
 
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Hono } from "hono";
 import "../setup";
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -48,7 +49,6 @@ const validApproveData = {
 /**
  * Check if database is available for runtime tests
  */
-let isDatabaseAvailable = false;
 let app: Hono | null = null;
 
 beforeAll(async () => {
@@ -76,19 +76,16 @@ beforeAll(async () => {
       clearTimeout(timeoutId);
 
       if (res.status === 200) {
-        isDatabaseAvailable = true;
         console.log("Database connection available for runtime tests");
       }
     } catch (abortError) {
       console.log("Database check timed out, marking as unavailable");
-      isDatabaseAvailable = false;
     }
   } catch (error) {
     console.log(
       "Could not initialize app for testing:",
       (error as Error).message
     );
-    isDatabaseAvailable = false;
   }
 }, 10000);
 
@@ -266,7 +263,7 @@ describe("Approvals Response Format", () => {
       const { approvalsApp } = await import("../../src/routes/approvals");
 
       const res = await approvalsApp.request(`/${validApprovalToken}`);
-      const json = await res.json();
+      const json = await readJson(res);
 
       // Should have success: false in error response
       expect(json).toHaveProperty("success");
@@ -285,7 +282,7 @@ describe("Approvals Response Format", () => {
         body: JSON.stringify(validChangeRequestData),
       });
 
-      const json = await res.json();
+      const json = await readJson(res);
 
       // Error responses should have success: false
       if (!json.success) {
@@ -304,7 +301,7 @@ describe("Approvals Response Format", () => {
         body: JSON.stringify(validApproveData),
       });
 
-      const json = await res.json();
+      const json = await readJson(res);
 
       // Error responses should have success: false
       if (!json.success) {

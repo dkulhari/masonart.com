@@ -61,12 +61,6 @@ const mockAiGeneratedItem = {
   snapshot: { title: "Custom AI Poster" },
 };
 
-const mockRegularItem = {
-  id: "item-2",
-  orderId: mockOrderId,
-  isAiGenerated: false,
-  snapshot: { title: "Standard Poster" },
-};
 
 const mockApproval = {
   id: "approval-123",

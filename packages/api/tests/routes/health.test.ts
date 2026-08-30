@@ -40,6 +40,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Setup
@@ -143,7 +144,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data).toHaveProperty('status');
   });
 
@@ -151,7 +152,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.status).toBe('healthy');
   });
 
@@ -159,7 +160,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data).toHaveProperty('timestamp');
   });
 
@@ -167,7 +168,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.timestamp).toBeDefined();
 
     const timestamp = new Date(data.timestamp);
@@ -182,7 +183,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     const before = new Date();
     const res = await app.request('/health');
     const after = new Date();
-    const data = await res.json();
+    const data = await readJson(res);
 
     const timestamp = new Date(data.timestamp);
     expect(timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime() - 5000);
@@ -193,7 +194,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     expect(data).toMatchObject({
       status: 'healthy',
@@ -205,7 +206,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     // Documented in docs/deployment.md; consumed by docs/RUNBOOK-OUTAGE.md L4.
     expect(data).toHaveProperty('status');
@@ -221,7 +222,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.service).toBe('chobii-api');
   });
 
@@ -229,7 +230,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     expect(data.components.database.status).toBe('healthy');
     expect(typeof data.components.database.latency_ms).toBe('number');
@@ -239,7 +240,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     expect(data.components.redis.status).toBe('healthy');
     expect(typeof data.components.redis.latency_ms).toBe('number');
@@ -249,7 +250,7 @@ describe('Health Endpoint Response Format (/health)', () => {
     if (!app) return;
 
     const res = await app.request('/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     const components = Object.values(
       data.components as Record<string, { status: string }>
@@ -288,7 +289,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data).toHaveProperty('status');
   });
 
@@ -296,7 +297,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.status).toBe('healthy');
   });
 
@@ -304,7 +305,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data).toHaveProperty('service');
   });
 
@@ -312,7 +313,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.service).toBe('chobii-api');
   });
 
@@ -320,7 +321,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data).toHaveProperty('timestamp');
   });
 
@@ -328,7 +329,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.timestamp).toBeDefined();
 
     const timestamp = new Date(data.timestamp);
@@ -342,7 +343,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     const before = new Date();
     const res = await app.request('/api/health');
     const after = new Date();
-    const data = await res.json();
+    const data = await readJson(res);
 
     const timestamp = new Date(data.timestamp);
     expect(timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime() - 5000);
@@ -353,7 +354,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     expect(data).toMatchObject({
       status: 'healthy',
@@ -370,7 +371,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     expect(data.components.database.status).toBe('healthy');
     expect(typeof data.components.database.latency_ms).toBe('number');
@@ -380,7 +381,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     expect(data.components.redis.status).toBe('healthy');
     expect(typeof data.components.redis.latency_ms).toBe('number');
@@ -390,7 +391,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     const components = Object.values(
       data.components as Record<string, { status: string }>
@@ -643,7 +644,7 @@ describe('Health Check Query Parameters', () => {
     const res = await app.request('/health?foo=bar&baz=qux');
     expect(res.status).toBe(200);
 
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.status).toBe('healthy');
   });
 
@@ -653,7 +654,7 @@ describe('Health Check Query Parameters', () => {
     const res = await app.request('/api/health?verbose=true&format=json');
     expect(res.status).toBe(200);
 
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.status).toBe('healthy');
   });
 });
@@ -793,7 +794,7 @@ describe('Health Check Consistency', () => {
     ]);
 
     const statuses = await Promise.all(
-      responses.map(res => res.json().then((d: { status: string }) => d.status))
+      responses.map(res => readJson<{ status: string }>(res).then((d) => d.status))
     );
 
     expect(statuses).toEqual(['healthy', 'healthy', 'healthy']);
@@ -809,7 +810,7 @@ describe('Health Check Consistency', () => {
     ]);
 
     const statuses = await Promise.all(
-      responses.map(res => res.json().then((d: { status: string }) => d.status))
+      responses.map(res => readJson<{ status: string }>(res).then((d) => d.status))
     );
 
     expect(statuses).toEqual(['healthy', 'healthy', 'healthy']);
@@ -824,7 +825,7 @@ describe('Health Check Consistency', () => {
     ]);
 
     const services = await Promise.all(
-      responses.map(res => res.json().then((d: { service: string }) => d.service))
+      responses.map(res => readJson<{ service: string }>(res).then((d) => d.service))
     );
 
     expect(services).toEqual(['chobii-api', 'chobii-api']);
@@ -838,8 +839,8 @@ describe('Health Check Consistency', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     const res2 = await app.request('/health');
 
-    const data1 = await res1.json();
-    const data2 = await res2.json();
+    const data1 = await readJson(res1);
+    const data2 = await readJson(res2);
 
     const time1 = new Date(data1.timestamp).getTime();
     const time2 = new Date(data2.timestamp).getTime();
@@ -1044,8 +1045,8 @@ describe('Health Check Endpoint Aliasing', () => {
     const res1 = await app.request('/health');
     const res2 = await app.request('/api/health');
 
-    const data1 = await res1.json();
-    const data2 = await res2.json();
+    const data1 = await readJson(res1);
+    const data2 = await readJson(res2);
 
     // /api/health forwards to the /health handler, so the two must never
     // disagree — a monitor polling one would otherwise miss what the other saw.
@@ -1059,8 +1060,8 @@ describe('Health Check Endpoint Aliasing', () => {
     const res1 = await app.request('/health');
     const res2 = await app.request('/api/health');
 
-    const data1 = await res1.json();
-    const data2 = await res2.json();
+    const data1 = await readJson(res1);
+    const data2 = await readJson(res2);
 
     expect(data1.service).toBe('chobii-api');
     expect(data2.service).toBe('chobii-api');
@@ -1072,8 +1073,8 @@ describe('Health Check Endpoint Aliasing', () => {
     const res1 = await app.request('/health');
     const res2 = await app.request('/api/health');
 
-    const data1 = await res1.json();
-    const data2 = await res2.json();
+    const data1 = await readJson(res1);
+    const data2 = await readJson(res2);
 
     expect(Object.keys(data1).sort()).toEqual(Object.keys(data2).sort());
   });
@@ -1084,8 +1085,8 @@ describe('Health Check Endpoint Aliasing', () => {
     const res1 = await app.request('/health');
     const res2 = await app.request('/api/health');
 
-    const data1 = await res1.json();
-    const data2 = await res2.json();
+    const data1 = await readJson(res1);
+    const data2 = await readJson(res2);
 
     expect(Object.keys(data1.components).sort()).toEqual(['database', 'redis']);
     expect(Object.keys(data2.components).sort()).toEqual(['database', 'redis']);
@@ -1112,7 +1113,7 @@ describe('Health Check Use Cases', () => {
     const res = await app.request('/health');
     expect(res.status).toBe(200);
 
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.status).toBe('healthy');
   });
 
@@ -1124,7 +1125,7 @@ describe('Health Check Use Cases', () => {
     const res = await app.request('/api/health');
     expect(res.status).toBe(200);
 
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.status).toBe('healthy');
     expect(data.components.database.status).toBe('healthy');
     expect(data.components.redis.status).toBe('healthy');
@@ -1147,7 +1148,7 @@ describe('Health Check Use Cases', () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
-    const data = await res.json();
+    const data = await readJson(res);
 
     // Service name should be identifiable
     expect(data.service).toBe('chobii-api');
@@ -1166,7 +1167,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(typeof data.status).toBe('string');
     });
@@ -1175,7 +1176,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(typeof data.timestamp).toBe('string');
     });
@@ -1184,7 +1185,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.status).not.toBeNull();
       expect(data.status).not.toBeUndefined();
@@ -1196,7 +1197,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.status).not.toBe('');
       expect(data.timestamp).not.toBe('');
@@ -1208,7 +1209,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(typeof data.status).toBe('string');
     });
@@ -1217,7 +1218,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(typeof data.service).toBe('string');
     });
@@ -1226,7 +1227,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(typeof data.timestamp).toBe('string');
     });
@@ -1235,7 +1236,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.status).not.toBeNull();
       expect(data.status).not.toBeUndefined();
@@ -1249,7 +1250,7 @@ describe('Health Check Response Data Types', () => {
       if (!app) return;
 
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.status).not.toBe('');
       expect(data.service).not.toBe('');

@@ -24,6 +24,7 @@ vi.mock('../../src/lib/redis', () => ({
 }));
 
 import { collectionsApp } from '../../src/routes/collections';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/collections', collectionsApp);
@@ -106,7 +107,7 @@ describe('the collection itself', () => {
     const res = await app.request('/api/collections/pop-art');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as {
+    const body = (await readJson(res)) as {
       collection: { slug: string; title: string; description: string };
       items: unknown[];
       total: number;
@@ -121,7 +122,7 @@ describe('the collection itself', () => {
   it('carries the SEO fields the page head needs', async () => {
     queueSelects([popArt], [{ count: 0 }], []);
 
-    const body = (await (await app.request('/api/collections/pop-art')).json()) as {
+    const body = (await readJson(await app.request('/api/collections/pop-art'))) as {
       collection: { seoTitle: string; seoDescription: string };
     };
     expect(body.collection.seoTitle).toBe('Pop Art prints');
@@ -149,9 +150,9 @@ describe('shopper facets narrow within the collection', () => {
     // An empty grid is true; the whole catalogue would be a lie.
     queueSelects([popArt]);
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections/pop-art?styles=ukiyo-e-art')
-    ).json()) as { items: unknown[]; total: number };
+    )) as { items: unknown[]; total: number };
 
     expect(body.items).toEqual([]);
     expect(body.total).toBe(0);
@@ -167,9 +168,9 @@ describe('shopper facets narrow within the collection', () => {
   it('still queries when the shopper narrows inside the collection', async () => {
     queueSelects([popArt], [{ count: 1 }], [product('a')]);
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections/pop-art?styles=pop-art')
-    ).json()) as { total: number };
+    )) as { total: number };
 
     expect(body.total).toBe(1);
   });
@@ -202,9 +203,9 @@ describe('pagination', () => {
   it('reports the page shape the grid pages against', async () => {
     queueSelects([popArt], [{ count: 50 }], [product('a')]);
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections/pop-art?page=2&pageSize=24')
-    ).json()) as {
+    )) as {
       page: number;
       pageSize: number;
       totalPages: number;
@@ -236,9 +237,9 @@ describe('manual collections', () => {
       [product('p3'), product('p1')]
     );
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections/staff-picks')
-    ).json()) as { items: { id: string }[] };
+    )) as { items: { id: string }[] };
 
     expect(body.items.map((i) => i.id)).toEqual(['p3', 'p1']);
   });
@@ -246,9 +247,9 @@ describe('manual collections', () => {
   it('renders an empty page for a collection with no members', async () => {
     queueSelects([manual], []);
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections/staff-picks')
-    ).json()) as { items: unknown[]; total: number };
+    )) as { items: unknown[]; total: number };
 
     expect(body.items).toEqual([]);
     expect(body.total).toBe(0);
@@ -266,7 +267,7 @@ describe('facet counts', () => {
       [{ value: 'pop-art', count: 2 }]
     );
 
-    const body = (await (await app.request('/api/collections/pop-art')).json()) as {
+    const body = (await readJson(await app.request('/api/collections/pop-art'))) as {
       facets: Record<string, { value: string; count: number }[]>;
     };
 

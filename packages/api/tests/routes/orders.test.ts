@@ -22,9 +22,10 @@
  * @see packages/api/src/routes/orders.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -154,7 +155,7 @@ describe('Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -169,7 +170,7 @@ describe('Orders Authentication Requirements', () => {
       const res = await app.request('/api/orders');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -184,7 +185,7 @@ describe('Orders Authentication Requirements', () => {
       const res = await app.request(`/api/orders/${validOrderId}`);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -201,7 +202,7 @@ describe('Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -220,7 +221,7 @@ describe('Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -1304,7 +1305,7 @@ describe('Orders Error Response Format', () => {
     const res = await app.request('/api/orders');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -1320,7 +1321,7 @@ describe('Orders Error Response Format', () => {
     // Auth middleware runs first so 401 is expected; 400 if validation runs first
     expect([400, 401].includes(res.status)).toBe(true);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
   });
 
@@ -1328,7 +1329,7 @@ describe('Orders Error Response Format', () => {
     if (!app) return;
 
     const res = await app.request('/api/orders');
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -1341,7 +1342,7 @@ describe('Orders Error Response Format', () => {
     const res = await app.request('/api/orders');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     // Accept common authentication error message formats
     expect(['Unauthorized', 'Authentication required'].includes(json.error)).toBe(true);
   });

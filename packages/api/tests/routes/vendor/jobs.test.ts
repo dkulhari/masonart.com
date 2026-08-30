@@ -25,7 +25,6 @@ import { buildRouteApp } from '../../helpers/route-app'
 import { vendorSessionFor } from '../../helpers/vendor-session'
 import '../../setup'
 
-import type { RecordedQuery } from '../../helpers/query-recorder'
 import { productionJobs } from '../../../src/database/schema/production-jobs'
 import { vendorRates } from '../../../src/database/schema/vendors'
 
@@ -54,12 +53,13 @@ vi.mock('../../../src/auth', () => ({
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
-const { queries, params, queueRows, ops } = recorder
+const { params, queueRows, ops } = recorder
 
 const VENDOR_ID = '33333333-3333-4333-8333-333333333333'
 const JOB_ID = '22222222-2222-4222-8222-222222222222'
@@ -134,7 +134,7 @@ describe('GET /api/vendor/jobs', () => {
     const res = await buildApp().request('/api/vendor/jobs?limit=5&offset=10')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.items).toHaveLength(2)
 
     // The filter reached the driver — not applied in JS after an unscoped read.
@@ -177,7 +177,7 @@ describe('GET /api/vendor/jobs/:id', () => {
     const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.job.id).toBe(JOB_ID)
     expect(body.items).toHaveLength(1)
     expect(body.reviews).toHaveLength(1)
@@ -219,7 +219,7 @@ describe('PATCH /api/vendor/jobs/:id', () => {
     )
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.job.status).toBe('received')
 
     const write = ops('update', productionJobs)[0]
@@ -312,7 +312,7 @@ describe('GET /api/vendor/rates', () => {
     const res = await buildApp().request('/api/vendor/rates')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.items).toHaveLength(1)
     expect(body.items[0].amount).toBe('100.00')
 
@@ -347,7 +347,7 @@ describe('GET /api/vendor/payments', () => {
     const res = await buildApp().request('/api/vendor/payments')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.settlements).toHaveLength(1)
     expect(body.payableTotal).toBe('250.00')
 

@@ -31,6 +31,7 @@ vi.mock("../../src/lib/promotion-pricing", async (importOriginal) => {
 });
 
 import { promotionsApp } from "../../src/routes/promotions";
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route("/api/promotions", promotionsApp);
@@ -77,14 +78,14 @@ describe("GET /api/promotions/active", () => {
   it("returns null when no promotion is running", async () => {
     const res = await get();
     expect(res.status).toBe(200);
-    expect(await res.json()).toBeNull();
+    expect(await readJson(res)).toBeNull();
   });
 
   it("returns the winning promotion with a resolved deadline", async () => {
     getActivePromotionsMock.mockResolvedValue([row()]);
 
     const res = await get();
-    const body = await res.json();
+    const body = await readJson(res);
 
     expect(body).toMatchObject({
       promotionId: PROMO_ID,
@@ -98,7 +99,7 @@ describe("GET /api/promotions/active", () => {
   it("serializes exactly the five public fields and nothing else", async () => {
     getActivePromotionsMock.mockResolvedValue([row()]);
 
-    const body = await (await get()).json();
+    const body = await readJson(await get());
 
     expect(Object.keys(body).sort()).toEqual([
       "deadline",
@@ -140,7 +141,7 @@ describe("GET /api/promotions/active", () => {
     const res = await get({
       Cookie: `promo_deadline_${PROMO_ID}=${existing.getTime()}`,
     });
-    const body = await res.json();
+    const body = await readJson(res);
 
     expect(res.headers.get("set-cookie")).toBeNull();
     expect(new Date(body.deadline).getTime()).toBe(existing.getTime());
@@ -153,7 +154,7 @@ describe("GET /api/promotions/active", () => {
     const res = await get({
       Cookie: `promo_deadline_${PROMO_ID}=${spent.getTime()}`,
     });
-    const body = await res.json();
+    const body = await readJson(res);
 
     expect(res.headers.get("set-cookie")).toContain(
       `promo_deadline_${PROMO_ID}=`
@@ -165,7 +166,7 @@ describe("GET /api/promotions/active", () => {
     const endsAt = new Date(Date.now() + 30 * 60_000);
     getActivePromotionsMock.mockResolvedValue([row({ endsAt })]);
 
-    const body = await (await get()).json();
+    const body = await readJson(await get());
     const deadline = new Date(body.deadline).getTime();
 
     // The rolling window is 12h; the sale has 30 minutes left. The clamp wins.
@@ -179,9 +180,9 @@ describe("GET /api/promotions/active", () => {
     getActivePromotionsMock.mockResolvedValue([row({ endsAt })]);
     const roomy = new Date(Date.now() + 8 * 60 * 60_000);
 
-    const body = await (
+    const body = await readJson(
       await get({ Cookie: `promo_deadline_${PROMO_ID}=${roomy.getTime()}` })
-    ).json();
+    );
 
     expect(new Date(body.deadline).getTime()).toBeLessThanOrEqual(
       endsAt.getTime()
@@ -195,7 +196,7 @@ describe("GET /api/promotions/active", () => {
     ]);
 
     const res = await get();
-    const body = await res.json();
+    const body = await readJson(res);
 
     expect(res.headers.get("set-cookie")).toBeNull();
     expect(new Date(body.deadline).getTime()).toBe(endsAt.getTime());
@@ -207,7 +208,7 @@ describe("GET /api/promotions/active", () => {
       row({ priority: 5, headline: "HIGH", discountValue: 40 }),
     ]);
 
-    const body = await (await get()).json();
+    const body = await readJson(await get());
 
     expect(body.headline).toBe("HIGH");
     expect(body.percentOff).toBe(40);
@@ -218,7 +219,7 @@ describe("GET /api/promotions/active", () => {
       row({ discountType: "fixed", discountValue: 50000 }),
     ]);
 
-    const body = await (await get()).json();
+    const body = await readJson(await get());
 
     expect(body.percentOff).toBeNull();
   });
@@ -237,6 +238,6 @@ describe("GET /api/promotions/active", () => {
     const res = await get();
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toBeNull();
+    expect(await readJson(res)).toBeNull();
   });
 });

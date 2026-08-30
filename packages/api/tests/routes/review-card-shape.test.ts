@@ -60,6 +60,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }))
 
 import { reviewsApp, productReviewsApp } from '../../src/routes/reviews'
+import { readJson } from '../helpers/json'
 
 const app = new Hono()
 app.route('/api/products/:productId/reviews', productReviewsApp)
@@ -185,7 +186,7 @@ describe('GET /api/reviews card shape', () => {
     // such thing as an unverified review here.
     queueSelects([{ count: 1 }], [reviewRow(REVIEW_A)], [])
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items[0].verified).toBe(true)
   })
@@ -193,7 +194,7 @@ describe('GET /api/reviews card shape', () => {
   it('carries the exact variant purchased as itemType', async () => {
     queueSelects([{ count: 1 }], [reviewRow(REVIEW_A)], [])
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items[0].itemType).toEqual({
       sizeLabel: "40''H x 30''W",
@@ -209,7 +210,7 @@ describe('GET /api/reviews card shape', () => {
       []
     )
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items[0].itemType).toEqual({
       sizeLabel: "24''H x 18''W",
@@ -221,7 +222,7 @@ describe('GET /api/reviews card shape', () => {
   it('returns itemType null rather than a half-built object with no snapshot', async () => {
     queueSelects([{ count: 1 }], [reviewRow(REVIEW_A, { itemSnapshot: null })], [])
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items[0].itemType).toBeNull()
   })
@@ -229,7 +230,7 @@ describe('GET /api/reviews card shape', () => {
   it('carries a product chip with sku and one thumbnail', async () => {
     queueSelects([{ count: 1 }], [reviewRow(REVIEW_A)], [])
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items[0].product).toEqual(productChip)
     // the whole image array is not the caller's business
@@ -251,7 +252,7 @@ describe('GET /api/reviews card shape', () => {
   it('still embeds media, and still only ready media', async () => {
     queueSelects([{ count: 1 }], [reviewRow(REVIEW_A)], [mediaRow(REVIEW_A)])
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items[0].media).toHaveLength(1)
     const mediaWhere = render(argsFor(selects[2]!, 'where')?.[0])
@@ -284,7 +285,7 @@ describe('GET /api/products/:productId/reviews card shape', () => {
     queueProductRead([reviewRow(REVIEW_A)])
 
     const res = await app.request(`/api/products/${PRODUCT_ID}/reviews`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.items[0].verified).toBe(true)
@@ -317,9 +318,9 @@ describe('GET /api/products/:productId/reviews card shape', () => {
   it('still embeds ready media', async () => {
     queueProductRead([reviewRow(REVIEW_A)], [mediaRow(REVIEW_A)])
 
-    const body = await (
+    const body = await readJson(
       await app.request(`/api/products/${PRODUCT_ID}/reviews`)
-    ).json()
+    )
 
     expect(body.items[0].media[0].thumbnailUrl).toBe('https://cdn/photo-thumb.webp')
     expect(render(argsFor(selects[3]!, 'where')?.[0]).params).toContain('ready')
@@ -345,7 +346,7 @@ describe('GET /api/reviews/:reviewId card shape', () => {
     queueSelects([singleReviewRow()], [])
 
     const res = await app.request(`/api/reviews/${REVIEW_A}`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.review.verified).toBe(true)
@@ -370,7 +371,7 @@ describe('GET /api/reviews/:reviewId card shape', () => {
   it('still embeds ready media', async () => {
     queueSelects([singleReviewRow()], [mediaRow(REVIEW_A)])
 
-    const body = await (await app.request(`/api/reviews/${REVIEW_A}`)).json()
+    const body = await readJson(await app.request(`/api/reviews/${REVIEW_A}`))
 
     expect(body.review.media).toHaveLength(1)
     expect(render(argsFor(selects[1]!, 'where')?.[0]).params).toContain('ready')

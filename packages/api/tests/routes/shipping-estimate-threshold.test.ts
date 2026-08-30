@@ -46,6 +46,7 @@ vi.mock('../../src/lib/shipping-config', async (importOriginal) => {
 });
 
 import { shippingApp } from '../../src/routes/shipping';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/shipping', shippingApp);
@@ -70,7 +71,7 @@ async function estimate(cartTotal: number): Promise<EstimateBody> {
     `/api/shipping/estimate?cartTotal=${cartTotal}`
   );
   expect(res.status).toBe(200);
-  return (await res.json()) as EstimateBody;
+  return (await readJson(res)) as EstimateBody;
 }
 
 beforeEach(() => {

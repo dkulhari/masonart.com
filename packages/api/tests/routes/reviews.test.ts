@@ -26,6 +26,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Hono } from "hono";
 import "../setup";
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Constants
@@ -351,7 +352,7 @@ describe("Reviews Route Availability", () => {
     // route existing means we get a handled JSON response, and specifically
     // not a "route not found" 404.
     expect(res.headers.get("content-type")).toContain("application/json");
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = (await readJson(res)) as Record<string, unknown>;
     expect(body.error).not.toBe("Not Found");
   });
 
@@ -485,7 +486,7 @@ describe("Reviews Input Validation", () => {
       );
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Invalid product ID");
     });
 
@@ -503,7 +504,7 @@ describe("Reviews Input Validation", () => {
         return;
       }
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(typeof json.averageRating).toBe("number");
       expect(typeof json.totalReviews).toBe("number");
       expect(Array.isArray(json.distribution)).toBe(true);
@@ -527,7 +528,7 @@ describe("Reviews Input Validation", () => {
       const res = await app.request(`/api/products/${INVALID_UUID}/reviews`);
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Invalid product ID");
     });
 
@@ -576,7 +577,7 @@ describe("Reviews Input Validation", () => {
       const res = await app.request(`/api/reviews/${INVALID_UUID}`);
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Invalid review ID");
     });
   });
@@ -678,7 +679,7 @@ describe("Reviews Response Format", () => {
     const res = await app.request(`/api/products/${INVALID_UUID}/reviews`);
     expect(res.status).toBe(400);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty("error");
     expect(typeof json.error).toBe("string");
   });
@@ -702,7 +703,7 @@ describe("Reviews Runtime Tests (Database Required)", () => {
       expect([200, 404].includes(res.status)).toBe(true);
 
       if (res.status === 200) {
-        const json = await res.json();
+        const json = await readJson(res);
         expect(json).toHaveProperty("items");
         expect(json).toHaveProperty("total");
         expect(json).toHaveProperty("page");
@@ -724,7 +725,7 @@ describe("Reviews Runtime Tests (Database Required)", () => {
       const res = await app.request(`/api/products/${VALID_UUID}/reviews`);
 
       if (res.status === 200) {
-        const json = await res.json();
+        const json = await readJson(res);
         // All returned reviews should have status 'approved'
         for (const review of json.items) {
           expect(review.status).toBe("approved");
@@ -744,7 +745,7 @@ describe("Reviews Runtime Tests (Database Required)", () => {
       );
 
       if (res.status === 200) {
-        const json = await res.json();
+        const json = await readJson(res);
         expect(json.page).toBe(1);
         expect(json.pageSize).toBe(5);
         expect(json.items.length).toBeLessThanOrEqual(5);
@@ -762,7 +763,7 @@ describe("Reviews Runtime Tests (Database Required)", () => {
       const res = await app.request(`/api/products/${nonExistentId}/reviews`);
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Product not found");
     });
   });
@@ -779,7 +780,7 @@ describe("Reviews Runtime Tests (Database Required)", () => {
       const res = await app.request(`/api/reviews/${nonExistentId}`);
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe("Review not found");
     });
   });

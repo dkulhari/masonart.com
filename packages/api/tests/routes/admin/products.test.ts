@@ -29,6 +29,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../../setup';
+import { readJson } from '../../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -158,7 +159,7 @@ describe('Admin Products Authentication Requirements', () => {
       const res = await app.request('/api/admin/products');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -173,7 +174,7 @@ describe('Admin Products Authentication Requirements', () => {
       const res = await app.request(`/api/admin/products/${validProductId}`);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -192,7 +193,7 @@ describe('Admin Products Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -211,7 +212,7 @@ describe('Admin Products Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -228,7 +229,7 @@ describe('Admin Products Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -247,7 +248,7 @@ describe('Admin Products Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -266,7 +267,7 @@ describe('Admin Products Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -283,7 +284,7 @@ describe('Admin Products Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -1272,7 +1273,7 @@ describe('Admin Products Error Response Format', () => {
     const res = await app.request('/api/admin/products');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -1281,7 +1282,7 @@ describe('Admin Products Error Response Format', () => {
     if (!app) return;
 
     const res = await app.request('/api/admin/products');
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -1294,7 +1295,7 @@ describe('Admin Products Error Response Format', () => {
     const res = await app.request('/api/admin/products');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     // Accept common authentication error message formats
     expect(['Unauthorized', 'Authentication required'].includes(json.error)).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { auth, validateAuthConfig, getSession, requireAuth } from '../../src/auth';
 import '../setup'; // Import test setup to configure environment variables
 

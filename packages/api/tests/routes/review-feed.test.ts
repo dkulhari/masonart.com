@@ -54,6 +54,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }))
 
 import { reviewsApp, productReviewsApp } from '../../src/routes/reviews'
+import { readJson } from '../helpers/json'
 
 const app = new Hono()
 app.route('/api/products/:productId/reviews', productReviewsApp)
@@ -112,7 +113,7 @@ function mediaRow(reviewId: string, overrides: Record<string, unknown> = {}) {
 // Mocked db.select — records the fragments each handler builds
 // ============================================================================
 
-const { selects, queueSelects, render, argsFor, joinSql, reset } =
+const { selects, queueSelects, render, argsFor, reset } =
   createSelectQueue(selectMock)
 
 beforeEach(() => {
@@ -137,7 +138,7 @@ describe('GET /api/reviews', () => {
     )
 
     const res = await app.request('/api/reviews')
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.items).toHaveLength(2)
@@ -167,7 +168,7 @@ describe('GET /api/reviews', () => {
     queueSelects([{ count: 42 }], [reviewRow(REVIEW_A)], [])
 
     const res = await app.request('/api/reviews?page=2&pageSize=5')
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(argsFor(selects[1]!, 'limit')).toEqual([5])
     expect(argsFor(selects[1]!, 'offset')).toEqual([5])
@@ -217,7 +218,7 @@ describe('GET /api/reviews', () => {
   it('skips the media query entirely when the page is empty', async () => {
     queueSelects([{ count: 0 }], [])
 
-    const body = await (await app.request('/api/reviews')).json()
+    const body = await readJson(await app.request('/api/reviews'))
 
     expect(body.items).toEqual([])
     expect(selectMock).toHaveBeenCalledTimes(2)
@@ -268,7 +269,7 @@ describe('GET /api/reviews/media', () => {
       },
     ])
 
-    const body = await (await app.request('/api/reviews/media')).json()
+    const body = await readJson(await app.request('/api/reviews/media'))
 
     expect(body.items).toHaveLength(2)
     expect(body.items[0]).toMatchObject({
@@ -342,7 +343,7 @@ describe('GET /api/products/:productId/reviews', () => {
     )
 
     const res = await app.request(`/api/products/${PRODUCT_ID}/reviews`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.items[0].media).toHaveLength(1)
@@ -381,7 +382,7 @@ describe('GET /api/reviews/:reviewId', () => {
     )
 
     const res = await app.request(`/api/reviews/${REVIEW_A}`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.review.media).toHaveLength(1)
@@ -407,7 +408,7 @@ describe('review route registration order', () => {
     queueSelects([{ averageRating: '4.8', reviewCount: 312 }])
 
     const res = await app.request('/api/reviews/stats')
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body).toEqual({ averageRating: 4.8, reviewCount: 312 })

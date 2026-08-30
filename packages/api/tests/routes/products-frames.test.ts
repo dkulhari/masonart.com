@@ -45,6 +45,7 @@ vi.mock('../../src/lib/redis', () => ({
 }));
 
 import { productsApp } from '../../src/routes/products';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/products', productsApp);
@@ -133,7 +134,7 @@ describe('GET /api/products/frames', () => {
     const res = await app.request('/api/products/frames');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { items: Array<{ category: string }> };
+    const body = (await readJson(res)) as { items: Array<{ category: string }> };
     expect(body.items).toHaveLength(2);
     for (const item of body.items) {
       expect(CATEGORIES).toContain(item.category);
@@ -144,7 +145,7 @@ describe('GET /api/products/frames', () => {
 
   it('returns the same fields on a cache HIT as on a MISS', async () => {
     const miss = await app.request('/api/products/frames');
-    const missBody = (await miss.json()) as { items: Record<string, unknown>[] };
+    const missBody = (await readJson(miss)) as { items: Record<string, unknown>[] };
 
     // Whatever the miss path cached is what a later hit will serve back.
     const cachedPayload = setCached.mock.calls[0]?.[1] as Record<
@@ -154,7 +155,7 @@ describe('GET /api/products/frames', () => {
     getCached.mockResolvedValue(cachedPayload);
 
     const hit = await app.request('/api/products/frames');
-    const hitBody = (await hit.json()) as {
+    const hitBody = (await readJson(hit)) as {
       items: Record<string, unknown>[];
       fromCache?: boolean;
     };

@@ -37,6 +37,7 @@ vi.mock('../../../src/lib/redis', () => ({
 }));
 
 import { adminProductsApp } from '../../../src/routes/admin/products';
+import { readJson } from '../../helpers/json';
 
 const app = new Hono();
 app.route('/api/admin/products', adminProductsApp);
@@ -91,13 +92,13 @@ describe('GET /api/admin/products/stats', () => {
     const res = await app.request('/api/admin/products/stats');
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body).not.toHaveProperty('error');
   });
 
   it('returns the four counts the dashboard reads', async () => {
     const res = await app.request('/api/admin/products/stats');
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = (await readJson(res)) as Record<string, unknown>;
 
     expect(body).toHaveProperty('totalProducts');
     expect(body).toHaveProperty('activeProducts');
@@ -107,7 +108,7 @@ describe('GET /api/admin/products/stats', () => {
 
   it('returns numbers, not strings — the dashboard renders them raw', async () => {
     const res = await app.request('/api/admin/products/stats');
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = (await readJson(res)) as Record<string, unknown>;
 
     for (const key of [
       'totalProducts',

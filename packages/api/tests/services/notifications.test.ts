@@ -262,7 +262,7 @@ describe('Notification Service', () => {
         emailOrderConfirmation: false, // Disabled in preferences
       });
 
-      const result = await sendOrderNotification({
+      await sendOrderNotification({
         orderId: 'order-123',
         type: 'order_confirmation',
         forceChannels: ['email'], // Force email anyway
@@ -465,7 +465,7 @@ describe('Notification Service', () => {
       vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(mockOrder);
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-      const result = await retryNotification('notif-123');
+      await retryNotification('notif-123');
 
       expect(sendEmail).toHaveBeenCalled();
     });

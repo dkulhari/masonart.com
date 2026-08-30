@@ -47,6 +47,7 @@ import { eq, like } from "drizzle-orm";
 import { cachePurgeSessionFor } from "../../helpers/cache-purge-harness";
 import { buildRouteApp } from "../../helpers/route-app";
 import "../../setup";
+import { readJson } from '../../helpers/json';
 
 // ============================================================================
 // An in-memory Redis
@@ -169,7 +170,7 @@ async function createOk(
     body: JSON.stringify(promotionBody(overrides)),
   });
   expect(res.status).toBe(201);
-  return res.json();
+  return readJson(res);
 }
 
 async function cleanup(): Promise<void> {

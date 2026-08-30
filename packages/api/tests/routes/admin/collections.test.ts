@@ -62,6 +62,7 @@ vi.mock('../../../src/lib/collection-resolver', () => ({
 }));
 
 import { adminCollectionsApp } from '../../../src/routes/admin/collections';
+import { readJson } from '../../helpers/json';
 
 const app = new Hono();
 app.route('/api/admin/collections', adminCollectionsApp);
@@ -155,7 +156,7 @@ describe('GET /', () => {
     const res = await asStaff('/api/admin/collections');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { collections: { slug: string; count: number }[] };
+    const body = (await readJson(res)) as { collections: { slug: string; count: number }[] };
     expect(body.collections[0].slug).toBe('pop-art');
     // The admin needs to see what a rule currently resolves to; a rule that
     // matches nothing is the failure worth catching at authoring time.
@@ -166,7 +167,7 @@ describe('GET /', () => {
     const res = await asStaff('/api/admin/collections');
     expect(res.status).toBe(200);
     // No isActive filter is applied — asserted by the handler not narrowing.
-    const body = (await res.json()) as { collections: unknown[] };
+    const body = (await readJson(res)) as { collections: unknown[] };
     expect(body.collections).toHaveLength(1);
   });
 });
@@ -191,7 +192,7 @@ describe('GET /:id', () => {
     const res = await asStaff('/api/admin/collections/c1');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { collection: { productIds: string[] } };
+    const body = (await readJson(res)) as { collection: { productIds: string[] } };
     // In position order — the order IS the curation.
     expect(body.collection.productIds).toEqual(['p3', 'p1']);
   });
@@ -202,7 +203,7 @@ describe('GET /:id', () => {
     selectMock.mockImplementation(() => chainReturning([collectionRow]));
 
     const res = await asStaff('/api/admin/collections/c2');
-    const body = (await res.json()) as { collection: { productIds: string[] } };
+    const body = (await readJson(res)) as { collection: { productIds: string[] } };
 
     expect(body.collection.productIds).toEqual([]);
   });
@@ -275,7 +276,7 @@ describe('POST /', () => {
     });
 
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string; slug: string };
+    const body = (await readJson(res)) as { error: string; slug: string };
     expect(body.slug).toBe('staff-picks');
   });
 

@@ -55,6 +55,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }));
 
 import { db } from '../../src/database';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Data
@@ -210,7 +211,7 @@ describe('GET /api/notification-preferences', () => {
       });
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences).toBeDefined();
     });
 
@@ -223,7 +224,7 @@ describe('GET /api/notification-preferences', () => {
         headers: authHeaders(),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.email).toEqual({
         orderConfirmation: true,
         shipped: true,
@@ -241,7 +242,7 @@ describe('GET /api/notification-preferences', () => {
         headers: authHeaders(),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.sms).toEqual({
         orderConfirmation: false,
         shipped: false,
@@ -259,7 +260,7 @@ describe('GET /api/notification-preferences', () => {
         headers: authHeaders(),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.updatedAt).toBeDefined();
     });
   });
@@ -297,7 +298,7 @@ describe('GET /api/notification-preferences', () => {
         headers: authHeaders(),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.email.orderConfirmation).toBe(true);
       expect(data.preferences.email.shipped).toBe(true);
     });
@@ -316,7 +317,7 @@ describe('GET /api/notification-preferences', () => {
         headers: authHeaders(),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.sms.orderConfirmation).toBe(false);
       expect(data.preferences.sms.shipped).toBe(false);
     });
@@ -335,7 +336,7 @@ describe('GET /api/notification-preferences', () => {
       });
 
       expect(res.status).toBe(500);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('GET_ERROR');
     });
   });
@@ -367,7 +368,7 @@ describe('PATCH /api/notification-preferences', () => {
       });
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.email.orderConfirmation).toBe(false);
     });
 
@@ -398,7 +399,7 @@ describe('PATCH /api/notification-preferences', () => {
       });
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.preferences.email.shipped).toBe(false);
       expect(data.preferences.sms.orderConfirmation).toBe(true);
     });
@@ -421,7 +422,7 @@ describe('PATCH /api/notification-preferences', () => {
         body: JSON.stringify({ emailDelivered: true }),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.message).toBe('Notification preferences updated');
     });
   });
@@ -460,7 +461,7 @@ describe('PATCH /api/notification-preferences', () => {
       });
 
       expect(res.status).toBe(400);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('NO_UPDATES');
     });
 
@@ -517,7 +518,7 @@ describe('PATCH /api/notification-preferences', () => {
       });
 
       expect(res.status).toBe(500);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('UPDATE_ERROR');
     });
   });
@@ -614,7 +615,7 @@ describe('Response Format', () => {
       headers: authHeaders(),
     });
 
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.preferences).toHaveProperty('email');
     expect(data.preferences).toHaveProperty('sms');
     expect(data.preferences.email).toHaveProperty('orderConfirmation');

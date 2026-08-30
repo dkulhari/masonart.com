@@ -143,6 +143,7 @@ vi.mock('../../../src/lib/storage', () => ({
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Fixtures
@@ -392,7 +393,7 @@ const JOB_KEYED_TABLES = ['production_job_items', 'production_job_reviews']
 
 async function run(path: string, init?: RequestInit) {
   const res = await buildApp().request(path, init)
-  const body = res.status === 204 ? null : await res.json().catch(() => null)
+  const body = res.status === 204 ? null : await readJson(res).catch(() => null)
   return { res, body }
 }
 

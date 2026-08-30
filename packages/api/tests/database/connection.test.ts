@@ -15,7 +15,7 @@
  * Runtime tests can be skipped by setting SKIP_DB_RUNTIME_TESTS=true
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import postgres from 'postgres';
 
 // Import connection modules - these should work even without database running

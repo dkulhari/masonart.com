@@ -18,9 +18,6 @@ import {
   users,
   addresses,
   sessions,
-  type User,
-  type Address,
-  type Session,
 } from '../../src/db/schema';
 
 // Check if we should skip database runtime tests

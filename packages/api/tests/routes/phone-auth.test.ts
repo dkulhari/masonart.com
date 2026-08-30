@@ -10,9 +10,10 @@
  * @see packages/api/src/routes/phone-auth.ts
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { app } from '../../src/index';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -98,7 +99,7 @@ describe('Phone Authentication Routes', () => {
       // May succeed (200) or fail with DB error (500)
       expect([200, 500]).toContain(res.status);
       if (res.status === 200) {
-        const data = await res.json();
+        const data = await readJson(res);
         expect(data.success).toBe(true);
         expect(data.sessionId).toBeDefined();
       }
@@ -112,7 +113,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       if (res.status === 200) {
-        const data = await res.json();
+        const data = await readJson(res);
         expect(data.sessionId).toBeDefined();
         expect(typeof data.sessionId).toBe('string');
       } else {
@@ -129,7 +130,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       if (res.status === 200) {
-        const data = await res.json();
+        const data = await readJson(res);
         expect(data.expiresIn).toBeDefined();
         expect(data.expiresIn).toBe(600); // 10 minutes
       }
@@ -143,7 +144,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       if (res.status === 200) {
-        const data = await res.json();
+        const data = await readJson(res);
         expect(typeof data.isExistingUser).toBe('boolean');
       }
     });
@@ -156,7 +157,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       if (res.status === 200) {
-        const data = await res.json();
+        const data = await readJson(res);
         expect(data.message).toBeDefined();
         expect(data.message).toContain('****');
         expect(data.message).not.toContain(validPhone);
@@ -193,7 +194,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       expect(res.status).toBe(400);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.success).toBe(false);
       expect(data.error).toBeDefined();
     });
@@ -206,7 +207,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       expect(res.status).toBe(400);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.error).toContain('Invalid Indian mobile number');
     });
 
@@ -285,7 +286,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       expect(res.status).toBe(400);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.success).toBe(false);
     });
 
@@ -424,7 +425,7 @@ describe('Phone Authentication Routes', () => {
 
       // DB may not be available
       if (res.status === 200) {
-        const data = await res.json();
+        const data = await readJson(res);
         expect(data.sessionId).toBeDefined();
       }
     });
@@ -461,7 +462,7 @@ describe('Phone Authentication Routes', () => {
       });
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(typeof data.enabled).toBe('boolean');
     });
 
@@ -470,7 +471,7 @@ describe('Phone Authentication Routes', () => {
         method: 'GET',
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.provider).toBe('2factor.in');
     });
 
@@ -542,7 +543,7 @@ describe('Phone Authentication Routes', () => {
         body: JSON.stringify({ phone: 'invalid' }),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.success).toBe(false);
       // Error can be string or object (from Zod validation)
       expect(data.error).toBeDefined();

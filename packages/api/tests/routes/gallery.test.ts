@@ -47,6 +47,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }));
 
 import { galleryApp } from '../../src/routes/gallery';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/gallery', galleryApp);
@@ -155,7 +156,7 @@ describe('POST /api/gallery/join', () => {
     const res = await join({ source: 'banner' });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.galleryMember).toBe(true);
     expect(body.galleryJoinedAt).toBeTruthy();
     expect(body.marketingConsentAt).toBeTruthy();
@@ -171,7 +172,7 @@ describe('POST /api/gallery/join', () => {
   it('returns membership state so the client unlocks without a refetch', async () => {
     givenNeverJoined();
 
-    const body = await (await join({ source: 'rail' })).json();
+    const body = await readJson(await join({ source: 'rail' }));
     expect(body).toMatchObject({ galleryMember: true, joinSource: 'rail' });
     expect(Date.parse(body.galleryJoinedAt)).not.toBeNaN();
     expect(Date.parse(body.marketingConsentAt)).not.toBeNaN();
@@ -182,7 +183,7 @@ describe('POST /api/gallery/join', () => {
     // like consent was collected separately from the join.
     givenNeverJoined();
 
-    const body = await (await join({ source: 'cart' })).json();
+    const body = await readJson(await join({ source: 'cart' }));
     expect(body.marketingConsentAt).toBe(body.galleryJoinedAt);
   });
 });
@@ -200,7 +201,7 @@ describe('idempotence', () => {
     const res = await join({ source: 'sale-page' });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.marketingConsentAt).toBe(ORIGINAL_CONSENT.toISOString());
     expect(body.galleryJoinedAt).toBe(ORIGINAL_JOIN.toISOString());
   });
@@ -216,7 +217,7 @@ describe('idempotence', () => {
     // Attribution belongs to the touchpoint that actually converted them.
     givenAlreadyJoined();
 
-    const body = await (await join({ source: 'sale-page' })).json();
+    const body = await readJson(await join({ source: 'sale-page' }));
     expect(body.joinSource).toBe('banner');
   });
 
@@ -230,7 +231,7 @@ describe('idempotence', () => {
       joinSource: null,
     });
 
-    const body = await (await join({ source: 'banner' })).json();
+    const body = await readJson(await join({ source: 'banner' }));
     expect(setPayload?.marketingConsentAt).toEqual(ORIGINAL_CONSENT);
     expect(body.marketingConsentAt).toBe(ORIGINAL_CONSENT.toISOString());
   });

@@ -91,6 +91,7 @@ vi.mock('../../src/lib/shipping-config', async (importOriginal) => {
 
 import { ordersApp, createOrderSchema } from '../../src/routes/orders';
 import { adminOrdersApp } from '../../src/routes/admin/orders';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/orders', ordersApp);
@@ -763,7 +764,7 @@ describe('order responses carry the promotion figures', () => {
   it('returns promotionId and promotionDiscount from the created order', async () => {
     givenPromotions([promotion()]);
 
-    const body = await (await postOrder()).json();
+    const body = await readJson(await postOrder());
 
     expect(body.order.promotionId).toBe(PROMOTION_ID);
     expect(body.order.promotionDiscount).toBe('800.00');
@@ -776,7 +777,7 @@ describe('order responses carry the promotion figures', () => {
     const res = await app.request(`/api/orders/${ORDER_ID}`);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.promotionId).toBe(PROMOTION_ID);
     expect(body.promotionDiscount).toBe('800.00');
     // The columns they sit beside, still there.
@@ -792,7 +793,7 @@ describe('order responses carry the promotion figures', () => {
     const res = await app.request(`/api/admin/orders/${ORDER_ID}`);
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.promotionId).toBe(PROMOTION_ID);
     expect(body.promotionDiscount).toBe('800.00');
   });

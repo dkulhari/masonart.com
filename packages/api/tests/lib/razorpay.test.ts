@@ -21,7 +21,7 @@
  * RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are properly configured.
  */
 
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import crypto from 'crypto';
 import '../setup';
 
@@ -52,7 +52,6 @@ import {
   type CreateRefundInput,
   type RazorpayRefund,
   type RazorpayWebhookEvent,
-  type RazorpayWebhookPayload,
   type RazorpayCurrency,
 } from '../../src/lib/razorpay';
 
@@ -1207,7 +1206,6 @@ describe('Integration Tests', () => {
 
   describe('Refund amount calculations', () => {
     it('should handle full refund', () => {
-      const originalAmount = 50000; // 500 INR in paise
       const refundInput: CreateRefundInput = {
         paymentId: 'pay_test',
         // No amount means full refund

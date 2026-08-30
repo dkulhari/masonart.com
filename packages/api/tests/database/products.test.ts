@@ -11,16 +11,13 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
 import { getDestructiveDbUrl, destructiveDbSkipReason } from '../helpers/destructive-db';
 import {
   products,
   productVariants,
   frames,
-  type Product,
-  type ProductVariant,
-  type Frame,
 } from '../../src/db/schema';
 
 // Check if we should skip database runtime tests

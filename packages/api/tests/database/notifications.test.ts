@@ -10,7 +10,6 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { resolveDatabaseUrl } from "../../src/config/database-url";
 import {
@@ -33,7 +32,6 @@ const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";
 let isDatabaseAvailable = false;
 
 let client: ReturnType<typeof postgres> | null = null;
-let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
   if (SKIP_TESTS) {
@@ -53,7 +51,6 @@ beforeAll(async () => {
     // Test connection
     await client`SELECT 1`;
     isDatabaseAvailable = true;
-    db = drizzle(client);
 
     console.log(
       "✅ Database connection established for notifications schema tests"

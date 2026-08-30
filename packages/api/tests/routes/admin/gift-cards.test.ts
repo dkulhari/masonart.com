@@ -22,6 +22,7 @@ import {
   type LiveDbConnection,
 } from "../../helpers/live-db";
 import { createGiftCardRowFactories } from "../../helpers/gift-card-row-factories";
+import { readJson } from '../../helpers/json';
 
 let adminAllowed = true;
 
@@ -134,7 +135,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
     if (!reachable) return;
 
     const { id } = await makeCard(50_000);
-    const body = (await (await get("/")).json()) as {
+    const body = (await readJson(await get("/"))) as {
       giftCards: Array<{ id: string; status: string }>;
     };
 
@@ -148,7 +149,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
     const spent = await makeCard(0);
     const disabled = await makeCard(50_000, { disabledAt: new Date() });
 
-    const body = (await (await get("/")).json()) as {
+    const body = (await readJson(await get("/"))) as {
       giftCards: Array<{ id: string; status: string }>;
     };
 
@@ -160,7 +161,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
     if (!reachable) return;
 
     const { id, code } = await makeCard(50_000);
-    const body = (await (await get(`/?q=${code}`)).json()) as {
+    const body = (await readJson(await get(`/?q=${code}`))) as {
       giftCards: Array<{ id: string }>;
     };
 
@@ -172,7 +173,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
     if (!reachable) return;
 
     const { id, code } = await makeCard(50_000);
-    const body = (await (await get(`/?q=${code.slice(-4)}`)).json()) as {
+    const body = (await readJson(await get(`/?q=${code.slice(-4)}`))) as {
       giftCards: Array<{ id: string }>;
     };
 
@@ -198,7 +199,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
       reason: "goodwill for a delayed order",
     });
 
-    const body = (await response.json()) as {
+    const body = (await readJson(response)) as {
       code: string;
       giftCard: { id: string };
     };
@@ -215,9 +216,9 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
   it("records who issued a card and why", async () => {
     if (!reachable) return;
 
-    const body = (await (
+    const body = (await readJson(
       await post("/", { amountPaise: 100_000, reason: "compensation" })
-    ).json()) as { giftCard: { id: string } };
+    )) as { giftCard: { id: string } };
     createdCardIds.push(body.giftCard.id);
 
     const ledger = await db.query.giftCardTransactions.findMany({
@@ -289,7 +290,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
   it("reports total outstanding liability", async () => {
     if (!reachable) return;
 
-    const before = (await (await get("/liability")).json()) as {
+    const before = (await readJson(await get("/liability"))) as {
       liabilityPaise: number;
     };
 
@@ -297,7 +298,7 @@ describe.skipIf(!DATABASE_URL)("admin gift cards", () => {
     await makeCard(30_000);
     await makeCard(90_000, { disabledAt: new Date() });
 
-    const after = (await (await get("/liability")).json()) as {
+    const after = (await readJson(await get("/liability"))) as {
       liabilityPaise: number;
     };
 

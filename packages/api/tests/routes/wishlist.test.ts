@@ -50,6 +50,7 @@ vi.mock('../../src/middleware/auth', () => ({
 
 import { db } from '../../src/database';
 import { wishlistApp } from '../../src/routes/wishlist';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/wishlist', wishlistApp);
@@ -165,7 +166,7 @@ describe('GET /api/wishlist', () => {
     const res = await app.request('/api/wishlist', { headers: AUTH });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.items).toHaveLength(2);
     expect(body.items.map((p: { title: string }) => p.title)).toEqual([
       'Alpha',
@@ -179,7 +180,7 @@ describe('GET /api/wishlist', () => {
 
     const res = await app.request('/api/wishlist', { headers: AUTH });
     expect(res.status).toBe(200);
-    expect((await res.json()).items).toEqual([]);
+    expect((await readJson(res)).items).toEqual([]);
   });
 
   it('does not query the catalogue at all when nothing is saved', async () => {
@@ -200,7 +201,7 @@ describe('GET /api/wishlist', () => {
     const res = await app.request('/api/wishlist', { headers: AUTH });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].id).toBe(PRODUCT_A);
   });
@@ -219,7 +220,7 @@ describe('GET /api/wishlist/count', () => {
 
     const res = await app.request('/api/wishlist/count', { headers: AUTH });
     expect(res.status).toBe(200);
-    expect((await res.json()).count).toBe(2);
+    expect((await readJson(res)).count).toBe(2);
   });
 
   it('counts live products, not raw array entries', async () => {
@@ -230,14 +231,14 @@ describe('GET /api/wishlist/count', () => {
     });
 
     const res = await app.request('/api/wishlist/count', { headers: AUTH });
-    expect((await res.json()).count).toBe(1);
+    expect((await readJson(res)).count).toBe(1);
   });
 
   it('is 0 when the column is null', async () => {
     givenWishlistColumn(null);
 
     const res = await app.request('/api/wishlist/count', { headers: AUTH });
-    expect((await res.json()).count).toBe(0);
+    expect((await readJson(res)).count).toBe(0);
     expect(selectMock).not.toHaveBeenCalled();
   });
 });
@@ -255,7 +256,7 @@ describe('POST /api/wishlist/:productId', () => {
       headers: AUTH,
     });
     expect(res.status).toBe(200);
-    expect((await res.json()).saved).toBe(true);
+    expect((await readJson(res)).saved).toBe(true);
     expect(updateMock).toHaveBeenCalled();
   });
 
@@ -269,7 +270,7 @@ describe('POST /api/wishlist/:productId', () => {
       headers: AUTH,
     });
     expect(res.status).toBe(200);
-    expect((await res.json()).saved).toBe(true);
+    expect((await readJson(res)).saved).toBe(true);
   });
 
   it('rejects a non-uuid id', async () => {
@@ -330,7 +331,7 @@ describe('POST /api/wishlist/merge', () => {
     const res = await post({ productIds: [PRODUCT_B] });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.items.map((p: { id: string }) => p.id)).toEqual([
       PRODUCT_A,
       PRODUCT_B,
@@ -347,7 +348,7 @@ describe('POST /api/wishlist/merge', () => {
       productRow(PRODUCT_B, 'Beta'),
     ]);
 
-    const body = await (await post({ productIds: [PRODUCT_A] })).json();
+    const body = await readJson(await post({ productIds: [PRODUCT_A] }));
     expect(body.items).toHaveLength(2);
   });
 
@@ -356,7 +357,7 @@ describe('POST /api/wishlist/merge', () => {
     givenMergeReturns([PRODUCT_A, DANGLING]);
     givenCatalogueReturns([productRow(PRODUCT_A, 'Alpha')]);
 
-    const body = await (await post({ productIds: [DANGLING] })).json();
+    const body = await readJson(await post({ productIds: [DANGLING] }));
     expect(body.items).toHaveLength(1);
     expect(body.items[0].id).toBe(PRODUCT_A);
   });
@@ -369,7 +370,7 @@ describe('POST /api/wishlist/merge', () => {
     const res = await post({ productIds: [] });
     expect(res.status).toBe(200);
     expect(updateMock).not.toHaveBeenCalled();
-    expect((await res.json()).items).toHaveLength(1);
+    expect((await readJson(res)).items).toHaveLength(1);
   });
 
   it('rejects a non-uuid id without touching the column', async () => {
@@ -414,7 +415,7 @@ describe('DELETE /api/wishlist/:productId', () => {
       headers: AUTH,
     });
     expect(res.status).toBe(200);
-    expect((await res.json()).saved).toBe(false);
+    expect((await readJson(res)).saved).toBe(false);
     expect(updateMock).toHaveBeenCalled();
   });
 
@@ -426,7 +427,7 @@ describe('DELETE /api/wishlist/:productId', () => {
       headers: AUTH,
     });
     expect(res.status).toBe(200);
-    expect((await res.json()).saved).toBe(false);
+    expect((await readJson(res)).saved).toBe(false);
   });
 
   it('rejects a non-uuid id', async () => {

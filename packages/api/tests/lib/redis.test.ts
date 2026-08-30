@@ -26,7 +26,7 @@
  * suite-local SKIP_REDIS_RUNTIME_TESTS).
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import Redis from 'ioredis';
 import '../setup';
 import {

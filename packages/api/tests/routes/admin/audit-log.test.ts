@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
+import { readJson } from '../../helpers/json';
 
 const selectMock = vi.hoisted(() => vi.fn());
 
@@ -99,7 +100,7 @@ describe('GET /api/admin/audit-log', () => {
     const res = await get('/api/admin/audit-log');
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { entries: unknown[]; nextCursor: string | null };
+    const body = (await readJson(res)) as { entries: unknown[]; nextCursor: string | null };
     expect(body.entries).toHaveLength(1);
 
     const ordering = recorded.find((op) => op.method === 'orderBy');
@@ -172,7 +173,7 @@ describe('GET /api/admin/audit-log', () => {
     selectMock.mockImplementation(() => thenable([row()]));
 
     const res = await get('/api/admin/audit-log?limit=50');
-    const body = (await res.json()) as { nextCursor: string | null };
+    const body = (await readJson(res)) as { nextCursor: string | null };
 
     // One row against a limit of 50: there is nothing after it, and a cursor
     // here would give the viewer an endless "load more".

@@ -47,6 +47,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }));
 
 import { wishlistApp } from '../../src/routes/wishlist';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/wishlist', wishlistApp);
@@ -102,7 +103,7 @@ describe('a legitimate reorder', () => {
     const res = await put({ productIds: [C, A, B] });
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { productIds: string[] };
+    const body = (await readJson(res)) as { productIds: string[] };
     expect(body.productIds).toEqual([C, A, B]);
     expect(updateMock).toHaveBeenCalled();
   });
@@ -147,7 +148,7 @@ describe('the permutation guard', () => {
     stored([A, B, C, D]);
 
     const res = await put({ productIds: [A, B] });
-    const body = (await res.json()) as { productIds: string[] };
+    const body = (await readJson(res)) as { productIds: string[] };
 
     expect(body.productIds).toEqual([A, B, C, D]);
   });
@@ -197,7 +198,7 @@ describe('GET returns the stored order', () => {
     const res = await app.request('/api/wishlist', {
       headers: { 'X-Test-User': USER },
     });
-    const body = (await res.json()) as { items: { id: string }[] };
+    const body = (await readJson(res)) as { items: { id: string }[] };
 
     expect(body.items.map((i) => i.id)).toEqual([C, A, B]);
   });
@@ -216,7 +217,7 @@ describe('GET returns the stored order', () => {
     const res = await app.request('/api/wishlist', {
       headers: { 'X-Test-User': USER },
     });
-    const body = (await res.json()) as { items: { id: string }[] };
+    const body = (await readJson(res)) as { items: { id: string }[] };
 
     expect(body.items.map((i) => i.id)).toEqual([A, C]);
   });

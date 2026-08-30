@@ -26,7 +26,6 @@ import { adminSessionFor } from '../../helpers/admin-session'
 import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
 
-import type { RecordedQuery } from '../../helpers/query-recorder'
 import { vendorRates } from '../../../src/database/schema/vendors'
 
 // ============================================================================
@@ -50,6 +49,7 @@ vi.mock('../../../src/auth', () => ({
 }))
 
 import { adminVendorRatesApp } from '../../../src/routes/admin/vendor-rates'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
@@ -114,7 +114,7 @@ describe('GET /api/admin/vendors/:id/rates', () => {
     const res = await buildApp().request(ratesPath)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.rates).toHaveLength(1)
     expect(body.rates[0].id).toBe(RATE_A)
     expect(typeof body.at).toBe('string')
@@ -135,7 +135,7 @@ describe('GET /api/admin/vendors/:id/rates', () => {
     const res = await buildApp().request(`${ratesPath}?at=2026-10-01T00:00:00.000Z`)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.at).toBe('2026-10-01T00:00:00.000Z')
 
     // The instant the caller asked about is the one in the WHERE, not `now`.
@@ -159,7 +159,7 @@ describe('GET /api/admin/vendors/:id/rates', () => {
 
     const res = await buildApp().request(`${ratesPath}?includeExpired=true`)
     expect(res.status).toBe(200)
-    expect((await res.json()).rates).toHaveLength(2)
+    expect((await readJson(res)).rates).toHaveLength(2)
 
     // No window predicate at all — the whole history for the vendor.
     const read = ops('select', vendorRates)[0]
@@ -180,7 +180,7 @@ describe('GET /api/admin/vendors/:id/rates', () => {
     const res = await buildApp().request(`${ratesPath}?kind=print&longestEdge=36`)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.resolved.id).toBe(RATE_B)
     expect(body.resolved.amount).toBe('900.00')
   })
@@ -198,7 +198,7 @@ describe('GET /api/admin/vendors/:id/rates', () => {
 
     const res = await buildApp().request(`${ratesPath}?kind=print&widthInches=36&heightInches=24`)
     expect(res.status).toBe(200)
-    expect((await res.json()).resolved.id).toBe(RATE_B)
+    expect((await readJson(res)).resolved.id).toBe(RATE_B)
   })
 
   it('answers null — not zero — when the vendor has not priced that size', async () => {
@@ -209,7 +209,7 @@ describe('GET /api/admin/vendors/:id/rates', () => {
 
     const res = await buildApp().request(`${ratesPath}?kind=print&longestEdge=96`)
     expect(res.status).toBe(200)
-    expect((await res.json()).resolved).toBeNull()
+    expect((await readJson(res)).resolved).toBeNull()
   })
 
   it('404s an unknown vendor and 400s a malformed id', async () => {
@@ -306,7 +306,7 @@ describe('POST /api/admin/vendors/:id/rates', () => {
     // 422, not 400: the payload is well-formed, it is the world that disagrees.
     expect(res.status).toBe(422)
 
-    const body = await res.json()
+    const body = await readJson(res)
     // WHICH band. Without this the admin has to go hunting.
     expect(body.conflict).toMatchObject({
       id: RATE_A,
@@ -407,7 +407,7 @@ describe('POST /api/admin/vendors/:id/rates', () => {
     })
 
     // And the admin is TOLD their new rate has an expiry they did not set.
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.warnings).toHaveLength(1)
     expect(body.warnings[0]).toContain('2026-12-01')
     expect(body.superseded).toMatchObject({ id: RATE_A })
@@ -432,7 +432,7 @@ describe('POST /api/admin/vendors/:id/rates', () => {
     )
     expect(res.status).toBe(201)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.warnings).toEqual([])
     expect(ops('insert', vendorRates)[0]?.values).toMatchObject({ effectiveTo: null })
     expect(ops('update', vendorRates)).toHaveLength(1)
@@ -467,7 +467,7 @@ describe('PATCH /api/admin/vendors/:id/rates/:rateId', () => {
       json({ amount: 500 }, 'PATCH')
     )
     expect(res.status).toBe(200)
-    expect((await res.json()).rate.amount).toBe('500.00')
+    expect((await readJson(res)).rate.amount).toBe('500.00')
     expect(ops('update', vendorRates)[0]?.values).toMatchObject({ amount: '500.00' })
   })
 
@@ -502,7 +502,7 @@ describe('PATCH /api/admin/vendors/:id/rates/:rateId', () => {
     )
     expect(res.status).toBe(422)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.conflict).toMatchObject({
       id: RATE_B,
       longestEdgeMinInches: 24,

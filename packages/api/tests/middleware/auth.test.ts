@@ -21,7 +21,8 @@ import {
   type AuthVariables,
   type OptionalAuthVariables,
 } from '../../src/middleware/auth';
-import '../setup'; // Import test setup
+import '../setup';
+import { readJson } from '../helpers/json'; // Import test setup
 
 /**
  * Tests to verify auth middleware works correctly
@@ -90,10 +91,8 @@ function createMockSession(userId: string = 'user-123'): AuthSession {
 }
 
 describe('Auth Middleware', () => {
-  let app: Hono;
 
   beforeEach(() => {
-    app = new Hono();
   });
 
   // ==========================================================================
@@ -303,7 +302,7 @@ describe('Auth Middleware', () => {
     describe('getUserRateLimitKey', () => {
       it('should return user-based key for authenticated user', () => {
         const mockContext = {
-          get: (key: 'user') => createMockUser({ id: 'user-123' }),
+          get: (_key: 'user') => createMockUser({ id: 'user-123' }),
           req: { header: () => undefined },
         };
         expect(getUserRateLimitKey(mockContext)).toBe('user:user-123');
@@ -351,7 +350,7 @@ describe('Auth Middleware', () => {
 
       it('should prefer user ID over IP when both available', () => {
         const mockContext = {
-          get: (key: 'user') => createMockUser({ id: 'user-456' }),
+          get: (_key: 'user') => createMockUser({ id: 'user-456' }),
           req: { header: (name: string) => name === 'x-forwarded-for' ? '192.168.1.1' : undefined },
         };
         expect(getUserRateLimitKey(mockContext)).toBe('user:user-456');
@@ -384,7 +383,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/protected');
       expect(res.status).toBe(401);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('error', 'Unauthorized');
       expect(body).toHaveProperty('message');
     });
@@ -402,7 +401,7 @@ describe('Auth Middleware', () => {
       });
 
       const res = await testApp.request('/protected');
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.message).toContain('Authentication required');
     });
 
@@ -606,7 +605,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/optional');
       expect(res.status).toBe(200);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('message', 'success');
     });
 
@@ -630,7 +629,7 @@ describe('Auth Middleware', () => {
       });
 
       const res = await testApp.request('/optional');
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.user).toBeNull();
     });
 
@@ -673,7 +672,7 @@ describe('Auth Middleware', () => {
       });
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.hasUser).toBe(false);
     });
 
@@ -762,7 +761,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/admin-only');
       expect(res.status).toBe(403);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('error', 'Forbidden');
     });
 
@@ -783,7 +782,7 @@ describe('Auth Middleware', () => {
       });
 
       const res = await testApp.request('/admin-only');
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.message).toContain('admin');
     });
 
@@ -800,7 +799,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/admin-only');
       expect(res.status).toBe(200);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('message', 'admin area');
     });
 
@@ -961,7 +960,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/admin');
       expect(res.status).toBe(200);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('message', 'admin dashboard');
     });
 
@@ -1014,7 +1013,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/admin');
       expect(res.headers.get('content-type')).toContain('application/json');
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('error');
       expect(body).toHaveProperty('message');
     });
@@ -1065,7 +1064,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/verified-only');
       expect(res.status).toBe(403);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.message).toContain('Email verification required');
     });
 
@@ -1082,7 +1081,7 @@ describe('Auth Middleware', () => {
       const res = await testApp.request('/verified-only');
       expect(res.status).toBe(200);
 
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('message', 'verified user content');
     });
 
@@ -1203,7 +1202,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/trade');
       expect(res.status).toBe(403);
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.message).toBe('Trade program access required');
     });
 
@@ -1296,7 +1295,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/ai');
       expect(res.status).toBe(403);
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.message).toContain('Insufficient AI credits');
     });
 
@@ -1318,7 +1317,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/ai');
       expect(res.status).toBe(403);
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body.message).toBe('Insufficient AI credits. Required: 5, Available: 3');
     });
 
@@ -1488,7 +1487,7 @@ describe('Auth Middleware', () => {
       });
 
       expect(res.status).toBe(401);
-      const body = await res.json();
+      const body = await readJson(res);
       expect(body).toHaveProperty('error');
     });
 
@@ -1521,7 +1520,7 @@ describe('Auth Middleware', () => {
       });
 
       const res = await testApp.request('/protected');
-      const body = await res.json();
+      const body = await readJson(res);
 
       expect(body).toHaveProperty('error');
       expect(body).toHaveProperty('message');
@@ -1591,7 +1590,7 @@ describe('Auth Middleware', () => {
       );
 
       const res = await testApp.request('/test');
-      const body = await res.json();
+      const body = await readJson(res);
 
       expect(body).toHaveProperty('user');
       expect(body).toHaveProperty('custom', 'value');

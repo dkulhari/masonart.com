@@ -14,6 +14,7 @@ vi.mock('../../src/database', () => ({
 }))
 
 import { requireVendor } from '../../src/middleware/vendor'
+import { readJson } from '../helpers/json'
 
 function appWithUser(user: any) {
   const app = new Hono()
@@ -50,6 +51,6 @@ describe('requireVendor', () => {
     mockLookup.mockResolvedValue([{ vendorId: 'v1', status: 'active' }])
     const res = await appWithUser({ id: 'u1', role: 'vendor' }).request('/x')
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ vendorId: 'v1' })
+    expect(await readJson(res)).toEqual({ vendorId: 'v1' })
   })
 })

@@ -35,6 +35,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }));
 
 import { reviewsApp } from '../../src/routes/reviews';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/reviews', reviewsApp);
@@ -68,7 +69,7 @@ describe('GET /api/reviews/stats', () => {
     queueSelects([{ averageRating: '4.8', reviewCount: 312 }]);
 
     const res = await app.request('/api/reviews/stats');
-    const body = await res.json();
+    const body = await readJson(res);
 
     expect(body).toEqual({ averageRating: 4.8, reviewCount: 312 });
   });
@@ -78,7 +79,7 @@ describe('GET /api/reviews/stats', () => {
     // means the tile renders "4.8" but arithmetic on it silently concatenates.
     queueSelects([{ averageRating: '4.8', reviewCount: 12 }]);
 
-    const body = await (await app.request('/api/reviews/stats')).json();
+    const body = await readJson(await app.request('/api/reviews/stats'));
 
     expect(typeof body.averageRating).toBe('number');
   });
@@ -86,7 +87,7 @@ describe('GET /api/reviews/stats', () => {
   it('reports averageRating as null rather than 0 when nothing is approved', async () => {
     queueSelects([{ averageRating: null, reviewCount: 0 }]);
 
-    const body = await (await app.request('/api/reviews/stats')).json();
+    const body = await readJson(await app.request('/api/reviews/stats'));
 
     expect(body.averageRating).toBeNull();
     expect(body.reviewCount).toBe(0);
@@ -96,7 +97,7 @@ describe('GET /api/reviews/stats', () => {
     queueSelects([]);
 
     const res = await app.request('/api/reviews/stats');
-    const body = await res.json();
+    const body = await readJson(res);
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ averageRating: null, reviewCount: 0 });

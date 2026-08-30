@@ -135,6 +135,7 @@ vi.mock('../../../src/auth', () => ({
 import { adminVendorInviteApp } from '../../../src/routes/admin/vendor-invite'
 import { requireAuth } from '../../../src/middleware/auth'
 import { requireVendor } from '../../../src/middleware/vendor'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
@@ -232,7 +233,7 @@ describe('POST /api/admin/vendors/:id/invite', () => {
     const res = await invite()
     expect(res.status).toBe(201)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.user).toMatchObject({ id: NEW_USER_ID, role: 'vendor' })
     expect(body.created).toBe(true)
 
@@ -270,7 +271,7 @@ describe('POST /api/admin/vendors/:id/invite', () => {
 
     const ok = await invite()
     expect(ok.status).toBe(201)
-    expect((await ok.json()).passwordResetSent).toBe(true)
+    expect((await readJson(ok)).passwordResetSent).toBe(true)
     expect(mockRequestPasswordReset).toHaveBeenCalledTimes(1)
 
     // The account and the link are already committed when the mail is
@@ -288,7 +289,7 @@ describe('POST /api/admin/vendors/:id/invite', () => {
 
     const stillOk = await invite()
     expect(stillOk.status).toBe(201)
-    expect((await stillOk.json()).passwordResetSent).toBe(false)
+    expect((await readJson(stillOk)).passwordResetSent).toBe(false)
     expect(queries.some((q) => q.op === 'delete')).toBe(false)
   })
 
@@ -303,7 +304,7 @@ describe('POST /api/admin/vendors/:id/invite', () => {
     const res = await invite()
     expect(res.status).toBe(201)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.created).toBe(false)
     expect(body.user.id).toBe('user_existing')
     expect(mockSignUpEmail).not.toHaveBeenCalled()
@@ -350,7 +351,7 @@ describe('invite refusals', () => {
     const res = await invite()
 
     expect(res.status).toBe(422)
-    expect((await res.json()).error).toMatch(/already linked to a vendor/i)
+    expect((await readJson(res)).error).toMatch(/already linked to a vendor/i)
   })
 
   it('does NOT silently convert an existing customer account', async () => {
@@ -361,7 +362,7 @@ describe('invite refusals', () => {
 
     const res = await invite()
     expect(res.status).toBe(409)
-    expect((await res.json()).error).toMatch(/already/i)
+    expect((await readJson(res)).error).toMatch(/already/i)
 
     // No signup, no role change, no link. Promoting a shopper's account to a
     // vendor login is a silent privilege change against a real person.
@@ -378,7 +379,7 @@ describe('invite refusals', () => {
 
     const res = await invite()
     expect(res.status).toBe(422)
-    expect((await res.json()).error).toMatch(/vendor/i)
+    expect((await readJson(res)).error).toMatch(/vendor/i)
     expect(queries.some((q) => q.op === 'insert')).toBe(false)
   })
 
@@ -459,7 +460,7 @@ describe('suspending the vendor suspends its logins', () => {
 
     const res = await vendorApp().request('/api/vendor/jobs')
     expect(res.status).toBe(403)
-    expect((await res.json()).message).toMatch(/not active/i)
+    expect((await readJson(res)).message).toMatch(/not active/i)
   })
 
   it('lets the same user through while the vendor is active', async () => {

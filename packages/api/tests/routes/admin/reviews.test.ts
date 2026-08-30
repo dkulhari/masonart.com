@@ -26,6 +26,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../../setup';
+import { readJson } from '../../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -325,7 +326,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       const res = await app.request('/api/admin/reviews');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
 
@@ -338,7 +339,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       const res = await app.request('/api/admin/reviews?status=pending&page=1');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -353,7 +354,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       const res = await app.request('/api/admin/reviews/stats');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -368,7 +369,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       const res = await app.request(`/api/admin/reviews/${validReviewId}`);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -387,7 +388,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
 
@@ -404,7 +405,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -421,7 +422,7 @@ describe('Admin Reviews Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -874,7 +875,7 @@ describe('Admin Reviews Error Response Format', () => {
     const res = await app.request('/api/admin/reviews');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -883,7 +884,7 @@ describe('Admin Reviews Error Response Format', () => {
     if (!app) return;
 
     const res = await app.request('/api/admin/reviews');
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -896,7 +897,7 @@ describe('Admin Reviews Error Response Format', () => {
     const res = await app.request('/api/admin/reviews');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     // Accept common authentication error message formats
     expect(['Unauthorized', 'Authentication required'].includes(json.error)).toBe(true);
   });

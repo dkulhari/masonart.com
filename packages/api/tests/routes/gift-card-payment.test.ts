@@ -31,6 +31,7 @@ import {
   purgeGiftCardFixtures,
   resetRazorpayOrderMock,
 } from "../helpers/gift-card-fixtures";
+import { readJson } from '../helpers/json';
 
 vi.mock("../../src/middleware/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/middleware/auth")>()),
@@ -39,7 +40,6 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
 
 /** Sequences orderNumber within this suite; codes get their own
   * sequence from freshGiftCardCode. */
-let counter = 0;
 
 const createRazorpayOrderMock = vi.fn();
 
@@ -174,7 +174,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/payment with gift cards", (
     const orderId = await makeOrder("2000.00");
 
     const response = await pay(orderId, [code]);
-    const body = (await response.json()) as { fullyCoveredByGiftCard?: boolean };
+    const body = (await readJson(response)) as { fullyCoveredByGiftCard?: boolean };
 
     expect(body.fullyCoveredByGiftCard).toBe(true);
     expect(createRazorpayOrderMock).not.toHaveBeenCalled();
@@ -190,7 +190,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/payment with gift cards", (
     const orderId = await makeOrder("2000.00");
 
     const response = await pay(orderId, [code]);
-    const body = (await response.json()) as { fullyCoveredByGiftCard?: boolean };
+    const body = (await readJson(response)) as { fullyCoveredByGiftCard?: boolean };
 
     // The guard is an exact zero. A threshold would let a near-zero balance
     // mark an order paid that was never paid.
@@ -260,7 +260,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/payment with gift cards", (
 
     await pay(orderId, [code]);
     const response = await pay(orderId, [code]);
-    const body = (await response.json()) as { amount: number };
+    const body = (await readJson(response)) as { amount: number };
 
     // The existing-Razorpay-order branch used to echo the full total, which
     // would show the customer an amount they are not being charged.

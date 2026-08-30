@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { app } from '../src/index';
+import { readJson } from './helpers/json';
 
 /**
  * Tests to verify Hono server starts correctly
@@ -59,7 +60,7 @@ describe('Hono Server Startup', () => {
 
     it('should return API metadata', async () => {
       const res = await app.request('/');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data).toHaveProperty('name');
       expect(data).toHaveProperty('version');
@@ -68,14 +69,14 @@ describe('Hono Server Startup', () => {
 
     it('should return correct API name', async () => {
       const res = await app.request('/');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.name).toBe('chobii.art API');
     });
 
     it('should return version string', async () => {
       const res = await app.request('/');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(typeof data.version).toBe('string');
       expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
@@ -83,14 +84,14 @@ describe('Hono Server Startup', () => {
 
     it('should advertise the health endpoint path', async () => {
       const res = await app.request('/');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.health).toBe('/api/health');
     });
 
     it('should advertise a health path that is actually served', async () => {
       const res = await app.request('/');
-      const data = await res.json();
+      const data = await readJson(res);
 
       // The root payload is the API's only self-description; an advertised
       // path that 404s is worse than no advertisement at all.
@@ -112,7 +113,7 @@ describe('Hono Server Startup', () => {
 
     it('should return health status', async () => {
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data).toHaveProperty('status');
       expect(data).toHaveProperty('timestamp');
@@ -120,14 +121,14 @@ describe('Hono Server Startup', () => {
 
     it('should return healthy status', async () => {
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.status).toBe('healthy');
     });
 
     it('should return valid ISO timestamp', async () => {
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.timestamp).toBeDefined();
       const timestamp = new Date(data.timestamp);
@@ -138,7 +139,7 @@ describe('Hono Server Startup', () => {
       const before = new Date();
       const res = await app.request('/health');
       const after = new Date();
-      const data = await res.json();
+      const data = await readJson(res);
 
       const timestamp = new Date(data.timestamp);
       expect(timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime() - 1000);
@@ -159,7 +160,7 @@ describe('Hono Server Startup', () => {
 
     it('should return health status with service info', async () => {
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data).toHaveProperty('status');
       expect(data).toHaveProperty('service');
@@ -168,14 +169,14 @@ describe('Hono Server Startup', () => {
 
     it('should return healthy status', async () => {
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.status).toBe('healthy');
     });
 
     it('should report database and redis reachability', async () => {
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       // The per-component block is what docs/RUNBOOK-OUTAGE.md L4 triages on.
       expect(data.components.database.status).toBe('healthy');
@@ -184,14 +185,14 @@ describe('Hono Server Startup', () => {
 
     it('should return correct service name', async () => {
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.service).toBe('chobii-api');
     });
 
     it('should return valid ISO timestamp', async () => {
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
 
       expect(data.timestamp).toBeDefined();
       const timestamp = new Date(data.timestamp);
@@ -346,7 +347,6 @@ describe('Hono Server Startup', () => {
     it('should include secure headers from middleware', async () => {
       const res = await app.request('/');
       // secureHeaders middleware adds various security headers
-      const headers = res.headers;
 
       // At minimum, check that response is valid
       expect(res.status).toBe(200);
@@ -408,10 +408,10 @@ describe('Hono Server Startup', () => {
 
     it('should maintain state across requests', async () => {
       const res1 = await app.request('/api/health');
-      const data1 = await res1.json();
+      const data1 = await readJson(res1);
 
       const res2 = await app.request('/api/health');
-      const data2 = await res2.json();
+      const data2 = await readJson(res2);
 
       expect(data1.service).toBe(data2.service);
       expect(data1.status).toBe(data2.status);
@@ -475,9 +475,9 @@ describe('Hono Server Startup', () => {
       expect(resHealth.status).toBe(200);
       expect(resApiHealth.status).toBe(200);
 
-      const dataRoot = await resRoot.json();
-      const dataHealth = await resHealth.json();
-      const dataApiHealth = await resApiHealth.json();
+      const dataRoot = await readJson(resRoot);
+      const dataHealth = await readJson(resHealth);
+      const dataApiHealth = await readJson(resApiHealth);
 
       expect(dataRoot.name).toBe('chobii.art API');
       expect(dataHealth.status).toBe('healthy');
@@ -567,20 +567,20 @@ describe('Hono Server Startup', () => {
     it('should return valid JSON from root endpoint', async () => {
       const res = await app.request('/');
       expect(() => res.json()).not.toThrow;
-      const data = await res.json();
+      const data = await readJson(res);
       expect(typeof data).toBe('object');
     });
 
     it('should return valid JSON from health endpoint', async () => {
       const res = await app.request('/health');
-      const data = await res.json();
+      const data = await readJson(res);
       expect(typeof data).toBe('object');
       expect(data).not.toBeNull();
     });
 
     it('should return valid JSON from api health endpoint', async () => {
       const res = await app.request('/api/health');
-      const data = await res.json();
+      const data = await readJson(res);
       expect(typeof data).toBe('object');
       expect(data).not.toBeNull();
     });

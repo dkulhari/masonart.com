@@ -24,6 +24,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Constants
@@ -152,7 +153,7 @@ describe('Order-Based Review Authentication', () => {
 
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
   });
 
@@ -167,7 +168,7 @@ describe('Order-Based Review Authentication', () => {
 
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     // Accept common authentication error message formats
     expect(['Unauthorized', 'Authentication required'].includes(json.error)).toBe(true);
   });
@@ -527,7 +528,7 @@ describe('Order-Based Review Error Response Format', () => {
 
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -541,7 +542,7 @@ describe('Order-Based Review Error Response Format', () => {
       body: JSON.stringify(validReviewData),
     });
 
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -683,7 +684,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
     // TDD: This assertion will fail until endpoint is fully implemented
     expect(res.status).toBe(201);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('message', 'Review submitted successfully');
     expect(json).toHaveProperty('review');
     expect(json.review).toHaveProperty('id');
@@ -722,7 +723,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
     // TDD: This assertion will fail until endpoint validates order status
     expect(res.status).toBe(400);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(json.error).toContain('delivered');
   });
@@ -757,7 +758,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
     // TDD: Should return 403 or 404 (hiding order existence is acceptable)
     expect([403, 404]).toContain(res.status);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
   });
 
@@ -794,7 +795,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
     // TDD: If a review already exists, should return 409
     expect(res.status).toBe(409);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(json.error).toContain('already exists');
   });
@@ -830,7 +831,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
     // TDD: Successful creation should include orderItemId for verified badge
     expect(res.status).toBe(201);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json.review).toHaveProperty('orderItemId', DELIVERED_ITEM_ID);
     // The productId should be derived from the order item
     expect(json.review).toHaveProperty('productId');
@@ -863,7 +864,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
 
     expect(res.status).toBe(404);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(json.error.toLowerCase()).toContain('order');
   });
@@ -889,7 +890,7 @@ describe('Order-Based Review Business Logic (TDD)', () => {
     );
 
     expect(res.status).toBe(404);
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.error).toBeDefined();
   });
 });

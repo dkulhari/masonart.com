@@ -27,7 +27,6 @@ import { adminSessionFor } from '../../helpers/admin-session'
 import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
 
-import type { RecordedQuery } from '../../helpers/query-recorder'
 import {
   productionJobs,
   productionJobItems,
@@ -55,6 +54,7 @@ vi.mock('../../../src/auth', () => ({
 }))
 
 import { adminProductionApp } from '../../../src/routes/admin/production-jobs'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
@@ -151,7 +151,7 @@ describe('POST /api/admin/production', () => {
     )
     expect(res.status).toBe(201)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.job.id).toBe(JOB_ID)
     expect(body.items).toHaveLength(2)
 
@@ -221,7 +221,7 @@ describe('POST /api/admin/production', () => {
     )
     expect(res.status).toBe(422)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.missingOrderItemIds).toEqual([ITEM_B])
     expect(queries.some((q) => q.op === 'insert')).toBe(false)
   })
@@ -291,14 +291,14 @@ describe('POST /api/admin/production', () => {
       json({ vendorId: VENDOR_ID })
     )
     expect(assignA.status).toBe(200)
-    expect((await assignA.json()).job.amountExpected).toBe('100.00')
+    expect((await readJson(assignA)).job.amountExpected).toBe('100.00')
 
     const assignB = await app.request(
       `/api/admin/production/${JOB_ID_2}/assign`,
       json({ vendorId: VENDOR_ID_2 })
     )
     expect(assignB.status).toBe(200)
-    expect((await assignB.json()).job.amountExpected).toBe('250.00')
+    expect((await readJson(assignB)).job.amountExpected).toBe('250.00')
 
     const assigned = updates(productionJobs)
     expect(assigned).toHaveLength(2)
@@ -430,7 +430,7 @@ describe('POST /api/admin/production/:jobId/assign', () => {
     )
     expect(res.status).toBe(422)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.unpriced).toEqual([
       expect.objectContaining({ orderItemId: ITEM_B, longestEdge: 60, size: '40x60' }),
     ])
@@ -465,7 +465,7 @@ describe('POST /api/admin/production/:jobId/assign', () => {
     )
     expect(res.status).toBe(422)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.unpriced[0]).toMatchObject({ orderItemId: ITEM_A, longestEdge: null })
     expect(updates(productionJobs)).toHaveLength(0)
   })
@@ -524,7 +524,7 @@ describe('PATCH /api/admin/production/:jobId', () => {
     )
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.job.amountActual).toBe('90.00')
     // The override, not the expectation — this is lib/vendor-payables' rule and
     // the number a settlement will be built from.
@@ -648,7 +648,7 @@ describe('POST /api/admin/production/:jobId/reviews', () => {
     const detail = await app.request(`/api/admin/production/${JOB_ID}`)
     expect(detail.status).toBe(200)
 
-    const body = await detail.json()
+    const body = await readJson(detail)
     expect(body.reviews).toHaveLength(3)
     expect(body.reviews.map((r: { id: string }) => r.id)).toEqual(['rev-3', 'rev-2', 'rev-1'])
 
@@ -695,7 +695,7 @@ describe('GET /api/admin/production', () => {
     const res = await buildApp().request('/api/admin/production')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body).toMatchObject({ page: 1, pageSize: 20, total: 1, totalPages: 1 })
     expect(body.items).toHaveLength(1)
 
@@ -710,7 +710,7 @@ describe('GET /api/admin/production', () => {
     const res = await buildApp().request('/api/admin/production?page=3&pageSize=500')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.page).toBe(3)
     expect(body.pageSize).toBe(100)
 

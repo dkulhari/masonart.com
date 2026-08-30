@@ -14,6 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { readJson } from '../helpers/json';
 
 const childBindings: Record<string, unknown>[] = [];
 const childLogger = { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() };
@@ -58,7 +59,7 @@ beforeEach(() => {
 describe('requestContext', () => {
   it('generates an id when the caller sends none', async () => {
     const res = await appWith().request('/thing');
-    const body = (await res.json()) as { requestId: string };
+    const body = (await readJson(res)) as { requestId: string };
 
     expect(body.requestId).toBeTruthy();
     expect(body.requestId.length).toBeGreaterThan(8);
@@ -69,13 +70,13 @@ describe('requestContext', () => {
       headers: { [REQUEST_ID_HEADER]: 'req-from-edge' },
     });
 
-    expect(((await res.json()) as { requestId: string }).requestId).toBe('req-from-edge');
+    expect(((await readJson(res)) as { requestId: string }).requestId).toBe('req-from-edge');
   });
 
   it('falls back to cf-ray, which is the id Cloudflare already assigned', async () => {
     const res = await appWith().request('/thing', { headers: { 'cf-ray': 'ray-123' } });
 
-    expect(((await res.json()) as { requestId: string }).requestId).toBe('ray-123');
+    expect(((await readJson(res)) as { requestId: string }).requestId).toBe('ray-123');
   });
 
   it('echoes the id on the response so a support ticket can carry it', async () => {
@@ -83,7 +84,7 @@ describe('requestContext', () => {
 
     expect(res.headers.get(REQUEST_ID_HEADER)).toBeTruthy();
     expect(res.headers.get(REQUEST_ID_HEADER)).toBe(
-      ((await res.json()) as { requestId: string }).requestId
+      ((await readJson(res)) as { requestId: string }).requestId
     );
   });
 
@@ -94,7 +95,7 @@ describe('requestContext', () => {
       headers: { [REQUEST_ID_HEADER]: 'x'.repeat(500) },
     });
 
-    const { requestId } = (await res.json()) as { requestId: string };
+    const { requestId } = (await readJson(res)) as { requestId: string };
     expect(requestId.length).toBeLessThanOrEqual(128);
   });
 

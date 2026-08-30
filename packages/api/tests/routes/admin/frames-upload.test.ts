@@ -63,6 +63,7 @@ vi.mock('../../../src/lib/product-media', () => ({
 }));
 
 import { adminFramesApp } from '../../../src/routes/admin/frames';
+import { readJson } from '../../helpers/json';
 
 const app = new Hono();
 app.route('/api/admin/frames', adminFramesApp);
@@ -135,7 +136,7 @@ describe('POST /api/admin/frames/upload-image', () => {
 
   it('returns both column values from one upload', async () => {
     const res = await uploadRequest(pngFile());
-    const body = (await res.json()) as {
+    const body = (await readJson(res)) as {
       thumbnailUrl: string;
       imageUrl: string;
     };
@@ -148,7 +149,7 @@ describe('POST /api/admin/frames/upload-image', () => {
     uploadOptimizedImage.mockResolvedValue({ ...LADDER, variants: [] });
 
     const res = await uploadRequest(pngFile());
-    const body = (await res.json()) as {
+    const body = (await readJson(res)) as {
       thumbnailUrl: string;
       imageUrl: string;
     };
@@ -176,7 +177,7 @@ describe('POST /api/admin/frames/upload-image', () => {
     const res = await uploadRequest(big);
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await readJson(res)) as { error: string };
     expect(body.error).toMatch(/10MB/);
     expect(uploadOptimizedImage).not.toHaveBeenCalled();
   });

@@ -194,6 +194,7 @@ vi.mock('../../../src/auth', () => ({
 
 import { adminVendorPayablesApp } from '../../../src/routes/admin/vendor-payables'
 import { getVendorPayableTotal } from '../../../src/lib/vendor-scope'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
@@ -308,7 +309,7 @@ describe('GET /api/admin/vendors/:id/payables', () => {
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}/payables`)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.jobs.map((j: { id: string }) => j.id)).toEqual([JOB_A, JOB_B])
     // The override wins on JOB_B: 1200.50 + 755.75, never 1200.50 + 800.00.
     expect(body.total).toBe('1956.25')
@@ -339,7 +340,7 @@ describe('GET /api/admin/vendors/:id/payables', () => {
     })
 
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}/payables`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     // The vendor portal reads this one. Admin and vendor must never be able to
     // open the same month and see two different numbers.
@@ -382,7 +383,7 @@ describe('POST /api/admin/vendors/:id/settlements', () => {
     )
     expect(res.status).toBe(201)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.settlement.id).toBe(SETTLEMENT_ID)
     expect(body.jobsSettled).toBe(2)
 
@@ -424,7 +425,7 @@ describe('POST /api/admin/vendors/:id/settlements', () => {
     })
 
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}/payables`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(body.jobs).toEqual([])
     expect(body.total).toBe('0.00')
@@ -442,7 +443,7 @@ describe('POST /api/admin/vendors/:id/settlements', () => {
       json({ ...validBody, jobIds: [JOB_A, JOB_FOREIGN] })
     )
     expect(res.status).toBe(422)
-    expect((await res.json()).error).toMatch(/vendor/i)
+    expect((await readJson(res)).error).toMatch(/vendor/i)
 
     expect(queries.some((q) => q.op === 'insert' || q.op === 'update')).toBe(false)
   })
@@ -458,7 +459,7 @@ describe('POST /api/admin/vendors/:id/settlements', () => {
       json({ ...validBody, jobIds: [JOB_A, JOB_SETTLED] })
     )
     expect(res.status).toBe(422)
-    expect((await res.json()).error).toMatch(/settled/i)
+    expect((await readJson(res)).error).toMatch(/settled/i)
 
     expect(queries.some((q) => q.op === 'insert' || q.op === 'update')).toBe(false)
   })
@@ -519,7 +520,7 @@ describe('GET /api/admin/vendors/:id/settlements', () => {
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}/settlements`)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.settlements).toHaveLength(1)
     expect(body.settlements[0].amount).toBe('1956.25')
 

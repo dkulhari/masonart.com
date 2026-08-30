@@ -34,6 +34,7 @@ vi.mock('../../src/database', () => ({
 }));
 
 import { db } from '../../src/database';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Data
@@ -141,7 +142,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.orderNumber).toBe('MA-2024-001234');
       expect(data.status).toBe('shipped');
     });
@@ -157,7 +158,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.orderNumber).toBe('MA-2024-001234');
     });
 
@@ -172,7 +173,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.tracking).not.toBeNull();
       expect(data.tracking.carrier).toBe('blue_dart');
       expect(data.tracking.trackingNumber).toBe('BD123456789');
@@ -189,7 +190,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.tracking).toBeNull();
     });
 
@@ -204,7 +205,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.timeline).toBeDefined();
       expect(data.timeline.orderedAt).toBeDefined();
     });
@@ -260,7 +261,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(404);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('ORDER_NOT_FOUND');
     });
   });
@@ -276,7 +277,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(404);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('ORDER_NOT_FOUND');
     });
 
@@ -290,7 +291,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(404);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('ORDER_NOT_FOUND');
     });
   });
@@ -363,7 +364,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.shippingAddress.city).toBe('Mumbai');
       expect(data.shippingAddress.state).toBe('Maharashtra');
       expect(data.shippingAddress.addressLine1).toBeUndefined();
@@ -388,7 +389,7 @@ describe('Token-Based Lookup - GET /api/tracking/token/:token', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.orderNumber).toBe('MA-2024-001234');
     });
 
@@ -403,7 +404,7 @@ describe('Token-Based Lookup - GET /api/tracking/token/:token', () => {
       );
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.tracking).not.toBeNull();
     });
   });
@@ -415,7 +416,7 @@ describe('Token-Based Lookup - GET /api/tracking/token/:token', () => {
       const res = await app.request('/api/tracking/token/short');
 
       expect(res.status).toBe(400);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('INVALID_TOKEN');
     });
 
@@ -429,7 +430,7 @@ describe('Token-Based Lookup - GET /api/tracking/token/:token', () => {
       );
 
       expect(res.status).toBe(404);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('TOKEN_NOT_FOUND');
     });
   });
@@ -449,7 +450,7 @@ describe('Token-Based Lookup - GET /api/tracking/token/:token', () => {
       );
 
       expect(res.status).toBe(410);
-      const data = await res.json();
+      const data = await readJson(res);
       expect(data.code).toBe('TOKEN_EXPIRED');
     });
   });
@@ -485,7 +486,7 @@ describe('Order Number Route - GET /api/tracking/:orderNumber', () => {
     const res = await app.request('/api/tracking/MA-2024-001234');
 
     expect(res.status).toBe(400);
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.code).toBe('VALIDATION_REQUIRED');
   });
 
@@ -536,7 +537,7 @@ describe('Error Handling', () => {
     );
 
     expect(res.status).toBe(500);
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.code).toBe('LOOKUP_ERROR');
   });
 
@@ -550,7 +551,7 @@ describe('Error Handling', () => {
     );
 
     expect(res.status).toBe(500);
-    const data = await res.json();
+    const data = await readJson(res);
     expect(data.code).toBe('LOOKUP_ERROR');
   });
 });

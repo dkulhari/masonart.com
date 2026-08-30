@@ -41,6 +41,7 @@ vi.mock('../../src/lib/redis', () => ({
 }));
 
 import { productsApp } from '../../src/routes/products';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/products', productsApp);
@@ -78,7 +79,7 @@ describe('GET /api/products/facets', () => {
     const res = await app.request('/api/products/facets');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.styles).toEqual([
       { value: 'wabi-sabi', count: 788 },
       { value: 'minimalist', count: 474 },
@@ -94,7 +95,7 @@ describe('GET /api/products/facets', () => {
 
     const res = await app.request('/api/products/facets');
     expect(res.status).toBe(200);
-    expect((await res.json()).styles).toEqual([]);
+    expect((await readJson(res)).styles).toEqual([]);
   });
 
   it('500s cleanly rather than throwing', async () => {

@@ -27,6 +27,7 @@ vi.mock('../../src/lib/redis', () => ({
 }));
 
 import { productsApp } from '../../src/routes/products';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/products', productsApp);
@@ -122,7 +123,7 @@ describe('facets endpoint covers the new groups', () => {
     const res = await app.request('/api/products/facets');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     for (const key of [
       'styles', 'subjects', 'colors', 'rooms', 'orientation',
       'vibe', 'aesthetic', 'medium', 'uniqueness', 'availability',

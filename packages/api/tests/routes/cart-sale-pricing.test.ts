@@ -87,6 +87,7 @@ vi.mock('../../src/lib/promotion-pricing', async (importOriginal) => {
 });
 
 import { cartApp } from '../../src/routes/cart';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/cart', cartApp);
@@ -285,7 +286,7 @@ function cachedKeys(): string[] {
 async function getCart() {
   const res = await app.request('/api/cart');
   expect(res.status).toBe(200);
-  return res.json();
+  return readJson(res);
 }
 
 beforeEach(() => {

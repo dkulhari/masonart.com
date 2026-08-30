@@ -22,6 +22,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Hono } from "hono";
 import "../../setup";
+import { readJson } from '../../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -61,7 +62,6 @@ const validCommentData = {
 /**
  * Check if database is available for runtime tests
  */
-let isDatabaseAvailable = false;
 let app: Hono | null = null;
 
 beforeAll(async () => {
@@ -89,19 +89,16 @@ beforeAll(async () => {
       clearTimeout(timeoutId);
 
       if (res.status === 200) {
-        isDatabaseAvailable = true;
         console.log("Database connection available for runtime tests");
       }
     } catch (abortError) {
       console.log("Database check timed out, marking as unavailable");
-      isDatabaseAvailable = false;
     }
   } catch (error) {
     console.log(
       "Could not initialize app for testing:",
       (error as Error).message
     );
-    isDatabaseAvailable = false;
   }
 }, 10000);
 
@@ -140,7 +137,7 @@ describe("Admin Approvals Authentication Requirements", () => {
       const res = await app.request("/api/admin/approvals");
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("error");
     });
   });
@@ -155,7 +152,7 @@ describe("Admin Approvals Authentication Requirements", () => {
       const res = await app.request("/api/admin/approvals/stats");
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("error");
     });
   });
@@ -170,7 +167,7 @@ describe("Admin Approvals Authentication Requirements", () => {
       const res = await app.request(`/api/admin/approvals/${validApprovalId}`);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("error");
     });
   });
@@ -192,7 +189,7 @@ describe("Admin Approvals Authentication Requirements", () => {
       );
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("error");
     });
   });
@@ -212,7 +209,7 @@ describe("Admin Approvals Authentication Requirements", () => {
       );
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("error");
     });
   });
@@ -234,7 +231,7 @@ describe("Admin Approvals Authentication Requirements", () => {
       );
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("error");
     });
   });

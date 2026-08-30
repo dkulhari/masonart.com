@@ -77,6 +77,7 @@ vi.mock('../../../src/auth', () => ({
 import { adminReviewsApp } from '../../../src/routes/admin/reviews'
 import { reviewMedia } from '../../../src/database/schema/review-media'
 import { reviews } from '../../../src/database/schema/reviews'
+import { readJson } from '../../helpers/json'
 
 const app = new Hono()
 app.route('/api/admin/reviews', adminReviewsApp)
@@ -253,7 +254,7 @@ describe('GET /api/admin/reviews', () => {
     )
 
     const res = await app.request('/api/admin/reviews')
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.items).toHaveLength(2)
@@ -283,7 +284,7 @@ describe('GET /api/admin/reviews', () => {
       ]
     )
 
-    const body = await (await app.request('/api/admin/reviews')).json()
+    const body = await readJson(await app.request('/api/admin/reviews'))
     const media = body.items[0].media
 
     expect(media).toHaveLength(3)
@@ -312,7 +313,7 @@ describe('GET /api/admin/reviews', () => {
   it('gives a review with no media an empty array, not undefined', async () => {
     queueSelects([{ count: 1 }], [reviewRow(REVIEW_A)], [productRow], [])
 
-    const body = await (await app.request('/api/admin/reviews')).json()
+    const body = await readJson(await app.request('/api/admin/reviews'))
 
     expect(body.items[0].media).toEqual([])
   })
@@ -334,7 +335,7 @@ describe('GET /api/admin/reviews', () => {
   it('skips the media query entirely when the queue is empty', async () => {
     queueSelects([{ count: 0 }], [])
 
-    const body = await (await app.request('/api/admin/reviews')).json()
+    const body = await readJson(await app.request('/api/admin/reviews'))
 
     expect(body.items).toEqual([])
     expect(selectMock).toHaveBeenCalledTimes(2)
@@ -362,7 +363,7 @@ describe('GET /api/admin/reviews/:reviewId', () => {
     )
 
     const res = await app.request(`/api/admin/reviews/${REVIEW_A}`)
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.media).toHaveLength(1)
@@ -377,7 +378,7 @@ describe('GET /api/admin/reviews/:reviewId', () => {
   it('returns an empty media array for a review with no attachments', async () => {
     queueSelects([reviewRow(REVIEW_A)], [productRow], [])
 
-    const body = await (await app.request(`/api/admin/reviews/${REVIEW_A}`)).json()
+    const body = await readJson(await app.request(`/api/admin/reviews/${REVIEW_A}`))
 
     expect(body.media).toEqual([])
   })
@@ -409,7 +410,7 @@ describe('DELETE /api/admin/reviews/:reviewId/media/:mediaId', () => {
       `/api/admin/reviews/${REVIEW_A}/media/${MEDIA_ID}`,
       { method: 'DELETE' }
     )
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(res.status).toBe(200)
     expect(body.mediaId).toBe(MEDIA_ID)

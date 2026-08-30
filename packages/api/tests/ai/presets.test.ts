@@ -14,7 +14,7 @@
  * Based on packages/api/src/ai/style-presets.ts
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import '../setup';
 
 // Import style presets module
@@ -34,10 +34,6 @@ import {
   isValidStylePreset,
   isValidAspectRatio,
   isValidColorMood,
-  type StylePresetConfig,
-  type AspectRatioConfig,
-  type ColorMoodConfig,
-  type AIModelParameters,
 } from '../../src/ai/style-presets';
 
 import type { AIStylePreset, AIAspectRatio, AIModelProvider } from '../../src/database/schema/ai-generations';

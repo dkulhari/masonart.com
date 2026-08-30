@@ -26,9 +26,10 @@
  * @see packages/api/src/routes/ai.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -78,17 +79,6 @@ const validModelProviders = ['stable-diffusion', 'midjourney', 'dalle', 'leonard
 /**
  * Valid generation request data for testing
  */
-const validGenerationData = {
-  prompt: 'A beautiful mountain landscape at sunset with vibrant colors',
-  negativePrompt: 'blurry, low quality, distorted',
-  stylePreset: 'minimalist-modern',
-  aspectRatio: 'landscape',
-  colorMood: 'warm',
-  colorPalette: ['#FF5733', '#33FF57', '#3357FF'],
-  variationCount: 4,
-  modelProvider: 'stable-diffusion',
-  seed: 12345,
-};
 
 /**
  * Minimal valid generation request
@@ -139,7 +129,7 @@ beforeAll(async () => {
         const dbRes = await testApp.request('/api/ai/gallery?page=1&pageSize=1');
         if (dbRes.status === 200 || dbRes.status === 500) {
           // 500 with specific error means DB unavailable
-          const json = await dbRes.json().catch(() => ({}));
+          const json = await readJson(dbRes).catch(() => ({}));
           if (json.error && json.error.includes('Failed to fetch')) {
             console.log('Database not available, skipping runtime tests');
             isDatabaseAvailable = false;
@@ -204,7 +194,7 @@ describe('AI Route Availability', () => {
 
     const res = await app.request('/api/ai/style-presets');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
+    const body = (await readJson(res)) as {
       items: Array<{
         id: string;
         name: string;
@@ -834,7 +824,7 @@ describe('AI Error Response Format', () => {
     const res = await app.request('/api/ai/gallery?sortBy=invalid');
     expect(res.status).toBe(400);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toBeDefined();
   });
 
@@ -844,7 +834,7 @@ describe('AI Error Response Format', () => {
     const res = await app.request('/api/ai/generations');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toBeDefined();
     expect(json).toHaveProperty('error');
   });
@@ -878,7 +868,7 @@ describe('AI Style Presets Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/style-presets');
-      const json = await res.json();
+      const json = await readJson(res);
 
       expect(json).toHaveProperty('items');
       expect(Array.isArray(json.items)).toBe(true);
@@ -888,7 +878,7 @@ describe('AI Style Presets Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/style-presets');
-      const json = await res.json();
+      const json = await readJson(res);
 
       expect(json.items.length).toBeGreaterThan(0);
       json.items.forEach((preset: { id: string; name: string }) => {
@@ -903,7 +893,7 @@ describe('AI Style Presets Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/style-presets');
-      const json = await res.json();
+      const json = await readJson(res);
 
       const presetIds = json.items.map((p: { id: string }) => p.id);
       // 'minimalist-modern' is a poster style, not an AI preset — the enum ships
@@ -916,7 +906,7 @@ describe('AI Style Presets Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/style-presets');
-      const json = await res.json();
+      const json = await readJson(res);
 
       const wabiSabi = json.items.find((p: { id: string }) => p.id === 'wabi-sabi');
       if (wabiSabi) {
@@ -945,7 +935,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       expect(json).toHaveProperty('items');
       expect(Array.isArray(json.items)).toBe(true);
@@ -955,7 +945,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       expect(json.items.length).toBe(4);
     });
@@ -964,7 +954,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       json.items.forEach((ratio: { id: string; name: string; ratio: string; description: string }) => {
         expect(ratio).toHaveProperty('id');
@@ -978,7 +968,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       const square = json.items.find((r: { id: string }) => r.id === 'square');
       expect(square).toBeDefined();
@@ -989,7 +979,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       const portrait = json.items.find((r: { id: string }) => r.id === 'portrait');
       expect(portrait).toBeDefined();
@@ -1000,7 +990,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       const landscape = json.items.find((r: { id: string }) => r.id === 'landscape');
       expect(landscape).toBeDefined();
@@ -1011,7 +1001,7 @@ describe('AI Aspect Ratios Endpoint', () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/aspect-ratios');
-      const json = await res.json();
+      const json = await readJson(res);
 
       const panoramic = json.items.find((r: { id: string }) => r.id === 'panoramic');
       expect(panoramic).toBeDefined();
@@ -1036,7 +1026,7 @@ describe('AI Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/ai/gallery');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
       expect(json).toHaveProperty('total');
       expect(json).toHaveProperty('page');
@@ -1057,7 +1047,7 @@ describe('AI Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/ai/gallery?stylePreset=minimalist-modern');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
     });
 
@@ -1071,7 +1061,7 @@ describe('AI Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/ai/gallery?page=1&pageSize=5');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.page).toBe(1);
       expect(json.pageSize).toBe(5);
     });
@@ -1108,7 +1098,7 @@ describe('AI Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/ai/gallery');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       if (json.items.length > 0) {
         const item = json.items[0];
         expect(item).toHaveProperty('id');
@@ -1132,7 +1122,7 @@ describe('AI Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/ai/gallery?page=1&pageSize=5');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       // fromCache may or may not be present depending on cache hit
       expect(json).toHaveProperty('items');
     });

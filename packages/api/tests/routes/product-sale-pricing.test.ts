@@ -88,6 +88,7 @@ vi.mock('../../src/lib/promotion-pricing', async (importOriginal) => {
 });
 
 import { productsApp } from '../../src/routes/products';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/products', productsApp);
@@ -242,7 +243,7 @@ describe('product list sale payload', () => {
     const res = await app.request('/api/products');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].sale).toBeNull();
   });
@@ -251,7 +252,7 @@ describe('product list sale payload', () => {
     givenPromotions([promotion()]);
     queueSelects([{ count: 1 }], [productRow()]);
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
 
     expect(body.items[0].sale).toEqual({
       promotionId: PROMOTION_ID,
@@ -274,7 +275,7 @@ describe('product list sale payload', () => {
     ]);
     queueSelects([{ count: 1 }], [productRow({ styles: ['wabi-sabi'] })]);
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
     expect(body.items[0].sale?.salePrice).toBe(SALE_PRICE);
   });
 
@@ -282,7 +283,7 @@ describe('product list sale payload', () => {
     givenPromotions([promotion()], { excludedIds: [PRODUCT_ID] });
     queueSelects([{ count: 1 }], [productRow()]);
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
     expect(body.items[0].sale).toBeNull();
   });
 
@@ -290,7 +291,7 @@ describe('product list sale payload', () => {
     givenPromotions([promotion({ membersOnly: true })]);
     queueSelects([{ count: 1 }], [productRow()]);
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
     expect(body.items[0].sale.locked).toBe(true);
     // The price is still shown — locked means "shown, base charged".
     expect(body.items[0].sale.salePrice).toBe(SALE_PRICE);
@@ -301,7 +302,7 @@ describe('product list sale payload', () => {
     givenPromotions([promotion({ membersOnly: true })]);
     queueSelects([{ count: 1 }], [productRow()]);
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
     expect(body.items[0].sale.locked).toBe(false);
   });
 
@@ -309,7 +310,7 @@ describe('product list sale payload', () => {
     givenPromotions([promotion()]);
     queueSelects([{ count: 1 }], [productRow()]);
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
     expect(JSON.stringify(body).includes('endsAt')).toBe(false);
   });
 
@@ -324,7 +325,7 @@ describe('product list sale payload', () => {
       ]
     );
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
 
     expect(body.items).toHaveLength(3);
     expect(loadPromotionProductSetsMock).toHaveBeenCalledTimes(1);
@@ -357,7 +358,7 @@ describe('product list sale payload', () => {
       total: 1,
     });
 
-    const body = await (await app.request('/api/products')).json();
+    const body = await readJson(await app.request('/api/products'));
 
     expect(body.fromCache).toBe(true);
     expect(body.items[0].sale).toBeNull();
@@ -389,7 +390,7 @@ describe('product detail sale payload', () => {
     const res = await app.request('/api/products/golden-dunes');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.sale).toBeNull();
   });
 
@@ -398,7 +399,7 @@ describe('product detail sale payload', () => {
     findFirstMock.mockResolvedValue(detailRow());
     queueSelects([]);
 
-    const body = await (await app.request('/api/products/golden-dunes')).json();
+    const body = await readJson(await app.request('/api/products/golden-dunes'));
 
     expect(body.sale).toEqual({
       promotionId: PROMOTION_ID,
@@ -415,7 +416,7 @@ describe('product detail sale payload', () => {
     findFirstMock.mockResolvedValue(detailRow());
     queueSelects([]);
 
-    const body = await (await app.request('/api/products/golden-dunes')).json();
+    const body = await readJson(await app.request('/api/products/golden-dunes'));
     expect(body.sale.locked).toBe(true);
   });
 
@@ -424,7 +425,7 @@ describe('product detail sale payload', () => {
     findFirstMock.mockResolvedValue(detailRow());
     queueSelects([]);
 
-    const body = await (await app.request('/api/products/golden-dunes')).json();
+    const body = await readJson(await app.request('/api/products/golden-dunes'));
     expect(JSON.stringify(body).includes('endsAt')).toBe(false);
   });
 
@@ -485,7 +486,7 @@ describe('featured products sale payload', () => {
     const res = await app.request('/api/products/featured');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].sale).toBeNull();
   });
@@ -494,7 +495,7 @@ describe('featured products sale payload', () => {
     givenPromotions([promotion()]);
     queueSelects([featuredRow()]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
 
     expect(body.items[0].sale).toEqual({
       promotionId: PROMOTION_ID,
@@ -510,7 +511,7 @@ describe('featured products sale payload', () => {
     givenPromotions([promotion()]);
 
     queueSelects([{ count: 1 }], [productRow({ isFeatured: true })]);
-    const list = await (await app.request('/api/products')).json();
+    const list = await readJson(await app.request('/api/products'));
 
     vi.clearAllMocks();
     getCachedMock.mockResolvedValue(null);
@@ -518,7 +519,7 @@ describe('featured products sale payload', () => {
     getSessionMock.mockResolvedValue(null);
     givenPromotions([promotion()]);
     queueSelects([featuredRow()]);
-    const featured = await (await app.request('/api/products/featured')).json();
+    const featured = await readJson(await app.request('/api/products/featured'));
 
     // The disagreement #516 exists to end: one catalogue, one price.
     expect(featured.items[0].sale).toEqual(list.items[0].sale);
@@ -543,7 +544,7 @@ describe('featured products sale payload', () => {
     ]);
     queueSelects([featuredRow({ rooms: ['living-room'] })]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
     expect(body.items[0].sale?.salePrice).toBe(SALE_PRICE);
   });
 
@@ -551,7 +552,7 @@ describe('featured products sale payload', () => {
     givenPromotions([promotion()], { excludedIds: [PRODUCT_ID] });
     queueSelects([featuredRow()]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
     expect(body.items[0].sale).toBeNull();
   });
 
@@ -559,7 +560,7 @@ describe('featured products sale payload', () => {
     givenPromotions([promotion({ membersOnly: true })]);
     queueSelects([featuredRow()]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
     expect(body.items[0].sale.locked).toBe(true);
     expect(body.items[0].sale.salePrice).toBe(SALE_PRICE);
   });
@@ -569,7 +570,7 @@ describe('featured products sale payload', () => {
     givenPromotions([promotion({ membersOnly: true })]);
     queueSelects([featuredRow()]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
     expect(body.items[0].sale.locked).toBe(false);
   });
 
@@ -612,7 +613,7 @@ describe('featured products sale payload', () => {
       featuredRow({ id: '44444444-4444-4444-8444-444444444444', slug: 'c' }),
     ]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
 
     expect(body.items).toHaveLength(3);
     expect(getActivePromotionsMock).toHaveBeenCalledTimes(1);
@@ -623,14 +624,14 @@ describe('featured products sale payload', () => {
     givenPromotions([promotion()]);
     queueSelects([featuredRow()]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
     expect(JSON.stringify(body).includes('endsAt')).toBe(false);
   });
 
   it('serves the cached body back without re-querying', async () => {
     getCachedMock.mockResolvedValue([{ id: PRODUCT_ID, sale: null }]);
 
-    const body = await (await app.request('/api/products/featured')).json();
+    const body = await readJson(await app.request('/api/products/featured'));
 
     expect(body.fromCache).toBe(true);
     expect(selectMock).not.toHaveBeenCalled();
@@ -681,7 +682,7 @@ describe('related products sale payload', () => {
     const res = await app.request('/api/products/golden-dunes/related');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.items[0].sale).toBeNull();
   });
 
@@ -689,9 +690,9 @@ describe('related products sale payload', () => {
     givenPromotions([promotion()]);
     queueRelated([relatedRow()]);
 
-    const body = await (
+    const body = await readJson(
       await app.request('/api/products/golden-dunes/related')
-    ).json();
+    );
 
     expect(body.items[0].sale.salePrice).toBe(SALE_PRICE);
     expect(body.items[0].sale.locked).toBe(false);
@@ -729,9 +730,9 @@ describe('related products sale payload', () => {
     givenPromotions([promotion()]);
     queueRelated([relatedRow()]);
 
-    const body = await (
+    const body = await readJson(
       await app.request('/api/products/golden-dunes/related')
-    ).json();
+    );
     expect(JSON.stringify(body).includes('endsAt')).toBe(false);
   });
 });

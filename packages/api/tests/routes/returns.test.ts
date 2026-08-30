@@ -21,13 +21,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Hono } from "hono";
 import "../setup";
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Constants
 // ============================================================================
 
 const VALID_UUID = "00000000-0000-0000-0000-000000000001";
-const INVALID_UUID = "not-a-uuid";
 
 // ============================================================================
 // Test State
@@ -387,7 +387,7 @@ describe("Returns Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/return-policies");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("policies");
       expect(Array.isArray(json.policies)).toBe(true);
     });
@@ -402,7 +402,7 @@ describe("Returns Runtime Tests (Database Required)", () => {
       const res = await app.request("/api/return-policies");
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty("fromCache");
       expect(typeof json.fromCache).toBe("boolean");
     });

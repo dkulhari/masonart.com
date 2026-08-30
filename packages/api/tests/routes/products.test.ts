@@ -22,9 +22,10 @@
  * @see packages/api/src/routes/products.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -88,7 +89,7 @@ beforeAll(async () => {
 
       // If we get a 500 error with specific database error, database is unavailable
       if (res.status === 500) {
-        const json = await res.json();
+        const json = await readJson(res);
         if (json.error === 'Failed to fetch products') {
           console.log('Database not available, skipping runtime tests');
           isDatabaseAvailable = false;
@@ -393,14 +394,14 @@ describe('Products Query Parameter Validation', () => {
       if (!app || !isDatabaseAvailable) return;
 
       const listRes = await app.request('/api/products?page=1&pageSize=1');
-      const list = (await listRes.json()) as { items?: Array<{ slug: string }> };
+      const list = (await readJson(listRes)) as { items?: Array<{ slug: string }> };
       const slug = list.items?.[0]?.slug;
       if (!slug) return;
 
       const res = await app.request(`/api/products/${slug}/related`);
       expect(res.status).toBe(200);
 
-      const json = (await res.json()) as { items: unknown[] };
+      const json = (await readJson(res)) as { items: unknown[] };
       expect(Array.isArray(json.items)).toBe(true);
     });
 
@@ -408,12 +409,12 @@ describe('Products Query Parameter Validation', () => {
       if (!app || !isDatabaseAvailable) return;
 
       const listRes = await app.request('/api/products?page=1&pageSize=1');
-      const list = (await listRes.json()) as { items?: Array<{ slug: string }> };
+      const list = (await readJson(listRes)) as { items?: Array<{ slug: string }> };
       const slug = list.items?.[0]?.slug;
       if (!slug) return;
 
       const res = await app.request(`/api/products/${slug}/related`);
-      const json = (await res.json()) as { items: Array<{ slug: string }> };
+      const json = (await readJson(res)) as { items: Array<{ slug: string }> };
 
       expect(json.items.map((item) => item.slug)).not.toContain(slug);
     });
@@ -422,12 +423,12 @@ describe('Products Query Parameter Validation', () => {
       if (!app || !isDatabaseAvailable) return;
 
       const listRes = await app.request('/api/products?page=1&pageSize=1');
-      const list = (await listRes.json()) as { items?: Array<{ slug: string }> };
+      const list = (await readJson(listRes)) as { items?: Array<{ slug: string }> };
       const slug = list.items?.[0]?.slug;
       if (!slug) return;
 
       const res = await app.request(`/api/products/${slug}/related?limit=2`);
-      const json = (await res.json()) as { items: unknown[] };
+      const json = (await readJson(res)) as { items: unknown[] };
 
       expect(json.items.length).toBeLessThanOrEqual(2);
     });
@@ -456,7 +457,7 @@ describe('Products Query Parameter Validation', () => {
       const res = await app.request('/api/products/INVALID-SLUG');
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Invalid slug format');
     });
 
@@ -466,7 +467,7 @@ describe('Products Query Parameter Validation', () => {
       const res = await app.request('/api/products/invalid_slug!');
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Invalid slug format');
     });
 
@@ -517,7 +518,7 @@ describe('Products Query Parameter Validation', () => {
       });
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.items).toEqual([]);
     });
 
@@ -673,7 +674,7 @@ describe('Products Error Response Format', () => {
     const res = await app.request('/api/products/INVALID-SLUG');
     expect(res.status).toBe(400);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -682,7 +683,7 @@ describe('Products Error Response Format', () => {
     if (!app) return;
 
     const res = await app.request('/api/products?page=-1');
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -706,7 +707,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products?page=1&pageSize=10');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
       expect(json).toHaveProperty('total');
       expect(json).toHaveProperty('page');
@@ -727,7 +728,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       // All returned products should be active (public API filter)
       // Note: Can't fully verify without knowing database state
       expect(json).toHaveProperty('items');
@@ -743,7 +744,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products?orientation=landscape');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
     });
 
@@ -772,7 +773,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       );
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
     });
 
@@ -788,7 +789,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       );
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
     });
 
@@ -819,13 +820,13 @@ describe('Products Runtime Tests (Database Required)', () => {
           `/api/products?${facet}=${first},${second}`
         );
         expect(joined.status).toBe(200);
-        expect(await joined.json()).toHaveProperty('items');
+        expect(await readJson(joined)).toHaveProperty('items');
 
         const repeated = await app.request(
           `/api/products?${facet}=${first}&${facet}=${second}`
         );
         expect(repeated.status).toBe(200);
-        expect(await repeated.json()).toHaveProperty('items');
+        expect(await readJson(repeated)).toHaveProperty('items');
       });
 
       it(`rejects an unknown ${facet} value in either form`, async () => {
@@ -853,7 +854,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products?priceMin=1000&priceMax=5000');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
     });
 
@@ -867,7 +868,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products?sortBy=basePrice&sortOrder=asc');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
       // Verify sorting if items exist
       if (json.items.length > 1) {
@@ -894,8 +895,8 @@ describe('Products Runtime Tests (Database Required)', () => {
       expect(res2.status).toBe(200);
 
       // Both should return valid data
-      const json1 = await res1.json();
-      const json2 = await res2.json();
+      const json1 = await readJson(res1);
+      const json2 = await readJson(res2);
       expect(json1.total).toBe(json2.total);
     });
   });
@@ -911,7 +912,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/search?q=poster');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('query', 'poster');
       expect(json).toHaveProperty('items');
       expect(json).toHaveProperty('total');
@@ -927,7 +928,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/search?q=art&page=1&pageSize=5');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.page).toBe(1);
       expect(json.pageSize).toBe(5);
     });
@@ -944,7 +945,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/featured');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
       expect(Array.isArray(json.items)).toBe(true);
     });
@@ -959,7 +960,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/featured?limit=5');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.items.length).toBeLessThanOrEqual(5);
     });
   });
@@ -975,7 +976,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/frames');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
       expect(Array.isArray(json.items)).toBe(true);
     });
@@ -992,7 +993,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/non-existent-product-slug-12345');
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Product not found');
     });
   });
@@ -1008,7 +1009,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/products/non-existent-slug/variants');
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Product not found');
     });
   });
@@ -1028,7 +1029,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       });
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.items).toEqual([]);
     });
 
@@ -1048,7 +1049,7 @@ describe('Products Runtime Tests (Database Required)', () => {
       });
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('items');
       expect(Array.isArray(json.items)).toBe(true);
     });

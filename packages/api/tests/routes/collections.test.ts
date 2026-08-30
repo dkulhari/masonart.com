@@ -35,6 +35,7 @@ vi.mock('../../src/lib/redis', () => ({
 }));
 
 import { collectionsApp } from '../../src/routes/collections';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/collections', collectionsApp);
@@ -73,7 +74,7 @@ describe('GET /api/collections', () => {
     const res = await app.request('/api/collections?discover=true');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { collections: { slug: string }[] };
+    const body = (await readJson(res)) as { collections: { slug: string }[] };
     expect(body.collections.map((c) => c.slug)).toEqual(['first', 'second']);
   });
 
@@ -81,9 +82,9 @@ describe('GET /api/collections', () => {
     listDiscoverCollections.mockResolvedValue([collection()]);
     countCollection.mockResolvedValue(11);
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections?discover=true')
-    ).json()) as { collections: { count: number }[] };
+    )) as { collections: { count: number }[] };
 
     expect(body.collections[0].count).toBe(11);
   });
@@ -98,9 +99,9 @@ describe('GET /api/collections', () => {
       c.slug === 'full' ? 3 : 0
     );
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections?discover=true')
-    ).json()) as { collections: { slug: string }[] };
+    )) as { collections: { slug: string }[] };
 
     expect(body.collections.map((c) => c.slug)).toEqual(['full']);
   });
@@ -120,9 +121,9 @@ describe('chip imagery', () => {
       new Map([['id-pop', { productId: 'p1', image: 'p1.jpg', orientation: 'square' }]])
     );
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections?discover=true')
-    ).json()) as {
+    )) as {
       collections: { image: string; imageIsMatted: boolean; orientation: string | null }[];
     };
 
@@ -140,9 +141,9 @@ describe('chip imagery', () => {
       ])
     );
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections?discover=true')
-    ).json()) as {
+    )) as {
       collections: { image: string; imageIsMatted: boolean; orientation: string | null }[];
     };
 
@@ -158,9 +159,9 @@ describe('chip imagery', () => {
     countCollection.mockResolvedValue(4);
     representativesFor.mockResolvedValue(new Map());
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections?discover=true')
-    ).json()) as { collections: { image: string | null; imageIsMatted: boolean }[] };
+    )) as { collections: { image: string | null; imageIsMatted: boolean }[] };
 
     expect(body.collections[0].image).toBeNull();
     expect(body.collections[0].imageIsMatted).toBe(false);
@@ -171,9 +172,9 @@ describe('caching', () => {
   it('serves a cached payload without touching the database', async () => {
     getCached.mockResolvedValue({ collections: [{ slug: 'cached' }] });
 
-    const body = (await (
+    const body = (await readJson(
       await app.request('/api/collections?discover=true')
-    ).json()) as { fromCache: boolean };
+    )) as { fromCache: boolean };
 
     expect(body.fromCache).toBe(true);
     expect(listDiscoverCollections).not.toHaveBeenCalled();

@@ -37,7 +37,6 @@ const INVALID_UUID = "not-a-uuid";
 // Test State
 // ============================================================================
 
-let isDatabaseAvailable = false;
 let app: Hono | null = null;
 
 beforeAll(async () => {
@@ -63,22 +62,18 @@ beforeAll(async () => {
       clearTimeout(timeoutId);
 
       if (res.status === 200) {
-        isDatabaseAvailable = true;
         console.log("Database connection available for runtime tests");
       } else if (res.status === 500) {
         console.log("Database not available, skipping runtime tests");
-        isDatabaseAvailable = false;
       }
     } catch (abortError) {
       console.log("Database check timed out, marking as unavailable");
-      isDatabaseAvailable = false;
     }
   } catch (error) {
     console.log(
       "Could not initialize app for testing:",
       (error as Error).message
     );
-    isDatabaseAvailable = false;
   }
 }, 10000);
 

@@ -57,6 +57,7 @@ vi.mock('../../../src/lib/audit', async (importOriginal) => ({
 }));
 
 import { adminProductsApp } from '../../../src/routes/admin/products';
+import { readJson } from '../../helpers/json';
 
 const app = new Hono();
 app.route('/api/admin/products', adminProductsApp);
@@ -150,7 +151,7 @@ describe('POST /api/admin/products — orientation against the artwork', () => {
     });
 
     expect(res.status).toBe(400);
-    const body = (await res.json()) as {
+    const body = (await readJson(res)) as {
       error: string;
       declared?: string;
       measured?: string;
@@ -263,7 +264,7 @@ describe('PATCH /api/admin/products/:id — orientation against the artwork', ()
     });
 
     expect(res.status).toBe(400);
-    expect((await res.json()).measured).toBe('portrait');
+    expect((await readJson(res)).measured).toBe('portrait');
     expect(updatedValues).toBeUndefined();
   });
 
@@ -311,7 +312,7 @@ describe('PATCH /api/admin/products/:id — orientation against the artwork', ()
     });
 
     expect(res.status).toBe(400);
-    expect((await res.json()).measured).toBe('portrait');
+    expect((await readJson(res)).measured).toBe('portrait');
   });
 
   it('leaves an unrelated edit alone', async () => {

@@ -20,6 +20,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { eq } from 'drizzle-orm';
 import '../../setup';
+import { readJson } from '../../helpers/json';
 
 const mockGetSession = vi.fn();
 
@@ -354,7 +355,7 @@ describe('GET /api/admin/customers', () => {
     const res = await app.request('/api/admin/customers');
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBeGreaterThan(0);
     const first = body.data[0];
@@ -393,7 +394,7 @@ describe('GET /api/admin/customers - filtering, sorting, pagination', () => {
   async function listOk(query: string) {
     const res = await listAs(query);
     expect(res.status).toBe(200);
-    return res.json();
+    return readJson(res);
   }
 
   const idsOf = (body: { data: Array<{ id: string }> }) =>
@@ -525,7 +526,7 @@ describe('GET /api/admin/customers - gallery membership filter', () => {
   async function listOk(query: string) {
     const res = await listAs(query);
     expect(res.status).toBe(200);
-    return res.json();
+    return readJson(res);
   }
 
   const idsOf = (body: { data: Array<{ id: string }> }) =>
@@ -747,7 +748,7 @@ describe('PUT /api/admin/customers/:id/role', () => {
 
     const res = await putRole(app, TARGET_CUSTOMER_ID, 'content-manager');
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body).toMatchObject({ success: true, role: 'content-manager' });
 
     // Verify persisted

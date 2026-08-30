@@ -39,7 +39,6 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
 
 /** Sequences orderNumber within this suite; codes get their own
   * sequence from freshGiftCardCode. */
-let counter = 0;
 
 const createRazorpayOrderMock = vi.fn();
 

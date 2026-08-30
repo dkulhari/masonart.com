@@ -28,6 +28,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../../setup';
+import { readJson } from '../../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -158,7 +159,7 @@ describe('Admin Orders Authentication Requirements', () => {
       const res = await app.request('/api/admin/orders');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -173,7 +174,7 @@ describe('Admin Orders Authentication Requirements', () => {
       const res = await app.request('/api/admin/orders/stats');
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -188,7 +189,7 @@ describe('Admin Orders Authentication Requirements', () => {
       const res = await app.request(`/api/admin/orders/${validOrderId}`);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
 
@@ -201,7 +202,7 @@ describe('Admin Orders Authentication Requirements', () => {
       const res = await app.request(`/api/admin/orders/${validOrderNumber}`);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -220,7 +221,7 @@ describe('Admin Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -239,7 +240,7 @@ describe('Admin Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -258,7 +259,7 @@ describe('Admin Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -277,7 +278,7 @@ describe('Admin Orders Authentication Requirements', () => {
       });
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('error');
     });
   });
@@ -1274,7 +1275,7 @@ describe('Admin Orders Error Response Format', () => {
     const res = await app.request('/api/admin/orders');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -1283,7 +1284,7 @@ describe('Admin Orders Error Response Format', () => {
     if (!app) return;
 
     const res = await app.request('/api/admin/orders');
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -1296,7 +1297,7 @@ describe('Admin Orders Error Response Format', () => {
     const res = await app.request('/api/admin/orders');
     expect(res.status).toBe(401);
 
-    const json = await res.json();
+    const json = await readJson(res);
     // Accept common authentication error message formats
     expect(['Unauthorized', 'Authentication required'].includes(json.error)).toBe(true);
   });

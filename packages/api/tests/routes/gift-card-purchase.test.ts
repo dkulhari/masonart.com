@@ -28,6 +28,7 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { readJson } from '../helpers/json';
 
 // Only auth is mocked. The database is real, because the assertions that
 // matter here are about what actually landed in `orders.giftCardPurchase`.
@@ -143,7 +144,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/purchase", () => {
     const response = await purchase(validBody);
     expect(response.status).toBe(200);
 
-    const body = (await response.json()) as { orderId: string; total: string };
+    const body = (await readJson(response)) as { orderId: string; total: string };
     await trackOrder(body.orderId);
 
     const order = await db.query.orders.findFirst({
@@ -159,7 +160,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/purchase", () => {
     if (!reachable) return;
 
     const response = await purchase(validBody);
-    const body = (await response.json()) as { orderId: string };
+    const body = (await readJson(response)) as { orderId: string };
     await trackOrder(body.orderId);
 
     const items = await db
@@ -177,7 +178,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/purchase", () => {
     if (!reachable) return;
 
     const response = await purchase(validBody);
-    const body = (await response.json()) as { orderId: string };
+    const body = (await readJson(response)) as { orderId: string };
     await trackOrder(body.orderId);
 
     const order = await db.query.orders.findFirst({
@@ -195,7 +196,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/purchase", () => {
     if (!reachable) return;
 
     const response = await purchase(validBody);
-    const body = (await response.json()) as { orderId: string };
+    const body = (await readJson(response)) as { orderId: string };
     await trackOrder(body.orderId);
 
     const card = await db.query.giftCards.findFirst({
@@ -212,7 +213,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/purchase", () => {
 
     const sendAt = new Date(Date.now() + 7 * 86_400_000);
     const response = await purchase({ ...validBody, sendAt: sendAt.toISOString() });
-    const body = (await response.json()) as { orderId: string };
+    const body = (await readJson(response)) as { orderId: string };
     await trackOrder(body.orderId);
 
     const order = await db.query.orders.findFirst({
@@ -233,7 +234,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/purchase", () => {
     if (!reachable) return;
 
     const response = await purchase(validBody);
-    const body = (await response.json()) as { orderId: string };
+    const body = (await readJson(response)) as { orderId: string };
     await trackOrder(body.orderId);
 
     const order = await db.query.orders.findFirst({

@@ -119,6 +119,7 @@ vi.mock('../../src/lib/redis', () => ({
 }));
 
 import reviewMediaApp from '../../src/routes/review-media';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/reviews', reviewMediaApp);
@@ -329,7 +330,7 @@ describe('POST /api/reviews/:reviewId/media/presign', () => {
     });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.key).toMatch(
       new RegExp(`^reviews/${REVIEW_ID}/media/[0-9a-f-]{36}\\.jpg$`)
     );
@@ -348,7 +349,7 @@ describe('POST /api/reviews/:reviewId/media/presign', () => {
     });
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.key).toMatch(
       new RegExp(`^reviews/${REVIEW_ID}/media/[0-9a-f-]{36}\\.mp4$`)
     );
@@ -366,7 +367,7 @@ describe('POST /api/reviews/:reviewId/media/presign', () => {
       filename: 'IMG_0042.MOV',
     });
     expect(res.status).toBe(200);
-    expect((await res.json()).key).toMatch(/\.mov$/);
+    expect((await readJson(res)).key).toMatch(/\.mov$/);
   });
 
   it('is 404 for a review that does not exist', async () => {
@@ -523,7 +524,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
 
     expect(queueAddMock).not.toHaveBeenCalled();
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.media.id).toBe(MEDIA_ID);
     expect(body.media.processingStatus).toBe('ready');
   });

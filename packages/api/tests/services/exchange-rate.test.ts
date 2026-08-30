@@ -13,14 +13,13 @@
  * @see packages/api/src/services/exchange-rate.ts
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import '../setup';
 
 // ============================================================================
 // Test Constants
 // ============================================================================
 
-const FALLBACK_RATE = 83.0;
 const MIN_REASONABLE_RATE = 70.0;
 const MAX_REASONABLE_RATE = 100.0;
 

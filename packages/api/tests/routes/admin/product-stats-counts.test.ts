@@ -35,6 +35,7 @@ import {
   productVariants,
 } from '../../../src/database/schema/products';
 import { adminProductsApp } from '../../../src/routes/admin/products';
+import { readJson } from '../../helpers/json';
 
 const app = new Hono();
 app.route('/api/admin/products', adminProductsApp);
@@ -101,7 +102,7 @@ let insertedProductIds: string[] = [];
 async function fetchStats(): Promise<ProductStats> {
   const res = await app.request('/api/admin/products/stats');
   expect(res.status).toBe(200);
-  return (await res.json()) as ProductStats;
+  return (await readJson(res)) as ProductStats;
 }
 
 let baseline: ProductStats | null = null;

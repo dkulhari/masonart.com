@@ -83,6 +83,7 @@ vi.mock('../../src/lib/promotion-pricing', async (importOriginal) => {
 
 import { galleryApp } from '../../src/routes/gallery';
 import { ordersApp } from '../../src/routes/orders';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/gallery', galleryApp);
@@ -522,7 +523,7 @@ describe('POST /api/gallery/join re-issues the session', () => {
     // The row is written. A cookie that would not re-issue costs a stale UI
     // for a few minutes, not the join and not the price.
     expect(res.status).toBe(200);
-    expect((await res.json()).galleryMember).toBe(true);
+    expect((await readJson(res)).galleryMember).toBe(true);
     expect(userRow.galleryMember).toBe(true);
   });
 
@@ -532,7 +533,7 @@ describe('POST /api/gallery/join re-issues the session', () => {
     const res = await join();
 
     expect(res.status).toBe(200);
-    expect((await res.json()).galleryMember).toBe(true);
+    expect((await readJson(res)).galleryMember).toBe(true);
   });
 
   it('leaves a rejected join alone — nothing to re-issue', async () => {

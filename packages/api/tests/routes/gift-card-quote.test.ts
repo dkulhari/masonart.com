@@ -26,6 +26,7 @@ import {
 } from "../helpers/live-db";
 import { purgeGiftCardFixtures } from "../helpers/gift-card-fixtures";
 import { createGiftCardRowFactories } from "../helpers/gift-card-row-factories";
+import { readJson } from '../helpers/json';
 
 // Partial mock: the orders route pulls in cart, which needs optionalAuth and
 // the rest of the real middleware. Only the session check is swapped out.
@@ -36,7 +37,6 @@ vi.mock("../../src/middleware/auth", async (importOriginal) => ({
 
 /** Sequences orderNumber within this suite; codes get their own
   * sequence from freshGiftCardCode. */
-let counter = 0;
 
 const DATABASE_URL = liveDbUrl();
 
@@ -51,7 +51,6 @@ const createdCardIds: string[] = [];
 const OWNER_ID = "test-user-gc-quote-owner";
 const OTHER_ID = "test-user-gc-quote-other";
 const OWNER = JSON.stringify({ id: OWNER_ID, email: "owner@example.com" });
-const OTHER = JSON.stringify({ id: OTHER_ID, email: "other@example.com" });
 
 beforeAll(async () => {
   ({ client, db, reachable } = await connectLiveDb({ max: 3 }));
@@ -154,7 +153,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/gift-card", () => {
     const response = await quote(orderId, code);
     expect(response.status).toBe(200);
 
-    const body = (await response.json()) as {
+    const body = (await readJson(response)) as {
       applicablePaise: number;
       balancePaise: number;
       last4: string;
@@ -174,7 +173,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/gift-card", () => {
     const { code } = await makeCard(50_000);
     const orderId = await makeOrder("2000.00");
 
-    const body = (await (await quote(orderId, code)).json()) as {
+    const body = (await readJson(await quote(orderId, code))) as {
       applicablePaise: number;
     };
     expect(body.applicablePaise).toBe(50_000);
@@ -245,7 +244,7 @@ describe.skipIf(!DATABASE_URL)("POST /api/gift-cards/balance", () => {
     const response = await balance(code);
     expect(response.status).toBe(200);
 
-    const body = (await response.json()) as {
+    const body = (await readJson(response)) as {
       balancePaise: number;
       last4: string;
     };

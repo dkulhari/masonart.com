@@ -22,7 +22,6 @@ import {
   getShippedTemplate,
   getOutForDeliveryTemplate,
   getDeliveredTemplate,
-  type EmailTemplate,
 } from '../../src/services/email-templates';
 import type { Order } from '../../src/database/schema/orders';
 

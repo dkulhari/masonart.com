@@ -36,6 +36,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, inArray, like } from "drizzle-orm";
 import "../../setup";
+import { readJson } from '../../helpers/json';
 
 const mockGetSession = vi.fn();
 const mockInvalidate = vi.fn();
@@ -156,7 +157,7 @@ async function createPromotion(
 async function createOk(app: Hono, overrides: Record<string, unknown> = {}) {
   const res = await createPromotion(app, overrides);
   expect(res.status).toBe(201);
-  return res.json();
+  return readJson(res);
 }
 
 async function seedProducts() {
@@ -281,7 +282,7 @@ describe("POST /api/admin/promotions", () => {
     const res = await createPromotion(app, { scopeType: "all" });
     expect(res.status).toBe(201);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.id).toBeTruthy();
     expect(body.scopeType).toBe("all");
     // isEnabled defaults to false: a new sale never goes live on save
@@ -403,7 +404,7 @@ describe("GET /api/admin/promotions", () => {
     const res = await app.request("/api/admin/promotions");
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(Array.isArray(body)).toBe(true);
 
     const byId = new Map<string, { isActive: boolean; isEnabled: boolean }>(
@@ -430,7 +431,7 @@ describe("GET /api/admin/promotions", () => {
     });
 
     const res = await app.request("/api/admin/promotions");
-    const body = await res.json();
+    const body = await readJson(res);
     const row = body.find((r: { id: string }) => r.id === created.id);
 
     expect(row.productIds).toEqual([PRODUCT_A]);
@@ -466,7 +467,7 @@ describe("PATCH /api/admin/promotions/:id", () => {
     );
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.headline).toBe("UPDATED HEADLINE");
     expect(body.discountValue).toBe(25);
   });
@@ -590,7 +591,7 @@ describe("POST /api/admin/promotions/:id/enable and /disable", () => {
     const res = await toggle(app, created.id, "enable");
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.isEnabled).toBe(true);
     // Enabled, started and not ended — the derived state follows immediately
     expect(body.isActive).toBe(true);
@@ -610,7 +611,7 @@ describe("POST /api/admin/promotions/:id/enable and /disable", () => {
     const res = await toggle(app, created.id, "disable");
     expect(res.status).toBe(200);
 
-    const body = await res.json();
+    const body = await readJson(res);
     expect(body.isEnabled).toBe(false);
     expect(body.isActive).toBe(false);
     expect(mockInvalidate).toHaveBeenCalled();
@@ -654,7 +655,7 @@ describe("DELETE /api/admin/promotions/:id", () => {
     });
     expect(res.status).toBe(200);
 
-    const list = await (await app.request("/api/admin/promotions")).json();
+    const list = await readJson(await app.request("/api/admin/promotions"));
     expect(list.some((row: { id: string }) => row.id === created.id)).toBe(
       false
     );

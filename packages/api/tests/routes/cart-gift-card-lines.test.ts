@@ -42,6 +42,7 @@ import {
   assertLiveDbReachable,
   type LiveDbConnection,
 } from "../helpers/live-db";
+import { readJson } from '../helpers/json';
 
 vi.mock("../../src/services/email", () => ({
   sendTemplateEmail: vi.fn().mockResolvedValue(undefined),
@@ -163,7 +164,7 @@ describe("POST /api/cart/gift-cards", () => {
     const response = await addGiftCard();
     expect(response.status).toBe(201);
 
-    const body = (await response.json()) as { item: Record<string, unknown> };
+    const body = (await readJson(response)) as { item: Record<string, unknown> };
 
     // The whole point of #579: a cart line that is not a catalogue entry.
     expect(body.item.productId).toBeNull();
@@ -175,7 +176,7 @@ describe("POST /api/cart/gift-cards", () => {
     if (!reachable) return;
 
     const response = await addGiftCard();
-    const body = (await response.json()) as {
+    const body = (await readJson(response)) as {
       item: { unitPrice: string; lineTotal: string };
     };
 
@@ -231,7 +232,7 @@ describe("the cart read", () => {
     await addGiftCard();
 
     const response = await app.request("/api/cart");
-    const body = (await response.json()) as {
+    const body = (await readJson(response)) as {
       items: Array<{
         lineType: string;
         product: unknown;
@@ -252,7 +253,7 @@ describe("the cart read", () => {
     await addGiftCard();
 
     const response = await app.request("/api/cart");
-    const body = (await response.json()) as {
+    const body = (await readJson(response)) as {
       items: Array<{ lineType: string; pricing: { sale: string | null } }>;
     };
 
@@ -270,7 +271,7 @@ describe("the cart read", () => {
     await addGiftCard();
 
     const response = await app.request("/api/cart");
-    const body = (await response.json()) as { subtotal: string };
+    const body = (await readJson(response)) as { subtotal: string };
 
     expect(parseFloat(body.subtotal)).toBe(2000);
   });
@@ -280,7 +281,7 @@ describe("PATCH on a gift card line", () => {
   it("refuses to change it", async () => {
     if (!reachable) return;
 
-    const created = (await (await addGiftCard()).json()) as {
+    const created = (await readJson(await addGiftCard())) as {
       item: { id: string };
     };
 
@@ -305,7 +306,7 @@ describe("PATCH on a gift card line", () => {
   it("still allows saving it for later", async () => {
     if (!reachable) return;
 
-    const created = (await (await addGiftCard()).json()) as {
+    const created = (await readJson(await addGiftCard())) as {
       item: { id: string };
     };
 
@@ -326,7 +327,7 @@ describe("PATCH on a gift card line", () => {
   it("can be removed like any other line", async () => {
     if (!reachable) return;
 
-    const created = (await (await addGiftCard()).json()) as {
+    const created = (await readJson(await addGiftCard())) as {
       item: { id: string };
     };
 

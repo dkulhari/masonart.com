@@ -42,6 +42,7 @@ vi.mock('../../src/middleware/auth', () => ({
 }));
 
 import { wishlistApp } from '../../src/routes/wishlist';
+import { readJson } from '../helpers/json';
 
 const app = new Hono();
 app.route('/api/wishlist', wishlistApp);
@@ -103,7 +104,7 @@ describe('replacing', () => {
     const res = await replace({ productIds: [C, B] });
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { productIds: string[] };
+    const body = (await readJson(res)) as { productIds: string[] };
     expect(body.productIds).toEqual([C, B]);
     expect(setSpy).toHaveBeenCalledWith(
       expect.objectContaining({ wishlistProductIds: [C, B] })
@@ -144,7 +145,7 @@ describe('validation', () => {
   it('names the ids it rejected', async () => {
     productsExist([A]);
     const res = await replace({ productIds: [A, C] });
-    const body = (await res.json()) as { unknown?: string[] };
+    const body = (await readJson(res)) as { unknown?: string[] };
     expect(body.unknown).toEqual([C]);
   });
 

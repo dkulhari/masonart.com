@@ -23,9 +23,10 @@
  * @see packages/api/src/routes/cart.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Hono } from 'hono';
 import '../setup';
+import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Fixtures
@@ -86,9 +87,6 @@ const validAiCartItemData = {
 /**
  * Valid update cart item data
  */
-const validUpdateCartItemData = {
-  quantity: 3,
-};
 
 /**
  * Check if database is available for runtime tests
@@ -120,7 +118,7 @@ beforeAll(async () => {
 
       // If we get a 500 error with specific database error, database is unavailable
       if (res.status === 500) {
-        const json = await res.json();
+        const json = await readJson(res);
         if (json.error === 'Failed to fetch cart') {
           console.log('Database not available, skipping runtime tests');
           isDatabaseAvailable = false;
@@ -558,7 +556,7 @@ describe('Cart Update Item Validation', () => {
       });
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Invalid item ID format');
     });
 
@@ -715,7 +713,7 @@ describe('Cart Delete Item Validation', () => {
       });
       expect(res.status).toBe(400);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Invalid item ID format');
     });
 
@@ -890,7 +888,7 @@ describe('Cart Error Response Format', () => {
     });
     expect(res.status).toBe(400);
 
-    const json = await res.json();
+    const json = await readJson(res);
     expect(json).toHaveProperty('error');
     expect(typeof json.error).toBe('string');
   });
@@ -903,7 +901,7 @@ describe('Cart Error Response Format', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ productId: 'invalid' }),
     });
-    const json = await res.json();
+    const json = await readJson(res);
 
     // Should not expose stack traces or internal paths
     expect(JSON.stringify(json)).not.toContain('/packages/api/');
@@ -928,7 +926,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/cart');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('id');
       expect(json).toHaveProperty('itemCount');
       expect(json).toHaveProperty('subtotal');
@@ -949,7 +947,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/cart');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('id');
       expect(json.itemCount).toBe(0);
     });
@@ -964,7 +962,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/cart');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json).toHaveProperty('currency');
       expect(json.currency).toBe('INR'); // Default currency
     });
@@ -979,7 +977,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       const res = await app.request('/api/cart');
       expect(res.status).toBe(200);
 
-      const json = await res.json();
+      const json = await readJson(res);
       // These fields should exist even if null
       expect(json).toHaveProperty('couponCode');
       expect(json).toHaveProperty('couponDiscount');
@@ -1005,7 +1003,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       });
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Product not found or unavailable');
     });
 
@@ -1042,7 +1040,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       });
 
       if (res.status === 201) {
-        const json = await res.json();
+        const json = await readJson(res);
         expect(json).toHaveProperty('message', 'Item added to cart');
         expect(json).toHaveProperty('item');
         expect(json.item).toHaveProperty('id');
@@ -1066,7 +1064,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       });
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Cart item not found');
     });
 
@@ -1102,7 +1100,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       });
       expect(res.status).toBe(404);
 
-      const json = await res.json();
+      const json = await readJson(res);
       expect(json.error).toBe('Cart item not found');
     });
   });
@@ -1127,7 +1125,7 @@ describe('Cart Runtime Tests (Database Required)', () => {
       expect([200, 404].includes(res.status)).toBe(true);
 
       if (res.status === 200) {
-        const json = await res.json();
+        const json = await readJson(res);
         expect(json.message).toBe('Cart cleared');
       }
     });
@@ -1233,7 +1231,7 @@ describe('Cart Guest Session Handling', () => {
     const res1 = await app.request('/api/cart');
     expect(res1.status).toBe(200);
 
-    const json1 = await res1.json();
+    const json1 = await readJson(res1);
     const cartId = json1.id;
 
     // Note: In real test with cookies, subsequent requests would use same cart
@@ -1254,7 +1252,7 @@ describe('Cart Cache Behavior', () => {
     const res1 = await app.request('/api/cart');
     expect(res1.status).toBe(200);
 
-    const json1 = await res1.json();
+    const json1 = await readJson(res1);
     // First request should not have fromCache=true
     // (or if Redis is unavailable, there's no cache)
     if (json1.fromCache !== undefined) {

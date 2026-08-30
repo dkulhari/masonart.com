@@ -16,7 +16,7 @@
  * Note: Runtime tests require actual S3/R2 connection. Most tests use mocks.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach, vi, type Mock } from 'vitest';
 import {
   S3Client,
   PutObjectCommand,

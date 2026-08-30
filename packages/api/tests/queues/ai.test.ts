@@ -1234,10 +1234,6 @@ describe('Job Status Response', () => {
 
     // The structure returned by getAIGenerationJobStatus
     // when a job exists should have these properties:
-    const expectedStructure = {
-      state: expect.any(String),
-      progress: expect.anything(), // Can be number or AIGenerationProgress
-    };
 
     // Since we can't guarantee a job exists, just verify the function signature
     expect(getAIGenerationJobStatus).toBeDefined();

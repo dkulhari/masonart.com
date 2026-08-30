@@ -21,14 +21,11 @@ import { adminSessionFor } from '../../helpers/admin-session'
 import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
 
-import type { RecordedQuery } from '../../helpers/query-recorder'
 import {
   vendors,
-  vendorContacts,
   vendorCapabilities,
   vendorRates,
 } from '../../../src/database/schema/vendors'
-import { productionJobs } from '../../../src/database/schema/production-jobs'
 
 // ============================================================================
 // Recording database mock
@@ -51,6 +48,7 @@ vi.mock('../../../src/auth', () => ({
 }))
 
 import { adminVendorsApp } from '../../../src/routes/admin/vendors'
+import { readJson } from '../../helpers/json'
 
 // ============================================================================
 // Helpers
@@ -104,7 +102,7 @@ describe('GET /api/admin/vendors', () => {
     const res = await buildApp().request('/api/admin/vendors')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.page).toBe(1)
     expect(body.pageSize).toBe(20)
     expect(body.total).toBe(1)
@@ -134,7 +132,7 @@ describe('GET /api/admin/vendors', () => {
     const res = await buildApp().request('/api/admin/vendors?page=3&pageSize=500')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.page).toBe(3)
     expect(body.pageSize).toBe(100)
 
@@ -173,7 +171,7 @@ describe('GET /api/admin/vendors', () => {
     const res = await buildApp().request('/api/admin/vendors?kind=print&minLongestEdge=36')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.items.map((v: { id: string }) => v.id)).toEqual([VENDOR_ID])
 
     // "can print at least 36 inches" is kind = 'print' AND (width >= 36 OR height >= 36).
@@ -198,7 +196,7 @@ describe('GET /api/admin/vendors', () => {
     const res = await buildApp().request('/api/admin/vendors?kind=frame&minLongestEdge=90')
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.items).toEqual([])
     expect(body.total).toBe(0)
     expect(selects(vendors)).toHaveLength(0)
@@ -223,7 +221,7 @@ describe('GET /api/admin/vendors', () => {
     })
 
     const res = await buildApp().request('/api/admin/vendors')
-    const body = await res.json()
+    const body = await readJson(res)
 
     expect(body.items[0].amountOwed).toBe('90.00')
     expect(body.items[0].openJobCount).toBe(1)
@@ -264,7 +262,7 @@ describe('vendor create / read / update', () => {
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`)
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.vendor.id).toBe(VENDOR_ID)
     expect(body.contacts).toHaveLength(1)
     expect(body.capabilities).toHaveLength(1)
@@ -293,7 +291,7 @@ describe('vendor create / read / update', () => {
     })
     expect(res.status).toBe(200)
 
-    const body = await res.json()
+    const body = await readJson(res)
     expect(body.vendor.status).toBe('suspended')
   })
 
@@ -408,7 +406,7 @@ describe('nested contacts and capabilities', () => {
 
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}/capabilities`)
     expect(res.status).toBe(200)
-    expect((await res.json()).capabilities).toHaveLength(1)
+    expect((await readJson(res)).capabilities).toHaveLength(1)
   })
 })
 

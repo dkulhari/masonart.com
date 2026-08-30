@@ -59,6 +59,7 @@ vi.mock('../../../src/lib/redis', () => ({
 }));
 
 import { adminFramesApp } from '../../../src/routes/admin/frames';
+import { readJson } from '../../helpers/json';
 
 const app = new Hono();
 app.route('/api/admin/frames', adminFramesApp);
@@ -127,7 +128,7 @@ describe('GET /api/admin/frames', () => {
     const res = await asStaff('/api/admin/frames');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { frames: Array<{ id: string }> };
+    const body = (await readJson(res)) as { frames: Array<{ id: string }> };
     expect(body.frames.map((f) => f.id)).toEqual(['f1', 'f2']);
   });
 
@@ -149,7 +150,7 @@ describe('GET /api/admin/frames/:id', () => {
     const res = await asStaff('/api/admin/frames/f1');
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { frame: { type: string } };
+    const body = (await readJson(res)) as { frame: { type: string } };
     expect(body.frame.type).toBe('gold');
   });
 
@@ -203,7 +204,7 @@ describe('POST /api/admin/frames', () => {
 
     expect(res.status).toBe(409);
 
-    const body = (await res.json()) as { type?: string };
+    const body = (await readJson(res)) as { type?: string };
     expect(body.type).toBe('stretch-maple');
   });
 });
