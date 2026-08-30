@@ -23,17 +23,12 @@ import {
   type VisibilityState,
   type RowSelectionState,
   type Row,
-  type Column,
   type HeaderContext,
   type CellContext,
   type FilterFn,
 } from '@tanstack/react-table'
 import {
-  ChevronDown,
-  ChevronUp,
-  ChevronsUpDown,
   Search,
-  MoreHorizontal,
   Pencil,
   Trash2,
   Eye,
@@ -42,6 +37,13 @@ import {
   ExternalLink,
   ImageIcon,
 } from 'lucide-react'
+import {
+  RowActionsMenu,
+  ROW_ACTION_ITEM,
+  ROW_ACTION_SEPARATOR,
+} from './RowActionsMenu'
+import { SortableHeader } from './SortableHeader'
+import { StatusBadge } from './StatusBadge'
 import { TablePagination } from './TablePagination'
 import { cn, formatPrice } from '~/lib/utils'
 
@@ -94,23 +96,10 @@ export interface ProductsTableProps {
 // Status Badge Component
 // ============================================================================
 
-function StatusBadge({ status }: { status: AdminProduct['status'] }) {
-  const styles = {
-    draft: 'bg-amber-100 text-amber-700 border-amber-200',
-    active: 'bg-green-100 text-green-700 border-green-200',
-    archived: 'bg-gray-100 text-gray-700 border-gray-200',
-  }
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize',
-        styles[status]
-      )}
-    >
-      {status}
-    </span>
-  )
+const PRODUCT_STATUS_STYLES: Record<AdminProduct['status'], string> = {
+  draft: 'bg-amber-100 text-amber-700 border-amber-200',
+  active: 'bg-green-100 text-green-700 border-green-200',
+  archived: 'bg-gray-100 text-gray-700 border-gray-200',
 }
 
 // ============================================================================
@@ -134,142 +123,94 @@ function ActionMenu({
   onArchive,
   onDuplicate,
 }: ActionMenuProps) {
-  const [isOpen, setIsOpen] = useState(false)
-
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-      >
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-
-      {isOpen && (
+    <RowActionsMenu>
+      {(close) => (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
-
-          {/* Menu */}
-          <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-border bg-card py-1 shadow-lg">
-            {onView && (
-              <button
-                type="button"
-                onClick={() => {
-                  onView(product)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
-              >
-                <Eye className="h-4 w-4" />
-                View Details
-              </button>
-            )}
-
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => {
-                  onEdit(product)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit Product
-              </button>
-            )}
-
-            {onDuplicate && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDuplicate(product)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
-              >
-                <Copy className="h-4 w-4" />
-                Duplicate
-              </button>
-            )}
-
-            <a
-              href={`/posters/${product.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
+          {onView && (
+            <button
+              type="button"
+              onClick={() => {
+                onView(product)
+                close()
+              }}
+              className={ROW_ACTION_ITEM}
             >
-              <ExternalLink className="h-4 w-4" />
-              View in Store
-            </a>
+              <Eye className="h-4 w-4" />
+              View Details
+            </button>
+          )}
 
-            <div className="my-1 border-t border-border" />
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                onEdit(product)
+                close()
+              }}
+              className={ROW_ACTION_ITEM}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit Product
+            </button>
+          )}
 
-            {onArchive && product.status !== 'archived' && (
-              <button
-                type="button"
-                onClick={() => {
-                  onArchive(product)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
-              >
-                <Archive className="h-4 w-4" />
-                Archive Product
-              </button>
-            )}
+          {onDuplicate && (
+            <button
+              type="button"
+              onClick={() => {
+                onDuplicate(product)
+                close()
+              }}
+              className={ROW_ACTION_ITEM}
+            >
+              <Copy className="h-4 w-4" />
+              Duplicate
+            </button>
+          )}
 
-            {onDelete && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDelete(product)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Product
-              </button>
-            )}
-          </div>
+          <a
+            href={`/posters/${product.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ROW_ACTION_ITEM}
+          >
+            <ExternalLink className="h-4 w-4" />
+            View in Store
+          </a>
+
+          <div className={ROW_ACTION_SEPARATOR} />
+
+          {onArchive && product.status !== 'archived' && (
+            <button
+              type="button"
+              onClick={() => {
+                onArchive(product)
+                close()
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
+            >
+              <Archive className="h-4 w-4" />
+              Archive Product
+            </button>
+          )}
+
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                onDelete(product)
+                close()
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Product
+            </button>
+          )}
         </>
       )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Column Header Components
-// ============================================================================
-
-function SortableHeader({
-  column,
-  children,
-}: {
-  column: Column<AdminProduct, unknown>
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => column.toggleSorting()}
-      className="flex items-center gap-1 font-medium"
-    >
-      {children}
-      {column.getIsSorted() === 'asc' ? (
-        <ChevronUp className="h-4 w-4" />
-      ) : column.getIsSorted() === 'desc' ? (
-        <ChevronDown className="h-4 w-4" />
-      ) : (
-        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-      )}
-    </button>
+    </RowActionsMenu>
   )
 }
 
@@ -364,7 +305,11 @@ export function ProductsTable({
           <SortableHeader column={column}>Status</SortableHeader>
         ),
         cell: ({ row }: CellContext<AdminProduct, unknown>) => (
-          <StatusBadge status={row.original.status} />
+          <StatusBadge
+            status={row.original.status}
+            styles={PRODUCT_STATUS_STYLES}
+            className="capitalize"
+          />
         ),
         filterFn: ((row: Row<AdminProduct>, _columnId: string, filterValue: string) => {
           if (!filterValue) return true

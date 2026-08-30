@@ -21,17 +21,12 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type Row,
-  type Column,
   type HeaderContext,
   type CellContext,
   type FilterFn,
 } from '@tanstack/react-table'
 import {
-  ChevronDown,
-  ChevronUp,
-  ChevronsUpDown,
   Search,
-  MoreHorizontal,
   Eye,
   Truck,
   XCircle,
@@ -39,8 +34,15 @@ import {
   Package,
   DollarSign,
 } from 'lucide-react'
+import {
+  RowActionsMenu,
+  ROW_ACTION_ITEM,
+  ROW_ACTION_SEPARATOR,
+} from './RowActionsMenu'
+import { SortableHeader } from './SortableHeader'
+import { StatusBadge } from './StatusBadge'
 import { TablePagination } from './TablePagination'
-import { cn, formatPrice } from '~/lib/utils'
+import { formatPrice } from '~/lib/utils'
 
 // ============================================================================
 // Types
@@ -113,78 +115,52 @@ export interface OrdersTableProps {
 // Status Badge Components
 // ============================================================================
 
-function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  const styles: Record<OrderStatus, string> = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    pending_payment: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-    processing: 'bg-purple-100 text-purple-700 border-purple-200',
-    shipped: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    out_for_delivery: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-    delivered: 'bg-green-100 text-green-700 border-green-200',
-    cancelled: 'bg-gray-100 text-gray-700 border-gray-200',
-    refund_requested: 'bg-orange-100 text-orange-700 border-orange-200',
-    refunded: 'bg-gray-100 text-gray-600 border-gray-200',
-    failed: 'bg-red-100 text-red-700 border-red-200',
-  }
-
-  const labels: Record<OrderStatus, string> = {
-    pending: 'Pending',
-    pending_payment: 'Payment Pending',
-    confirmed: 'Confirmed',
-    processing: 'Processing',
-    shipped: 'Shipped',
-    out_for_delivery: 'Out for Delivery',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
-    refund_requested: 'Refund Requested',
-    refunded: 'Refunded',
-    failed: 'Failed',
-  }
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
-        styles[status]
-      )}
-    >
-      {labels[status]}
-    </span>
-  )
+const ORDER_STATUS_STYLES: Record<OrderStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700 border-amber-200',
+  pending_payment: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
+  processing: 'bg-purple-100 text-purple-700 border-purple-200',
+  shipped: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  out_for_delivery: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  delivered: 'bg-green-100 text-green-700 border-green-200',
+  cancelled: 'bg-gray-100 text-gray-700 border-gray-200',
+  refund_requested: 'bg-orange-100 text-orange-700 border-orange-200',
+  refunded: 'bg-gray-100 text-gray-600 border-gray-200',
+  failed: 'bg-red-100 text-red-700 border-red-200',
 }
 
-function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const styles: Record<PaymentStatus, string> = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    processing: 'bg-blue-100 text-blue-700 border-blue-200',
-    paid: 'bg-green-100 text-green-700 border-green-200',
-    failed: 'bg-red-100 text-red-700 border-red-200',
-    refunded: 'bg-gray-100 text-gray-600 border-gray-200',
-    partially_refunded: 'bg-orange-100 text-orange-700 border-orange-200',
-    cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
-  }
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  pending: 'Pending',
+  pending_payment: 'Payment Pending',
+  confirmed: 'Confirmed',
+  processing: 'Processing',
+  shipped: 'Shipped',
+  out_for_delivery: 'Out for Delivery',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  refund_requested: 'Refund Requested',
+  refunded: 'Refunded',
+  failed: 'Failed',
+}
 
-  const labels: Record<PaymentStatus, string> = {
-    pending: 'Pending',
-    processing: 'Processing',
-    paid: 'Paid',
-    failed: 'Failed',
-    refunded: 'Refunded',
-    partially_refunded: 'Partial Refund',
-    cancelled: 'Cancelled',
-  }
+const PAYMENT_STATUS_STYLES: Record<PaymentStatus, string> = {
+  pending: 'bg-amber-100 text-amber-700 border-amber-200',
+  processing: 'bg-blue-100 text-blue-700 border-blue-200',
+  paid: 'bg-green-100 text-green-700 border-green-200',
+  failed: 'bg-red-100 text-red-700 border-red-200',
+  refunded: 'bg-gray-100 text-gray-600 border-gray-200',
+  partially_refunded: 'bg-orange-100 text-orange-700 border-orange-200',
+  cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
+}
 
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
-        styles[status]
-      )}
-    >
-      {labels[status]}
-    </span>
-  )
+const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  pending: 'Pending',
+  processing: 'Processing',
+  paid: 'Paid',
+  failed: 'Failed',
+  refunded: 'Refunded',
+  partially_refunded: 'Partial Refund',
+  cancelled: 'Cancelled',
 }
 
 // ============================================================================
@@ -206,8 +182,6 @@ function ActionMenu({
   onCancel,
   onRefund,
 }: ActionMenuProps) {
-  const [isOpen, setIsOpen] = useState(false)
-
   const canCancel = ![
     'delivered',
     'cancelled',
@@ -220,123 +194,74 @@ function ActionMenu({
     !['refunded', 'cancelled'].includes(order.status)
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        /*
-         * Named, because an icon-only trigger is unreachable by name to a
-         * screen reader and to anything driving this table (#625).
-         */
-        aria-label={`Order actions for ${order.orderNumber}`}
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-      >
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-
-      {isOpen && (
+    /*
+     * Named, because an icon-only trigger is unreachable by name to a
+     * screen reader and to anything driving this table (#625).
+     */
+    <RowActionsMenu label={`Order actions for ${order.orderNumber}`}>
+      {(close) => (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
+          {onView && (
+            <button
+              type="button"
+              onClick={() => {
+                onView(order)
+                close()
+              }}
+              className={ROW_ACTION_ITEM}
+            >
+              <Eye className="h-4 w-4" />
+              View Details
+            </button>
+          )}
 
-          {/* Menu */}
-          <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-border bg-card py-1 shadow-lg">
-            {onView && (
+          {onUpdateStatus && (
+            <button
+              type="button"
+              onClick={() => {
+                onUpdateStatus(order)
+                close()
+              }}
+              className={ROW_ACTION_ITEM}
+            >
+              <Truck className="h-4 w-4" />
+              Update Status
+            </button>
+          )}
+
+          {canCancel && onCancel && (
+            <>
+              <div className={ROW_ACTION_SEPARATOR} />
               <button
                 type="button"
                 onClick={() => {
-                  onView(order)
-                  setIsOpen(false)
+                  onCancel(order)
+                  close()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
               >
-                <Eye className="h-4 w-4" />
-                View Details
+                <XCircle className="h-4 w-4" />
+                Cancel Order
               </button>
-            )}
+            </>
+          )}
 
-            {onUpdateStatus && (
-              <button
-                type="button"
-                onClick={() => {
-                  onUpdateStatus(order)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
-              >
-                <Truck className="h-4 w-4" />
-                Update Status
-              </button>
-            )}
-
-            {canCancel && onCancel && (
-              <>
-                <div className="my-1 border-t border-border" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    onCancel(order)
-                    setIsOpen(false)
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Cancel Order
-                </button>
-              </>
-            )}
-
-            {canRefund && onRefund && (
-              <button
-                type="button"
-                onClick={() => {
-                  onRefund(order)
-                  setIsOpen(false)
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Initiate Refund
-              </button>
-            )}
-          </div>
+          {canRefund && onRefund && (
+            <button
+              type="button"
+              onClick={() => {
+                onRefund(order)
+                close()
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Initiate Refund
+            </button>
+          )}
         </>
       )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Column Header Component
-// ============================================================================
-
-function SortableHeader({
-  column,
-  children,
-}: {
-  column: Column<AdminOrder, unknown>
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => column.toggleSorting()}
-      className="flex items-center gap-1 font-medium"
-    >
-      {children}
-      {column.getIsSorted() === 'asc' ? (
-        <ChevronUp className="h-4 w-4" />
-      ) : column.getIsSorted() === 'desc' ? (
-        <ChevronDown className="h-4 w-4" />
-      ) : (
-        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-      )}
-    </button>
+    </RowActionsMenu>
   )
 }
 
@@ -415,7 +340,11 @@ export function OrdersTable({
           <SortableHeader column={column}>Status</SortableHeader>
         ),
         cell: ({ row }: CellContext<AdminOrder, unknown>) => (
-          <OrderStatusBadge status={row.original.status} />
+          <StatusBadge
+            status={row.original.status}
+            styles={ORDER_STATUS_STYLES}
+            labels={ORDER_STATUS_LABELS}
+          />
         ),
         filterFn: ((row: Row<AdminOrder>, _columnId: string, filterValue: string) => {
           if (!filterValue) return true
@@ -430,7 +359,11 @@ export function OrdersTable({
           <SortableHeader column={column}>Payment</SortableHeader>
         ),
         cell: ({ row }: CellContext<AdminOrder, unknown>) => (
-          <PaymentStatusBadge status={row.original.paymentStatus} />
+          <StatusBadge
+            status={row.original.paymentStatus}
+            styles={PAYMENT_STATUS_STYLES}
+            labels={PAYMENT_STATUS_LABELS}
+          />
         ),
         filterFn: ((row: Row<AdminOrder>, _columnId: string, filterValue: string) => {
           if (!filterValue) return true
