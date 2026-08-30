@@ -294,6 +294,9 @@ const A_ITEM_ID = '4444444a-4444-4444-8444-444444444444'
 const B_PHOTO_ID = '66666666-6666-4666-8666-666666666666'
 /** A real photo id — A's, on A's job. */
 const A_PHOTO_ID = '6666666a-6666-4666-8666-666666666666'
+const B_TRANSFER_ID = '77777777-7777-4777-8777-777777777777'
+/** A real transfer id — A's, between A and somebody who is not B. */
+const A_TRANSFER_ID = '7777777a-7777-4777-8777-777777777777'
 
 /** The key the QC upload routes build, spelled here as the client would. */
 const qcKey = (jobId: string, slot = 'print_full') =>
@@ -413,6 +416,27 @@ const OWNED_ROWS: Record<string, unknown[][]> = {
       },
     ],
   ],
+  /**
+   * One parcel, through the SEVEN-field projection plus the caller-relative
+   * `direction`. No vendor id on it at all — which is the point: vendor B never
+   * learns the parcel came from vendor A.
+   */
+  'select:production_transfers': [
+    [
+      {
+        id: B_TRANSFER_ID,
+        reference: 'DL-9911',
+        carrier: 'Delhivery',
+        pieceCount: 1,
+        dispatchedAt: PAST,
+        expectedBy: null,
+        receivedAt: null,
+        direction: 'outbound',
+      },
+    ],
+  ],
+  'select:production_transfer_jobs': [[]],
+  'insert:production_transfer_jobs': [[]],
   'select:vendor_settlements': [
     [
       {
@@ -446,6 +470,17 @@ interface RouteCase {
   theirs?: () => [string, RequestInit | undefined]
   /** Status the entitled request answers with. */
   okStatus: number
+  /**
+   * Row batches for THIS route, layered over `OWNED_ROWS`.
+   *
+   * `OWNED_ROWS` is one job in one state, which is all a per-job route needs.
+   * A transfer route reads `production_jobs` three times for three different
+   * shapes — the locked scan, the routing aggregate, the guard's evidence — and
+   * from a status no per-job route uses. Overriding the key here keeps that
+   * local to the entry that needs it instead of bending the shared fixture into
+   * a shape no reader actually returns.
+   */
+  rows?: Record<string, unknown[][]>
   /**
    * The ONE signing scope this route may produce a signature in, if any.
    *
@@ -551,6 +586,109 @@ const ROUTE_TABLE: RouteCase[] = [
     okStatus: 200,
   },
   {
+    pattern: '/transfers',
+    method: 'GET',
+    mine: () => ['/api/vendor/transfers', undefined],
+    okStatus: 200,
+  },
+  {
+    pattern: '/transfers/:id',
+    method: 'GET',
+    mine: () => [`/api/vendor/transfers/${B_TRANSFER_ID}`, undefined],
+    theirs: () => [`/api/vendor/transfers/${A_TRANSFER_ID}`, undefined],
+    okStatus: 200,
+  },
+  {
+    pattern: '/transfers',
+    method: 'POST',
+    mine: () => [
+      '/api/vendor/transfers',
+      jsonInit(
+        { jobIds: [B_JOB_ID], carrier: 'Delhivery', reference: 'DL-9911', pieceCount: 1 },
+        'POST'
+      ),
+    ],
+    // A real job id — A's. A well-formed request aimed at somebody else's row
+    // is the attack; the locked scan is vendor-scoped, so it finds nothing.
+    theirs: () => [
+      '/api/vendor/transfers',
+      jsonInit(
+        { jobIds: [A_JOB_ID], carrier: 'Delhivery', reference: 'DL-9911', pieceCount: 1 },
+        'POST'
+      ),
+    ],
+    okStatus: 201,
+    rows: {
+      'select:production_jobs': [
+        // The locked scan: `qc_passed` is the only status with a vendor edge
+        // into `dispatched`, which is what despatching a parcel takes.
+        [{ id: B_JOB_ID, stage: 'print', status: 'qc_passed', settlementId: null }],
+        // The routing aggregate. The order id is never selected — see the
+        // module note — so "one order" is a count and the destination is the
+        // consolidator, joined off the caller's own job.
+        [{ orderCount: 1, consolidatorVendorId: VENDOR_A }],
+        // The guard's evidence, once the parcel exists inside this transaction.
+        [{ transferId: B_TRANSFER_ID, hasOrderLabel: false }],
+      ],
+      'insert:production_transfers': [
+        [
+          {
+            id: B_TRANSFER_ID,
+            reference: 'DL-9911',
+            carrier: 'Delhivery',
+            pieceCount: 1,
+            dispatchedAt: PAST,
+            expectedBy: null,
+            receivedAt: null,
+            direction: 'outbound',
+          },
+        ],
+      ],
+      'update:production_jobs': [[{ id: B_JOB_ID }]],
+    },
+  },
+  {
+    pattern: '/transfers/:id/received',
+    method: 'POST',
+    mine: () => [
+      `/api/vendor/transfers/${B_TRANSFER_ID}/received`,
+      jsonInit({}, 'POST'),
+    ],
+    theirs: () => [
+      `/api/vendor/transfers/${A_TRANSFER_ID}/received`,
+      jsonInit({}, 'POST'),
+    ],
+    okStatus: 200,
+    rows: {
+      'select:production_transfers': [
+        // The locked read is INTERNAL: it needs `lostAt`, which no vendor-facing
+        // projection has ever carried.
+        [
+          {
+            id: B_TRANSFER_ID,
+            reference: 'DL-9911',
+            dispatchedAt: PAST,
+            receivedAt: null,
+            lostAt: null,
+          },
+        ],
+        [
+          {
+            id: B_TRANSFER_ID,
+            reference: 'DL-9911',
+            carrier: 'Delhivery',
+            pieceCount: 1,
+            dispatchedAt: PAST,
+            expectedBy: null,
+            receivedAt: PAST,
+            direction: 'inbound',
+          },
+        ],
+      ],
+      'update:production_transfers': [[{ id: B_TRANSFER_ID }]],
+    },
+  },
+  {
     pattern: '/rates',
     method: 'GET',
     mine: () => ['/api/vendor/rates', undefined],
@@ -639,16 +777,44 @@ const VENDOR_OWNED_TABLES = ['production_jobs', 'vendor_rates', 'vendor_settleme
  * which is what `getVendorJobLabelKey` does today, and what #687's routes have
  * to keep doing.
  *
+ * `orders` joined them with #686, and it is the same silence a fourth time. The
+ * `open-transfer-or-order-label` guard has joined it since #684 — it asks
+ * whether a shipping label exists as a BOOLEAN, because the AWB is a courier's
+ * handle on a customer's parcel — but no route in this table could reach that
+ * guard until a vendor could despatch a parcel, so the join has sat here
+ * unexamined for two tickets. It holds more customer data than any other table
+ * on this boundary, which makes it the worst one to have been silently skipping.
+ *
  * They are written down because **Property 1 is an ALLOW-LIST**, and an
  * allow-list fails silently: a read of a table nobody listed is not judged
- * unscoped, it is not examined. #678 brought these two across and added neither,
- * so every assertion below went on passing while covering none of the new
- * surface — which is indistinguishable, from the outside, from coverage.
+ * unscoped, it is not examined. #678 brought two of them across and added
+ * neither, so every assertion below went on passing while covering none of the
+ * new surface — which is indistinguishable, from the outside, from coverage.
  */
-const ORDER_KEYED_TABLES = ['order_consolidation', 'order_shipments']
+const ORDER_KEYED_TABLES = ['order_consolidation', 'order_shipments', 'orders']
+
+/**
+ * The parcel table. Two vendor columns, not one, so it is not vendor-OWNED the
+ * way `production_jobs` is — but every vendor-facing read of it must still bind
+ * the caller, on one side or the other, or a vendor sees a leg that is none of
+ * their business.
+ *
+ * Written down for the reason the note above gives: **Property 1 is an
+ * ALLOW-LIST**, and an allow-list fails SILENTLY. A read of a table nobody
+ * listed is not judged unscoped, it is not examined — the silence that let #678
+ * bring two tables across with no coverage, that #684 had to fix again for
+ * `production_job_photos`, and that #685 hit twice. This is the fourth time; the
+ * table goes in the vocabulary in the same commit that first queries it.
+ *
+ * `production_transfer_jobs` is deliberately NOT here. It carries no vendor
+ * column at all, so there is nothing for a WHERE to bind — it is reachable only
+ * behind a scoped job or a scoped transfer, which is what `JOB_KEYED_TABLES`
+ * means, and where it is listed instead.
+ */
+const TRANSFER_TABLES = ['production_transfers']
 
 /** Every table a vendor-facing query must name the caller's vendor id in. */
-const SCOPED_TABLES = [...VENDOR_OWNED_TABLES, ...ORDER_KEYED_TABLES]
+const SCOPED_TABLES = [...VENDOR_OWNED_TABLES, ...ORDER_KEYED_TABLES, ...TRANSFER_TABLES]
 
 /**
  * Reachable only through a job, which is itself scoped before they are read.
@@ -663,7 +829,21 @@ const JOB_KEYED_TABLES = [
   'production_job_items',
   'production_job_reviews',
   'production_job_photos',
+  // #686. A join table with no vendor column: a row here is reachable only
+  // through a job we scoped or a transfer we scoped, both of which name the
+  // caller in their own WHERE.
+  'production_transfer_jobs',
 ]
+
+/**
+ * The tables a job-keyed read is only safe BEHIND. One of them must have been
+ * read with the caller's id first, or the join it hangs off proves nothing.
+ *
+ * `production_transfers` joined the list with #686: `GET /transfers/:id` reaches
+ * `production_transfer_jobs` from the parcel rather than from a job, and a gate
+ * that only ever knew about `production_jobs` would have called that unproven.
+ */
+const GATE_TABLES = ['production_jobs', 'production_transfers']
 
 /** Every scoped table one query touches, in its FROM or in any of its JOINs. */
 function scopedTablesTouched(q: RecordedQuery): string[] {
@@ -678,10 +858,47 @@ function scopedTablesTouched(q: RecordedQuery): string[] {
  * nobody has watched fail is indistinguishable from one that examines nothing,
  * which is exactly the state #678 left this in.
  */
+/**
+ * Does this query bind the caller's id in the ROW IT WRITES?
+ *
+ * An INSERT has no WHERE, so judging it by `params(q.where)` alone calls every
+ * insert into a scoped table unscoped — which is why `production_job_photos`
+ * could never be added to `SCOPED_TABLES` and had to settle for the weaker
+ * job-keyed rule. An insert that writes `from_vendor_id = <the session's
+ * vendor>` is scoped exactly as surely as a select that filters on it, and
+ * saying so is what lets `production_transfers` be judged on BOTH its reads and
+ * its writes rather than on half of them.
+ *
+ * Recursive, with a `seen` guard: drizzle wraps a bound value in a `Param`
+ * object, and a `sql` fragment in a chunk list, so the id is rarely at the top
+ * level.
+ */
+function bindsVendorInValues(
+  values: unknown,
+  vendorId: string,
+  seen = new Set<unknown>()
+): boolean {
+  if (values === vendorId) return true
+  if (values === null || typeof values !== 'object') return false
+  if (seen.has(values)) return false
+  seen.add(values)
+  return Object.values(values as Record<string, unknown>).some((v) =>
+    bindsVendorInValues(v, vendorId, seen)
+  )
+}
+
 function unscopedReads(qs: readonly RecordedQuery[], vendorId: string): RecordedQuery[] {
   return qs.filter(
-    (q) => scopedTablesTouched(q).length > 0 && !params(q.where).includes(vendorId)
+    (q) =>
+      scopedTablesTouched(q).length > 0 &&
+      !params(q.where).includes(vendorId) &&
+      !(q.op !== 'select' && bindsVendorInValues(q.values, vendorId))
   )
+}
+
+/** `OWNED_ROWS`, with whatever the route's own entry layers over it. */
+function seedFor(route: RouteCase) {
+  queueRows({ ...OWNED_ROWS, ...(route.rows ?? {}) })
 }
 
 async function run(path: string, init?: RequestInit) {
@@ -733,7 +950,7 @@ describe('property 1: a vendor reaches only their own rows', () => {
   it.each(ROUTE_TABLE.map((r) => [label(r), r] as const))(
     '%s names the session vendor in every vendor-owned read',
     async (_name, route) => {
-      queueRows(OWNED_ROWS)
+      seedFor(route)
       const [path, init] = route.mine()
       const { res } = await run(path, init)
       expect(res.status).toBe(route.okStatus)
@@ -744,18 +961,21 @@ describe('property 1: a vendor reaches only their own rows', () => {
         'a vendor-scoped table was queried without the vendorId in its WHERE'
       ).toEqual([])
 
-      // Job-keyed tables are safe only because the job was scoped first.
-      const touchedJobKeyed = queries.some(
-        (q) => q.table !== null && JOB_KEYED_TABLES.includes(q.table)
+      // Job-keyed tables are safe only because a job — or a parcel — was scoped
+      // first. JOINS count: a table reached only through a join is exactly the
+      // position #678's two tables were in when nothing examined them.
+      const touchedJobKeyed = queries.some((q) =>
+        [q.table, ...q.joins].some((t) => t !== null && JOB_KEYED_TABLES.includes(t))
       )
       if (touchedJobKeyed) {
-        const scopedJobRead = queries.some(
+        const scopedGateRead = queries.some(
           (q) =>
             q.op === 'select' &&
-            q.table === 'production_jobs' &&
+            q.table !== null &&
+            GATE_TABLES.includes(q.table) &&
             params(q.where).includes(VENDOR_B)
         )
-        expect(scopedJobRead, 'job-keyed rows were read without a scoped job read').toBe(true)
+        expect(scopedGateRead, 'job-keyed rows were read without a scoped gate read').toBe(true)
       }
     }
   )
@@ -784,8 +1004,14 @@ describe('property 1: a vendor reaches only their own rows', () => {
     expect(serialised).not.toContain(A_JOB_ID)
     expect(serialised).not.toContain(A_ITEM_ID)
 
-    const scopedRead = queries.find((q) => q.table === 'production_jobs')
-    expect(scopedRead, 'no job read happened at all').toBeDefined()
+    // The FIRST scoped read, whichever table it lands on. It used to name
+    // `production_jobs` outright, which was true of every route that existed —
+    // and silently vacuous for the transfer routes, which reach a parcel
+    // without touching a job at all.
+    const scopedRead = queries.find(
+      (q) => q.op === 'select' && scopedTablesTouched(q).length > 0
+    )
+    expect(scopedRead, 'no scoped read happened at all').toBeDefined()
     expect(params(scopedRead?.where)).toContain(VENDOR_B)
     expect(params(scopedRead?.where)).not.toContain(VENDOR_A)
   })
@@ -827,13 +1053,41 @@ describe('property 1: a vendor reaches only their own rows', () => {
       q({ table: 'order_shipments' }),
       // The FROM is innocent; the JOIN is where #678 actually reached.
       q({ table: 'production_job_items', joins: ['order_shipments'] }),
+      // #686's parcel table, read and WRITTEN. The write is the shape the
+      // WHERE-only rule could never judge: an insert has no WHERE, so it was
+      // either a false positive or invisible, and this vocabulary chose
+      // invisible for every table an insert could reach.
+      q({ table: 'production_transfers' }),
+      q({ op: 'insert', table: 'production_transfers', values: { pieceCount: 1 } }),
+      q({ table: 'production_jobs', joins: ['production_transfers'] }),
+      // The guard's join, unexamined since #684 because nothing could reach it.
+      q({ table: 'production_jobs', joins: ['orders'] }),
     ]
     expect(unscopedReads(planted, VENDOR_B).map((p) => p.table)).toEqual([
       'production_jobs',
       'order_consolidation',
       'order_shipments',
       'production_job_items',
+      'production_transfers',
+      'production_transfers',
+      'production_jobs',
+      'production_jobs',
     ])
+
+    // ...and an insert that WRITES the caller's id is scoped, so the widening
+    // is a check and not a blanket pass for every write.
+    expect(
+      unscopedReads(
+        [q({ op: 'insert', table: 'production_transfers', values: { fromVendorId: VENDOR_B } })],
+        VENDOR_B
+      )
+    ).toEqual([])
+    expect(
+      unscopedReads(
+        [q({ op: 'insert', table: 'production_transfers', values: { fromVendorId: VENDOR_A } })],
+        VENDOR_B
+      ).map((p) => p.table)
+    ).toEqual(['production_transfers'])
 
     // ...and it clears the same reads once they name the caller, so it is a
     // check and not a blanket refusal.
@@ -854,7 +1108,7 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
   it.each(ROUTE_TABLE.map((r) => [label(r), r] as const))(
     '%s selects no table wholesale',
     async (_name, route) => {
-      queueRows(OWNED_ROWS)
+      seedFor(route)
       const [path, init] = route.mine()
       await run(path, init)
 
@@ -872,7 +1126,7 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
   it.each(ROUTE_TABLE.map((r) => [label(r), r] as const))(
     '%s selects no forbidden column',
     async (_name, route) => {
-      queueRows(OWNED_ROWS)
+      seedFor(route)
       const [path, init] = route.mine()
       await run(path, init)
 
@@ -893,7 +1147,7 @@ describe('property 2: no customer data crosses the vendor boundary', () => {
   it.each(ROUTE_TABLE.map((r) => [label(r), r] as const))(
     '%s returns a body with no forbidden key at any depth',
     async (_name, route) => {
-      queueRows(OWNED_ROWS)
+      seedFor(route)
       const [path, init] = route.mine()
       const { res, body } = await run(path, init)
       expect(res.status).toBe(route.okStatus)
@@ -1048,7 +1302,7 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
       mockPresign.mockClear()
       mockUploadPresign.mockClear()
       queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
-      queueRows(OWNED_ROWS)
+      seedFor(route)
 
       const [path, init] = route.mine()
       await run(path, init)
@@ -1066,7 +1320,7 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
       rowQueues.clear()
       mockPublicUrl.mockClear()
       queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
-      queueRows(OWNED_ROWS)
+      seedFor(route)
 
       const [path, init] = route.mine()
       await run(path, init)
@@ -1102,7 +1356,7 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
       mockPresign.mockClear()
       mockUploadPresign.mockClear()
       queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
-      queueRows(OWNED_ROWS)
+      seedFor(route)
 
       const [path, init] = route.mine()
       await run(path, init)
@@ -1127,7 +1381,7 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
       mockPresign.mockClear()
       mockUploadPresign.mockClear()
       queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
-      queueRows(OWNED_ROWS)
+      seedFor(route)
 
       const [path, init] = route.mine()
       await run(path, init)

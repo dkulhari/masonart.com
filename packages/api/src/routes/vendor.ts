@@ -9,6 +9,10 @@
  * - POST   /api/vendor/jobs/:id/photos/presign    authorise a direct-to-R2 PUT
  * - POST   /api/vendor/jobs/:id/photos/complete   record what landed
  * - DELETE /api/vendor/jobs/:id/photos/:photoId   withdraw a shot
+ * - GET    /api/vendor/transfers                  parcels at either of my ends
+ * - GET    /api/vendor/transfers/:id              one parcel, and my jobs on it
+ * - POST   /api/vendor/transfers                  despatch a parcel to the consolidator
+ * - POST   /api/vendor/transfers/:id/received     confirm one arrived
  * - GET    /api/vendor/rates      my rate card, read-only
  * - GET    /api/vendor/payments   my settlements and what is still owed
  *
@@ -64,6 +68,18 @@
  *    ONE named scope of `VENDOR_SIGNING_SCOPES`: artwork under `artwork`,
  *    photographs under `qcPhoto`, and neither may sign the other's key.
  *
+ * 5. **A transfer tells a vendor about a PARCEL, never about the vendor at the
+ *    other end.** `{ id, reference, carrier, pieceCount, dispatchedAt,
+ *    expectedBy, receivedAt }` and a `direction` computed from the caller's own
+ *    id — no vendor name, no vendor id, no order id, no cost. Vendor B does not
+ *    learn the parcel came from vendor A; if B needs to chase a carrier, an
+ *    admin chases it, because the admin sees both ends. The two writes belong to
+ *    opposite ends and neither may borrow the other's: a transfer is created
+ *    only by `from_vendor_id` and received only by `to_vendor_id`, both as
+ *    predicates in the scoped module rather than as branches here. And
+ *    `cost_amount` has no field in either direction — we pay the leg because we
+ *    chose the routing.
+ *
  * Zero customer data crosses this boundary — no name, address, phone, email or
  * person-linked order reference. Every response here is built from the scoped
  * module's explicit column lists, which is what makes that an absolute rather
@@ -107,6 +123,10 @@ import {
   assertVendorMayUploadQcPhoto,
   recordVendorQcPhoto,
   retractVendorQcPhoto,
+  listVendorTransfers,
+  getVendorTransfer,
+  createVendorTransfer,
+  markVendorTransferReceived,
   type VendorQcPhoto,
 } from "../lib/vendor-scope";
 import {
@@ -215,6 +235,61 @@ const photoParamSchema = z.object({
  * early reject, exactly as in `routes/review-media.ts`. R2 is told the same
  * content type in the signature, and `complete` re-checks both.
  */
+/**
+ * The list a vendor asks for. `direction` narrows to one end of their own legs;
+ * omitted, they get both, which is the only default that shows a vendor all of
+ * their own work.
+ */
+const transferListQuerySchema = z.object({
+  direction: z.enum(["inbound", "outbound"]).optional(),
+  /** Clamped, not rejected: `?limit=100000` is answered with 100 rows. */
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(DEFAULT_PAGE_SIZE)
+    .transform((n) => Math.min(n, MAX_PAGE_SIZE)),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+const transferParamSchema = z.object({ id: z.string().uuid() });
+
+/**
+ * What a vendor may say when despatching a parcel — and `.strict()`, so what
+ * they may not say is a 400 rather than a silently dropped field.
+ *
+ * Four fields are absent on purpose, and each absence is a rule:
+ *
+ * - **`costAmount`.** We pay the leg because we chose the routing, so a vendor
+ *   cannot price a distance we picked. Asking A to absorb it is how rate cards
+ *   get padded.
+ * - **`toVendorId`.** The destination is DERIVED from the order's consolidator.
+ *   Letting A name B would be A learning who else is working this order, which
+ *   is the fact this whole boundary is built to withhold.
+ * - **`fromVendorId`.** The sender is the session. A transfer is created only by
+ *   its sending end, and there is no field in which to claim otherwise.
+ * - **`dispatchedAt` and `receivedAt`.** The server stamps both. A vendor
+ *   back-dating a despatch is a lie about an SLA clock, and the only way to make
+ *   it unsayable is to give it no field to say it in.
+ *
+ * `orderId` is absent for a fifth reason: it is a person-linked handle R1
+ * forbids, and the scoped module never lets it into this process at all.
+ *
+ * `expectedBy` IS settable, and it is the one date here that is not ours: it is
+ * the carrier's promise, off the docket in the vendor's hand, and it makes no
+ * claim about the vendor's own performance.
+ */
+const createTransferSchema = z
+  .object({
+    jobIds: z.array(z.string().uuid()).min(1).max(50),
+    carrier: z.string().trim().min(1).max(120).nullish(),
+    reference: z.string().trim().min(1).max(120).nullish(),
+    /** One parcel is the overwhelming case, so it is the default. */
+    pieceCount: z.coerce.number().int().min(1).max(999).default(1),
+    expectedBy: z.string().datetime().nullish(),
+  })
+  .strict();
+
 const photoPresignSchema = z.object({
   slot: qcSlotSchema,
   contentType: z.string().min(1).max(128),
@@ -861,6 +936,278 @@ vendorApp.patch(
       return c.json(result.body, result.status);
     } catch (error) {
       return c.json(failed("update job", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// Inter-vendor transfers
+// ============================================================================
+
+/**
+ * A parcel from one vendor's bench to another's, and the two ends that may act
+ * on it.
+ *
+ * The design's whole position on this surface is a subtraction: **what vendor B
+ * is told about an inbound parcel is `{ id, reference, carrier, pieceCount,
+ * dispatchedAt, expectedBy, receivedAt }` and nothing else.** No vendor names,
+ * no order id, no customer anything, and no `costAmount` — B does not learn the
+ * parcel came from A. That is not politeness; surfacing another vendor's row
+ * through `lib/vendor-scope.ts` would break the isolation suite's first
+ * property, which is a hard, already-tested boundary. If B needs to chase a
+ * carrier, an admin chases it: `routes/admin/transfers.ts` aliases `vendors`
+ * twice and sees both ends, because if somebody has to argue with a courier it
+ * is us.
+ *
+ * The one field added to those seven is `direction`, computed in SQL from the
+ * CALLER'S own vendor id. It answers "is this coming to me", never "who is at
+ * the other end", and without it the confirm-receipt screen cannot exist.
+ *
+ * As everywhere else in this file, the decision is not taken here: the scoped
+ * module locks the rows, evaluates the guard the transition matrix names, stamps
+ * the clocks and writes with the predicate repeated. These handlers translate
+ * its answer into a status code and own the audit vocabulary.
+ */
+
+// ============================================================================
+// GET /api/vendor/transfers
+// ============================================================================
+
+vendorApp.get(
+  "/transfers",
+  zValidator("query", transferListQuerySchema),
+  async (c) => {
+    const vendorId = c.get("vendorId");
+    const { direction, limit, offset } = c.req.valid("query");
+
+    try {
+      const items = await listVendorTransfers(vendorId, {
+        direction,
+        limit,
+        offset,
+      });
+      return c.json({ items, limit, offset });
+    } catch (error) {
+      return c.json(failed("list transfers", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/vendor/transfers/:id
+// ============================================================================
+
+/**
+ * One parcel, and the caller's OWN jobs on it.
+ *
+ * `jobIds` is scoped a second time at `production_jobs.vendor_id`, so a
+ * receiving vendor gets an empty list rather than a set of stable handles on the
+ * sender's work. A parcel with neither end at this vendor is 404, never 403.
+ */
+vendorApp.get(
+  "/transfers/:id",
+  zValidator("param", transferParamSchema),
+  async (c) => {
+    const vendorId = c.get("vendorId");
+    const { id } = c.req.valid("param");
+
+    try {
+      const found = await getVendorTransfer(vendorId, id);
+      // Covers "no such parcel" and "neither end is yours" alike, and
+      // deliberately does not distinguish them.
+      if (!found) return c.json({ error: "Transfer not found" }, 404);
+
+      const { jobIds, ...transfer } = found;
+      return c.json({ transfer, jobIds });
+    } catch (error) {
+      return c.json(failed("read transfer", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// POST /api/vendor/transfers
+// ============================================================================
+
+/**
+ * Vendor A despatches, and the jobs on the parcel move with it.
+ *
+ * Despatching is what makes `qc_passed -> dispatched` legal — that edge's guard
+ * is `open-transfer-or-order-label` — so the scoped module inserts the transfer
+ * FIRST and then evaluates the guard against it, inside one transaction. A
+ * transfer whose jobs never moved leaves the order permanently unlabelable
+ * (`dispatched` is terminal); jobs that moved with no transfer is the same
+ * failure from the other side. One transaction makes both unreachable.
+ *
+ * The audit row SHARES that transaction: a row saying "this parcel was
+ * despatched" beside a transfer that rolled back is worse than no row. The
+ * refusal row must NOT, and by construction cannot — `createVendorTransfer` has
+ * already returned, and its transaction is already rolled back, by the time the
+ * refusal below is written.
+ */
+vendorApp.post(
+  "/transfers",
+  zValidator("json", createTransferSchema, (result, c) => {
+    if (!result.success) {
+      // Where `costAmount`, `toVendorId`, `fromVendorId`, `orderId` and any
+      // back-dated timestamp land: `.strict()` refuses them rather than dropping
+      // them quietly, so a vendor who tries is told, not ignored.
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+  }),
+  async (c) => {
+    const vendorId = c.get("vendorId");
+    const user = c.get("user");
+    const { jobIds, carrier, reference, pieceCount, expectedBy } =
+      c.req.valid("json");
+
+    try {
+      const result = await createVendorTransfer(
+        vendorId,
+        {
+          jobIds,
+          carrier: carrier ?? null,
+          reference: reference ?? null,
+          pieceCount,
+          expectedBy: expectedBy ? new Date(expectedBy) : null,
+          createdBy: user?.id ?? null,
+        },
+        {
+          onDispatch: async (tx, move) => {
+            await recordAudit(
+              c,
+              {
+                action: "production_transfer.dispatched",
+                entityType: "production_transfer",
+                entityId: move.transferId,
+                summary:
+                  `Vendor despatched ${move.pieceCount} piece(s) carrying ` +
+                  `${move.jobIds.length} job(s) as ${move.reference ?? move.transferId}`,
+                after: {
+                  dispatchedAt: move.dispatchedAt,
+                  expectedBy: move.expectedBy,
+                  carrier: move.carrier,
+                  pieceCount: move.pieceCount,
+                },
+                // The job ids and the docket: a reader chasing "what was on this
+                // parcel" has to be able to answer it from the trail alone, and
+                // the reference is what an admin quotes to a carrier. Neither
+                // names a customer.
+                metadata: {
+                  jobIds: move.jobIds,
+                  reference: move.reference,
+                  carrier: move.carrier,
+                },
+              },
+              // Shares the transaction. See the note above.
+              tx
+            );
+          },
+        }
+      );
+
+      if (result.ok) {
+        return c.json(
+          { message: "Transfer despatched", transfer: result.transfer, jobIds: result.jobIds },
+          201
+        );
+      }
+
+      // No entity, so nothing to refuse — and a row confirming the jobs exist is
+      // the very fact the 404 is there to withhold.
+      if (result.status === 404) return c.json(result.body, 404);
+
+      await recordAudit(c, {
+        action: "production_transfer.dispatched",
+        entityType: "production_transfer",
+        entityId: null,
+        outcome: "failure",
+        summary: `Refused to despatch a transfer: ${result.body.error}`,
+        metadata: result.body,
+        // NO `tx`, deliberately, and there is none to pass: the transaction
+        // this row is ABOUT has already rolled back.
+      });
+
+      return c.json(result.body, result.status);
+    } catch (error) {
+      return c.json(failed("despatch transfer", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// POST /api/vendor/transfers/:id/received
+// ============================================================================
+
+/**
+ * Vendor B confirms a parcel arrived.
+ *
+ * **There is no body.** `received_at` is stamped from our clock, and the only
+ * other thing a vendor could put in one is `cost_amount`, which is not theirs to
+ * set in either direction. A route with no payload cannot be talked into
+ * accepting a field it does not have.
+ *
+ * `received_at` is settable only by `to_vendor_id`, and that is a predicate in
+ * the scoped module's WHERE rather than a branch here: the sending vendor asking
+ * about their own outbound parcel simply finds nothing, and gets a 404 rather
+ * than a 403 that would confirm the row.
+ *
+ * No job moves. A received parcel is a fact about the PARCEL — in the
+ * consolidation case the receiving vendor has no job for the piece at all — and
+ * `lib/production-readiness.ts` reads the transfer, not a second status.
+ */
+vendorApp.post(
+  "/transfers/:id/received",
+  zValidator("param", transferParamSchema),
+  async (c) => {
+    const vendorId = c.get("vendorId");
+    const { id } = c.req.valid("param");
+
+    try {
+      const result = await markVendorTransferReceived(vendorId, id, {
+        onReceipt: async (tx, move) => {
+          await recordAudit(
+            c,
+            {
+              action: "production_transfer.received",
+              entityType: "production_transfer",
+              entityId: move.transferId,
+              summary: `Vendor confirmed parcel ${move.reference ?? move.transferId} arrived`,
+              before: { receivedAt: null },
+              after: { receivedAt: move.receivedAt },
+              // The job ids and the docket, exactly as the despatch row carries
+              // them, so an admin reading the trail can answer "what arrived"
+              // without joining anything. This is the AUDIT log, which is ours;
+              // none of it reaches the vendor's response.
+              metadata: { jobIds: move.jobIds, reference: move.reference },
+            },
+            // Shares the transaction: a row saying "it arrived" beside a parcel
+            // still in transit is worse than no row.
+            tx
+          );
+        },
+      });
+
+      if (result.ok) {
+        return c.json({ message: "Transfer received", transfer: result.transfer });
+      }
+
+      // No entity to refuse, and the 404 is withholding its existence.
+      if (result.status === 404) return c.json(result.body, 404);
+
+      await recordAudit(c, {
+        action: "production_transfer.received",
+        entityType: "production_transfer",
+        entityId: id,
+        outcome: "failure",
+        summary: `Refused to confirm receipt: ${result.body.error}`,
+        metadata: result.body,
+        // NO `tx`: the transaction this row is ABOUT has already rolled back.
+      });
+
+      return c.json(result.body, result.status);
+    } catch (error) {
+      return c.json(failed("confirm transfer receipt", error), 500);
     }
   }
 );

@@ -57,7 +57,7 @@
  * exceptions.
  */
 
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { qcShotsForStage, requiredQcSlots, type QcStage } from '@chobii/shared'
 import { db } from '../database'
 import {
@@ -656,6 +656,22 @@ export type VendorJobRefusalCode =
   | 'SLOT_NOT_ON_SHOT_LIST'
   /** No LIVE photo with that id on that job. Superseded counts as gone. */
   | 'PHOTO_NOT_FOUND'
+  /** No parcel with that id at either of this vendor's ends. */
+  | 'TRANSFER_NOT_FOUND'
+  /** One parcel, one order: `production_transfers.order_id` is single-valued. */
+  | 'JOBS_SPAN_ORDERS'
+  /** Nobody has decided who assembles this order, so there is nowhere to send it. */
+  | 'NO_CONSOLIDATOR'
+  /** The caller IS the consolidator. There is no leg to book to your own bench. */
+  | 'CONSOLIDATOR_IS_SELF'
+  /** A job is on at most one transfer, EVER. A lost parcel is replaced, not re-sent. */
+  | 'JOB_ALREADY_ON_TRANSFER'
+  /** Nothing has left the sending vendor, so there is nothing to have arrived. */
+  | 'TRANSFER_NOT_DISPATCHED'
+  /** It is already on the receiving bench. */
+  | 'TRANSFER_ALREADY_RECEIVED'
+  /** An admin wrote it off. Receipt after a loss is an admin's correction, not a vendor's. */
+  | 'TRANSFER_LOST'
 
 export interface VendorJobRefusal {
   ok: false
@@ -1532,4 +1548,703 @@ export async function getVendorJobReviews(vendorId: string | null | undefined, j
     .from(productionJobReviews)
     .where(eq(productionJobReviews.jobId, jobId))
     .orderBy(desc(productionJobReviews.createdAt))
+}
+
+// ============================================================================
+// Inter-vendor transfers — the parcel between two benches
+// ============================================================================
+
+/**
+ * ## What a vendor is told about a parcel, and why it is so little
+ *
+ * `{ id, reference, carrier, pieceCount, dispatchedAt, expectedBy, receivedAt }`
+ * — the design's list (§5), verbatim — plus a `direction` computed from the
+ * CALLER'S OWN id. No vendor names, no vendor ids, no order id, no cost, no
+ * `lostAt`.
+ *
+ * **Vendor B does not learn the parcel came from vendor A.** That is not
+ * discretion, it is the isolation suite's first property: surfacing another
+ * vendor's row through this module is precisely what the whole file exists to
+ * make inexpressible, and a `fromVendorName` on an inbound parcel would be one.
+ * If B needs to chase a carrier, an admin chases it — `routes/admin/transfers.ts`
+ * aliases `vendors` twice and sees both ends, because if somebody has to argue
+ * with a courier it is us.
+ *
+ * `direction` is the ONE field added to the design's seven, and it is safe for
+ * the reason the other seven are not enough without it: a vendor is a sender on
+ * some parcels and a receiver on others, and the receipt confirmation only
+ * exists for the inbound ones. It is computed as a SQL `case` over the caller's
+ * own vendor id, so neither vendor column is ever selected at all — the answer
+ * is "is this coming to me", never "who is at the other end".
+ *
+ * ## `cost_amount` is absent from every projection AND every input
+ *
+ * We pay the leg because we chose the routing, so a vendor cannot price a
+ * distance we picked, and asking A to absorb it is how rate cards get padded. It
+ * is not filtered out of a response; there is no field for it in either
+ * direction, which is the only version of that rule a refactor cannot lose.
+ *
+ * ## The order id never enters this process
+ *
+ * `production_transfers.order_id` is NOT NULL, so a transfer cannot be created
+ * without one — and an order id is a person-linked handle R1 forbids at any
+ * depth, in any casing. Both are satisfied by never reading it out: the insert
+ * writes it through a scoped SQL sub-select, and "these jobs are all on one
+ * order" is a `count(distinct …)` rather than a comparison between values we
+ * hold. The value exists only inside the database, where no response, log or
+ * crash dump can reach it.
+ */
+export interface VendorTransfer {
+  id: string
+  reference: string | null
+  carrier: string | null
+  pieceCount: number
+  dispatchedAt: Date | null
+  expectedBy: Date | null
+  receivedAt: Date | null
+  /** Relative to the CALLER, and the only thing they learn about the other end. */
+  direction: 'inbound' | 'outbound'
+}
+
+/**
+ * The one column list every vendor-facing transfer read uses.
+ *
+ * A function of `vendorId` rather than a constant, because `direction` is
+ * relative to the caller. That is also what keeps `from_vendor_id` and
+ * `to_vendor_id` out of the projection entirely: the comparison happens in SQL
+ * and only its answer comes back.
+ */
+function vendorTransferColumns(vendorId: string) {
+  return {
+    id: productionTransfers.id,
+    reference: productionTransfers.reference,
+    carrier: productionTransfers.carrier,
+    pieceCount: productionTransfers.pieceCount,
+    dispatchedAt: productionTransfers.dispatchedAt,
+    expectedBy: productionTransfers.expectedBy,
+    receivedAt: productionTransfers.receivedAt,
+    // Deliberately absent: orderId, fromVendorId, toVendorId, costAmount,
+    // lostAt, lostNote, createdBy. Every one of them is either a person-linked
+    // handle, another vendor's identity, or money that is not theirs to see.
+    direction: sql<'inbound' | 'outbound'>`case when ${productionTransfers.toVendorId} = ${vendorId} then 'inbound' else 'outbound' end`,
+  }
+}
+
+/** The caller is at one end of this leg — either end. */
+function callerIsAnEnd(vendorId: string) {
+  return or(
+    eq(productionTransfers.fromVendorId, vendorId),
+    eq(productionTransfers.toVendorId, vendorId)
+  )
+}
+
+/**
+ * Every parcel with the caller at one end of it, newest first.
+ *
+ * BOTH ends in one predicate by default. A list showing only the outbound side
+ * would leave a vendor unable to confirm anything they were sent, and a list
+ * showing only the inbound side would hide the legs they are still on the hook
+ * for. `direction` is how the screen tells them apart, and `?direction=` is how
+ * it asks for one.
+ */
+export async function listVendorTransfers(
+  vendorId: string | null | undefined,
+  opts: { direction?: 'inbound' | 'outbound'; limit?: number; offset?: number } = {}
+): Promise<VendorTransfer[]> {
+  assertVendorId(vendorId)
+  const limit = Math.min(opts.limit ?? 20, 100)
+  const offset = opts.offset ?? 0
+
+  const side =
+    opts.direction === 'inbound'
+      ? eq(productionTransfers.toVendorId, vendorId)
+      : opts.direction === 'outbound'
+        ? eq(productionTransfers.fromVendorId, vendorId)
+        : callerIsAnEnd(vendorId)
+
+  return db
+    .select(vendorTransferColumns(vendorId))
+    .from(productionTransfers)
+    .where(side)
+    .orderBy(desc(productionTransfers.createdAt))
+    .limit(limit)
+    .offset(offset)
+}
+
+/**
+ * One parcel the caller is an end of, with the caller's OWN jobs on it.
+ *
+ * `jobIds` is scoped a second time, at `production_jobs.vendor_id`, and that is
+ * the whole point of entering the join from the job side: the jobs on a parcel
+ * belong to the SENDER, so a receiving vendor gets an empty list rather than a
+ * handle on somebody else's row. Listing them unscoped would hand B a set of
+ * stable identifiers for A's work — a smaller leak than a vendor name, and the
+ * same kind.
+ */
+export async function getVendorTransfer(
+  vendorId: string | null | undefined,
+  transferId?: string
+): Promise<(VendorTransfer & { jobIds: string[] }) | null> {
+  assertVendorId(vendorId)
+  if (!transferId) return null
+
+  // vendorId in the WHERE, not checked afterwards: a parcel with neither end at
+  // this vendor is NOT FOUND, which is also the right thing to leak (nothing).
+  const [transfer] = await db
+    .select(vendorTransferColumns(vendorId))
+    .from(productionTransfers)
+    .where(and(eq(productionTransfers.id, transferId), callerIsAnEnd(vendorId)))
+    .limit(1)
+
+  if (!transfer) return null
+
+  const jobs = await db
+    .select({ id: productionJobs.id })
+    .from(productionJobs)
+    .innerJoin(productionTransferJobs, eq(productionTransferJobs.jobId, productionJobs.id))
+    .where(
+      and(
+        eq(productionTransferJobs.transferId, transferId),
+        eq(productionJobs.vendorId, vendorId)
+      )
+    )
+    .orderBy(asc(productionJobs.createdAt))
+
+  return { ...transfer, jobIds: jobs.map((job) => job.id) }
+}
+
+/** What the vendor supplies. Every other column is ours, or derived. */
+export interface VendorTransferInput {
+  jobIds: string[]
+  carrier: string | null
+  reference: string | null
+  pieceCount: number
+  /**
+   * The CARRIER'S promise, which the vendor holds the docket for. Not an SLA
+   * clock about their own performance — `dispatched_at` is that, and the server
+   * stamps it — so there is no lie available here that back-dating a despatch
+   * would be.
+   */
+  expectedBy: Date | null
+  createdBy: string | null
+}
+
+export interface VendorTransferAccepted {
+  ok: true
+  transfer: VendorTransfer
+  /** The caller's own jobs that rode it. Empty on a receipt: they hold none. */
+  jobIds: string[]
+}
+
+/** What the despatch audit row records, taken from the write itself. */
+export interface VendorTransferDispatchRecord {
+  transferId: string
+  reference: string | null
+  carrier: string | null
+  pieceCount: number
+  jobIds: string[]
+  dispatchedAt: Date
+  expectedBy: Date | null
+}
+
+/**
+ * What the receipt audit row records.
+ *
+ * `jobIds` is the parcel's MANIFEST — the sending vendor's jobs — and it exists
+ * for the trail and for nothing else. An admin reading
+ * `production_transfer.received` has to be able to answer "what arrived" without
+ * joining anything, which is the same reason the despatch row carries them. It
+ * never reaches a response: `markVendorTransferReceived` answers `jobIds: []`,
+ * because the receiving vendor holds none of them and a set of stable handles on
+ * the sender's work is a smaller version of the sender's name.
+ */
+export interface VendorTransferReceiptRecord {
+  transferId: string
+  reference: string | null
+  receivedAt: Date
+  jobIds: string[]
+}
+
+/**
+ * Called INSIDE the transaction, after the write and before the commit.
+ *
+ * Same split as `VendorTransitionAudit`: the audit vocabulary stays in the route
+ * (which holds the request context), the transaction stays here (which holds the
+ * data access). A row saying "this parcel was despatched" beside a transfer that
+ * rolled back is worse than no row, so these share the transaction — and share
+ * its failures, which is the point.
+ */
+export type VendorTransferDispatchAudit = (
+  tx: VendorAuditWriter,
+  move: VendorTransferDispatchRecord
+) => Promise<void>
+
+export type VendorTransferReceiptAudit = (
+  tx: VendorAuditWriter,
+  move: VendorTransferReceiptRecord
+) => Promise<void>
+
+/**
+ * Vendor A despatches a parcel, and the jobs on it move with it.
+ *
+ * ## The two halves cannot come apart
+ *
+ * Despatching is what makes `qc_passed -> dispatched` legal — that edge's guard
+ * is `open-transfer-or-order-label` — so the ORDER of this transaction is the
+ * design, not an implementation detail:
+ *
+ * 1. lock the caller's jobs, and refuse anything the matrix will not move;
+ * 2. INSERT the transfer and its job links;
+ * 3. EVALUATE the guard, which now sees the parcel we just created;
+ * 4. move the jobs, with the predicate repeated.
+ *
+ * A transfer whose jobs never moved leaves an order permanently unlabelable —
+ * `dispatched` is terminal and the readiness gate wants every job either
+ * `qc_passed` at the consolidator or `dispatched` on a received transfer. Jobs
+ * that moved with no transfer is the same failure from the other side. One
+ * transaction makes both unreachable; the guard being evaluated rather than
+ * assumed is what makes step 3 worth writing at all, since an edge whose guard
+ * nobody evaluates is an unguarded edge with a comment.
+ *
+ * ## The destination is DERIVED, never named
+ *
+ * `to_vendor_id` is the order's consolidator, read through
+ * `order_consolidation` joined off the caller's OWN job. A vendor does not get
+ * to name a counterparty: we chose the routing (which is exactly why we, not
+ * they, pay for the leg), and letting A name B would be A learning who else is
+ * working this order. `from_vendor_id` is the session, so a transfer is created
+ * only by its sending end and there is no field in which to say otherwise.
+ *
+ * ## A job is on at most one transfer, EVER
+ *
+ * `production_transfer_jobs_job_id_unique` is the enforcement. The explicit
+ * check below exists so the answer is a 409 naming the jobs rather than a 500
+ * out of the index — and it is checked against the caller's own rows, so it
+ * cannot be used to probe whether somebody else's job is in transit. A lost
+ * parcel produces a REPLACEMENT job (`routes/admin/transfers.ts`), never a
+ * second leg for the original.
+ */
+export async function createVendorTransfer(
+  vendorId: string | null | undefined,
+  input: VendorTransferInput,
+  hooks: { onDispatch?: VendorTransferDispatchAudit } = {}
+): Promise<VendorTransferAccepted | VendorJobRefusal> {
+  assertVendorId(vendorId)
+
+  const jobNotFound: VendorJobRefusal['body'] = {
+    error: 'Job not found',
+    code: 'JOB_NOT_FOUND',
+  }
+
+  const requested = [...new Set(input.jobIds)]
+  if (requested.length === 0) {
+    return { ok: false, status: 404, body: jobNotFound }
+  }
+
+  return refusable(async () =>
+    db.transaction(async (tx) => {
+      // FOR UPDATE, and SCOPED: an admin who reassigned one of these in between
+      // must win, and this must find nothing. Two tabs despatching the same jobs
+      // serialise here rather than both reading "not yet on a parcel".
+      const jobs = await tx
+        .select({
+          id: productionJobs.id,
+          stage: productionJobs.stage,
+          status: productionJobs.status,
+          // Not in any response projection, and never will be. The freeze is
+          // about this column; the vendor is told what it means, not its value.
+          settlementId: productionJobs.settlementId,
+        })
+        .from(productionJobs)
+        .where(and(inArray(productionJobs.id, requested), eq(productionJobs.vendorId, vendorId)))
+        .for('update')
+
+      // 404 for "not yours" and for "no such job" alike, and deliberately not
+      // distinguished — nor are the missing ids named, because naming them is
+      // exactly the confirmation the 404 exists to withhold.
+      if (jobs.length !== requested.length) {
+        throw new VendorWriteRefused(404, jobNotFound)
+      }
+
+      for (const job of jobs) {
+        // Checked FIRST, like `updateVendorJob`: it is the one refusal that
+        // changes what the vendor should do next, and they already know the job
+        // exists because it is theirs.
+        if (job.status === 'cancelled') {
+          throw new VendorWriteRefused(409, {
+            error:
+              'One of these jobs was cancelled, so there is nothing left to send. ' +
+              'Take it off the parcel and check your queue for the current work.',
+            code: 'JOB_CANCELLED',
+            jobIds: [job.id],
+          })
+        }
+
+        if (job.settlementId !== null) {
+          throw new VendorWriteRefused(409, {
+            error:
+              'One of these jobs has already been settled and can no longer be moved. ' +
+              'Raise it with us rather than re-opening a paid job.',
+            code: 'JOB_SETTLED',
+            jobIds: [job.id],
+          })
+        }
+
+        // The matrix decides; this module only asks. Only `qc_passed` carries a
+        // vendor edge into `dispatched`, and that fact lives in ONE place.
+        try {
+          assertTransition(job.status, 'dispatched', 'vendor')
+        } catch (error) {
+          if (error instanceof ProductionTransitionError) {
+            throw new VendorWriteRefused(409, {
+              ...error.toResponseBody(),
+              code: 'ILLEGAL_TRANSITION',
+              jobIds: [job.id],
+            })
+          }
+          throw error
+        }
+      }
+
+      // ONE row, and the order id is not in it. `count(distinct)` answers "are
+      // these all on one order" without the value ever leaving the database, and
+      // the consolidator is reached by JOIN off the caller's own scoped rows —
+      // the same shape `getVendorJobLabelKey` uses for the same reason.
+      const [routing] = await tx
+        .select({
+          orderCount: sql<number>`count(distinct ${productionJobs.orderId})`,
+          consolidatorVendorId: sql<
+            string | null
+          >`max(${orderConsolidation.vendorId}::text)`,
+        })
+        .from(productionJobs)
+        .leftJoin(orderConsolidation, eq(orderConsolidation.orderId, productionJobs.orderId))
+        .where(and(inArray(productionJobs.id, requested), eq(productionJobs.vendorId, vendorId)))
+
+      if (Number(routing?.orderCount ?? 0) !== 1) {
+        // One parcel, one order. `production_transfers.order_id` is
+        // single-valued, and the readiness gate reads every transfer on ONE
+        // order — a parcel spanning two would be invisible to one of them.
+        throw new VendorWriteRefused(422, {
+          error:
+            'These jobs are not all on the same order, so they cannot ride one parcel. ' +
+            'Send one parcel per order.',
+          code: 'JOBS_SPAN_ORDERS',
+        })
+      }
+
+      const toVendorId = routing?.consolidatorVendorId ?? null
+      if (!toVendorId) {
+        // Absence is meaningful: no `order_consolidation` row means nobody has
+        // decided who assembles this order, so there is nowhere to send it.
+        throw new VendorWriteRefused(409, {
+          error:
+            'Nobody has been chosen to assemble this order yet, so there is nowhere ' +
+            'to send it. We will route it and it will appear in your queue.',
+          code: 'NO_CONSOLIDATOR',
+        })
+      }
+
+      if (toVendorId === vendorId) {
+        // The receiving end of a leg is the vendor who assembles the order. They
+        // have no leg to book — the goods are already on their bench — which is
+        // what closes the whole create surface to the receiving end without a
+        // single check that names a counterparty.
+        throw new VendorWriteRefused(422, {
+          error:
+            'You are assembling this order yourself, so there is no parcel to send. ' +
+            'Keep the pieces and despatch the order when the rest arrives.',
+          code: 'CONSOLIDATOR_IS_SELF',
+        })
+      }
+
+      // The unique index is the real enforcement; this is here so the answer
+      // NAMES the job instead of being a 500 out of a constraint. Scoped through
+      // the caller's own jobs, so it cannot be used to probe somebody else's.
+      const already = await tx
+        .select({ jobId: productionTransferJobs.jobId })
+        .from(productionTransferJobs)
+        .innerJoin(productionJobs, eq(productionJobs.id, productionTransferJobs.jobId))
+        .where(
+          and(
+            inArray(productionTransferJobs.jobId, requested),
+            eq(productionJobs.vendorId, vendorId)
+          )
+        )
+
+      if (already.length > 0) {
+        throw new VendorWriteRefused(409, {
+          error:
+            'These jobs have already been sent on a parcel, and a job rides exactly one. ' +
+            'If that parcel went missing we will raise a replacement job for it.',
+          code: 'JOB_ALREADY_ON_TRANSFER',
+          jobIds: already.map((row) => row.jobId),
+        })
+      }
+
+      const dispatchedAt = new Date()
+      const anchor = jobs[0]!
+
+      const [transfer] = await tx
+        .insert(productionTransfers)
+        .values({
+          /**
+           * NEVER read out. `order_id` is NOT NULL and it is a person-linked
+           * handle R1 forbids at any depth — so it is copied from the caller's
+           * own job INSIDE the database, with the vendor predicate repeated in
+           * the sub-select, and never becomes a value this process holds.
+           */
+          orderId: sql<string>`(select ${productionJobs.orderId} from ${productionJobs} where ${productionJobs.id} = ${anchor.id} and ${productionJobs.vendorId} = ${vendorId})` as never,
+          // The session, not the body. A transfer is created only by its
+          // sending end, and there is no field in which to claim otherwise.
+          fromVendorId: vendorId,
+          // DERIVED. We chose the routing, so a vendor does not name a
+          // counterparty — and naming one would be a vendor learning who else
+          // is working this order.
+          toVendorId,
+          carrier: input.carrier,
+          reference: input.reference,
+          pieceCount: input.pieceCount,
+          // OUR clock. A vendor back-dating a despatch is a lie about an SLA
+          // clock, and there is no field in which to say it.
+          dispatchedAt,
+          expectedBy: input.expectedBy,
+          createdBy: input.createdBy,
+          // `costAmount` is deliberately absent, in both directions. We pay the
+          // leg because we picked the route.
+        })
+        .returning(vendorTransferColumns(vendorId))
+
+      if (!transfer) {
+        throw new VendorWriteRefused(409, {
+          error: 'The parcel was not recorded; nothing was changed.',
+          code: 'CONCURRENT_MODIFICATION',
+        })
+      }
+
+      await tx
+        .insert(productionTransferJobs)
+        .values(jobs.map((job) => ({ transferId: transfer.id, jobId: job.id })))
+
+      // ...and NOW the guard, which the matrix names on the edge we are about to
+      // take. It reads the parcel we just inserted, inside this transaction,
+      // which is the entire reason the insert comes first.
+      for (const job of jobs) {
+        await assertVendorGuardSatisfied(
+          tx,
+          { jobId: job.id, vendorId, stage: job.stage },
+          job.status,
+          'dispatched'
+        )
+      }
+
+      // The statuses we actually READ, repeated in the WHERE rather than trusted
+      // from the read: anybody who moved or settled one in between wins, and we
+      // match nothing. Derived from the rows, so no second copy of the matrix.
+      const fromStatuses = [...new Set(jobs.map((job) => job.status))]
+
+      const written = await tx
+        .update(productionJobs)
+        .set({ status: 'dispatched', dispatchedAt, updatedAt: dispatchedAt })
+        .where(
+          and(
+            inArray(
+              productionJobs.id,
+              jobs.map((job) => job.id)
+            ),
+            eq(productionJobs.vendorId, vendorId),
+            inArray(productionJobs.status, fromStatuses),
+            isNull(productionJobs.settlementId)
+          )
+        )
+        // Narrow on purpose: the raw row carries `orderId`.
+        .returning({ id: productionJobs.id })
+
+      if (written.length !== jobs.length) {
+        // The whole transaction goes back — including the transfer. A parcel
+        // whose jobs never moved is exactly the state the ordering above exists
+        // to make impossible.
+        throw new VendorWriteRefused(409, {
+          error: `Expected to move ${jobs.length} job(s) but matched ${written.length}; nothing was recorded`,
+          code: 'CONCURRENT_MODIFICATION',
+        })
+      }
+
+      // Inside the transaction, and its failure aborts the despatch. Catching it
+      // here to "keep going" would answer 201 over a write about to roll back.
+      await hooks.onDispatch?.(tx, {
+        transferId: transfer.id,
+        reference: transfer.reference,
+        carrier: transfer.carrier,
+        pieceCount: transfer.pieceCount,
+        jobIds: jobs.map((job) => job.id),
+        dispatchedAt,
+        expectedBy: transfer.expectedBy,
+      })
+
+      return { ok: true as const, transfer, jobIds: jobs.map((job) => job.id) }
+    })
+  )
+}
+
+/**
+ * Vendor B confirms a parcel arrived.
+ *
+ * ## Only the receiving end, and it is not an `if`
+ *
+ * `to_vendor_id` is in the WHERE of both the locked read and the UPDATE, so
+ * vendor A asking about their own outbound parcel finds NOTHING — a 404, not a
+ * 403, because 403 would confirm a row they are not entitled to know about.
+ * There is no branch in application code where that check could be skipped.
+ *
+ * ## No job moves
+ *
+ * A received parcel is a fact about the PARCEL. In the consolidation case the
+ * receiving vendor has no job for the piece at all — the rolled poster has
+ * `frame_id NULL`, so there is no second row to move — which is the first of the
+ * four reasons the transfer is its own entity. The readiness gate reads the
+ * transfer, not a status: a `dispatched` job counts only if it rode a transfer
+ * to the consolidator that is received and not lost.
+ *
+ * ## What it refuses, and why each one is a 409
+ *
+ * Already received (the dispute is about something else), already declared lost
+ * (an admin wrote it off and raised replacement work; a vendor un-writing that
+ * off is a vendor deciding who eats a cost), and not yet dispatched (nothing
+ * left the sending vendor, so nothing can have arrived). All three are "the
+ * world moved", never "your payload is wrong" — there is no payload.
+ */
+export async function markVendorTransferReceived(
+  vendorId: string | null | undefined,
+  transferId?: string,
+  hooks: { onReceipt?: VendorTransferReceiptAudit } = {}
+): Promise<VendorTransferAccepted | VendorJobRefusal> {
+  assertVendorId(vendorId)
+
+  const notFound: VendorJobRefusal['body'] = {
+    error: 'Transfer not found',
+    code: 'TRANSFER_NOT_FOUND',
+  }
+
+  if (!transferId) return { ok: false, status: 404, body: notFound }
+
+  return refusable(async () =>
+    db.transaction(async (tx) => {
+      // FOR UPDATE: two of the receiving vendor's tabs confirming the same
+      // parcel must serialise here rather than both read "not yet arrived".
+      const [before] = await tx
+        .select({
+          id: productionTransfers.id,
+          reference: productionTransfers.reference,
+          dispatchedAt: productionTransfers.dispatchedAt,
+          receivedAt: productionTransfers.receivedAt,
+          // INTERNAL. `lostAt` has never been in a vendor-facing projection and
+          // is not going into one: a vendor is told the parcel is not receivable,
+          // not that we wrote it off and paid somebody to remake the work.
+          lostAt: productionTransfers.lostAt,
+        })
+        .from(productionTransfers)
+        // The receiving end ONLY. The sending vendor finds nothing here, which
+        // is what makes "received_at is settable only by to_vendor_id" a
+        // predicate rather than a comment.
+        .where(
+          and(
+            eq(productionTransfers.id, transferId),
+            eq(productionTransfers.toVendorId, vendorId)
+          )
+        )
+        .limit(1)
+        .for('update')
+
+      if (!before) throw new VendorWriteRefused(404, notFound)
+
+      if (before.receivedAt) {
+        throw new VendorWriteRefused(409, {
+          error: `This parcel was already confirmed as arrived on ${before.receivedAt.toISOString()}.`,
+          code: 'TRANSFER_ALREADY_RECEIVED',
+        })
+      }
+
+      if (before.lostAt) {
+        throw new VendorWriteRefused(409, {
+          error:
+            'This parcel was written off and the work is being remade. ' +
+            'If it has turned up, tell us rather than confirming it here.',
+          code: 'TRANSFER_LOST',
+        })
+      }
+
+      if (!before.dispatchedAt) {
+        throw new VendorWriteRefused(409, {
+          error:
+            'This parcel has not been sent yet, so it cannot have arrived. ' +
+            'Confirm it once the sending vendor despatches it.',
+          code: 'TRANSFER_NOT_DISPATCHED',
+        })
+      }
+
+      // The manifest, read behind the scoped parcel and only for the audit row.
+      // No vendor id in the WHERE and none is available: the join table has no
+      // vendor column. What makes this safe is the read above — the parcel was
+      // proved to be at this caller's receiving end before anything here ran,
+      // which is exactly what `JOB_KEYED_TABLES` means in the isolation suite.
+      const carried = await tx
+        .select({ jobId: productionTransferJobs.jobId })
+        .from(productionTransferJobs)
+        .where(eq(productionTransferJobs.transferId, transferId))
+
+      const receivedAt = new Date()
+
+      // Every predicate REPEATED, and the row count turns a race into a
+      // rollback rather than a second confirmation over a parcel somebody has
+      // meanwhile declared lost.
+      const claimed = await tx
+        .update(productionTransfers)
+        .set({ receivedAt, updatedAt: receivedAt })
+        .where(
+          and(
+            eq(productionTransfers.id, transferId),
+            eq(productionTransfers.toVendorId, vendorId),
+            isNotNull(productionTransfers.dispatchedAt),
+            isNull(productionTransfers.receivedAt),
+            isNull(productionTransfers.lostAt)
+          )
+        )
+        .returning({ id: productionTransfers.id })
+
+      if (claimed.length !== 1) {
+        throw new VendorWriteRefused(409, {
+          error:
+            'This parcel was confirmed or written off by someone else; nothing was recorded',
+          code: 'CONCURRENT_MODIFICATION',
+        })
+      }
+
+      await hooks.onReceipt?.(tx, {
+        transferId,
+        reference: before.reference,
+        receivedAt,
+        jobIds: carried.map((row) => row.jobId),
+      })
+
+      // Re-read through the same narrow column list every other read uses, from
+      // the TRANSACTION — a read outside it could not see the write.
+      const [transfer] = await tx
+        .select(vendorTransferColumns(vendorId))
+        .from(productionTransfers)
+        .where(
+          and(
+            eq(productionTransfers.id, transferId),
+            eq(productionTransfers.toVendorId, vendorId)
+          )
+        )
+        .limit(1)
+
+      if (!transfer) throw new VendorWriteRefused(404, notFound)
+
+      // The receiving vendor holds no job on the parcel — they belong to the
+      // sender — so there is nothing of theirs to list.
+      return { ok: true as const, transfer, jobIds: [] }
+    })
+  )
 }

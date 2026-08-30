@@ -38,6 +38,15 @@ describe('vendor-scope module contract', () => {
     'assertVendorMayUploadQcPhoto',
     'recordVendorQcPhoto',
     'retractVendorQcPhoto',
+    // Inter-vendor transfers (#686) — two reads and two writes. Both writes are
+    // one END of a leg: a transfer is created only by `from_vendor_id` and
+    // received only by `to_vendor_id`, and the vendorId argument is which end
+    // the caller is. An unscoped call here would hand a vendor somebody else's
+    // parcel, which is the boundary the whole feature turns on.
+    'listVendorTransfers',
+    'getVendorTransfer',
+    'createVendorTransfer',
+    'markVendorTransferReceived',
   ] as const
 
   /**
