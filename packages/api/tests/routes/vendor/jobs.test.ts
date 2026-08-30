@@ -750,13 +750,23 @@ describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
     expect(ops('select', productionJobs).filter((q) => q.inTx).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('takes FOR UPDATE on the read the decision rests on', () => {
+  it('takes FOR UPDATE on the read every transaction in the module rests on', () => {
     // The one part of the recipe no assertion above can reach: the recorder
     // answers `.for('update')` exactly as it answers a plain read, so a lock
     // dropped in a refactor is invisible to it. Scanned from the source in the
     // shape `tests/routes/admin/transfers.test.ts` already uses.
-    const source = readSource('lib/vendor-scope.ts')
-    expect(source.match(/\.for\(["']update["']\)/g) ?? []).toHaveLength(1)
+    //
+    // Counted against the TRANSACTIONS rather than fixed at one. #685 gave the
+    // module two more — recording a QC photograph and withdrawing one — and a
+    // hardcoded `1` would have had to be raised to `3` by hand, which is a
+    // number nobody can check. Every transaction here decides something from a
+    // row it then writes, so every one of them locks that row.
+    const source = stripComments(readSource('lib/vendor-scope.ts'))
+    const transactions = source.match(/db\.transaction\(/g) ?? []
+    const locks = source.match(/\.for\(["']update["']\)/g) ?? []
+
+    expect(transactions.length, 'no transaction found — the scan is vacuous').toBeGreaterThan(0)
+    expect(locks).toHaveLength(transactions.length)
   })
 
   // --------------------------------------------------------------------

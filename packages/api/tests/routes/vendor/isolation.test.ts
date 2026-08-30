@@ -198,12 +198,36 @@ vi.mock('../../../src/auth', () => ({
 }))
 
 const SIGNED_URL = 'https://r2.example.com/bucket/products/abc.jpg?X-Amz-Signature=deadbeef'
+const UPLOAD_URL = 'https://r2.example.com/bucket/put?X-Amz-Signature=deadbeef'
 const mockPresign = vi.fn(async (_key: string, _expiresInSeconds?: number) => SIGNED_URL)
+/**
+ * The UPLOAD presigner (#685), spied separately and then folded into the same
+ * scope property as the download one.
+ *
+ * Property 3 is about signatures, not about downloads. An upload signature is a
+ * capability over the same bucket — R2 is handed the key, and whoever holds the
+ * URL can write to it — so leaving it unwatched would mean the scope allow-list
+ * governed half the signing surface while the other half signed whatever it
+ * liked.
+ */
+const mockUploadPresign = vi.fn(
+  async (_key: string, _contentType?: string, _expiresInSeconds?: number) => UPLOAD_URL
+)
 const mockPublicUrl = vi.fn((key: string) => `https://cdn.example.com/${key}`)
 
-vi.mock('../../../src/lib/storage', () => ({
+/**
+ * `StoragePaths` is the REAL one, which is why this mock spreads the original
+ * rather than listing exports. The QC upload routes build their key through it
+ * and `complete` verifies the returned key by REBUILDING it; a stubbed builder
+ * would make that agreement true by construction and prove nothing about the
+ * key a vendor is actually handed.
+ */
+vi.mock('../../../src/lib/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/storage')>()),
   getPresignedDownloadUrl: (...args: unknown[]) =>
     mockPresign(...(args as [string, number?])),
+  getPresignedUploadUrl: (...args: unknown[]) =>
+    mockUploadPresign(...(args as [string, string?, number?])),
   // Exported into the mock ON PURPOSE, so "nobody called it" is a real
   // observation rather than an absence of evidence.
   getPublicUrl: (...args: unknown[]) => mockPublicUrl(...(args as [string])),
@@ -267,6 +291,13 @@ const B_JOB_ID = '22222222-2222-4222-8222-222222222222'
 const A_JOB_ID = '2222222a-2222-4222-8222-222222222222'
 const B_ITEM_ID = '44444444-4444-4444-8444-444444444444'
 const A_ITEM_ID = '4444444a-4444-4444-8444-444444444444'
+const B_PHOTO_ID = '66666666-6666-4666-8666-666666666666'
+/** A real photo id — A's, on A's job. */
+const A_PHOTO_ID = '6666666a-6666-4666-8666-666666666666'
+
+/** The key the QC upload routes build, spelled here as the client would. */
+const qcKey = (jobId: string, slot = 'print_full') =>
+  `production-qc/${jobId}/${slot}/1a2b3c.jpg`
 
 const PAST = new Date('2026-01-01T00:00:00Z')
 
@@ -311,24 +342,52 @@ const jsonInit = (body: unknown, method = 'PATCH'): RequestInit => ({
   body: JSON.stringify(body),
 })
 
-/** Rows shaped exactly as the scoped module's column lists return them. */
+/** One live QC photograph, shaped as every read of that table projects it. */
+const qcPhotoRow = (slot: string, id = B_PHOTO_ID) => ({
+  id,
+  slot,
+  objectKey: qcKey(B_JOB_ID, slot),
+  contentType: 'image/jpeg',
+  sizeBytes: 1024,
+  uploadedAt: PAST,
+  reviewId: null,
+})
+
+/**
+ * Rows shaped exactly as the scoped module's column lists return them.
+ *
+ * The job sits at `received` with a COMPLETE print shot list, which is the one
+ * state in which every route in the table below has something to do: the QC
+ * upload window is open (it is derived from the `shot-list-complete` edge), and
+ * the PATCH entry can take that edge for real rather than being the only route
+ * exercised against a job nobody has started.
+ */
 const OWNED_ROWS: Record<string, unknown[][]> = {
   'select:production_jobs': [
     [
       {
         id: B_JOB_ID,
         stage: 'print',
-        status: 'assigned',
+        status: 'received',
         settlementId: null,
         dueAt: PAST,
         sentAt: null,
-        receivedAt: null,
+        receivedAt: PAST,
         amountExpected: '100.00',
         amountActual: null,
         createdAt: PAST,
       },
     ],
   ],
+  'select:production_job_photos': [
+    [
+      qcPhotoRow('print_full'),
+      qcPhotoRow('print_colour_reference', '6666666b-6666-4666-8666-666666666666'),
+      qcPhotoRow('print_raking_light', '6666666c-6666-4666-8666-666666666666'),
+    ],
+  ],
+  'update:production_job_photos': [[{ id: B_PHOTO_ID }]],
+  'insert:production_job_photos': [[qcPhotoRow('print_full')]],
   /**
    * The guarded PATCH writes with `.returning({ id })` and refuses on a
    * row-count mismatch, so "no rows queued" is now a 409 rather than a silent
@@ -387,6 +446,16 @@ interface RouteCase {
   theirs?: () => [string, RequestInit | undefined]
   /** Status the entitled request answers with. */
   okStatus: number
+  /**
+   * The ONE signing scope this route may produce a signature in, if any.
+   *
+   * R3 in the route table itself. A route that omits this signs nothing at all,
+   * and Property 3 asserts both halves — that a scoped route's every signature
+   * lands in its own scope, and that an unscoped route reaches no presigner.
+   * Naming it here rather than special-casing the artwork route is what makes
+   * the property extend to a route added later without anybody editing it.
+   */
+  scope?: VendorSigningScope
 }
 
 const ROUTE_TABLE: RouteCase[] = [
@@ -406,8 +475,10 @@ const ROUTE_TABLE: RouteCase[] = [
   {
     pattern: '/jobs/:id',
     method: 'PATCH',
-    mine: () => [`/api/vendor/jobs/${B_JOB_ID}`, jsonInit({ status: 'received' })],
-    theirs: () => [`/api/vendor/jobs/${A_JOB_ID}`, jsonInit({ status: 'received' })],
+    // The job sits at `received` with a full shot list, so this is the real
+    // guarded edge rather than the only one a fresh job could take.
+    mine: () => [`/api/vendor/jobs/${B_JOB_ID}`, jsonInit({ status: 'qc_submitted' })],
+    theirs: () => [`/api/vendor/jobs/${A_JOB_ID}`, jsonInit({ status: 'qc_submitted' })],
     okStatus: 200,
   },
   {
@@ -415,6 +486,68 @@ const ROUTE_TABLE: RouteCase[] = [
     method: 'GET',
     mine: () => [`/api/vendor/jobs/${B_JOB_ID}/artwork/${B_ITEM_ID}`, undefined],
     theirs: () => [`/api/vendor/jobs/${A_JOB_ID}/artwork/${A_ITEM_ID}`, undefined],
+    okStatus: 200,
+    scope: 'artwork',
+  },
+  {
+    pattern: '/jobs/:id/photos',
+    method: 'GET',
+    mine: () => [`/api/vendor/jobs/${B_JOB_ID}/photos`, undefined],
+    theirs: () => [`/api/vendor/jobs/${A_JOB_ID}/photos`, undefined],
+    okStatus: 200,
+    scope: 'qcPhoto',
+  },
+  {
+    pattern: '/jobs/:id/photos/presign',
+    method: 'POST',
+    mine: () => [
+      `/api/vendor/jobs/${B_JOB_ID}/photos/presign`,
+      jsonInit({ slot: 'print_full', contentType: 'image/jpeg', sizeBytes: 2048 }, 'POST'),
+    ],
+    theirs: () => [
+      `/api/vendor/jobs/${A_JOB_ID}/photos/presign`,
+      jsonInit({ slot: 'print_full', contentType: 'image/jpeg', sizeBytes: 2048 }, 'POST'),
+    ],
+    okStatus: 200,
+    scope: 'qcPhoto',
+  },
+  {
+    pattern: '/jobs/:id/photos/complete',
+    method: 'POST',
+    mine: () => [
+      `/api/vendor/jobs/${B_JOB_ID}/photos/complete`,
+      jsonInit(
+        {
+          slot: 'print_full',
+          key: qcKey(B_JOB_ID),
+          contentType: 'image/jpeg',
+          sizeBytes: 2048,
+        },
+        'POST'
+      ),
+    ],
+    // The key names A's job too. A well-formed request aimed at somebody else's
+    // row is the attack; a key still naming B's job would be refused by the
+    // rebuild check before the scoping ever came into it.
+    theirs: () => [
+      `/api/vendor/jobs/${A_JOB_ID}/photos/complete`,
+      jsonInit(
+        {
+          slot: 'print_full',
+          key: qcKey(A_JOB_ID),
+          contentType: 'image/jpeg',
+          sizeBytes: 2048,
+        },
+        'POST'
+      ),
+    ],
+    okStatus: 201,
+  },
+  {
+    pattern: '/jobs/:id/photos/:photoId',
+    method: 'DELETE',
+    mine: () => [`/api/vendor/jobs/${B_JOB_ID}/photos/${B_PHOTO_ID}`, { method: 'DELETE' }],
+    theirs: () => [`/api/vendor/jobs/${A_JOB_ID}/photos/${A_PHOTO_ID}`, { method: 'DELETE' }],
     okStatus: 200,
   },
   {
@@ -564,6 +697,8 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue(sessionFor('vendor'))
   mockPresign.mockClear()
   mockPresign.mockResolvedValue(SIGNED_URL)
+  mockUploadPresign.mockClear()
+  mockUploadPresign.mockResolvedValue(UPLOAD_URL)
   mockPublicUrl.mockClear()
   queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
 })
@@ -901,17 +1036,40 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
     expect(JSON.stringify(body ?? {})).not.toContain('user-9')
   })
 
-  it('never signs on any other vendor route', async () => {
-    for (const route of ROUTE_TABLE.filter((r) => r !== ARTWORK)) {
+  it('never signs on a route that declares no scope', async () => {
+    // It used to read "never signs on any other route", with artwork as the one
+    // exception. #685 made that false — the QC routes sign too — and the honest
+    // generalisation is the route table's own `scope` field rather than a
+    // growing list of exceptions here. A route that names no scope still signs
+    // NOTHING, which is the half that was ever load-bearing.
+    for (const route of ROUTE_TABLE.filter((r) => !r.scope)) {
       queries.length = 0
       rowQueues.clear()
       mockPresign.mockClear()
+      mockUploadPresign.mockClear()
       queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
       queueRows(OWNED_ROWS)
 
       const [path, init] = route.mine()
       await run(path, init)
-      expect(mockPresign, `${label(route)} signed something`).not.toHaveBeenCalled()
+      expect(mockPresign, `${label(route)} signed a download`).not.toHaveBeenCalled()
+      expect(mockUploadPresign, `${label(route)} signed an upload`).not.toHaveBeenCalled()
+    }
+  })
+
+  it('never builds a permanent public URL anywhere on this boundary', async () => {
+    // `getPublicUrl` produces an unauthenticated path that stays readable by
+    // anyone who ever saw it. Its call count across the whole vendor surface is
+    // zero — asserted over every route, not only the ones that sign.
+    for (const route of ROUTE_TABLE) {
+      queries.length = 0
+      rowQueues.clear()
+      mockPublicUrl.mockClear()
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      queueRows(OWNED_ROWS)
+
+      const [path, init] = route.mine()
+      await run(path, init)
       expect(mockPublicUrl, `${label(route)} built a public URL`).not.toHaveBeenCalled()
     }
   })
@@ -928,7 +1086,13 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
     )
   }
 
-  it('every key ever handed to the presigner falls in EXACTLY ONE scope', async () => {
+  /** Every key handed to EITHER presigner — downloads and uploads alike. */
+  const signedKeys = () =>
+    [...mockPresign.mock.calls, ...mockUploadPresign.mock.calls].map(
+      (call) => call[0] as string
+    )
+
+  it('every key ever handed to a presigner falls in EXACTLY ONE scope', async () => {
     // Not "in some scope". Exactly one — because a key matching two scopes
     // means the prefixes overlap, and an overlap is how the label scope's
     // consolidator check gets bypassed by asking the artwork route instead.
@@ -936,18 +1100,42 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
       queries.length = 0
       rowQueues.clear()
       mockPresign.mockClear()
+      mockUploadPresign.mockClear()
       queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
       queueRows(OWNED_ROWS)
 
       const [path, init] = route.mine()
       await run(path, init)
 
-      for (const call of mockPresign.mock.calls) {
-        const key = call[0] as string
+      for (const key of signedKeys()) {
         expect(
           scopesMatching(key),
           `${label(route)} signed "${key}", which matches ${scopesMatching(key).length} scopes`
         ).toHaveLength(1)
+      }
+    }
+  })
+
+  it("and it is the route's OWN scope, never a sibling's", async () => {
+    // The half that stops the label exception widening. `objectKeyForScope`
+    // refuses a key from another scope, but only if the route passes its own
+    // scope name; a route that passed `label` "because the key looked like one"
+    // would be a general PII signer with a correct-looking allow-list behind it.
+    for (const route of ROUTE_TABLE.filter((r) => r.scope)) {
+      queries.length = 0
+      rowQueues.clear()
+      mockPresign.mockClear()
+      mockUploadPresign.mockClear()
+      queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_B, status: 'active' }]] })
+      queueRows(OWNED_ROWS)
+
+      const [path, init] = route.mine()
+      await run(path, init)
+
+      const keys = signedKeys()
+      expect(keys.length, `${label(route)} declares a scope but signed nothing`).toBeGreaterThan(0)
+      for (const key of keys) {
+        expect(scopesMatching(key), `${label(route)} signed "${key}"`).toEqual([route.scope])
       }
     }
   })

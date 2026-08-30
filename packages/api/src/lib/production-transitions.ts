@@ -330,6 +330,30 @@ export const VENDOR_SETTABLE_STATUSES = nonEmpty(
 )
 
 /**
+ * The statuses in which a vendor may still change a job's shot list.
+ *
+ * DERIVED from the guard, not listed. A QC photograph exists for exactly one
+ * purpose — to satisfy `shot-list-complete` — so the window for uploading,
+ * replacing or retracting one is precisely the set of statuses a vendor can
+ * take that guarded edge FROM. Today that is `received` alone, including the
+ * second time a job passes through it after a failed inspection, which is when
+ * the reshoot happens.
+ *
+ * Listing it would be a second copy of the matrix, and #684 is the standing
+ * lesson on what those cost: `routes/vendor.ts` held `['sent', 'received']` as
+ * a literal, and the RETIRED `sent` stayed in a vendor's public vocabulary for
+ * two phases after the rows stopped using it. A guard moved to a different edge
+ * moves this window with it.
+ */
+export const QC_PHOTO_UPLOAD_STATUSES: readonly ProductionJobStatus[] = STATUS_VALUES.filter(
+  (from) =>
+    STATUS_VALUES.some((to) => {
+      const edge = edgeFor(from, to)
+      return edge?.guard === 'shot-list-complete' && edge.actors.includes('vendor')
+    })
+)
+
+/**
  * Statuses a job can enter and never leave.
  *
  * Derived as "reachable, with nowhere to go" rather than listed, which is what

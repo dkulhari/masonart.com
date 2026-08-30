@@ -27,10 +27,28 @@ describe('vendor-scope module contract', () => {
     // data, so an unscoped call to it is the worst one available. Added by
     // #678, which shipped it without enrolling it here and left this suite red.
     'getVendorJobLabelKey',
-    // The one mutation. Enrolled here for the same reason as the reads: an
+    // The transition. Enrolled here for the same reason as the reads: an
     // unscoped write is worse than an unscoped read, not exempt from the rule.
     'updateVendorJob',
+    // QC photographs (#685) — one read and three writes. The upload authoriser
+    // is here because a wrong answer from it is what gets a signed URL minted
+    // for somebody else's job, and a signature that is generated and then
+    // withheld has still been generated.
+    'listVendorJobPhotos',
+    'assertVendorMayUploadQcPhoto',
+    'recordVendorQcPhoto',
+    'retractVendorQcPhoto',
   ] as const
+
+  /**
+   * The exceptions: exported functions that touch no vendor data at all.
+   *
+   * Written down because the check below is now a "everything is accounted
+   * for" test rather than a name-pattern one. `objectKeyForScope` is pure — a
+   * string and a scope name in, a string or null out — and takes no vendorId
+   * because there is no row for one to scope.
+   */
+  const pureHelpers = ['objectKeyForScope'] as const
 
   it('exports every vendor-facing query', () => {
     for (const fn of scopedFns) {
@@ -46,13 +64,27 @@ describe('vendor-scope module contract', () => {
     await expect((scope as any)[fn](null)).rejects.toThrow(/vendorId/i)
   })
 
-  it('exposes no function that reads vendor data without scoping', () => {
-    // Anything exported that queries must take vendorId first. A future
-    // convenience helper that forgets is what this catches.
+  it('exposes no function that reads or writes vendor data without scoping', () => {
+    // EVERY exported function is either enrolled above — and therefore proved
+    // to refuse a falsy vendorId — or named as a pure helper. It used to test a
+    // NAME PATTERN, `/^(list|get|find|query)/`, which is a filter and not an
+    // account: `updateVendorJob` never matched it, and neither would
+    // `recordVendorQcPhoto`, so the writes this module exposes were exactly the
+    // ones it could not see. An unlisted function was not judged unscoped; it
+    // was not examined.
     const exported = Object.keys(scope).filter((k) => typeof (scope as any)[k] === 'function')
-    const unscoped = exported.filter(
-      (k) => !scopedFns.includes(k as any) && /^(list|get|find|query)/.test(k)
+    const unaccounted = exported.filter(
+      (k) => !scopedFns.includes(k as any) && !pureHelpers.includes(k as any)
     )
-    expect(unscoped).toEqual([])
+    expect(unaccounted).toEqual([])
+  })
+
+  it('the account is not vacuous — a helper that forgot to scope would show up', () => {
+    // Same guard the isolation suite carries on every allow-list it owns.
+    const exported = ['listVendorJobs', 'objectKeyForScope', 'listVendorInvoicesSomeday']
+    const unaccounted = exported.filter(
+      (k) => !scopedFns.includes(k as any) && !pureHelpers.includes(k as any)
+    )
+    expect(unaccounted).toEqual(['listVendorInvoicesSomeday'])
   })
 })

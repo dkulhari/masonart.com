@@ -121,6 +121,43 @@ export const qcSlotSchema = z.enum(
   QC_SHOT_SLOTS as unknown as [string, ...string[]]
 )
 
+/**
+ * What a QC photograph may be, and how big.
+ *
+ * Here rather than in the API's `lib/storage.ts` — where `REVIEW_MEDIA_LIMITS`
+ * lives — because the vendor portal has to refuse the file before it uploads
+ * it, and `lib/storage.ts` drags an S3 client in with it. This module is
+ * already the one copy of what "photographed" means; the accepted formats are
+ * part of that.
+ *
+ * **A map to the extension, not a list.** The key the object lands under is
+ * `production-qc/<jobId>/<slot>/<uuid>.<ext>`, and `complete` rebuilds that key
+ * from the same three values minutes later. `getExtensionFromContentType` in
+ * the API falls back to `'jpg'` for anything it does not know, which would key
+ * a PNG as `.jpg` and make the rebuild disagree with the upload.
+ *
+ * **No HEIC, deliberately.** It is what a phone shoots by default and what no
+ * reviewer's browser displays. Nothing here transcodes — the QC screen is an
+ * `<img>` — so accepting it would store a photograph nobody can look at, which
+ * is worse than refusing it at the door with a message.
+ */
+export const QC_PHOTO_CONTENT_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+/**
+ * The size cap, checked at presign and again at complete.
+ *
+ * Generous next to `REVIEW_MEDIA_LIMITS.image` (10MB): a raking-light shot of a
+ * whole print is the evidence a colour dispute turns on, and a vendor phone
+ * downscaling it to fit a limit is exactly the wrong saving. Still a cap —
+ * `sizeBytes` at presign is the browser's DECLARED size, so this is a cheap
+ * early reject, and R2 is told the same content type in the signature.
+ */
+export const QC_PHOTO_MAX_BYTES = 25 * 1024 * 1024
+
 /** The shot list one job is judged against, chosen by its stage. */
 export function qcShotsForStage(stage: QcStage): readonly QcShot[] {
   return QC_SHOT_LIST[stage]

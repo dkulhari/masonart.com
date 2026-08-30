@@ -57,8 +57,8 @@
  * exceptions.
  */
 
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
-import { requiredQcSlots, type QcStage } from '@chobii/shared'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
+import { qcShotsForStage, requiredQcSlots, type QcStage } from '@chobii/shared'
 import { db } from '../database'
 import {
   productionJobs,
@@ -77,6 +77,7 @@ import { orderShipments } from '../database/schema/shipping'
 import { vendorRates } from '../database/schema/vendors'
 import {
   ProductionTransitionError,
+  QC_PHOTO_UPLOAD_STATUSES,
   VENDOR_SETTABLE_STATUSES,
   assertTransition,
   guardFor,
@@ -649,17 +650,25 @@ export type VendorJobRefusalCode =
   | 'SHOT_LIST_INCOMPLETE'
   | 'GUARD_UNSATISFIED'
   | 'CONCURRENT_MODIFICATION'
+  /** The job is outside the window in which its shot list may change. */
+  | 'JOB_NOT_ACCEPTING_PHOTOS'
+  /** A real slot, but not one this job's stage asks for. */
+  | 'SLOT_NOT_ON_SHOT_LIST'
+  /** No LIVE photo with that id on that job. Superseded counts as gone. */
+  | 'PHOTO_NOT_FOUND'
 
 export interface VendorJobRefusal {
   ok: false
   /**
-   * 404 the job is not theirs (or is gone), 409 the world moved, 422 the caller
-   * can fix it. The split matters: 422 in this router means "your payload names
-   * things that do not line up", which a client retries by CHANGING something.
-   * A transition conflict is not that, and conflating them teaches clients to
-   * retry the wrong thing.
+   * 400 the payload is malformed, 404 the job is not theirs (or is gone), 409
+   * the world moved, 422 the caller can fix it. The split matters: 422 in this
+   * router means "your payload names things that do not line up", which a
+   * client retries by CHANGING something. A transition conflict is not that,
+   * and conflating them teaches clients to retry the wrong thing. 400 is
+   * narrower still — the request could not be parsed as a claim about this job
+   * at all, which is where an object key belonging somewhere else lands.
    */
-  status: 404 | 409 | 422
+  status: 400 | 404 | 409 | 422
   body: { error: string; code: VendorJobRefusalCode } & Record<string, unknown>
 }
 
@@ -697,11 +706,28 @@ type VendorTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
  */
 export type VendorAuditWriter = { insert: typeof db.insert }
 
+/**
+ * What a guard SAW when it let the edge through.
+ *
+ * The shot-list guard already reads every live photograph in order to decide;
+ * `production_job.photos_submitted` has to name the same set. Handing the
+ * guard's own result up is what makes the audit row a record of the decision
+ * rather than a second, later query that could disagree with it — the photo
+ * table is not locked, and a re-upload landing between the two would produce an
+ * audit row naming a shot the guard never counted.
+ */
+export interface VendorGuardEvidence {
+  slots: string[]
+  keys: string[]
+}
+
 export interface VendorTransitionRecord {
   from: ProductionJobStatus
   to: VendorSettableStatus
   before: Record<string, unknown>
   after: Record<string, unknown>
+  /** Present only for a guarded edge that had something to show. */
+  evidence?: VendorGuardEvidence
 }
 
 /**
@@ -750,21 +776,29 @@ const ORDER_HAS_LABEL = sql<boolean>`coalesce(
  * Until Phase 3 nothing in `src/` called `guardFor` at all, so every guarded
  * edge was taken unchecked. Both edges a vendor can reach are guarded, so for
  * this module "evaluate the guard" is not an extra — it is most of the job.
+ *
+ * Returns what it SAW, so the audit row can name the same evidence the decision
+ * was taken on rather than re-reading it afterwards.
  */
 async function assertVendorGuardSatisfied(
   tx: VendorTx,
   job: { jobId: string; vendorId: string; stage: string },
   from: ProductionJobStatus,
   to: VendorSettableStatus
-): Promise<void> {
+): Promise<VendorGuardEvidence | undefined> {
   const guard = guardFor(from, to)
-  if (!guard) return
+  if (!guard) return undefined
 
   if (guard === 'shot-list-complete') {
     // LIVE photos only. A superseded row is one the vendor REPLACED, and
     // counting it would let a reshoot that never happened satisfy the list.
+    //
+    // The KEY comes back beside the slot because the audit row records both,
+    // and the key is identity-free by construction
+    // (`production-qc/<jobId>/<slot>/<file>`), so carrying it costs nothing
+    // under R1 and makes a dispute able to name the exact object.
     const live = await tx
-      .select({ slot: productionJobPhotos.slot })
+      .select({ slot: productionJobPhotos.slot, objectKey: productionJobPhotos.objectKey })
       .from(productionJobPhotos)
       .where(
         and(
@@ -775,7 +809,9 @@ async function assertVendorGuardSatisfied(
 
     const uploaded = new Set(live.map((row) => row.slot))
     const missing = requiredQcSlots(job.stage as QcStage).filter((slot) => !uploaded.has(slot))
-    if (missing.length === 0) return
+    if (missing.length === 0) {
+      return { slots: live.map((row) => row.slot), keys: live.map((row) => row.objectKey) }
+    }
 
     // 422, not 409: this refusal IS fixable by the caller — upload the photos —
     // which is exactly what separates the two codes in this router.
@@ -815,7 +851,7 @@ async function assertVendorGuardSatisfied(
       .where(and(eq(productionJobs.id, job.jobId), eq(productionJobs.vendorId, job.vendorId)))
       .limit(1)
 
-    if (evidence?.transferId || evidence?.hasOrderLabel) return
+    if (evidence?.transferId || evidence?.hasOrderLabel) return undefined
 
     throw new VendorWriteRefused(409, {
       error:
@@ -970,8 +1006,14 @@ export async function updateVendorJob(
       }
 
       // ...and then the circumstance the edge NAMES, which `assertTransition`
-      // deliberately does not answer.
-      await assertVendorGuardSatisfied(tx, { jobId, vendorId, stage: before.stage }, from, to)
+      // deliberately does not answer. What it saw travels with the move, so the
+      // audit row names the evidence the decision was taken on.
+      const evidence = await assertVendorGuardSatisfied(
+        tx,
+        { jobId, vendorId, stage: before.stage },
+        from,
+        to
+      )
 
       // OUR clock, at the instant of the write. A vendor cannot say "I received
       // it three days ago", because there is no field in which to say it.
@@ -1012,6 +1054,7 @@ export async function updateVendorJob(
         to,
         before: { status: from },
         after: { status: to, [stamp]: stampedAt },
+        evidence,
       })
 
       // Re-read through the same customer-free column list every other read
@@ -1028,6 +1071,448 @@ export async function updateVendorJob(
     if (error instanceof VendorWriteRefused) return error.refusal
     throw error
   }
+}
+
+// ============================================================================
+// QC photographs — the vendor's own evidence that the piece is right
+// ============================================================================
+
+/**
+ * ## Why the photo writes live here and not in the route
+ *
+ * Same reason as every read above: `vendorId` is a required first argument, so
+ * an unscoped write is inexpressible rather than merely discouraged. And the
+ * three refusals below — not yours, not the moment, not that slot — have to be
+ * decided against the SAME locked row the write uses, which is a transaction,
+ * which is data access.
+ *
+ * ## What a photograph is allowed to be
+ *
+ * A photograph is only ever evidence for one guard: `shot-list-complete` on
+ * `received -> qc_submitted`. So the window in which the list may change is
+ * derived from that edge (`QC_PHOTO_UPLOAD_STATUSES`) rather than listed, and a
+ * job outside it is refused with the window NAMED — a vendor who sees "not now"
+ * and nothing else opens a support ticket.
+ *
+ * That window is the ONLY gate. There is deliberately no settlement freeze on
+ * these writes, unlike `updateVendorJob`: the freeze exists because payables
+ * are derived with no stored total, so moving a settled job makes the
+ * settlement disagree with the sum of its jobs. A photo row carries no amount
+ * and moves no job, so there is nothing for it to falsify.
+ *
+ * ## Append-only, like `production_job_reviews`
+ *
+ * Nothing here deletes a row, including the route spelled `DELETE`. A re-upload
+ * and a retraction both stamp `superseded_at` on the row they replace, which is
+ * what the partial unique index on `(job_id, slot) WHERE superseded_at IS NULL`
+ * means by "live". The write ORDER is therefore load-bearing — stamp first,
+ * insert second — and both halves sit in one transaction with the job row
+ * locked, so two `complete` calls for one slot serialise instead of racing into
+ * the index.
+ *
+ * The R2 objects outlive the rows on purpose. A cascade would drop rows and
+ * leave the objects orphaned forever, so the 400-day retention sweep has to
+ * call `deleteByPrefix('production-qc/<jobId>/')` and only THEN delete rows.
+ * That sweep is not in this module and not yet written — see #685's completion
+ * note.
+ */
+
+/** One live photograph as this module answers it: a KEY, never a URL. */
+export interface VendorQcPhoto {
+  id: string
+  slot: string
+  /**
+   * Null when the stored reference falls outside the `qcPhoto` scope. Fails
+   * CLOSED rather than signing, and is not silently dropped either: a
+   * photograph that exists and cannot be shown is a real failure mode, and
+   * hiding it here is how it stays invisible.
+   */
+  key: string | null
+  contentType: string
+  sizeBytes: number
+  uploadedAt: Date
+  reviewId: string | null
+}
+
+export interface VendorJobPhotos {
+  stage: string
+  status: ProductionJobStatus
+  photos: VendorQcPhoto[]
+}
+
+/**
+ * Every LIVE photograph on a job the caller owns, oldest first.
+ *
+ * Scoped twice, like the artwork read: `getVendorJob` runs first, so another
+ * vendor's job is NOT FOUND before the photo table is touched at all, and the
+ * photo read is keyed on that same job id.
+ *
+ * `uploaded_by` is deliberately absent from the projection. It is the vendor's
+ * own staff, so it is not R1's business — but it is a user id in a payload
+ * whose whole point is to carry none, and the portal has no use for one.
+ */
+export async function listVendorJobPhotos(
+  vendorId: string | null | undefined,
+  jobId?: string
+): Promise<VendorJobPhotos | null> {
+  assertVendorId(vendorId)
+  if (!jobId) return null
+
+  const job = await getVendorJob(vendorId, jobId)
+  if (!job) return null
+
+  const live = await db
+    .select({
+      id: productionJobPhotos.id,
+      slot: productionJobPhotos.slot,
+      objectKey: productionJobPhotos.objectKey,
+      contentType: productionJobPhotos.contentType,
+      sizeBytes: productionJobPhotos.sizeBytes,
+      uploadedAt: productionJobPhotos.uploadedAt,
+      reviewId: productionJobPhotos.reviewId,
+    })
+    .from(productionJobPhotos)
+    .where(and(eq(productionJobPhotos.jobId, jobId), isNull(productionJobPhotos.supersededAt)))
+    .orderBy(asc(productionJobPhotos.uploadedAt))
+
+  return {
+    stage: job.stage,
+    status: job.status,
+    photos: live.map((row) => ({
+      id: row.id,
+      slot: row.slot,
+      // Through the allow-list under its OWN scope, so a stored value that
+      // somehow reads `products/…` or `fulfilment/labels/…` resolves to null
+      // instead of to a signable key. R3 is an enforcement, not a convention.
+      key: objectKeyForScope('qcPhoto', row.objectKey),
+      contentType: row.contentType,
+      sizeBytes: row.sizeBytes,
+      uploadedAt: row.uploadedAt,
+      reviewId: row.reviewId,
+    })),
+  }
+}
+
+/** Refuse unless the job is in the window where its shot list may change. */
+function assertJobAcceptsPhotos(status: ProductionJobStatus): void {
+  if (QC_PHOTO_UPLOAD_STATUSES.includes(status)) return
+
+  throw new VendorWriteRefused(409, {
+    error:
+      `This job is '${status}', so its photographs can no longer be changed. ` +
+      `Shots can be added, replaced or withdrawn while it is ` +
+      `${QC_PHOTO_UPLOAD_STATUSES.join(' or ')}.`,
+    code: 'JOB_NOT_ACCEPTING_PHOTOS',
+    status,
+    allowed: [...QC_PHOTO_UPLOAD_STATUSES],
+  })
+}
+
+/**
+ * Refuse a slot this job's stage does not ask for.
+ *
+ * 422, not 400: `qcSlotSchema` already rejected anything outside the vocabulary
+ * at the route, so what reaches here is a REAL slot aimed at the wrong stage —
+ * `frame_back` on a print job. The payload parses; it just names things that do
+ * not line up, which is exactly the 422/400 split this router keeps.
+ */
+function assertSlotOnShotList(stage: string, slot: string): void {
+  const slots = qcShotsForStage(stage as QcStage)?.map((shot) => shot.slot) ?? []
+  if (slots.includes(slot)) return
+
+  throw new VendorWriteRefused(422, {
+    error:
+      `'${slot}' is not a shot this job asks for. A ${stage} job is photographed as: ` +
+      `${slots.join(', ')}.`,
+    code: 'SLOT_NOT_ON_SHOT_LIST',
+    slot,
+    stage,
+    slots,
+  })
+}
+
+/** Run a body that refuses by throwing, and answer the refusal instead. */
+async function refusable<T>(body: () => Promise<T>): Promise<T | VendorJobRefusal> {
+  try {
+    return await body()
+  } catch (error) {
+    if (error instanceof VendorWriteRefused) return error.refusal
+    throw error
+  }
+}
+
+export interface VendorQcPhotoSlotAccepted {
+  ok: true
+  jobId: string
+  stage: string
+  slot: string
+}
+
+/**
+ * May this vendor upload THIS slot on THIS job, right now?
+ *
+ * Read-only, and it signs nothing: the caller builds the key and reaches the
+ * presigner only on an `ok` answer. That ordering is the requirement — a signed
+ * URL that is generated and then withheld has still been generated, and lives
+ * in whatever log, trace or crash dump saw it.
+ */
+export async function assertVendorMayUploadQcPhoto(
+  vendorId: string | null | undefined,
+  jobId: string | undefined,
+  slot: string
+): Promise<VendorQcPhotoSlotAccepted | VendorJobRefusal> {
+  assertVendorId(vendorId)
+
+  return refusable(async () => {
+    const job = jobId ? await getVendorJob(vendorId, jobId) : null
+    if (!job || !jobId) {
+      throw new VendorWriteRefused(404, { error: 'Job not found', code: 'JOB_NOT_FOUND' })
+    }
+
+    assertJobAcceptsPhotos(job.status)
+    assertSlotOnShotList(job.stage, slot)
+
+    return { ok: true as const, jobId, stage: job.stage, slot }
+  })
+}
+
+export interface VendorQcPhotoInput {
+  slot: string
+  objectKey: string
+  contentType: string
+  sizeBytes: number
+  uploadedBy: string | null
+}
+
+export interface VendorQcPhotoAccepted {
+  ok: true
+  photo: VendorQcPhoto
+  /** The shot this one replaced, or null when the slot was empty. */
+  supersededPhotoId: string | null
+}
+
+/**
+ * Record an uploaded photograph, superseding whatever held the slot.
+ *
+ * Everything `assertVendorMayUploadQcPhoto` checked is checked AGAIN, against a
+ * locked row. The two calls are minutes apart — that is the whole reason the
+ * presign/complete split exists — and nothing guarantees the second came from
+ * the same page, or that the job has not been cancelled or moved to QC in
+ * between.
+ *
+ * The job row is locked FOR UPDATE first, which is what serialises two
+ * `complete` calls for the same slot. Without it both read an empty slot, both
+ * insert, and the partial unique index turns the second into a 500 instead of a
+ * supersession — the same reasoning `routes/review-media.ts` locks the parent
+ * review row for.
+ */
+export async function recordVendorQcPhoto(
+  vendorId: string | null | undefined,
+  jobId: string | undefined,
+  input: VendorQcPhotoInput
+): Promise<VendorQcPhotoAccepted | VendorJobRefusal> {
+  assertVendorId(vendorId)
+
+  // Defence in depth. The route rebuilds the key from `(jobId, slot, filename)`
+  // and refuses a mismatch, so this is unreachable through the router — but
+  // this module is the boundary, and a boundary that trusts its only caller is
+  // a boundary that stops being one the day a second caller appears.
+  const key = objectKeyForScope('qcPhoto', input.objectKey)
+  if (!key || !jobId || !key.startsWith(`production-qc/${jobId}/`)) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: 'That upload key does not belong to this job.',
+        code: 'PHOTO_NOT_FOUND',
+      },
+    }
+  }
+
+  return refusable(async () =>
+    db.transaction(async (tx) => {
+      const [job] = await tx
+        .select({
+          id: productionJobs.id,
+          stage: productionJobs.stage,
+          status: productionJobs.status,
+        })
+        .from(productionJobs)
+        // Scoped again, not trusted from the pre-read: an admin who reassigned
+        // the job in between must win, and this must find nothing.
+        .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+        .limit(1)
+        .for('update')
+
+      if (!job) {
+        throw new VendorWriteRefused(404, { error: 'Job not found', code: 'JOB_NOT_FOUND' })
+      }
+
+      assertJobAcceptsPhotos(job.status)
+      assertSlotOnShotList(job.stage, input.slot)
+
+      const [held] = await tx
+        .select({ id: productionJobPhotos.id })
+        .from(productionJobPhotos)
+        .where(
+          and(
+            eq(productionJobPhotos.jobId, jobId),
+            eq(productionJobPhotos.slot, input.slot),
+            isNull(productionJobPhotos.supersededAt)
+          )
+        )
+        .limit(1)
+
+      const now = new Date()
+
+      // STAMP FIRST, insert second. The partial unique index allows exactly one
+      // row per `(job_id, slot)` with a null `superseded_at`; inserting before
+      // the old row is stamped violates it, and deleting the old row instead
+      // would throw away the history this table exists to keep.
+      if (held) {
+        await tx
+          .update(productionJobPhotos)
+          .set({ supersededAt: now })
+          .where(
+            and(
+              eq(productionJobPhotos.id, held.id),
+              eq(productionJobPhotos.jobId, jobId),
+              // Repeated rather than trusted from the read: anybody who
+              // superseded it in between wins, and we match nothing.
+              isNull(productionJobPhotos.supersededAt)
+            )
+          )
+      }
+
+      const [row] = await tx
+        .insert(productionJobPhotos)
+        .values({
+          jobId,
+          slot: input.slot,
+          objectKey: key,
+          contentType: input.contentType,
+          sizeBytes: input.sizeBytes,
+          uploadedBy: input.uploadedBy,
+          uploadedAt: now,
+        })
+        // Narrow on purpose, and it is also the customer-free list: nothing on
+        // this table names a customer, and the projection stays explicit so the
+        // next column added to it does not arrive in a response by default.
+        .returning({
+          id: productionJobPhotos.id,
+          slot: productionJobPhotos.slot,
+          objectKey: productionJobPhotos.objectKey,
+          contentType: productionJobPhotos.contentType,
+          sizeBytes: productionJobPhotos.sizeBytes,
+          uploadedAt: productionJobPhotos.uploadedAt,
+          reviewId: productionJobPhotos.reviewId,
+        })
+
+      if (!row) {
+        throw new VendorWriteRefused(409, {
+          error: 'The photograph was not recorded; nothing was changed.',
+          code: 'CONCURRENT_MODIFICATION',
+        })
+      }
+
+      return {
+        ok: true as const,
+        photo: {
+          id: row.id,
+          slot: row.slot,
+          key: objectKeyForScope('qcPhoto', row.objectKey),
+          contentType: row.contentType,
+          sizeBytes: row.sizeBytes,
+          uploadedAt: row.uploadedAt,
+          reviewId: row.reviewId,
+        },
+        supersededPhotoId: held?.id ?? null,
+      }
+    })
+  )
+}
+
+export interface VendorQcPhotoRetracted {
+  ok: true
+  photoId: string
+  slot: string
+}
+
+/**
+ * Withdraw a photograph — by SUPERSEDING it, never by deleting it.
+ *
+ * The route is spelled `DELETE` and the collection it removes the row from is
+ * the LIVE shot list, which is what `superseded_at IS NULL` means. The row and
+ * the R2 object both survive: a hard delete would orphan the object forever,
+ * and the 400-day retention window exists precisely so the audit row and the
+ * photograph it refers to do not outlive each other in opposite directions.
+ *
+ * A photograph a review already judged can still be withdrawn. That is not an
+ * oversight: `qc_failed -> received` is a REWORK, and reshooting is the whole
+ * point of it. The judged row keeps its `review_id` and its place in history,
+ * so what the reviewer saw remains answerable.
+ */
+export async function retractVendorQcPhoto(
+  vendorId: string | null | undefined,
+  jobId: string | undefined,
+  photoId: string | undefined
+): Promise<VendorQcPhotoRetracted | VendorJobRefusal> {
+  assertVendorId(vendorId)
+
+  return refusable(async () =>
+    db.transaction(async (tx) => {
+      if (!jobId || !photoId) {
+        throw new VendorWriteRefused(404, { error: 'Job not found', code: 'JOB_NOT_FOUND' })
+      }
+
+      const [job] = await tx
+        .select({ id: productionJobs.id, status: productionJobs.status })
+        .from(productionJobs)
+        .where(and(eq(productionJobs.id, jobId), eq(productionJobs.vendorId, vendorId)))
+        .limit(1)
+        .for('update')
+
+      if (!job) {
+        throw new VendorWriteRefused(404, { error: 'Job not found', code: 'JOB_NOT_FOUND' })
+      }
+
+      assertJobAcceptsPhotos(job.status)
+
+      // Keyed on the job as well as on the id: a real photo id from another
+      // job would otherwise be withdrawn by whoever guessed it.
+      const [live] = await tx
+        .select({ id: productionJobPhotos.id, slot: productionJobPhotos.slot })
+        .from(productionJobPhotos)
+        .where(
+          and(
+            eq(productionJobPhotos.id, photoId),
+            eq(productionJobPhotos.jobId, jobId),
+            isNull(productionJobPhotos.supersededAt)
+          )
+        )
+        .limit(1)
+
+      if (!live) {
+        throw new VendorWriteRefused(404, {
+          error: 'That photograph is not on this job, or has already been replaced.',
+          code: 'PHOTO_NOT_FOUND',
+        })
+      }
+
+      await tx
+        .update(productionJobPhotos)
+        .set({ supersededAt: new Date() })
+        .where(
+          and(
+            eq(productionJobPhotos.id, live.id),
+            eq(productionJobPhotos.jobId, jobId),
+            isNull(productionJobPhotos.supersededAt)
+          )
+        )
+
+      return { ok: true as const, photoId: live.id, slot: live.slot }
+    })
+  )
 }
 
 /** QC history for a job the caller owns. */
