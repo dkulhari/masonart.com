@@ -88,9 +88,10 @@
  *    HOW: rendered bytes behind a five-minute signature, handed to the operating
  *    system, never as fields and never composed here. `GET /jobs/:id/label`
  *    answers `{ jobId, url, expiresInSeconds, expiresAt }` and the customer is
- *    inside the PDF, never beside it. `getVendorJobLabelKey` puts all three
+ *    inside the PDF, never beside it. `getVendorJobLabelKey` puts all four
  *    authorisation conditions in ONE WHERE — the job is theirs, they are the
- *    order's consolidator, a label exists — so a vendor who holds a job on the
+ *    order's consolidator, the job is in a status where a label is legitimately
+ *    needed, a label exists — so a vendor who holds a job on the
  *    order but is not despatching it gets `null`, a 404, AND NO SIGNATURE. The
  *    ordering is the requirement, not the status code: a signed URL that is
  *    generated and then withheld has still been generated, and lives in
@@ -122,8 +123,10 @@ import {
 } from "@chobii/shared";
 
 import { requireAuth } from "../middleware/auth";
+import { rateLimit } from "../middleware/rate-limit";
 import { requireVendor, type VendorVariables } from "../middleware/vendor";
 import { recordAudit } from "../lib/audit";
+import { logger } from "../lib/logger";
 import { VENDOR_SETTABLE_STATUSES } from "../lib/production-transitions";
 import {
   listVendorJobs,
@@ -136,6 +139,7 @@ import {
   getVendorPayableTotal,
   getVendorJobArtwork,
   getVendorJobLabelKey,
+  LabelSeamNotReady,
   listVendorJobPhotos,
   assertVendorMayUploadQcPhoto,
   recordVendorQcPhoto,
@@ -148,6 +152,7 @@ import {
 } from "../lib/vendor-scope";
 import {
   StoragePaths,
+  fileExists,
   getPresignedDownloadUrl,
   getPresignedUploadUrl,
 } from "../lib/storage";
@@ -352,9 +357,30 @@ const vendorApp = new Hono<{ Variables: VendorVariables }>();
 // A vendor role with no link is 403 there, never an unscoped read here.
 vendorApp.use("*", requireAuth, requireVendor);
 
+/**
+ * The last-resort answer, and it says NOTHING it was not asked to say.
+ *
+ * It used to append `error.message` verbatim. On most routers that is merely
+ * untidy; here it sat on `GET /jobs/:id/label` — the one route on this boundary
+ * whose entire purpose is to move a customer's name, address and phone — and it
+ * echoed whatever the driver had raised. The label seam is the concrete case:
+ * `label_object_token` does not exist yet, so every Print Label click answered
+ * `500 Failed to sign label URL: column "order_shipments"."label_object_token"
+ * does not exist`, which is our schema, narrated to a supplier, from the route
+ * that must give the least away.
+ *
+ * A wider argument for the same fix: nothing constrains what a driver puts in a
+ * message. node-postgres keeps constraint VALUES in `detail` rather than in
+ * `message` today, which is the only reason this was a schema disclosure and not
+ * a data one — a property of a dependency, not of our code, and not one worth
+ * betting a customer's address on.
+ *
+ * So the caller gets the action that failed and nothing else, and the details go
+ * to the log, where an operator can read them and a vendor cannot.
+ */
 function failed(action: string, error: unknown) {
-  const message = error instanceof Error ? error.message : "Unknown error";
-  return { error: `Failed to ${action}: ${message}` } as const;
+  logger.error({ err: error }, `vendor portal: failed to ${action}`);
+  return { error: `Failed to ${action}` } as const;
 }
 
 // ============================================================================
@@ -484,6 +510,16 @@ vendorApp.get(
  * everyone else on the order shipped their piece onward by transfer and has no
  * business with the customer's address.
  *
+ * A fourth condition rides in the same WHERE and is the one this route was
+ * missing: the job's STATUS. `LABEL_ACCESS_STATUSES` is derived from the
+ * transition matrix — the statuses a vendor can take the
+ * `open-transfer-or-order-label` edge from, which today is `qc_passed` alone —
+ * so the window opens where decision 4 of the design says it does ("photo QC
+ * gates the label") and closes at despatch. Without it a vendor whose job had
+ * been CANCELLED, and who had been told in as many words to stop work, could
+ * still print the customer's name, address and phone for as long as the
+ * consolidation row survived.
+ *
  * A miss ends the request at the 404 below, BEFORE `getPresignedDownloadUrl` is
  * reached. That is the requirement, not the status code. A signed URL that is
  * generated and then withheld has still been generated, and lives in whatever
@@ -498,6 +534,15 @@ vendorApp.get(
  * path is a stable person-linked handle living in the one place an assertion
  * about JSON *keys* can never reach, since the object key rides in the path of
  * the signed URL as a value.
+ *
+ * ## The seam under all of this, and the 503
+ *
+ * `order_shipments.label_object_token` does not exist yet — it belongs to
+ * `order-dispatch-tracking` — so in every environment today this route's read
+ * raises, and the catch answers **503 with a fixed body**. Not a 404, which
+ * would make a missing seam indistinguishable from "no label bought yet", and
+ * not the old 500, which echoed the driver's sentence and so published our
+ * schema from the one route that must give the least away.
  *
  * ## The audit row
  *
@@ -550,6 +595,38 @@ vendorApp.get("/jobs/:id/label", zValidator("param", jobParamSchema), async (c) 
       ).toISOString(),
     });
   } catch (error) {
+    // The SEAM, answered deliberately. `order_shipments.label_object_token`
+    // belongs to `order-dispatch-tracking` and has not landed, so this route
+    // cannot work yet in any environment. Three answers were possible and two
+    // are wrong: a 404 would dress a missing seam up as "no label bought yet"
+    // and hide it for as long as nobody checked, and the 500 this used to give
+    // quoted the driver's own sentence back — our schema, narrated to a
+    // supplier, from the one route that carries a customer's address.
+    //
+    // So: 503, a FIXED body naming no column, table or driver, and a message the
+    // consolidator can act on — the label is not available here yet, ask the
+    // office. `LabelSeamNotReady` is a type rather than a parsed message, so it
+    // cannot be raised by anything except the seam, and every other failure
+    // still falls through to the generic 500 below.
+    //
+    // `tests/lib/vendor-label-seam.test.ts` goes RED the day the column lands.
+    // Delete this branch then, and the catch in `getVendorJobLabelKey` with it.
+    if (error instanceof LabelSeamNotReady) {
+      logger.error(
+        { err: error },
+        "vendor portal: label requested before the dispatch-tracking seam landed"
+      );
+      return c.json(
+        {
+          error:
+            "Carrier labels are not available in the portal yet. Nothing is " +
+            "wrong with this order — ask the office for the label.",
+          code: "LABEL_NOT_AVAILABLE",
+        },
+        503
+      );
+    }
+
     return c.json(failed("sign label URL", error), 500);
   }
 });
@@ -729,9 +806,32 @@ vendorApp.get(
  * Every refusal is answered BEFORE the presigner is reached. A signed URL that
  * is generated and then withheld has still been generated, and lives in
  * whatever log, trace or crash dump saw it.
+ *
+ * ## Two bounds on VOLUME, because this route hands out write capability
+ *
+ * A presigned PUT is permission to put bytes in our bucket, and this route used
+ * to hand them out without limit: no row is created, so nothing counted, and
+ * `getPresignedUploadUrl` signs `Key` and `ContentType` only — with no
+ * content-length range in the policy, `QC_PHOTO_MAX_BYTES` below is a declared
+ * size we check, not a size R2 enforces.
+ *
+ * 1. **Per job.** `assertVendorMayUploadQcPhoto` now refuses once the job holds
+ *    `MAX_QC_PHOTOS_PER_JOB` photograph rows, superseded ones included —
+ *    `review-media.ts`'s `MAX_MEDIA_PER_REVIEW` check, moved into the scoped
+ *    module because this file holds no database access. Bytes per job are
+ *    bounded by that count times the size cap.
+ * 2. **Per caller, per minute.** A vendor who never calls `complete` writes no
+ *    rows at all, so the count alone cannot bound the RATE. The shared IP
+ *    limiter does, and 60 a minute is far past photographing eight shots and far
+ *    short of a script.
+ *
+ * The remaining gap is deliberate and named: a content-length range belongs in
+ * the signing policy in `lib/storage.ts`, which `routes/review-media.ts` shares,
+ * and widening that signature is not this route's change to make.
  */
 vendorApp.post(
   "/jobs/:id/photos/presign",
+  rateLimit({ limit: 60, windowSeconds: 60, keyPrefix: "vendor-qc-presign" }),
   zValidator("param", jobParamSchema),
   zValidator("json", photoPresignSchema, (result, c) => {
     if (!result.success) {
@@ -819,6 +919,11 @@ vendorApp.post(
  * The previous live photo is superseded, never deleted, and the stamp happens
  * before the insert so the partial unique index on `(job_id, slot) WHERE
  * superseded_at IS NULL` is never violated. Both are in one transaction.
+ *
+ * **And the object is checked for.** Re-validating the claim is not the same as
+ * verifying it: a well-formed key names an object that may never have been
+ * uploaded, and a row written for one is QC evidence of nothing. 422, because it
+ * is the refusal the caller can actually fix — retry the PUT, then say so.
  */
 vendorApp.post(
   "/jobs/:id/photos/complete",
@@ -871,6 +976,30 @@ vendorApp.post(
             maxBytes: QC_PHOTO_MAX_BYTES,
           },
           400
+        );
+      }
+
+      // AND THE OBJECT IS REALLY THERE. Everything above judges the SHAPE of a
+      // claim; nothing above it has looked in the bucket, and the shot-list
+      // guard that holds the label shut is satisfied by rows, not by
+      // photographs. Three `complete` calls with well-formed fabricated keys
+      // used to take a job `received -> qc_submitted` with nobody having
+      // photographed anything — the QC gate passing on evidence that does not
+      // exist, which is worse than no gate, because the audit row says a human
+      // looked.
+      //
+      // A HEAD on one key, after the cheap checks and before any row is written.
+      // It leaks nothing: the key embeds a uuid WE minted at presign, so only a
+      // caller who already held the job can name one at all.
+      if (!(await fileExists(key))) {
+        return c.json(
+          {
+            error:
+              "We cannot find that photograph in storage. The upload did not " +
+              "finish — send the file again, then record it.",
+            code: "PHOTO_OBJECT_MISSING",
+          },
+          422
         );
       }
 

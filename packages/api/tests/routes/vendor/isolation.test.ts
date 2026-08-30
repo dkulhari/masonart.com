@@ -234,6 +234,10 @@ vi.mock('../../../src/lib/storage', async (importOriginal) => ({
   // Exported into the mock ON PURPOSE, so "nobody called it" is a real
   // observation rather than an absence of evidence.
   getPublicUrl: (...args: unknown[]) => mockPublicUrl(...(args as [string])),
+  // The bucket says yes. `complete` verifies the object exists before it writes
+  // a row for it (#687's shot-list fix); the real client would HEAD a bucket no
+  // unit run has, and answer no to everything.
+  fileExists: async (_key: string) => true,
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'

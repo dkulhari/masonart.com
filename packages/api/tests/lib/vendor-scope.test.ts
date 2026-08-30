@@ -59,6 +59,18 @@ describe('vendor-scope module contract', () => {
    */
   const pureHelpers = ['objectKeyForScope'] as const
 
+  /**
+   * Exported ERROR TYPES. `typeof` a class is `'function'`, so they land in the
+   * account below and have to be named — which is the right outcome: an error
+   * this module exports is part of its contract, and the route that catches it
+   * behaves differently because of it.
+   *
+   * `LabelSeamNotReady` says `order_shipments.label_object_token` has not landed
+   * yet. It reads no vendor data and takes no vendorId — it is thrown by
+   * `getVendorJobLabelKey`, which is enrolled above and refuses without one.
+   */
+  const errorTypes = ['LabelSeamNotReady'] as const
+
   it('exports every vendor-facing query', () => {
     for (const fn of scopedFns) {
       expect(typeof (scope as any)[fn], `${fn} missing`).toBe('function')
@@ -83,7 +95,10 @@ describe('vendor-scope module contract', () => {
     // was not examined.
     const exported = Object.keys(scope).filter((k) => typeof (scope as any)[k] === 'function')
     const unaccounted = exported.filter(
-      (k) => !scopedFns.includes(k as any) && !pureHelpers.includes(k as any)
+      (k) =>
+        !scopedFns.includes(k as any) &&
+        !pureHelpers.includes(k as any) &&
+        !errorTypes.includes(k as any)
     )
     expect(unaccounted).toEqual([])
   })

@@ -58,7 +58,13 @@
  */
 
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
-import { qcShotsForStage, requiredQcSlots, type QcStage } from '@chobii/shared'
+import {
+  QC_SHOT_LIST,
+  QC_STAGES,
+  qcShotsForStage,
+  requiredQcSlots,
+  type QcStage,
+} from '@chobii/shared'
 import { db } from '../database'
 import {
   productionJobs,
@@ -76,12 +82,14 @@ import {
 import { orderShipments } from '../database/schema/shipping'
 import { vendorRates } from '../database/schema/vendors'
 import {
+  PRODUCTION_TRANSITIONS,
   ProductionTransitionError,
   QC_PHOTO_UPLOAD_STATUSES,
   VENDOR_SETTABLE_STATUSES,
   assertTransition,
   guardFor,
   type ProductionJobStatus,
+  type TransitionGuard,
 } from './production-transitions'
 
 /**
@@ -387,20 +395,78 @@ export async function getVendorJobArtwork(
  * Written as a SQL fragment rather than a drizzle column for exactly that
  * reason — inventing the column in `schema/shipping.ts` would put this feature's
  * name on another sub-project's table and produce a migration nobody owns.
- * Until that column lands, this query throws. `GET /api/vendor/jobs/:id/label`
- * calls it as of #687 and turns that throw into a 500 — deliberately, and NOT
- * into a 404: "the label is not ready" and "the column this feature reads does
- * not exist" are different facts, and answering the second with the first would
- * make a missing seam look like an ordinary empty state for as long as nobody
- * checked. What must never happen is a FALLBACK — substituting the order id, or
- * any other handle that names a person, would put it in the path of a signed
- * URL where no assertion about JSON keys can see it. Replace this fragment with
- * `orderShipments.labelObjectToken` the day it exists.
+ * Until that column lands, this query throws — Postgres raises `42703`,
+ * `column "label_object_token" does not exist`.
+ *
+ * **That throw is CAUGHT, and it is caught here.** It used to travel to
+ * `routes/vendor.ts`'s catch-all and come back as a 500 whose body quoted the
+ * database's own sentence — on the one route that exists to carry customer PII,
+ * which is the last place to be narrating our schema to a supplier. The reasons
+ * it must not be a 404 are unchanged and still right: "no label has been bought
+ * for this order yet" and "the column this feature reads does not exist" are
+ * different facts, and answering the second with the first hides a missing seam
+ * behind an ordinary empty state. So it becomes a THIRD answer — a
+ * `LabelSeamNotReady` throw, which the route turns into a fixed 503 that names
+ * no column, no table and no driver. The vendor is told the label is not
+ * available yet; nobody is told what our shipping table looks like.
+ *
+ * Nothing here becomes a FALLBACK. Substituting the order id, or any other
+ * handle that names a person, would put it in the path of a signed URL where no
+ * assertion about JSON keys can see it. Replace this fragment with
+ * `orderShipments.labelObjectToken` the day it exists, and delete the catch
+ * below with it — `tests/lib/vendor-label-seam.test.ts` goes red on the day the
+ * column lands and says so, so this is noticed rather than discovered.
  *
  * A random token, following the `production_approvals.approval_token`
  * precedent, and NOT the order id. See `getVendorJobLabelKey`.
  */
 const LABEL_OBJECT_TOKEN = sql`"order_shipments"."label_object_token"`
+
+/** The column name, once, so the catch below and the doc above cannot drift. */
+const LABEL_OBJECT_TOKEN_COLUMN = 'label_object_token'
+
+/** Postgres `undefined_column`. The exact class of failure the seam produces. */
+const UNDEFINED_COLUMN = '42703'
+
+/**
+ * The label seam has not landed yet, said as a TYPE rather than as a message.
+ *
+ * Carries no cause and no driver text on purpose: the route answers it with a
+ * fixed body, and a class the route can `instanceof` cannot accidentally echo
+ * what it wrapped. `Error.message` here is what an operator reads in a log, not
+ * what a vendor reads in a response.
+ */
+export class LabelSeamNotReady extends Error {
+  readonly code = 'LABEL_SEAM_NOT_READY' as const
+
+  constructor() {
+    super(
+      'vendor-scope: order_shipments has no label token column yet — the ' +
+        'order-dispatch-tracking seam has not landed'
+    )
+    this.name = 'LabelSeamNotReady'
+  }
+}
+
+/**
+ * Is this failure the MISSING SEAM, and not some other broken query?
+ *
+ * Both halves are required. `42703` alone would swallow a genuine typo in a
+ * column somewhere else in this select and report it to an operator as "the
+ * label feature is not wired up yet", which is a bug that hides for months. The
+ * column name alone would catch a permissions error that happened to quote it.
+ * A driver that reports no `code` still gets recognised by the sentence
+ * Postgres always renders, so this does not depend on one client library.
+ */
+function isMissingLabelSeam(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+
+  const { code, message } = error as { code?: unknown; message?: unknown }
+  const text = typeof message === 'string' ? message : ''
+  if (!text.includes(LABEL_OBJECT_TOKEN_COLUMN)) return false
+
+  return code === UNDEFINED_COLUMN || /does not exist/i.test(text)
+}
 
 /**
  * A token is DATA, read from a table this feature does not write. It becomes a
@@ -410,6 +476,57 @@ const LABEL_OBJECT_TOKEN = sql`"order_shipments"."label_object_token"`
  * `fulfilment/labels/<token>.pdf` meaning one file rather than a subtree.
  */
 const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
+
+/** The guard a label exists, on this boundary, in order to satisfy. */
+const LABEL_GUARD: TransitionGuard = 'open-transfer-or-order-label'
+
+/**
+ * The job statuses in which a vendor may fetch the carrier label.
+ *
+ * ## Derived from the matrix, not listed
+ *
+ * The same move `QC_PHOTO_UPLOAD_STATUSES` makes, for the same reason. A
+ * photograph exists to satisfy `shot-list-complete`, so its window is the set of
+ * statuses a vendor can take THAT edge from. A label exists, on this boundary, to
+ * satisfy `open-transfer-or-order-label` on the one edge a vendor takes with it —
+ * `qc_passed -> dispatched`, §4 of the design — so its window is the set of
+ * statuses a vendor can take that edge from. Today: `qc_passed`, alone. A guard
+ * that moves to a different edge moves this window with it, and neither this
+ * file nor the design has to be edited twice.
+ *
+ * ## Why each excluded status is excluded, since this is a PII bound
+ *
+ * - `draft`, `assigned`, `received`, `qc_submitted` — the work has not been
+ *   accepted. Decision 4 of the design is "photo QC gates the label"; a label
+ *   readable before the gate opens is the gate not existing. A vendor who has
+ *   not yet been told their work is good has no parcel to hand a courier.
+ * - `cancelled` — the freeze `updateVendorJob` installs says, in as many words,
+ *   *"stop work on this piece"*. A route that then hands over the customer's
+ *   name, address and phone is that same refusal walking in through another
+ *   door, and it was the more serious half: the audit row recorded the fetch and
+ *   nothing prevented it.
+ * - `dispatched` — TERMINAL. Nothing leaves it, so including it would not be a
+ *   window at all: it would make every consolidated order's label permanently
+ *   fetchable by that vendor, for as long as the `order_consolidation` row
+ *   survives, which is the unbounded half of the same defect. The label is
+ *   printed and stuck to the parcel BEFORE the vendor says it went, so the
+ *   window closes exactly where the need does. A reprint after handover is an
+ *   admin's job, and an admin has the order.
+ *
+ * ## It fails closed
+ *
+ * If the guard is ever renamed and this derives empty, `inArray(status, [])`
+ * renders `false` and the label becomes unreachable for everybody — the safe
+ * direction, and `tests/lib/vendor-label-seam.test.ts` asserts the derivation is
+ * non-empty so the silence is not how anyone finds out.
+ */
+export const LABEL_ACCESS_STATUSES: readonly ProductionJobStatus[] = (
+  Object.keys(PRODUCTION_TRANSITIONS) as ProductionJobStatus[]
+).filter((from) =>
+  Object.values(PRODUCTION_TRANSITIONS[from]).some(
+    (edge) => edge?.guard === LABEL_GUARD && edge.actors.includes('vendor')
+  )
+)
 
 /**
  * The object key for the carrier label on an order this vendor is consolidating.
@@ -425,11 +542,13 @@ const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
  * key; it is never in it. The token follows the
  * `production_approvals.approval_token` precedent.
  *
- * ## Three AUTHORISATION conditions live in the WHERE — and a fourth does not
+ * ## Four AUTHORISATION conditions live in the WHERE — and a fifth does not
  *
  * The job is this vendor's; the order's consolidator (`order_consolidation`) is
- * this vendor; a label token exists. One query, three predicates, no branch in
- * application code where one of them can be skipped. A vendor who holds a job on
+ * this vendor; the job is in a status where a label is legitimately needed
+ * (`LABEL_ACCESS_STATUSES`, derived from the matrix); a label token exists. One
+ * query, four predicates, no branch in application code where one of them can be
+ * skipped. A vendor who holds a job on
  * the order but is NOT the consolidator gets `null` — a 404 at the route — and
  * the presigner is **never reached**. That is the actual requirement: a signed
  * URL that is generated and then withheld has still been generated, and lives in
@@ -440,10 +559,18 @@ const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
  * order shipped their piece onward by inter-vendor transfer and has no business
  * with the customer's address.
  *
- * ## The fourth condition: WHICH shipment
+ * And only WHILE they need it. The status predicate is not decoration: without
+ * it a vendor whose job was cancelled — told in as many words to stop work —
+ * could still fetch the customer's name, address and phone as a PDF, for as long
+ * as the `order_consolidation` row survived, and a `draft` or `assigned` job
+ * granted the same. The audit row recorded each fetch; nothing prevented one.
+ * `LABEL_ACCESS_STATUSES` above says which statuses those are and why.
+ *
+ * ## The fifth condition: WHICH shipment
  *
  * It is not an authorisation check and it cannot be written as a predicate, so
- * spelling out "all three" and stopping there was a lie of omission.
+ * spelling out the authorisation conditions and stopping there was a lie of
+ * omission.
  * `order_shipments.order_id` is a plain indexed FK, NOT unique
  * (`schema/shipping.ts`), so an order whose label was voided and re-bought
  * carries more than one row, each with its own `label_object_token`. A bare
@@ -482,7 +609,7 @@ export async function getVendorJobLabelKey(
   assertVendorId(vendorId)
   if (!jobId) return null
 
-  const [row] = await db
+  const read = db
     // Narrow on purpose, like every read above: the token and nothing else.
     // `orders`, `order_shipments` and `order_consolidation` all hold or point
     // at customer data, and a wholesale select of any of them would drag it
@@ -498,11 +625,14 @@ export async function getVendorJobLabelKey(
         eq(productionJobs.vendorId, vendorId),
         // ...AND they are the one despatching the order...
         eq(orderConsolidation.vendorId, vendorId),
-        // ...AND a label actually exists. All three, or no row.
+        // ...AND the job is in a status where a label is legitimately needed,
+        // which is derived from the matrix rather than listed here...
+        inArray(productionJobs.status, [...LABEL_ACCESS_STATUSES]),
+        // ...AND a label actually exists. All four, or no row.
         sql`${LABEL_OBJECT_TOKEN} is not null`
       )
     )
-    // The fourth condition, and the reason this is not a bare LIMIT 1. Several
+    // The fifth condition, and the reason this is not a bare LIMIT 1. Several
     // labelled shipments can hang off one order (voided and re-bought); without
     // an ORDER BY the row is whichever one the planner reached first. Newest
     // labelled shipment wins, `id` making the ordering total.
@@ -511,7 +641,20 @@ export async function getVendorJobLabelKey(
     .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
     .limit(1)
 
-  const token = row?.token
+  // The SEAM's failure is caught at the seam. `label_object_token` does not
+  // exist yet, so this read raises `42703` in every environment; letting that
+  // travel to the route made a schema disclosure out of the one route that
+  // carries customer data. See `LABEL_OBJECT_TOKEN` above for the whole story
+  // and for what to delete the day the column lands.
+  let rows: { token: string | null }[] = []
+  try {
+    rows = await read
+  } catch (error) {
+    if (isMissingLabelSeam(error)) throw new LabelSeamNotReady()
+    throw error
+  }
+
+  const token = rows[0]?.token
   if (typeof token !== 'string' || !LABEL_TOKEN_PATTERN.test(token)) return null
 
   // Through the same allow-list every other signature passes, under its OWN
@@ -662,6 +805,14 @@ export type VendorJobRefusalCode =
   | 'SLOT_NOT_ON_SHOT_LIST'
   /** No LIVE photo with that id on that job. Superseded counts as gone. */
   | 'PHOTO_NOT_FOUND'
+  /** The job has had every photograph we keep for one piece. */
+  | 'PHOTO_LIMIT_REACHED'
+  /**
+   * The object the caller says it uploaded is not in the bucket. Emitted by
+   * `routes/vendor.ts`, which owns the storage call, and named here so the
+   * portal reads ONE vocabulary of refusal codes.
+   */
+  | 'PHOTO_OBJECT_MISSING'
   /** No parcel with that id at either of this vendor's ends. */
   | 'TRANSFER_NOT_FOUND'
   /** One parcel, one order: `production_transfers.order_id` is single-valued. */
@@ -1215,6 +1366,80 @@ export async function listVendorJobPhotos(
   }
 }
 
+/**
+ * Shots at one slot before we stop taking photographs: the original round, a
+ * reshoot after a failed inspection, and three more for one that came out badly.
+ * Comfortably past any honest workflow, which is the point — this is a backstop
+ * against abuse, not a workflow limit.
+ */
+const QC_PHOTO_ATTEMPTS_PER_SLOT = 5
+
+/**
+ * The most photographs one job will ever hold, SUPERSEDED ROWS INCLUDED.
+ *
+ * `routes/review-media.ts` caps a review at `MAX_MEDIA_PER_REVIEW = 5` and
+ * counts every row it already has; this is the same cap on the same reasoning,
+ * sized for a different collection. Without one, a vendor holding a single job
+ * could write rows — and objects behind them — without end: `presign` creates no
+ * row and refuses nothing on volume, and `complete` supersedes rather than
+ * replaces, so re-uploading one slot appends for ever.
+ *
+ * **Every row counts, including the ones a re-upload superseded.** Counting only
+ * the live shot list would cap nothing: the whole point of the append-only table
+ * is that the old row survives, and so does the object behind it. This is a cap
+ * on bytes as much as on rows, and the object behind a superseded row is exactly
+ * the byte cost this bounds.
+ *
+ * **DERIVED, not chosen**: attempts per slot times the longest shot list
+ * (`frame`'s eight), so a stage that grows a shot moves the cap with it. One job
+ * is therefore bounded at `MAX_QC_PHOTOS_PER_JOB × QC_PHOTO_MAX_BYTES` — 40 × 25MB
+ * today — and a vendor's total by the jobs an ADMIN assigned them, rather than by
+ * their own patience.
+ */
+export const MAX_QC_PHOTOS_PER_JOB =
+  QC_PHOTO_ATTEMPTS_PER_SLOT * Math.max(...QC_STAGES.map((stage) => QC_SHOT_LIST[stage].length))
+
+/**
+ * How many photograph rows this job holds, live and superseded alike.
+ *
+ * Takes the READER so the pre-check can ask `db` and the enforcement can ask the
+ * transaction that holds the job's lock. `production_job_photos` carries no
+ * vendor column: it is job-keyed, and every caller here has already read the job
+ * with `vendorId` in its WHERE, which is what makes this safe.
+ */
+async function countJobPhotos(reader: VendorReader, jobId: string): Promise<number> {
+  const [row] = await reader
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productionJobPhotos)
+    .where(eq(productionJobPhotos.jobId, jobId))
+
+  return Number(row?.count ?? 0)
+}
+
+/**
+ * Refuse a job that has already had all the photographs we keep.
+ *
+ * 409, like `review-media.ts`'s sixth upload and for the same reason: the world
+ * is the way it is and no edit to the payload changes it. At `presign` this is
+ * answered before a signature exists at all; at `complete` it is answered inside
+ * the transaction, under the job's lock, which is what stops two calls landing
+ * either side of one count and both passing.
+ */
+async function assertJobUnderPhotoCap(reader: VendorReader, jobId: string): Promise<void> {
+  const held = await countJobPhotos(reader, jobId)
+  if (held < MAX_QC_PHOTOS_PER_JOB) return
+
+  throw new VendorWriteRefused(409, {
+    error:
+      `This job already holds the ${MAX_QC_PHOTOS_PER_JOB} photographs we keep for one ` +
+      `piece, counting shots that were replaced. Tell us what is missing rather than ` +
+      `uploading more.`,
+    code: 'PHOTO_LIMIT_REACHED',
+    limit: MAX_QC_PHOTOS_PER_JOB,
+    held,
+  })
+}
+
 /** Refuse unless the job is in the window where its shot list may change. */
 function assertJobAcceptsPhotos(status: ProductionJobStatus): void {
   if (QC_PHOTO_UPLOAD_STATUSES.includes(status)) return
@@ -1293,6 +1518,10 @@ export async function assertVendorMayUploadQcPhoto(
 
     assertJobAcceptsPhotos(job.status)
     assertSlotOnShotList(job.stage, slot)
+    // Volume, checked BEFORE a signature exists. `presign` writes no row, so
+    // this is the only place the count can stop an upload that would otherwise
+    // put bytes in the bucket and be refused afterwards at `complete`.
+    await assertJobUnderPhotoCap(db, jobId)
 
     return { ok: true as const, jobId, stage: job.stage, slot }
   })
@@ -1372,6 +1601,11 @@ export async function recordVendorQcPhoto(
 
       assertJobAcceptsPhotos(job.status)
       assertSlotOnShotList(job.stage, input.slot)
+      // The ENFORCEMENT half. Inside the transaction and behind the job's
+      // `FOR UPDATE`, so two `complete` calls cannot read the same count either
+      // side of one insert and both pass it — `review-media.ts` locks its parent
+      // review row for exactly this, and the lock above is already held here.
+      await assertJobUnderPhotoCap(tx, jobId)
 
       const [held] = await tx
         .select({ id: productionJobPhotos.id })
@@ -2144,9 +2378,16 @@ export async function markVendorTransferReceived(
           reference: productionTransfers.reference,
           dispatchedAt: productionTransfers.dispatchedAt,
           receivedAt: productionTransfers.receivedAt,
-          // INTERNAL. `lostAt` has never been in a vendor-facing projection and
-          // is not going into one: a vendor is told the parcel is not receivable,
-          // not that we wrote it off and paid somebody to remake the work.
+          // READ, NEVER PROJECTED. `lostAt` decides the refusal below and has
+          // never been in a vendor-facing projection. The refusal itself does
+          // say the parcel was written off and the work is being remade, and
+          // that is deliberate: this reaches the RECEIVING vendor, the one
+          // standing there waiting for a parcel that is never coming, and
+          // "cannot be confirmed" with no reason is how a consolidator stays
+          // frozen holding an order open for a piece nobody is sending. What
+          // stays inside is the ledger around it — WHEN we wrote it off, what it
+          // cost, who is remaking it and at whose expense. None of that is a
+          // vendor's to see, and none of it is in the message.
           lostAt: productionTransfers.lostAt,
         })
         .from(productionTransfers)

@@ -91,6 +91,19 @@ const mockDownloadPresign = vi.hoisted(() =>
 const mockPublicUrl = vi.hoisted(() => vi.fn((key: string) => `https://cdn.example.com/${key}`))
 
 /**
+ * The bucket, answering whether the object the caller claims to have uploaded
+ * is really there.
+ *
+ * Mocked rather than left to the real client — which would HEAD a bucket that
+ * does not exist in a unit run and answer `false` for every key — and default
+ * TRUE, so the suites below go on testing what they were written to test. The
+ * `false` case is a test of its own: `complete` must refuse a well-formed key
+ * naming nothing, because a QC gate satisfied by rows nobody photographed is
+ * worse than no gate.
+ */
+const mockFileExists = vi.hoisted(() => vi.fn(async (_key: string) => true))
+
+/**
  * `StoragePaths` is the REAL one. The whole point of `complete`'s key check is
  * that the route rebuilds the key the same way `presign` built it; a stubbed
  * builder would make that agreement true by construction and prove nothing.
@@ -102,6 +115,7 @@ vi.mock('../../../src/lib/storage', async (importOriginal) => ({
   getPresignedDownloadUrl: (...args: unknown[]) =>
     mockDownloadPresign(...(args as [string, number?])),
   getPublicUrl: (...args: unknown[]) => mockPublicUrl(...(args as [string])),
+  fileExists: (...args: unknown[]) => mockFileExists(...(args as [string])),
 }))
 
 const auditSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
@@ -112,6 +126,7 @@ vi.mock('../../../src/lib/audit', async (importOriginal) => ({
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'
+import { MAX_QC_PHOTOS_PER_JOB } from '../../../src/lib/vendor-scope'
 import { readJson } from '../../helpers/json'
 import { QC_PHOTO_CONTENT_TYPES, QC_PHOTO_MAX_BYTES } from '@chobii/shared'
 
@@ -218,6 +233,8 @@ beforeEach(() => {
   mockDownloadPresign.mockClear()
   mockDownloadPresign.mockResolvedValue(DOWNLOAD_URL)
   mockPublicUrl.mockClear()
+  mockFileExists.mockClear()
+  mockFileExists.mockResolvedValue(true)
   queueRows({ 'select:vendor_users': [[{ vendorId: VENDOR_ID, status: 'active' }]] })
 })
 
@@ -422,6 +439,45 @@ describe('POST /api/vendor/jobs/:id/photos/presign', () => {
     expect((await readJson(res)).maxBytes).toBe(QC_PHOTO_MAX_BYTES)
     expect(mockUploadPresign).not.toHaveBeenCalled()
   })
+
+  it('refuses once the job holds every photograph we keep, and signs nothing', async () => {
+    // A presigned PUT is permission to write bytes into our bucket, and this
+    // route creates no row — so without a count NOTHING bounded how many a
+    // vendor could ask for. `review-media.ts` caps a review at five and counts
+    // what it already has; this is the same check, one level down.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[{ count: MAX_QC_PHOTOS_PER_JOB }]],
+    })
+
+    const res = await presign()
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    expect(body.code).toBe('PHOTO_LIMIT_REACHED')
+    expect(body.limit).toBe(MAX_QC_PHOTOS_PER_JOB)
+    // Before the presigner, not after it: a signed URL that is generated and
+    // then withheld has still been generated.
+    expect(mockUploadPresign).not.toHaveBeenCalled()
+  })
+
+  it('counts SUPERSEDED photographs too — the cap is on bytes, not on the live list', async () => {
+    // Counting only the live shot list would cap nothing: a re-upload supersedes
+    // rather than replaces, so the old row and the object behind it both
+    // survive, and one slot could be re-shot for ever.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[{ count: 3 }]],
+    })
+
+    const res = await presign()
+    expect(res.status).toBe(200)
+
+    const counted = ops('select', productionJobPhotos)[0]
+    expect(counted, 'nothing counted the photographs on this job').toBeDefined()
+    expect(render(counted?.where).sql).not.toContain('superseded_at')
+    expect(params(counted?.where)).toContain(JOB_ID)
+  })
 })
 
 // ============================================================================
@@ -491,9 +547,14 @@ describe('POST /api/vendor/jobs/:id/photos/complete', () => {
     // The row it stamps is the LIVE one it found in this slot on this job —
     // located by slot, stamped by id, and both predicates repeated in the
     // UPDATE so anybody who superseded it in between wins instead.
-    const located = ops('select', productionJobPhotos)[0]
+    // Found by what it DOES, not by its position: the volume cap counts this
+    // table first, so `[0]` is now the `count(*)` and asserting on it would be
+    // asserting on the wrong query.
+    const located = ops('select', productionJobPhotos).find((q) =>
+      render(q.where).sql.includes('superseded_at')
+    )
+    expect(located, 'the live photo in the slot was never located').toBeDefined()
     expect(params(located?.where)).toEqual(expect.arrayContaining([JOB_ID, 'print_full']))
-    expect(render(located?.where).sql).toContain('superseded_at')
 
     const supersede = photoWrites[0]
     expect((supersede.values as Record<string, unknown>).supersededAt).toBeInstanceOf(Date)
@@ -566,6 +627,91 @@ describe('POST /api/vendor/jobs/:id/photos/complete', () => {
     const res = await complete({ contentType: 'video/mp4' })
     expect(res.status).toBe(400)
     expect(ops('insert', productionJobPhotos)).toEqual([])
+  })
+
+  // --------------------------------------------------------------------------
+  // The object has to BE there
+  // --------------------------------------------------------------------------
+
+  it('refuses a well-formed key naming an object that was never uploaded', async () => {
+    // The whole shot-list guard rests on rows, and a row is a CLAIM until
+    // something looks in the bucket. Three of these calls with fabricated keys
+    // used to take a job `received -> qc_submitted` with nobody having
+    // photographed anything — a QC gate satisfied by an empty bucket, which is
+    // worse than no gate, because the audit row says evidence was filed.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[]],
+    })
+    mockFileExists.mockResolvedValueOnce(false)
+
+    const res = await complete()
+    expect(res.status).toBe(422)
+
+    const body = await readJson(res)
+    expect(body.code).toBe('PHOTO_OBJECT_MISSING')
+    // 422, because it is the refusal the caller can act on: PUT the file, then
+    // say so. And nothing is recorded for a photograph that does not exist.
+    expect(ops('insert', productionJobPhotos)).toEqual([])
+    expect(queries.filter((q) => q.op !== 'select')).toEqual([])
+  })
+
+  it('asks the bucket about the KEY IT VERIFIED, once, and only after the cheap checks', async () => {
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[]],
+      'insert:production_job_photos': [[photoRow({ objectKey: KEY })]],
+    })
+
+    expect((await complete()).status).toBe(201)
+    expect(mockFileExists).toHaveBeenCalledTimes(1)
+    expect(mockFileExists.mock.calls[0][0]).toBe(KEY)
+
+    // A key we would never have issued, or a type we do not take, is refused
+    // without a round trip to storage at all.
+    mockFileExists.mockClear()
+    await complete({ key: 'products/originals/abc.jpg' })
+    await complete({ contentType: 'video/mp4' })
+    expect(mockFileExists).not.toHaveBeenCalled()
+  })
+
+  // --------------------------------------------------------------------------
+  // The volume cap
+  // --------------------------------------------------------------------------
+
+  it('refuses at the cap INSIDE the transaction, and inserts nothing', async () => {
+    // The presign check is a courtesy; this is the enforcement. It runs behind
+    // the job's `FOR UPDATE`, which is what stops two `complete` calls reading
+    // the same count either side of one insert — `review-media.ts` locks its
+    // parent review row for exactly this.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[{ count: MAX_QC_PHOTOS_PER_JOB }]],
+    })
+
+    const res = await complete()
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    expect(body.code).toBe('PHOTO_LIMIT_REACHED')
+    expect(body.limit).toBe(MAX_QC_PHOTOS_PER_JOB)
+    expect(ops('insert', productionJobPhotos)).toEqual([])
+
+    // Inside the transaction, so the refusal rolls back rather than returns.
+    const counted = ops('select', productionJobPhotos)[0]
+    expect(counted?.inTx, 'the cap was counted outside the job lock').toBe(true)
+  })
+
+  it('lets the last photograph under the cap through', async () => {
+    // A cap that is off by one is a cap that blocks honest work, so the boundary
+    // is asserted from both sides.
+    queueRows({
+      'select:production_jobs': [[jobRow()]],
+      'select:production_job_photos': [[{ count: MAX_QC_PHOTOS_PER_JOB - 1 }], []],
+      'insert:production_job_photos': [[photoRow({ objectKey: KEY })]],
+    })
+
+    expect((await complete()).status).toBe(201)
   })
 })
 
