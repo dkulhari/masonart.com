@@ -146,7 +146,7 @@ function setupMocks() {
     values: vi.fn(() => ({
       returning: vi.fn(() => Promise.resolve([mockApproval])),
     })),
-  }) as any);
+  }) as never as any);
 
   vi.mocked(db.update).mockImplementation(() => ({
     set: vi.fn(() => ({
@@ -154,11 +154,11 @@ function setupMocks() {
         returning: vi.fn(() => Promise.resolve([mockApproval])),
       })),
     })),
-  }) as any);
+  }) as never as any);
 
   vi.mocked(db.delete).mockImplementation(() => ({
     where: vi.fn(() => Promise.resolve()),
-  }) as any);
+  }) as never as any);
 }
 
 // ============================================================================
@@ -181,7 +181,7 @@ describe("Approval Service", () => {
       vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
         mockOrderItem as any
       );
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
       const result = await createApproval({
         orderId: "order-123",
@@ -194,7 +194,7 @@ describe("Approval Service", () => {
     });
 
     it("should fail if order not found", async () => {
-      vi.mocked(db.query.orders.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.orders.findFirst).mockResolvedValue(undefined);
 
       const result = await createApproval({
         orderId: "nonexistent",
@@ -207,7 +207,7 @@ describe("Approval Service", () => {
 
     it("should fail if order item not found", async () => {
       vi.mocked(db.query.orders.findFirst).mockResolvedValue(mockOrder as any);
-      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(undefined);
 
       const result = await createApproval({
         orderId: "order-123",
@@ -241,7 +241,7 @@ describe("Approval Service", () => {
       vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
         mockOrderItem as any
       );
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
       await createApproval({
         orderId: "order-123",
@@ -264,7 +264,7 @@ describe("Approval Service", () => {
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve(mockPhotos)),
         })),
-      }));
+      }) as never);
 
       const result = await uploadPhotos({
         approvalId: "approval-123",
@@ -277,7 +277,7 @@ describe("Approval Service", () => {
     });
 
     it("should fail if approval not found", async () => {
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
       const result = await uploadPhotos({
         approvalId: "nonexistent",
@@ -315,7 +315,7 @@ describe("Approval Service", () => {
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve(mockPhotos)),
         })),
-      }));
+      }) as never);
 
       const result = await uploadPhotos({
         approvalId: "approval-123",
@@ -338,7 +338,7 @@ describe("Approval Service", () => {
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([mockComment])),
         })),
-      }));
+      }) as never);
 
       vi.mocked(db.update).mockImplementation(() => ({
         set: vi.fn(() => ({
@@ -348,7 +348,7 @@ describe("Approval Service", () => {
             ),
           })),
         })),
-      }));
+      }) as never);
 
       const result = await requestChanges({
         approvalToken: "apv_abc123def456",
@@ -362,7 +362,7 @@ describe("Approval Service", () => {
     });
 
     it("should fail if approval not found", async () => {
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
       const result = await requestChanges({
         approvalToken: "invalid_token",
@@ -426,7 +426,7 @@ describe("Approval Service", () => {
             ),
           })),
         })),
-      }));
+      }) as never);
 
       const result = await approveProduction({
         approvalToken: "apv_abc123def456",
@@ -438,7 +438,7 @@ describe("Approval Service", () => {
     });
 
     it("should fail if approval not found", async () => {
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
       const result = await approveProduction({
         approvalToken: "invalid_token",
@@ -482,7 +482,7 @@ describe("Approval Service", () => {
     });
 
     it("should return null if not found", async () => {
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
       const result = await getApprovalByToken("invalid_token");
 
@@ -560,7 +560,7 @@ describe("Approval Service", () => {
         set: vi.fn(() => ({
           where: vi.fn(() => Promise.resolve()),
         })),
-      }));
+      }) as never);
 
       const result = await markReminderSent("approval-123");
 
@@ -579,7 +579,7 @@ describe("Approval Service", () => {
             ),
           })),
         })),
-      }));
+      }) as never);
 
       const result = await expireOverdueApprovals();
 
@@ -600,7 +600,7 @@ describe("Approval Service", () => {
         values: vi.fn(() => ({
           returning: vi.fn(() => Promise.resolve([adminComment])),
         })),
-      }));
+      }) as never);
 
       const result = await addAdminComment(
         "approval-123",
@@ -629,7 +629,7 @@ describe("Approval Token Generation", () => {
     vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
       mockOrderItem as any
     );
-    vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+    vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
 
     let capturedToken: string | undefined;
     vi.mocked(db.insert).mockImplementation(() => ({
@@ -639,7 +639,7 @@ describe("Approval Token Generation", () => {
           returning: vi.fn(() => Promise.resolve([{ ...mockApproval, ...data }])),
         };
       }),
-    }));
+    }) as never);
 
     await createApproval({
       orderId: "order-123",

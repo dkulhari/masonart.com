@@ -11,9 +11,10 @@
  */
 
 import { Hono } from 'hono'
+import type { Env } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 
-export function buildRouteApp(basePath: string, routeApp: Parameters<Hono['route']>[1]): Hono {
+export function buildRouteApp<E extends Env>(basePath: string, routeApp: Hono<E>): Hono {
   const app = new Hono()
   app.route(basePath, routeApp)
   app.onError((err, c) => {

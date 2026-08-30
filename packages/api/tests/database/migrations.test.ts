@@ -1235,8 +1235,11 @@ describe('Database Migrations', () => {
     it.skipIf(shouldSkip())('should have proper transaction support', async () => {
       let success = false;
       try {
+        // postgres.js types TransactionSql as `Omit<Sql, …>`, and Omit drops the
+        // call signature — the handle is callable at runtime but not in the
+        // types. Restore it rather than skip the assertion (#662).
         await client!.begin(async sql => {
-          await sql`SELECT 1`;
+          await (sql as unknown as postgres.Sql)`SELECT 1`;
           success = true;
         });
       } catch (error) {

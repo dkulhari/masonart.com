@@ -126,7 +126,7 @@ describe('POST /api/ai/palettes', () => {
       const body = {
         name: 'My Palette',
         colors: ['#FF0000', '#00FF00', '#0000FF'],
-      };
+      } as { name: string; colors: string[]; isDefault?: boolean };
       const isDefault = body.isDefault ?? false;
       expect(isDefault).toBe(false);
     });

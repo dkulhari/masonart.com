@@ -278,7 +278,7 @@ describe('POST /api/ai/suggestions/record-usage', () => {
     it('should accept prompt without stylePreset', () => {
       const body = {
         prompt: 'A beautiful sunset',
-      };
+      } as { prompt: string; stylePreset?: string };
       expect(body.prompt).toBeDefined();
       expect(body.stylePreset).toBeUndefined();
     });

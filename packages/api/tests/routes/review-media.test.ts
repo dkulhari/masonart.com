@@ -91,7 +91,8 @@ vi.mock('../../src/middleware/auth', () => ({
 }));
 
 const presignMock = vi.fn(
-  async (key: string) => `https://r2.test.example.com/${key}?signed=1`
+  async (key: string, _contentType: string) =>
+    `https://r2.test.example.com/${key}?signed=1`
 );
 
 vi.mock('../../src/lib/storage', async (importOriginal) => {
@@ -106,13 +107,13 @@ vi.mock('../../src/lib/storage', async (importOriginal) => {
   };
 });
 
-const queueAddMock = vi.fn(async () => ({ id: 'job-1' }));
+const queueAddMock = vi.fn(async (..._args: unknown[]) => ({ id: 'job-1' }));
 
 vi.mock('../../src/queues/review-media', () => ({
   reviewMediaQueue: { add: (...args: unknown[]) => queueAddMock(...args) },
 }));
 
-const deleteCachedPatternMock = vi.fn(async () => 0);
+const deleteCachedPatternMock = vi.fn(async (..._args: unknown[]) => 0);
 
 vi.mock('../../src/lib/redis', () => ({
   deleteCachedPattern: (...args: unknown[]) => deleteCachedPatternMock(...args),

@@ -17,7 +17,7 @@ import { requireVendor } from '../../src/middleware/vendor'
 import { readJson } from '../helpers/json'
 
 function appWithUser(user: any) {
-  const app = new Hono()
+  const app = new Hono<{ Variables: { user: unknown } }>()
   app.use('*', async (c, next) => {
     c.set('user', user)
     await next()

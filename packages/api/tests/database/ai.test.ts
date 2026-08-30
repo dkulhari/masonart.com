@@ -19,6 +19,13 @@ import {
   aiGenerations,
 } from '../../src/db/schema';
 
+/**
+ * `user.id` is `text PRIMARY KEY NOT NULL` with no database default — production
+ * always supplies it. Omitting it here would have failed on a NOT NULL violation
+ * had the test ever run against a database (#662).
+ */
+const newUserId = () => `test-user-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
 
@@ -173,6 +180,7 @@ describe('AI Generations Table Schema', () => {
 
     // Create test user
     const [user] = await db.insert(users).values({
+      id: newUserId(),
       email: 'ai-test@example.com',
       name: 'AI Test User',
       role: 'customer',
@@ -181,6 +189,7 @@ describe('AI Generations Table Schema', () => {
 
     // Create moderator
     const [moderator] = await db.insert(users).values({
+      id: newUserId(),
       email: 'moderator@example.com',
       name: 'Moderator User',
       role: 'admin',

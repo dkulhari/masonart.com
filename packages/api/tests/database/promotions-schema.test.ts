@@ -21,7 +21,7 @@ describe('promotion table', () => {
   });
 
   it('has no status column — active state is derived from the dates', () => {
-    expect((promotions as Record<string, unknown>).status).toBeUndefined();
+    expect((promotions as unknown as Record<string, unknown>).status).toBeUndefined();
     expect(promotions.isEnabled).toBeDefined();
     expect(promotions.startsAt).toBeDefined();
     expect(promotions.endsAt).toBeDefined();

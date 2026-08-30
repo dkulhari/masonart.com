@@ -131,12 +131,13 @@ vi.mock('../../../src/auth', () => ({
 const SIGNED_URL =
   'https://r2.example.com/poster-app-dev/products/abc.jpg?X-Amz-Signature=deadbeef&X-Amz-Expires=300'
 
-const mockPresign = vi.fn(async () => SIGNED_URL)
+const mockPresign = vi.fn(async (_key: string, _expiresInSeconds?: number) => SIGNED_URL)
 
 // Only the presigner is faked. Everything that decides WHETHER to call it is
 // the real code path.
 vi.mock('../../../src/lib/storage', () => ({
-  getPresignedDownloadUrl: (...args: unknown[]) => mockPresign(...(args as [])),
+  getPresignedDownloadUrl: (...args: unknown[]) =>
+    mockPresign(...(args as [string, number?])),
 }))
 
 import { vendorApp } from '../../../src/routes/vendor'

@@ -17,18 +17,32 @@ import {
   mergeCollectionFilters,
   resolveCollectionSort,
   IMPOSSIBLE,
+  type CollectionFilters,
 } from '../../src/lib/collection-resolver';
+
+/**
+ * `assertMerged(merged).styles` looked like a guard but never was one: IMPOSSIBLE is
+ * a symbol, and symbols are truthy, so the merge-failed case sailed straight
+ * through and read `.styles` off a symbol. This asserts the thing the `&&` was
+ * pretending to (#662).
+ */
+function assertMerged(
+  merged: ReturnType<typeof mergeCollectionFilters>
+): CollectionFilters {
+  expect(merged).not.toBe(IMPOSSIBLE);
+  return merged as CollectionFilters;
+}
 
 describe('array facets intersect', () => {
   it('takes the rule alone when the shopper asked for nothing', () => {
     const merged = mergeCollectionFilters({ styles: ['pop-art'] }, {});
     expect(merged).not.toBe(IMPOSSIBLE);
-    expect(merged && merged.styles).toEqual(['pop-art']);
+    expect(assertMerged(merged).styles).toEqual(['pop-art']);
   });
 
   it('takes the shopper alone when the rule constrains nothing', () => {
     const merged = mergeCollectionFilters({}, { styles: ['pop-art'] });
-    expect(merged && merged.styles).toEqual(['pop-art']);
+    expect(assertMerged(merged).styles).toEqual(['pop-art']);
   });
 
   it('narrows to the overlap when both name the same group', () => {
@@ -36,7 +50,7 @@ describe('array facets intersect', () => {
       { styles: ['pop-art', 'graffiti-art', 'bohemian-art'] },
       { styles: ['graffiti-art', 'bohemian-art'] }
     );
-    expect(merged && merged.styles).toEqual(['graffiti-art', 'bohemian-art']);
+    expect(assertMerged(merged).styles).toEqual(['graffiti-art', 'bohemian-art']);
   });
 
   it('is IMPOSSIBLE when the overlap is empty — never the union', () => {
@@ -54,8 +68,8 @@ describe('array facets intersect', () => {
       { styles: ['pop-art'] },
       { colors: ['blue'] }
     );
-    expect(merged && merged.styles).toEqual(['pop-art']);
-    expect(merged && merged.colors).toEqual(['blue']);
+    expect(assertMerged(merged).styles).toEqual(['pop-art']);
+    expect(assertMerged(merged).colors).toEqual(['blue']);
   });
 
   it('intersects every multi-valued group, not just styles', () => {
@@ -63,8 +77,8 @@ describe('array facets intersect', () => {
       { subjects: ['abstract', 'city'], rooms: ['bedroom', 'kitchen'] },
       { subjects: ['city'], rooms: ['kitchen'] }
     );
-    expect(merged && merged.subjects).toEqual(['city']);
-    expect(merged && merged.rooms).toEqual(['kitchen']);
+    expect(assertMerged(merged).subjects).toEqual(['city']);
+    expect(assertMerged(merged).rooms).toEqual(['kitchen']);
   });
 });
 
@@ -74,7 +88,7 @@ describe('scalar facets agree or the query is impossible', () => {
       { orientation: 'panoramic' },
       { orientation: 'panoramic' }
     );
-    expect(merged && merged.orientation).toBe('panoramic');
+    expect(assertMerged(merged).orientation).toBe('panoramic');
   });
 
   it('is IMPOSSIBLE when they disagree', () => {
@@ -93,7 +107,7 @@ describe('scalar facets agree or the query is impossible', () => {
       { isFeatured: true },
       { isFeatured: true }
     );
-    expect(agreed && agreed.isFeatured).toBe(true);
+    expect(assertMerged(agreed).isFeatured).toBe(true);
   });
 });
 
@@ -103,8 +117,8 @@ describe('price ranges intersect', () => {
       { priceMin: 1000, priceMax: 90000 },
       { priceMin: 5000, priceMax: 50000 }
     );
-    expect(merged && merged.priceMin).toBe(5000);
-    expect(merged && merged.priceMax).toBe(50000);
+    expect(assertMerged(merged).priceMin).toBe(5000);
+    expect(assertMerged(merged).priceMax).toBe(50000);
   });
 
   it('is IMPOSSIBLE when the ranges do not overlap', () => {
@@ -149,8 +163,8 @@ describe('sort', () => {
       {}
     );
     expect(merged).not.toBe(IMPOSSIBLE);
-    expect(merged && merged.styles).toBeUndefined();
-    expect(merged && Object.keys(merged)).not.toContain('sortBy');
+    expect(assertMerged(merged).styles).toBeUndefined();
+    expect(Object.keys(assertMerged(merged))).not.toContain('sortBy');
   });
 });
 

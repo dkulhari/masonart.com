@@ -145,8 +145,15 @@ async function makeReturn(
       paymentStatus: "paid",
       subtotal: total,
       total,
-      shippingAddress: { fullName: "Store Credit Customer" },
-      billingAddress: { fullName: "Store Credit Customer" },
+      shippingAddress: {
+        fullName: "Store Credit Customer",
+        phone: "9876543210",
+        addressLine1: "1 Test Street",
+        city: "Mumbai",
+        state: "Maharashtra",
+        postalCode: "400001",
+        countryCode: "IN",
+      },
     })
     .returning();
 

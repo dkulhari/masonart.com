@@ -43,6 +43,17 @@ import {
   type LiveDbConnection,
 } from "../helpers/live-db";
 import { readJson } from '../helpers/json';
+import type { OrderShippingAddress } from "../../src/database/schema/orders";
+
+const TEST_SHIPPING_ADDRESS: OrderShippingAddress = {
+  fullName: "Mixed Cart",
+  phone: "9876543210",
+  addressLine1: "1 Test Street",
+  city: "Mumbai",
+  state: "Maharashtra",
+  postalCode: "400001",
+  countryCode: "IN",
+};
 
 vi.mock("../../src/services/email", () => ({
   sendTemplateEmail: vi.fn().mockResolvedValue(undefined),
@@ -358,8 +369,7 @@ describe("gift card tender against a mixed order", () => {
         paymentStatus: "pending",
         subtotal: "5000.00",
         total: "5000.00",
-        shippingAddress: { fullName: "Mixed Cart" },
-        billingAddress: { fullName: "Mixed Cart" },
+        shippingAddress: TEST_SHIPPING_ADDRESS,
       })
       .returning();
     createdOrderIds.push(order!.id);
@@ -413,8 +423,7 @@ describe("gift card tender against a mixed order", () => {
         paymentStatus: "pending",
         subtotal: "3000.00",
         total: "3000.00",
-        shippingAddress: { fullName: "Mixed Cart" },
-        billingAddress: { fullName: "Mixed Cart" },
+        shippingAddress: TEST_SHIPPING_ADDRESS,
       })
       .returning();
     createdOrderIds.push(order!.id);
@@ -451,8 +460,7 @@ describe("minting identity moved from the order to the line", () => {
         paymentStatus: "paid",
         subtotal: "4000.00",
         total: "4000.00",
-        shippingAddress: { fullName: "Mixed Cart" },
-        billingAddress: { fullName: "Mixed Cart" },
+        shippingAddress: TEST_SHIPPING_ADDRESS,
       })
       .returning();
     createdOrderIds.push(order!.id);
@@ -502,8 +510,7 @@ describe("minting identity moved from the order to the line", () => {
         paymentStatus: "paid",
         subtotal: "2000.00",
         total: "2000.00",
-        shippingAddress: { fullName: "Mixed Cart" },
-        billingAddress: { fullName: "Mixed Cart" },
+        shippingAddress: TEST_SHIPPING_ADDRESS,
       })
       .returning();
     createdOrderIds.push(order!.id);
@@ -560,8 +567,7 @@ describe("minting identity moved from the order to the line", () => {
         paymentStatus: "paid",
         subtotal: "2000.00",
         total: "2000.00",
-        shippingAddress: { fullName: "Mixed Cart" },
-        billingAddress: { fullName: "Mixed Cart" },
+        shippingAddress: TEST_SHIPPING_ADDRESS,
       })
       .returning();
     createdOrderIds.push(order!.id);

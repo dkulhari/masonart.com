@@ -20,8 +20,8 @@ import '../setup'
 
 const mocks = vi.hoisted(() => {
   const whereMock = vi.fn(async () => undefined)
-  const setMock = vi.fn(() => ({ where: whereMock }))
-  const updateMock = vi.fn(() => ({ set: setMock }))
+  const setMock = vi.fn((_payload: Record<string, unknown>) => ({ where: whereMock }))
+  const updateMock = vi.fn((_table: unknown) => ({ set: setMock }))
 
   // The Queue is constructed once at module import, i.e. before any
   // beforeEach — keep a handle that vi.clearAllMocks() cannot take away.
@@ -33,7 +33,9 @@ const mocks = vi.hoisted(() => {
     setMock,
     updateMock,
     getFileMock: vi.fn(async () => Buffer.from('source-video-bytes')),
-    uploadFileMock: vi.fn(async (_buffer: Buffer, key: string) => ({
+    // uploadFile takes (buffer, key, options) — the third argument is what the
+    // content-type assertions below read (#662).
+    uploadFileMock: vi.fn(async (_buffer: Buffer, key: string, _options: unknown) => ({
       url: `https://cdn.test.example.com/${key}`,
       key,
       bucket: 'poster-app-test',
@@ -54,7 +56,12 @@ const mocks = vi.hoisted(() => {
     extractPosterFrameMock: vi.fn(async (_input: string, output: string) => {
       await writeFile(output, 'poster-jpeg-bytes')
     }),
-    WorkerMock: vi.fn(function (this: Record<string, unknown>, name: string) {
+    WorkerMock: vi.fn(function (
+      this: Record<string, unknown>,
+      name: string,
+      _processor?: unknown,
+      _opts?: { concurrency: number }
+    ) {
       this.name = name
       this.on = vi.fn()
       this.close = vi.fn(async () => undefined)

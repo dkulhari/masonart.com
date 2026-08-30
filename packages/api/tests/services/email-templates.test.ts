@@ -29,7 +29,8 @@ import type { Order } from '../../src/database/schema/orders';
 // Test Data
 // ============================================================================
 
-const createMockOrder = (overrides: Partial<Order> = {}): Order => ({
+/** Annotated as Order, so drift in these defaults is a type error. */
+const orderDefaults: Order = {
   id: 'order-123',
   orderNumber: 'MA-2024-001234',
   userId: 'user-123',
@@ -43,8 +44,12 @@ const createMockOrder = (overrides: Partial<Order> = {}): Order => ({
   discount: '0.00',
   total: '2999.00',
   paymentStatus: 'paid',
-  paymentMethod: 'card',
-  paymentId: 'pay_123',
+  // Not columns: the order row carries these inside paymentDetails (#662).
+  paymentDetails: {
+    provider: 'razorpay',
+    method: 'card',
+    paymentId: 'pay_123',
+  },
   shippingAddress: {
     fullName: 'John Doe',
     phone: '9876543210',
@@ -54,24 +59,47 @@ const createMockOrder = (overrides: Partial<Order> = {}): Order => ({
     city: 'Mumbai',
     state: 'Maharashtra',
     postalCode: '400001',
-    country: 'India',
+    countryCode: 'IN',
   },
-  billingAddress: null,
+  billingAddressId: null,
+  // OrderShippingDetails declares these as ISO strings, not Dates, and the
+  // optional fields are omitted rather than nulled (#662).
   shippingDetails: {
     carrier: 'blue_dart',
     trackingNumber: 'BD123456789',
     trackingUrl: 'https://bluedart.com/track/BD123456789',
-    estimatedDelivery: new Date('2024-02-15'),
-    shippedAt: new Date('2024-02-10'),
-    deliveredAt: null,
+    estimatedDelivery: '2024-02-15T00:00:00.000Z',
+    shippedAt: '2024-02-10T00:00:00.000Z',
   },
-  notes: null,
+  customerNotes: null,
+  internalNotes: null,
+  orderType: 'regular',
+  shippingMethod: 'standard',
+  couponCode: null,
+  couponDiscount: '0.00',
+  promotionId: null,
+  promotionDiscount: '0.00',
+  tradeDiscount: '0.00',
+  giftCardAmount: '0.00',
+  giftCardPurchase: null,
+  currency: 'INR',
+  paidAt: new Date('2024-02-08'),
+  shippedAt: null,
+  deliveredAt: null,
+  cancelledAt: null,
   trackingToken: null,
   trackingTokenExpiresAt: null,
   createdAt: new Date('2024-02-08'),
   updatedAt: new Date('2024-02-08'),
-  ...overrides,
-});
+};
+
+/**
+ * Spreading a Partial<Order> widens every field to `| undefined`, which Order
+ * does not accept. The cast is on the merge only — orderDefaults above stays
+ * fully checked.
+ */
+const createMockOrder = (overrides: Partial<Order> = {}): Order =>
+  ({ ...orderDefaults, ...overrides }) as Order;
 
 // ============================================================================
 // Template Structure Tests
@@ -245,7 +273,7 @@ describe('Email Templates', () => {
       const order = createMockOrder({
         shippingDetails: {
           ...createMockOrder().shippingDetails!,
-          trackingUrl: null,
+          trackingUrl: undefined,
         },
       });
       const template = getShippedTemplate(order);
@@ -258,7 +286,7 @@ describe('Email Templates', () => {
       const order = createMockOrder({
         shippingDetails: {
           ...createMockOrder().shippingDetails!,
-          trackingNumber: null,
+          trackingNumber: undefined,
         },
       });
       const template = getShippedTemplate(order);
@@ -427,8 +455,8 @@ describe('Email Templates', () => {
   // ==========================================================================
 
   describe('Edge Cases', () => {
-    it('should handle null shipping address', () => {
-      const order = createMockOrder({ shippingAddress: null });
+    it('should handle a missing shipping address', () => {
+      const order = createMockOrder({ shippingAddress: undefined });
 
       // Should not throw
       expect(() => getOrderConfirmationTemplate(order)).not.toThrow();
@@ -494,12 +522,12 @@ describe('Email Templates', () => {
           fullName: 'John Doe',
           phone: '9876543210',
           addressLine1: '123 Main Street',
-          addressLine2: null,
-          landmark: null,
+          addressLine2: undefined,
+          landmark: undefined,
           city: 'Mumbai',
           state: 'Maharashtra',
           postalCode: '400001',
-          country: 'India',
+          countryCode: 'IN',
         },
       });
       const template = getOrderConfirmationTemplate(order);

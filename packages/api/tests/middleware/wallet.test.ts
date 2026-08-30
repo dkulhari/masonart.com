@@ -33,7 +33,7 @@ describe('Wallet Middleware', () => {
       const { requireSufficientFunds } = await import('../../src/middleware/wallet');
 
       const middleware = requireSufficientFunds(() => ({
-        provider: 'fal',
+        provider: 'fal-ai',
         variationCount: 4,
       }));
 
@@ -47,7 +47,7 @@ describe('Wallet Middleware', () => {
       // Should not throw when called with valid params getter
       expect(() => {
         requireSufficientFunds(() => ({
-          provider: 'fal',
+          provider: 'fal-ai',
           variationCount: 4,
         }));
       }).not.toThrow();
@@ -58,9 +58,9 @@ describe('Wallet Middleware', () => {
 
       expect(() => {
         requireSufficientFunds(() => ({
-          provider: 'fal',
+          provider: 'fal-ai',
           variationCount: 4,
-          falModel: 'flux-pro',
+          falModel: 'fluxDev',
         }));
       }).not.toThrow();
     });

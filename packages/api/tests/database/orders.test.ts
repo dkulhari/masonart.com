@@ -22,6 +22,13 @@ import {
   orderItems,
 } from '../../src/db/schema';
 
+/**
+ * `user.id` is `text PRIMARY KEY NOT NULL` with no database default — production
+ * always supplies it. Omitting it here would have failed on a NOT NULL violation
+ * had the test ever run against a database (#662).
+ */
+const newUserId = () => `test-user-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
 
@@ -242,6 +249,7 @@ describe('Orders Table Schema', () => {
     if (shouldSkip() || !db) return;
 
     const [user] = await db.insert(users).values({
+      id: newUserId(),
       email: 'order-test@example.com',
       name: 'Order Test User',
       role: 'customer',
@@ -531,6 +539,7 @@ describe('Order Items Table Schema', () => {
     if (shouldSkip() || !db) return;
 
     const [user] = await db.insert(users).values({
+      id: newUserId(),
       email: 'item-test@example.com',
       name: 'Item Test User',
       role: 'customer',

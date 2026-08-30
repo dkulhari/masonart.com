@@ -99,6 +99,7 @@ describe('AI generation templates escape user name and prompt in HTML', () => {
   it('approved template', () => {
     const { html, text } = getAIGenerationApprovedTemplate({
       userName: XSS_NAME,
+      userEmail: 'xss@example.com',
       generationId: 'gen-1',
       promptText: `sunset ${XSS} vibes`,
       stylePreset: 'oil-painting',
@@ -112,6 +113,8 @@ describe('AI generation templates escape user name and prompt in HTML', () => {
   it('rejected template escapes prompt and rejection reason', () => {
     const { html } = getAIGenerationRejectedTemplate({
       userName: XSS_NAME,
+      userEmail: 'xss@example.com',
+      generationId: 'gen-2',
       promptText: `sunset ${XSS} vibes`,
       stylePreset: 'oil-painting',
       rejectionReason: `bad ${XSS} content`,

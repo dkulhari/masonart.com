@@ -70,9 +70,11 @@ describe('the new facet filters are accepted', () => {
   }
 
   it('accepts several comma-separated values on a multi facet', () => {
-    return app
-      .request('/api/products?vibe=tranquility-and-zen,warmth-and-cozy')
-      .then((res) => expect(res.status).toBe(200));
+    // app.request returns Response | Promise<Response>; await it rather than
+    // assuming the promise half.
+    return Promise.resolve(
+      app.request('/api/products?vibe=tranquility-and-zen,warmth-and-cozy')
+    ).then((res) => expect(res.status).toBe(200));
   });
 
   it('still accepts the original comma-separated shape for styles', async () => {

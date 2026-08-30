@@ -11,7 +11,19 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+
+/**
+ * `user.id` and `session.id` are `text PRIMARY KEY NOT NULL` with no database
+ * default (see migration 0000, `CREATE TABLE "user"`). Production always supplies
+ * the id — better-auth generates it, and src/routes/phone-auth.ts passes one
+ * explicitly. These inserts omitted it, so every one would have failed on a NOT
+ * NULL violation had it ever run against a database. They skip whenever none is
+ * reachable, which is why nothing ever reported it (#662).
+ */
+let idSeq = 0;
+const testId = (prefix: string) => `${prefix}-${Date.now()}-${++idSeq}`;
+
 import postgres from 'postgres';
 import { getDestructiveDbUrl, destructiveDbSkipReason } from '../helpers/destructive-db';
 import {
@@ -217,6 +229,7 @@ describe('Users Table Schema', () => {
   describe('User CRUD Operations', () => {
     it.skipIf(shouldSkip())('should insert a user', async () => {
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'test@example.com',
         name: 'Test User',
         phone: '+919876543210',
@@ -232,6 +245,7 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should select users', async () => {
       await db!.insert(users).values({
+        id: testId('user'),
         email: 'user1@example.com',
         name: 'User One',
         role: 'customer',
@@ -244,6 +258,7 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should update a user', async () => {
       const [inserted] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'update@example.com',
         name: 'Update User',
         role: 'customer',
@@ -260,6 +275,7 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should delete a user', async () => {
       const [inserted] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'delete@example.com',
         name: 'Delete User',
         role: 'customer',
@@ -275,6 +291,7 @@ describe('Users Table Schema', () => {
   describe('User Roles', () => {
     it.skipIf(shouldSkip())('should insert admin user', async () => {
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'admin@example.com',
         name: 'Admin User',
         role: 'admin',
@@ -285,6 +302,7 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should insert trade user', async () => {
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'trade@example.com',
         name: 'Trade User',
         role: 'trade',
@@ -303,9 +321,9 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should filter users by role', async () => {
       await db!.insert(users).values([
-        { email: 'customer1@example.com', name: 'Customer 1', role: 'customer' },
-        { email: 'customer2@example.com', name: 'Customer 2', role: 'customer' },
-        { email: 'admin1@example.com', name: 'Admin 1', role: 'admin' },
+        { id: testId('user'), email: 'customer1@example.com', name: 'Customer 1', role: 'customer' },
+        { id: testId('user'), email: 'customer2@example.com', name: 'Customer 2', role: 'customer' },
+        { id: testId('user'), email: 'admin1@example.com', name: 'Admin 1', role: 'admin' },
       ]);
 
       const customers = await db!.select().from(users).where(eq(users.role, 'customer'));
@@ -319,6 +337,7 @@ describe('Users Table Schema', () => {
   describe('User Preferences', () => {
     it.skipIf(shouldSkip())('should store user preferences as JSON', async () => {
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'prefs@example.com',
         name: 'Prefs User',
         role: 'customer',
@@ -337,6 +356,7 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should use default preferences', async () => {
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'default@example.com',
         name: 'Default User',
         role: 'customer',
@@ -357,6 +377,7 @@ describe('Users Table Schema', () => {
       };
 
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'gallery@example.com',
         name: 'Gallery Owner',
         role: 'trade',
@@ -370,6 +391,7 @@ describe('Users Table Schema', () => {
 
     it.skipIf(shouldSkip())('should handle pending trade accounts', async () => {
       const [result] = await db!.insert(users).values({
+        id: testId('user'),
         email: 'pending@example.com',
         name: 'Pending Trade',
         role: 'trade',
@@ -387,6 +409,7 @@ describe('Users Table Schema', () => {
   describe('Email Uniqueness', () => {
     it.skipIf(shouldSkip())('should enforce email uniqueness', async () => {
       await db!.insert(users).values({
+        id: testId('user'),
         email: 'unique@example.com',
         name: 'User One',
         role: 'customer',
@@ -395,6 +418,7 @@ describe('Users Table Schema', () => {
       let error;
       try {
         await db!.insert(users).values({
+          id: testId('user'),
           email: 'unique@example.com',
           name: 'User Two',
           role: 'customer',
@@ -416,6 +440,7 @@ describe('Addresses Table Schema', () => {
     if (shouldSkip() || !db) return;
 
     const [user] = await db.insert(users).values({
+      id: testId('user'),
       email: 'address-test@example.com',
       name: 'Address Test User',
       role: 'customer',
@@ -593,8 +618,7 @@ describe('Addresses Table Schema', () => {
       ]);
 
       const result = await db!.select().from(addresses)
-        .where(eq(addresses.userId, testUserId))
-        .where(eq(addresses.isDefault, true));
+        .where(and(eq(addresses.userId, testUserId), eq(addresses.isDefault, true)));
 
       expect(result).toHaveLength(1);
       expect(result[0].addressLine1).toBe('Default Address');
@@ -609,6 +633,7 @@ describe('Sessions Table Schema', () => {
     if (shouldSkip() || !db) return;
 
     const [user] = await db.insert(users).values({
+      id: testId('user'),
       email: 'session-test@example.com',
       name: 'Session Test User',
       role: 'customer',
@@ -647,6 +672,7 @@ describe('Sessions Table Schema', () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
 
       const [result] = await db!.insert(sessions).values({
+        id: testId('session'),
         userId: testUserId,
         token: 'test-session-token-123456',
         expiresAt,
@@ -662,11 +688,13 @@ describe('Sessions Table Schema', () => {
 
       await db!.insert(sessions).values([
         {
+          id: testId('session'),
           userId: testUserId,
           token: 'session-token-1',
           expiresAt,
         },
         {
+          id: testId('session'),
           userId: testUserId,
           token: 'session-token-2',
           expiresAt,
@@ -681,6 +709,7 @@ describe('Sessions Table Schema', () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const [inserted] = await db!.insert(sessions).values({
+        id: testId('session'),
         userId: testUserId,
         token: 'delete-token',
         expiresAt,
@@ -696,6 +725,7 @@ describe('Sessions Table Schema', () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       await db!.insert(sessions).values({
+        id: testId('session'),
         userId: testUserId,
         token: 'cascade-test-token',
         expiresAt,
@@ -713,6 +743,7 @@ describe('Sessions Table Schema', () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       await db!.insert(sessions).values({
+        id: testId('session'),
         userId: testUserId,
         token: 'unique-token',
         expiresAt,
@@ -721,6 +752,7 @@ describe('Sessions Table Schema', () => {
       let error;
       try {
         await db!.insert(sessions).values({
+          id: testId('session'),
           userId: testUserId,
           token: 'unique-token',
           expiresAt,

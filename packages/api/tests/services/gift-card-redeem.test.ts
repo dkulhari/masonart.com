@@ -156,7 +156,9 @@ describe.skipIf(!DATABASE_URL)("redeemGiftCards", () => {
      */
     const barrier = postgres(DATABASE_URL!, { max: 1, onnotice: () => {} });
     const released = barrier.begin(async (tx) => {
-      await tx`SELECT id FROM gift_card WHERE id = ${id} FOR UPDATE`;
+      // postgres.js types TransactionSql as `Omit<Sql, …>`, and Omit drops the
+      // call signature — callable at runtime, not in the types (#662).
+      await (tx as unknown as postgres.Sql)`SELECT id FROM gift_card WHERE id = ${id} FOR UPDATE`;
       // Long enough for both redeems below to reach their own read.
       await new Promise((resolve) => setTimeout(resolve, 300));
     });

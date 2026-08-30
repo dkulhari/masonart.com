@@ -132,11 +132,12 @@ vi.mock('../../../src/auth', () => ({
 }))
 
 const SIGNED_URL = 'https://r2.example.com/bucket/products/abc.jpg?X-Amz-Signature=deadbeef'
-const mockPresign = vi.fn(async () => SIGNED_URL)
+const mockPresign = vi.fn(async (_key: string, _expiresInSeconds?: number) => SIGNED_URL)
 const mockPublicUrl = vi.fn((key: string) => `https://cdn.example.com/${key}`)
 
 vi.mock('../../../src/lib/storage', () => ({
-  getPresignedDownloadUrl: (...args: unknown[]) => mockPresign(...(args as [])),
+  getPresignedDownloadUrl: (...args: unknown[]) =>
+    mockPresign(...(args as [string, number?])),
   // Exported into the mock ON PURPOSE, so "nobody called it" is a real
   // observation rather than an absence of evidence.
   getPublicUrl: (...args: unknown[]) => mockPublicUrl(...(args as [string])),

@@ -269,7 +269,7 @@ describe('GET /api/notification-preferences', () => {
     it('should create default preferences for new user', async () => {
       if (!app) return;
 
-      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(undefined);
       vi.mocked(db.insert).mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([defaultPreferences]),
@@ -287,7 +287,7 @@ describe('GET /api/notification-preferences', () => {
     it('should return default preferences with email enabled', async () => {
       if (!app) return;
 
-      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(undefined);
       vi.mocked(db.insert).mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([defaultPreferences]),
@@ -306,7 +306,7 @@ describe('GET /api/notification-preferences', () => {
     it('should return default preferences with SMS disabled', async () => {
       if (!app) return;
 
-      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(undefined);
       vi.mocked(db.insert).mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([defaultPreferences]),
@@ -432,7 +432,7 @@ describe('PATCH /api/notification-preferences', () => {
       if (!app) return;
 
       const newPrefs = { ...defaultPreferences, emailOrderConfirmation: false };
-      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(undefined);
       vi.mocked(db.insert).mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([newPrefs]),

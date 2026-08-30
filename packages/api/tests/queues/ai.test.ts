@@ -113,7 +113,7 @@ beforeAll(async () => {
   await aiGenerationWorker.pause();
 
   // Start clean even if a previous run with this pid was killed mid-flight.
-  await deleteKeysByPrefix(testClient, `${bullPrefix}:`);
+  await deleteKeysByPrefix(testClient ?? undefined, `${bullPrefix}:`);
 });
 
 afterAll(async () => {
@@ -123,7 +123,7 @@ afterAll(async () => {
       // Only this run's keyspace. The old `KEYS bull:ai-generation:*` deleted
       // every concurrent run's jobs too, which is half of why the failures
       // moved around (#656).
-      await deleteKeysByPrefix(testClient, `${bullPrefix}:`);
+      await deleteKeysByPrefix(testClient ?? undefined, `${bullPrefix}:`);
     } catch {
       // Ignore cleanup errors
     }

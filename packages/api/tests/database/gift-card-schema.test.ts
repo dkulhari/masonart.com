@@ -26,7 +26,7 @@ describe("gift_card", () => {
     expect(giftCards.codeLast4).toBeDefined();
     // The plaintext code must never be a column: a database dump would then
     // leak spendable money.
-    expect((giftCards as Record<string, unknown>).code).toBeUndefined();
+    expect((giftCards as unknown as Record<string, unknown>).code).toBeUndefined();
   });
 
   it("tracks balance in integer paise, like the wallet", () => {
@@ -39,7 +39,7 @@ describe("gift_card", () => {
   it("has no status column — status is derived", () => {
     // Deriving from balance/disabledAt/expiresAt is the contract; a stored
     // status would drift from the balance on every redemption.
-    expect((giftCards as Record<string, unknown>).status).toBeUndefined();
+    expect((giftCards as unknown as Record<string, unknown>).status).toBeUndefined();
     expect(giftCards.disabledAt).toBeDefined();
     expect(giftCards.expiresAt).toBeDefined();
     expect(giftCards.expiresAt.notNull).toBe(false);

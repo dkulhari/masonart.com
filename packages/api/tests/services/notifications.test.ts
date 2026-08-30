@@ -86,6 +86,35 @@ vi.mock('../../src/services/email-templates', () => ({
 // Test Data
 // ============================================================================
 
+/**
+ * Typed for real, unlike the fixture below. This is where drift actually hides:
+ * this object declared `country: 'India'`, but OrderShippingAddress requires
+ * `countryCode` and has no `country` field at all (#662). The template read
+ * neither, so nothing failed — it just tested a shape production never builds.
+ */
+const mockShippingAddress: OrderShippingAddress = {
+  fullName: 'John Doe',
+  phone: '9876543210',
+  addressLine1: '123 Main Street',
+  city: 'Mumbai',
+  state: 'Maharashtra',
+  postalCode: '400001',
+  countryCode: 'IN',
+};
+
+/**
+ * The service reads a handful of columns; these fixtures supply those and stand
+ * in for the full rows, so they are cast once here rather than at every
+ * mockResolvedValueOnce call site.
+ */
+type OrderRow = NonNullable<Awaited<ReturnType<typeof db.query.orders.findFirst>>>;
+type PrefsRow = NonNullable<
+  Awaited<ReturnType<typeof db.query.notificationPreferences.findFirst>>
+>;
+type NotificationRow = NonNullable<
+  Awaited<ReturnType<typeof db.query.notifications.findFirst>>
+>;
+
 const mockOrder = {
   id: 'order-123',
   orderNumber: 'MA-2024-001234',
@@ -95,15 +124,7 @@ const mockOrder = {
   status: 'confirmed',
   itemCount: 2,
   total: '2999.00',
-  shippingAddress: {
-    fullName: 'John Doe',
-    phone: '9876543210',
-    addressLine1: '123 Main Street',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    postalCode: '400001',
-    country: 'India',
-  },
+  shippingAddress: mockShippingAddress,
   shippingDetails: {
     trackingUrl: 'https://tracking.example.com/123',
     trackingNumber: 'TRK123',
@@ -116,7 +137,7 @@ const mockOrder = {
   },
   createdAt: new Date('2024-02-08'),
   updatedAt: new Date('2024-02-08'),
-};
+} as unknown as OrderRow;
 
 const mockPreferences = {
   userId: 'user-123',
@@ -128,7 +149,7 @@ const mockPreferences = {
   smsShipped: false,
   smsOutForDelivery: false,
   smsDelivered: false,
-};
+} as unknown as PrefsRow;
 
 // ============================================================================
 // Service Import (after mocks)
@@ -141,6 +162,7 @@ import {
   retryNotification,
 } from '../../src/services/notifications';
 import { db } from '../../src/database';
+import type { OrderShippingAddress } from '../../src/database/schema/orders';
 import { sendEmail } from '../../src/services/email';
 
 // ============================================================================
@@ -166,7 +188,7 @@ describe('Notification Service', () => {
 
   describe('sendOrderNotification', () => {
     it('should return error for non-existent order', async () => {
-      vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(undefined);
 
       const result = await sendOrderNotification({
         orderId: 'non-existent',
@@ -206,7 +228,7 @@ describe('Notification Service', () => {
 
     it('should use default preferences for users without saved preferences', async () => {
       vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(mockOrder);
-      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(undefined);
 
       const result = await sendOrderNotification({
         orderId: 'order-123',
@@ -407,7 +429,7 @@ describe('Notification Service', () => {
       const mockNotifications = [
         { id: 'notif-1', type: 'order_confirmation', status: 'sent' },
         { id: 'notif-2', type: 'shipped', status: 'sent' },
-      ];
+      ] as unknown as NotificationRow[];
       vi.mocked(db.query.notifications.findMany).mockResolvedValueOnce(mockNotifications);
 
       const result = await getOrderNotifications('order-123');
@@ -431,7 +453,7 @@ describe('Notification Service', () => {
 
   describe('retryNotification', () => {
     it('should return error for non-existent notification', async () => {
-      vi.mocked(db.query.notifications.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.notifications.findFirst).mockResolvedValueOnce(undefined);
 
       const result = await retryNotification('non-existent');
 
@@ -446,7 +468,7 @@ describe('Notification Service', () => {
         type: 'order_confirmation',
         channel: 'email',
         status: 'sent', // Not failed
-      });
+      } as unknown as NotificationRow);
 
       const result = await retryNotification('notif-123');
 
@@ -461,7 +483,7 @@ describe('Notification Service', () => {
         type: 'order_confirmation',
         channel: 'email',
         status: 'failed',
-      });
+      } as unknown as NotificationRow);
       vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(mockOrder);
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
@@ -477,7 +499,7 @@ describe('Notification Service', () => {
         type: 'order_confirmation',
         channel: 'email',
         status: 'failed',
-      });
+      } as unknown as NotificationRow);
       vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(mockOrder);
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce({
         ...mockPreferences,

@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
 const insertValues = vi.fn().mockResolvedValue(undefined);
-const insert = vi.fn(() => ({ values: insertValues }));
+const insert = vi.fn((..._args: unknown[]) => ({ values: insertValues }));
 
 vi.mock('../../src/database', () => ({
   db: { insert: (...args: unknown[]) => insert(...args) },

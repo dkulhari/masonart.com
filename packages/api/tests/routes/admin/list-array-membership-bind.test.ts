@@ -34,6 +34,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
+import type { Env } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
@@ -190,7 +191,7 @@ function sessionFor(role: string) {
   }
 }
 
-function buildApp(path: string, router: Hono): Hono {
+function buildApp<E extends Env>(path: string, router: Hono<E>): Hono {
   const app = new Hono()
   app.route(path, router as never)
   app.onError((err, c) => {

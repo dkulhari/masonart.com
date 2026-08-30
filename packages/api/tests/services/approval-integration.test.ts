@@ -93,7 +93,7 @@ describe("Approval Order Integration", () => {
       ]);
       // First call checks for existing approval in createApprovalsForOrder
       // Second call is in createApproval to check if order item belongs to order
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(undefined);
       vi.mocked(db.query.orders.findFirst).mockResolvedValue({ id: mockOrderId } as any);
       vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(mockAiGeneratedItem as any);
       vi.mocked(db.insert).mockReturnValue({

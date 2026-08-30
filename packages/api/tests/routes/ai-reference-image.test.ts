@@ -131,7 +131,7 @@ describe('POST /api/ai/reference-image', () => {
     });
 
     it('should default weight to 0.5', () => {
-      const formData = { file: 'mock-file-data' };
+      const formData: { file: string; weight?: string } = { file: 'mock-file-data' };
       const weight = formData.weight ?? '0.5';
       expect(parseFloat(weight)).toBe(0.5);
     });
@@ -245,6 +245,12 @@ describe('Reference Image in Generation Request', () => {
         prompt: 'A sunset over mountains',
         stylePreset: 'photography',
         aspectRatio: 'landscape',
+      } as {
+        prompt: string;
+        stylePreset: string;
+        aspectRatio: string;
+        referenceImageUrl?: string;
+        referenceImageWeight?: number;
       };
 
       expect(request.referenceImageUrl).toBeUndefined();
@@ -257,6 +263,12 @@ describe('Reference Image in Generation Request', () => {
         stylePreset: 'photography',
         aspectRatio: 'landscape',
         referenceImageUrl: 'https://example.com/ref.jpg',
+      } as {
+        prompt: string;
+        stylePreset: string;
+        aspectRatio: string;
+        referenceImageUrl: string;
+        referenceImageWeight?: number;
       };
       const weight = request.referenceImageWeight ?? 0.5;
       expect(weight).toBe(0.5);

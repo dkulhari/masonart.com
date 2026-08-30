@@ -875,6 +875,8 @@ describe('Order-Based Review Business Logic (TDD)', () => {
    */
   it.skip('should return 404 for non-existent item', async () => {
     // Requires: Auth fixture, endpoint implementation
+    if (!app) return;
+
     const NON_EXISTENT_ITEM_ID = '00000000-0000-0000-0000-000000000000';
 
     const res = await app.request(

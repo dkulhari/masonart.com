@@ -19,7 +19,7 @@
     "dev": "DISABLE_RATE_LIMIT=true bun run --env-file=../../.env --hot src/index.ts",
     "build": "tsc",
     "start": "bun run dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
     "clean": "rm -rf dist .turbo",
     "test": "vitest run",
     "test:watch": "vitest",

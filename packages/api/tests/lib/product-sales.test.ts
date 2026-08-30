@@ -52,7 +52,9 @@ describe('unitsSoldSql', () => {
     // no mocked `db` will say so.
     expect(products.id).toBeDefined();
     expect(products.id.name).toBe('id');
-    expect(products[Symbol.for('drizzle:Name')]).toBe('products');
+    expect(
+      (products as unknown as Record<symbol, unknown>)[Symbol.for('drizzle:Name')]
+    ).toBe('products');
   });
 
   it('correlates against a table-qualified products.id when selected without joins', () => {

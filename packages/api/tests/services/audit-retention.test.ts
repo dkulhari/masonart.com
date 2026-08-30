@@ -17,11 +17,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const execute = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const execute = vi.hoisted(() =>
+  vi.fn((..._args: unknown[]) => Promise.resolve([] as unknown[]))
+);
 const transaction = vi.hoisted(() =>
-  vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ execute: (...args: unknown[]) => execute(...args) })
-  )
+  // The parameter list is a rest so the vi.mock wrapper below can forward its
+  // spread; the body still runs the callback, which is the whole point.
+  vi.fn(async (...args: unknown[]) => {
+    const fn = args[0] as (tx: unknown) => Promise<unknown>
+    return fn({ execute: (..._a: unknown[]) => execute(..._a) })
+  })
 );
 
 vi.mock('../../src/database', () => ({

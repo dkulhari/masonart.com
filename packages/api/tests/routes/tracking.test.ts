@@ -34,11 +34,35 @@ vi.mock('../../src/database', () => ({
 }));
 
 import { db } from '../../src/database';
+import type { OrderShippingAddress } from '../../src/database/schema/orders';
 import { readJson } from '../helpers/json';
 
 // ============================================================================
 // Test Data
 // ============================================================================
+
+/**
+ * Typed for real: the schema requires `countryCode` and has no `country` field,
+ * which this fixture used to declare (#662).
+ */
+const mockShippingAddress: OrderShippingAddress = {
+  fullName: 'John Doe',
+  phone: '9876543210',
+  addressLine1: '123 Main Street',
+  city: 'Mumbai',
+  state: 'Maharashtra',
+  postalCode: '400001',
+  countryCode: 'IN',
+};
+
+/**
+ * The route reads a handful of columns; these fixtures supply those and stand in
+ * for the full rows, so the cast lives here rather than at every call site.
+ */
+type OrderRow = NonNullable<Awaited<ReturnType<typeof db.query.orders.findFirst>>>;
+type ShipmentRow = NonNullable<
+  Awaited<ReturnType<typeof db.query.orderShipments.findFirst>>
+>;
 
 const mockOrder = {
   id: 'order-123',
@@ -47,15 +71,7 @@ const mockOrder = {
   guestEmail: 'guest@example.com',
   guestPhone: '9876543210',
   userId: null,
-  shippingAddress: {
-    fullName: 'John Doe',
-    phone: '9876543210',
-    addressLine1: '123 Main Street',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    postalCode: '400001',
-    country: 'India',
-  },
+  shippingAddress: mockShippingAddress,
   shippingDetails: {
     carrier: 'blue_dart',
     trackingNumber: 'BD123456789',
@@ -66,7 +82,7 @@ const mockOrder = {
   shippedAt: new Date('2024-02-10'),
   deliveredAt: null,
   user: null,
-};
+} as unknown as OrderRow;
 
 const mockOrderWithUser = {
   ...mockOrder,
@@ -96,7 +112,7 @@ const mockShipment = {
   estimatedDeliveryAt: new Date('2024-02-15'),
   deliveredAt: null,
   createdAt: new Date('2024-02-10'),
-};
+} as unknown as ShipmentRow;
 
 // ============================================================================
 // Test Setup
@@ -183,7 +199,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
       if (!app) return;
 
       vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(mockOrder);
-      vi.mocked(db.query.orderShipments.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.orderShipments.findFirst).mockResolvedValueOnce(undefined);
 
       const res = await app.request(
         '/api/tracking/lookup?orderNumber=MA-2024-001234&email=guest@example.com'
@@ -254,7 +270,7 @@ describe('Guest Order Lookup - GET /api/tracking/lookup', () => {
     it('should return 404 for non-existent order', async () => {
       if (!app) return;
 
-      vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(undefined);
 
       const res = await app.request(
         '/api/tracking/lookup?orderNumber=MA-9999-999999&email=test@example.com'
@@ -423,7 +439,7 @@ describe('Token-Based Lookup - GET /api/tracking/token/:token', () => {
     it('should return 404 for non-existent token', async () => {
       if (!app) return;
 
-      vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(null);
+      vi.mocked(db.query.orders.findFirst).mockResolvedValueOnce(undefined);
 
       const res = await app.request(
         '/api/tracking/token/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'

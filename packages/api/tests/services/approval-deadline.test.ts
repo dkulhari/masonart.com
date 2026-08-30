@@ -215,7 +215,7 @@ describe("Approval Deadline Checker Service", () => {
     it("should record error when order not found", async () => {
       vi.mocked(getApprovalsNearDeadline).mockResolvedValue([mockApproval as any]);
       vi.mocked(getApprovalById).mockResolvedValue(mockApprovalWithDetails as any);
-      vi.mocked(db.query.orders.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.orders.findFirst).mockResolvedValue(undefined);
 
       const result = await sendDeadlineReminders();
 
