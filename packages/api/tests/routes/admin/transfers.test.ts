@@ -173,8 +173,18 @@ function jobRow(over: Record<string, unknown> = {}) {
 
 /** Every job row the database holds for vendor A in the default fixture. */
 const ORIGINAL_JOBS: PayableJob[] = [
-  { id: JOB_A, amountExpected: '400.00', amountActual: null, settlementId: null },
-  { id: JOB_B, amountExpected: '150.50', amountActual: '175.00', settlementId: null },
+  // `dispatched`, and deliberately so: declaring a transfer lost leaves the
+  // originals exactly there. #695 made a job's status part of whether it is
+  // payable, and `dispatched` is on the paying side of that line — we owe for
+  // the work, whatever happened to the parcel.
+  { id: JOB_A, status: 'dispatched', amountExpected: '400.00', amountActual: null, settlementId: null },
+  {
+    id: JOB_B,
+    status: 'dispatched',
+    amountExpected: '150.50',
+    amountActual: '175.00',
+    settlementId: null,
+  },
 ]
 
 /**
@@ -686,6 +696,10 @@ describe('POST /api/admin/transfers/:id/lost', () => {
       [...ORIGINAL_JOBS.map((job) => ({ ...job, ...patch })), ...insertedRows(productionJobs)].map(
         (r) => ({
           id: String(r.id ?? 'new'),
+          // Absent means the column default, which is 'draft'. A patch that
+          // cancelled an original to "tidy up" would land here and move the
+          // number, which is the point of replaying rather than assuming.
+          status: String(r.status ?? 'draft'),
           amountExpected: (r.amountExpected ?? null) as string | null,
           amountActual: (r.amountActual ?? null) as string | null,
           settlementId: (r.settlementId ?? null) as string | null,

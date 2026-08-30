@@ -91,6 +91,7 @@ import {
   type ProductionJobStatus,
   type TransitionGuard,
 } from './production-transitions'
+import { payableJobsCondition } from './vendor-payables'
 
 /**
  * The guard every export starts with. Throws rather than returning empty:
@@ -184,7 +185,14 @@ export async function listVendorSettlements(vendorId: string | null | undefined)
 
 /**
  * Payables are DERIVED, never stored: no parallel ledger to drift.
- * owed = SUM(COALESCE(amountActual, amountExpected)) over unsettled jobs.
+ * owed = SUM(COALESCE(amountActual, amountExpected)) over payable jobs.
+ *
+ * This is the number the VENDOR sees on their own screen, and its admin twin is
+ * `routes/admin/vendor-payables.ts`. The predicate is imported from
+ * `lib/vendor-payables` rather than retyped here: this query used to say
+ * `settlement_id IS NULL` and nothing else, so a cancelled job kept showing the
+ * vendor a rate-card amount for work they never did, permanently, with no
+ * screen anywhere that could clear it — #695.
  */
 export async function getVendorPayableTotal(vendorId: string | null | undefined) {
   assertVendorId(vendorId)
@@ -193,7 +201,7 @@ export async function getVendorPayableTotal(vendorId: string | null | undefined)
       total: sql<string>`COALESCE(SUM(COALESCE(${productionJobs.amountActual}, ${productionJobs.amountExpected})), 0)`,
     })
     .from(productionJobs)
-    .where(and(eq(productionJobs.vendorId, vendorId), isNull(productionJobs.settlementId)))
+    .where(and(eq(productionJobs.vendorId, vendorId), payableJobsCondition()))
 
   return row?.total ?? '0'
 }

@@ -489,6 +489,107 @@ describe('my jobs — the three states', () => {
   })
 })
 
+// ============================================================================
+// #695 — the phantom payable, on the screen the ticket is named after
+// ============================================================================
+
+/**
+ * "You are paid" is the column a print shop reads to decide whether to chase
+ * us. `amountExpected` is the rate card's guess at what the work would have
+ * cost; `amountActual` is what a human said we owe. On a CANCELLED job only the
+ * second is real, and showing the first is a bill the vendor cannot explain,
+ * cannot clear, and will eventually phone about.
+ *
+ * The mirror of `lib/vendor-payables.jobPayableAmount` on the API side. Both
+ * ends have to agree or the portal and the settlement screen show two numbers.
+ */
+describe('a cancelled job shows no phantom amount (#695)', () => {
+  const cancelled = (over: Partial<VendorJobListItem> = {}): VendorJobListItem => ({
+    ...job,
+    status: 'cancelled',
+    amountExpected: '500.00',
+    amountActual: null,
+    ...over,
+  })
+
+  function renderRow(row: VendorJobListItem) {
+    render(<VendorJobsListBody jobs={[row]} isLoading={false} error={null} onRetry={() => {}} />)
+    return screen.getByTestId(`vendor-job-row-${row.id}`)
+  }
+
+  it('replaces the rate-card expectation with a real zero', () => {
+    const row = renderRow(cancelled())
+    expect(row).toHaveTextContent('₹0.00')
+    expect(row).not.toHaveTextContent('500')
+  })
+
+  it('renders the status beside it, so the zero is legible rather than mysterious', () => {
+    // A ₹0 line nobody can explain is the same support call as a phantom
+    // amount. The pill on the same row is what makes it an answer.
+    expect(renderRow(cancelled())).toHaveTextContent('Cancelled')
+  })
+
+  it('keeps a kill fee an admin actually agreed', () => {
+    // Cancelled after real work, at a price someone stated. This is the case a
+    // blanket "cancelled means zero" would quietly delete.
+    const row = renderRow(cancelled({ amountExpected: '900.00', amountActual: '250.00' }))
+    expect(row).toHaveTextContent('₹250.00')
+    expect(row).not.toHaveTextContent('900')
+  })
+
+  it('shows an explicitly agreed zero as a zero', () => {
+    const row = renderRow(cancelled({ amountExpected: '700.00', amountActual: '0.00' }))
+    expect(row).toHaveTextContent('₹0.00')
+    expect(row).not.toHaveTextContent('700')
+  })
+
+  it('leaves a live job alone', () => {
+    // The rule is about `cancelled`, not about a missing override. Every other
+    // status still falls back to the expectation, including the terminal one:
+    // a lost parcel does not stop us owing for the work.
+    expect(renderRow({ ...job, status: 'dispatched' })).toHaveTextContent('₹850.00')
+  })
+
+  it('says the same thing on the job detail screen', () => {
+    // The two screens read the same row. A vendor who sees ₹0.00 in the list
+    // and ₹500.00 one click later has learned that neither number is real.
+    render(
+      <VendorJobDetailBody
+        data={{
+          ...detail,
+          job: { ...detail.job, status: 'cancelled', amountExpected: '500.00', amountActual: null },
+        }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    const amount = screen.getByTestId('vendor-job-amount')
+    expect(amount).toHaveTextContent('₹0.00')
+    expect(amount).not.toHaveTextContent('500')
+  })
+
+  it('and still shows a kill fee there', () => {
+    render(
+      <VendorJobDetailBody
+        data={{
+          ...detail,
+          job: {
+            ...detail.job,
+            status: 'cancelled',
+            amountExpected: '900.00',
+            amountActual: '250.00',
+          },
+        }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+    expect(screen.getByTestId('vendor-job-amount')).toHaveTextContent('₹250.00')
+  })
+})
+
 describe('the job detail — the three states and the two writes', () => {
   it('shows a skeleton, then the job', () => {
     const { rerender } = render(

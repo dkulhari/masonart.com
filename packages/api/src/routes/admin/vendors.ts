@@ -82,7 +82,11 @@ import {
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { sumPayable, type PayableJob } from "../../lib/vendor-payables";
+import {
+  sumPayable,
+  payableJobsCondition,
+  type PayableJob,
+} from "../../lib/vendor-payables";
 
 // ============================================================================
 // Constants
@@ -299,22 +303,23 @@ adminVendorsApp.get("/", zValidator("query", listQuerySchema), async (c) => {
       )
       .groupBy(productionJobs.vendorId);
 
-    // Unsettled only — the same predicate lib/vendor-payables documents. The
-    // sum itself is that module's, never a SUM() written here.
+    // The predicate lib/vendor-payables documents, IMPORTED rather than
+    // restated — this query used to claim it was "the same predicate" while
+    // spelling out only half of it, so a cancelled job kept inflating
+    // `amountOwed` on the vendor list (#695). The sum itself is that module's
+    // too, never a SUM() written here.
     const unsettledJobRows = await db
       .select({
         id: productionJobs.id,
         vendorId: productionJobs.vendorId,
+        status: productionJobs.status,
         amountExpected: productionJobs.amountExpected,
         amountActual: productionJobs.amountActual,
         settlementId: productionJobs.settlementId,
       })
       .from(productionJobs)
       .where(
-        and(
-          inArray(productionJobs.vendorId, pageIds),
-          isNull(productionJobs.settlementId)
-        )
+        and(inArray(productionJobs.vendorId, pageIds), payableJobsCondition())
       );
 
     const capabilitiesByVendor = new Map<
@@ -346,6 +351,7 @@ adminVendorsApp.get("/", zValidator("query", listQuerySchema), async (c) => {
       const list = jobsByVendor.get(job.vendorId) ?? [];
       list.push({
         id: job.id,
+        status: job.status,
         amountExpected: job.amountExpected,
         amountActual: job.amountActual,
         settlementId: job.settlementId,

@@ -98,10 +98,11 @@
  *    only writes it, with `decided_by = NULL`, and only once every live job on
  *    the order is assigned to that one vendor.
  *
- * Money arithmetic is `lib/vendor-payables`' throughout — `sumPayable` adds the
+ * Money arithmetic is `lib/vendor-payables`' throughout — `sumRupees` adds the
  * matched rates in integer paise and `jobPayableAmount` answers
- * `COALESCE(actual, expected)`. A second money implementation in a router is
- * how a ledger starts disagreeing with itself.
+ * `COALESCE(actual, expected)`, except on a cancelled job where only an amount
+ * an admin actually stated counts (#695). A second money implementation in a
+ * router is how a ledger starts disagreeing with itself.
  *
  * Concurrency is `routes/admin/vendor-payables.ts`' shape, copied deliberately:
  * `FOR UPDATE` on the read, the predicate REPEATED in the UPDATE's WHERE, and a
@@ -148,7 +149,7 @@ import {
   type RateRow,
 } from "../../lib/vendor-rates";
 import {
-  sumPayable,
+  sumRupees,
   jobPayableAmount,
   type PayableJob,
 } from "../../lib/vendor-payables";
@@ -1088,14 +1089,14 @@ adminProductionApp.post(
         // Summed in integer paise by the payables module rather than by a float
         // add here — the amounts are decimals precisely so they stay exact. One
         // entry per PIECE: three posters on one line are three rates.
-        const amountExpected = sumPayable(
+        //
+        // `sumRupees`, not `sumPayable`: these are rate-card matches, not job
+        // rows. Borrowing the payable summer meant building fake jobs with a
+        // null settlement to satisfy its filter, which made the payable rules
+        // look like arithmetic incidentals rather than rules (#695).
+        const amountExpected = sumRupees(
           priced.flatMap((p) =>
-            Array.from({ length: p.units }, (_unit, index) => ({
-              id: `${p.orderItemId}#${index}`,
-              amountExpected: p.rate?.amount ?? null,
-              amountActual: null,
-              settlementId: null,
-            }))
+            Array.from({ length: p.units }, () => p.rate?.amount ?? null)
           )
         );
 

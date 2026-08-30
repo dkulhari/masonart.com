@@ -162,6 +162,29 @@ export interface VendorJobsResponse {
 // ============================================================================
 
 /**
+ * What this job is worth to the vendor, in rupees, or null if we cannot say.
+ *
+ * `amountExpected` is what the rate card said the work WOULD cost;
+ * `amountActual` is what a human said we owe. On a CANCELLED job only the
+ * second is real — the first is a bill for work that never happened, and it is
+ * the vendor's own screen it lands on, permanently, with no way to clear it
+ * (#695). So a cancellation with nothing agreed is a definite `'0.00'`, not a
+ * fallback to the expectation and not a blank: the status pill on the same row
+ * says why, which is what makes the zero an answer instead of a mystery.
+ *
+ * The mirror of the API's `lib/vendor-payables.jobPayableAmount`. Both ends
+ * have to agree or the portal and the settlement screen show two numbers.
+ */
+export function vendorJobPayableAmount(job: {
+  status: ProductionJobStatus
+  amountExpected: string | null
+  amountActual: string | null
+}): string | null {
+  if (job.status === 'cancelled') return job.amountActual ?? '0.00'
+  return job.amountActual ?? job.amountExpected
+}
+
+/**
  * A status, in words and in colour.
  *
  * Both come from `vendor-nav`'s fallback-carrying helpers rather than a blind
@@ -837,7 +860,7 @@ export function VendorJobsListBody({
           {jobs.map((job) => {
             // What we will actually pay: the agreed amount unless a final one
             // has been recorded. Never a zero when neither parses.
-            const amount = formatVendorAmount(job.amountActual ?? job.amountExpected)
+            const amount = formatVendorAmount(vendorJobPayableAmount(job))
 
             return (
               <tr

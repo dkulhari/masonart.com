@@ -176,6 +176,7 @@ import {
   VendorJobStatusPill,
   fetchInboundAwaitingArrival,
   inboundAwaitingArrival,
+  vendorJobPayableAmount,
   type VendorTransfer,
 } from '~/routes/vendor/index'
 
@@ -1727,7 +1728,10 @@ export function VendorJobDetailBody({
   if (!data) return <JobError message="This job could not be loaded." onRetry={onRetry} />
 
   const { job, items, reviews } = data
-  const agreed = formatVendorAmount(job.amountExpected)
+  // `vendorJobPayableAmount` rather than `job.amountExpected` directly: on a
+  // cancelled job the rate-card expectation is not a bill, and this screen and
+  // the list have to say the same thing about the same row (#695).
+  const agreed = formatVendorAmount(vendorJobPayableAmount(job))
   const final = formatVendorAmount(job.amountActual)
 
   const qcPanel: VendorQcPanelState = qc ?? {
