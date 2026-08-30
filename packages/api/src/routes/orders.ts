@@ -31,10 +31,7 @@ import { invalidateCartCache } from "./cart";
 import { productionApprovals } from "../database/schema/approvals";
 import { reviews } from "../database/schema/reviews";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
-import {
-  generateOrderNumber,
-  ORDER_NUMBER_PREFIX,
-} from "../lib/order-number";
+import { generateOrderNumber, isOrderNumber } from "../lib/order-number";
 import { deliverImmediateGiftCard } from "../services/gift-card-delivery";
 import {
   quoteGiftCard,
@@ -826,9 +823,8 @@ ordersApp.get("/:id", async (c) => {
   try {
     // Determine if ID is UUID or order number
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 
@@ -1016,8 +1012,7 @@ ordersApp.post(
 
     const isUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 
@@ -1068,9 +1063,8 @@ ordersApp.post("/:id/payment", async (c) => {
   try {
     // Determine if ID is UUID or order number
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 
@@ -1293,9 +1287,8 @@ ordersApp.post(
     try {
       // Determine if ID is UUID or order number
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-      if (!isUUID && !isOrderNumber) {
+      if (!isUUID && !isOrderNumber(id)) {
         return c.json({ error: "Invalid order ID format" }, 400);
       }
 

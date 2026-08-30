@@ -121,7 +121,7 @@ interface SeedOrder {
 /**
  * Twelve orders over ten products.
  *
- * Two of them — CH-SEED-0011 and CH-SEED-0012 — must NOT reach any total.
+ * Two of them — CA-SEED-0011 and CA-SEED-0012 — must NOT reach any total.
  * One is cancelled, one refunded, and they exist so the denylist in
  * `lib/product-sales.ts` is exercised by real rows rather than only by a
  * mocked assertion. `paper-layers` appears exclusively in those two, so a
@@ -130,7 +130,7 @@ interface SeedOrder {
  */
 const SEED_ORDERS: SeedOrder[] = [
   {
-    orderNumber: "CH-SEED-0001",
+    orderNumber: "CA-SEED-0001",
     customerIndex: 0,
     status: "delivered",
     paymentStatus: "paid",
@@ -160,7 +160,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0002",
+    orderNumber: "CA-SEED-0002",
     customerIndex: 1,
     status: "delivered",
     paymentStatus: "paid",
@@ -178,7 +178,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0003",
+    orderNumber: "CA-SEED-0003",
     customerIndex: 2,
     status: "delivered",
     paymentStatus: "paid",
@@ -208,7 +208,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0004",
+    orderNumber: "CA-SEED-0004",
     customerIndex: 3,
     status: "shipped",
     paymentStatus: "paid",
@@ -226,7 +226,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0005",
+    orderNumber: "CA-SEED-0005",
     customerIndex: 4,
     status: "delivered",
     paymentStatus: "paid",
@@ -244,7 +244,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0006",
+    orderNumber: "CA-SEED-0006",
     customerIndex: 0,
     status: "delivered",
     paymentStatus: "paid",
@@ -262,7 +262,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0007",
+    orderNumber: "CA-SEED-0007",
     customerIndex: 1,
     status: "processing",
     paymentStatus: "paid",
@@ -280,7 +280,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0008",
+    orderNumber: "CA-SEED-0008",
     customerIndex: 2,
     status: "delivered",
     paymentStatus: "paid",
@@ -310,7 +310,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0009",
+    orderNumber: "CA-SEED-0009",
     customerIndex: 3,
     status: "delivered",
     paymentStatus: "paid",
@@ -328,7 +328,7 @@ const SEED_ORDERS: SeedOrder[] = [
     ],
   },
   {
-    orderNumber: "CH-SEED-0010",
+    orderNumber: "CA-SEED-0010",
     customerIndex: 4,
     status: "confirmed",
     paymentStatus: "paid",
@@ -347,7 +347,7 @@ const SEED_ORDERS: SeedOrder[] = [
   },
   {
     /** Voided. Must never reach a sales total. */
-    orderNumber: "CH-SEED-0011",
+    orderNumber: "CA-SEED-0011",
     customerIndex: 0,
     status: "cancelled",
     paymentStatus: "cancelled",
@@ -356,7 +356,7 @@ const SEED_ORDERS: SeedOrder[] = [
   },
   {
     /** Voided. Must never reach a sales total. */
-    orderNumber: "CH-SEED-0012",
+    orderNumber: "CA-SEED-0012",
     customerIndex: 1,
     status: "refunded",
     paymentStatus: "refunded",

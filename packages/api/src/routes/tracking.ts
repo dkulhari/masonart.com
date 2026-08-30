@@ -53,7 +53,7 @@ const tracking = new Hono<{ Variables: TrackingVariables }>();
  * Look up an order by order number and email/phone (guest checkout support)
  *
  * Query params:
- * - orderNumber: Order number (e.g., "MA-2024-001234")
+ * - orderNumber: Order number (e.g., "CA-2026-001234")
  * - email: Email used for the order (optional if phone provided)
  * - phone: Phone used for the order (optional if email provided)
  *

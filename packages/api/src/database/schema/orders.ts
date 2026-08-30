@@ -154,7 +154,7 @@ export const orders = pgTable(
   "orders",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    orderNumber: text("order_number").unique().notNull(), // Human-readable order ID (e.g., "MA-2024-001234")
+    orderNumber: text("order_number").unique().notNull(), // Human-readable order ID (e.g., "CA-2026-001234")
 
     // Customer info
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }), // null for guest checkout

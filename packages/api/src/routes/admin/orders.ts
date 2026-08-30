@@ -32,6 +32,7 @@ import {
 
 import { db } from "../../database";
 import { recordAudit } from "../../lib/audit";
+import { isOrderNumber } from "../../lib/order-number";
 import {
   orders,
   type PaymentStatus,
@@ -72,8 +73,6 @@ const orderAuditAction = (status?: string | null) =>
   status === "cancelled"
     ? ("order.cancelled" as const)
     : ("order.status_changed" as const);
-
-const ORDER_NUMBER_PREFIX = "MA";
 
 // ============================================================================
 // Validation Schemas
@@ -469,9 +468,8 @@ adminOrdersApp.get("/:id", async (c) => {
   // Determine if ID is UUID or order number
   const isUUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-  const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-  if (!isUUID && !isOrderNumber) {
+  if (!isUUID && !isOrderNumber(id)) {
     return c.json({ error: "Invalid order ID format" }, 400);
   }
 
@@ -629,9 +627,8 @@ adminOrdersApp.patch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         id
       );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 
@@ -796,9 +793,8 @@ adminOrdersApp.patch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         id
       );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 
@@ -955,9 +951,8 @@ adminOrdersApp.patch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         id
       );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 
@@ -1059,9 +1054,8 @@ adminOrdersApp.post(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         id
       );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
+    if (!isUUID && !isOrderNumber(id)) {
       return c.json({ error: "Invalid order ID format" }, 400);
     }
 

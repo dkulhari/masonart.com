@@ -1547,33 +1547,3 @@ describe('Order Status Constants', () => {
     });
   });
 });
-
-// ============================================================================
-// Order Number Format Tests
-// ============================================================================
-
-describe('Order Number Format', () => {
-  it('should recognize valid order number format', () => {
-    const orderNumber = 'MA-2024-000001';
-    const isValid = /^MA-\d{4}-\d{6}$/.test(orderNumber);
-    expect(isValid).toBe(true);
-  });
-
-  it('should reject order number without MA prefix', () => {
-    const orderNumber = 'XX-2024-000001';
-    const isValid = /^MA-\d{4}-\d{6}$/.test(orderNumber);
-    expect(isValid).toBe(false);
-  });
-
-  it('should reject order number with invalid year', () => {
-    const orderNumber = 'MA-24-000001';
-    const isValid = /^MA-\d{4}-\d{6}$/.test(orderNumber);
-    expect(isValid).toBe(false);
-  });
-
-  it('should reject order number with invalid sequence', () => {
-    const orderNumber = 'MA-2024-001';
-    const isValid = /^MA-\d{4}-\d{6}$/.test(orderNumber);
-    expect(isValid).toBe(false);
-  });
-});
