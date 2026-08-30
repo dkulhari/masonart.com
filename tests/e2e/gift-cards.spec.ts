@@ -101,6 +101,31 @@ async function advanceToPaymentStep(page: Page) {
  */
 async function checkoutWithAnItem(page: Page) {
   await page.goto('/posters', { waitUntil: 'networkidle' })
+
+  /**
+   * Start from an empty cart, every time.
+   *
+   * These tests share one signed-in customer, so they share one server-side
+   * cart, and it survives the browser context that Playwright throws away
+   * between them. A gift card line left behind by "buying a gift card
+   * alongside a poster" was still in the cart when this spec's checkout tests
+   * ran again, and the order they built was a poster PLUS that card.
+   *
+   * That is what made the pay step fail one run in two or three: gift card
+   * tender is capped to exclude gift card lines (#579), so a card could not
+   * cover an order that contained one. The remainder was real, the server
+   * asked for a gateway, none is configured in dev, and the 503 rolled the
+   * whole payment back — leaving the browser on /checkout with an emptied
+   * cart and no request in the trace that looked wrong (#661).
+   *
+   * Deleting through the page's own origin, not the absolute API URL: the
+   * browser reaches the API through the Vite proxy, so a same-origin request
+   * carries the session cookie and needs no CORS allowance.
+   */
+  await page.evaluate(async () => {
+    await fetch('/api/cart', { method: 'DELETE', credentials: 'include' })
+  })
+
   await page.locator('main a[href^="/posters/"]').first().click()
 
   const [added] = await Promise.all([
@@ -125,9 +150,13 @@ async function checkoutWithAnItem(page: Page) {
         })
         return cart
       },
-      { timeout: 15_000, message: 'the cart never reported the item it just accepted' }
+      {
+        timeout: 15_000,
+        message:
+          'the cart did not hold exactly the one item this test added — a leftover line from an earlier test changes what the order costs, and silently',
+      }
     )
-    .toBeGreaterThan(0)
+    .toBe(1)
 
   await page.goto('/checkout', { waitUntil: 'networkidle' })
   await expect(giftCardInput(page)).toBeVisible()
