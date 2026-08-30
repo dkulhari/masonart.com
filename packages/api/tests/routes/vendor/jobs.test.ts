@@ -270,6 +270,22 @@ describe('PATCH /api/vendor/jobs/:id', () => {
     expect(ops('update', productionJobs)).toHaveLength(0)
   })
 
+  it('refuses the RETIRED `sent` status, and issues no UPDATE', async () => {
+    // Not caught by the schema: `routes/vendor.ts` still holds its own
+    // `['sent','received']` literal, so zod lets this through and the scoped
+    // module is what has to stop it (#684 replaces that literal and turns the
+    // refusal below into a 409). It stops it because its vocabulary is DERIVED
+    // from the transition matrix, in which `sent` is edgeless in both
+    // directions — #675 retired it and `retire-sent-status.ts` erased it from
+    // the rows that carried it. A vendor writing it back would re-create
+    // exactly what that backfill had just removed.
+    queueRows({ 'select:production_jobs': [[jobRow()]] })
+
+    const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: 'sent' }))
+    expect(res.status, 'a vendor moved a job into the retired status').not.toBe(200)
+    expect(ops('update', productionJobs)).toHaveLength(0)
+  })
+
   it("404s on another vendor's job and writes NOTHING", async () => {
     queueRows({ 'select:production_jobs': [[]] })
 

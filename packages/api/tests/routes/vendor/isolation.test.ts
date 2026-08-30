@@ -78,7 +78,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { PgDialect, getTableConfig } from 'drizzle-orm/pg-core'
-import type { SQL } from 'drizzle-orm'
+import { sql, type SQL } from 'drizzle-orm'
 import '../../setup'
 
 // ============================================================================
@@ -91,6 +91,15 @@ interface RecordedQuery {
   where?: unknown
   /** Column names handed to `db.select({...})`. `null` means WHOLESALE. */
   fields: string[] | null
+  /**
+   * Tables pulled in by JOIN. Recorded because a joined table crosses this
+   * boundary exactly as much as the FROM table does, and #678 reached
+   * `order_consolidation` and `order_shipments` through joins alone — which is
+   * how they slipped past a Property 1 that only ever looked at the FROM.
+   */
+  joins: string[]
+  /** The ORDER BY expressions, so "a deterministic row" is checkable at all. */
+  orderBy: unknown[]
   values?: unknown
 }
 
@@ -117,6 +126,8 @@ function builder(op: RecordedQuery['op'], table?: unknown, fields?: unknown) {
     table: table === undefined ? null : tableName(table),
     fields:
       fields && typeof fields === 'object' ? Object.keys(fields as object) : null,
+    joins: [],
+    orderBy: [],
   }
   queries.push(rec)
 
@@ -125,10 +136,19 @@ function builder(op: RecordedQuery['op'], table?: unknown, fields?: unknown) {
       rec.table = tableName(t)
       return chain
     },
-    leftJoin: () => chain,
-    innerJoin: () => chain,
+    leftJoin(t: unknown) {
+      rec.joins.push(tableName(t))
+      return chain
+    },
+    innerJoin(t: unknown) {
+      rec.joins.push(tableName(t))
+      return chain
+    },
     groupBy: () => chain,
-    orderBy: () => chain,
+    orderBy(...exprs: unknown[]) {
+      rec.orderBy = exprs
+      return chain
+    },
     returning: () => chain,
     where(w: unknown) {
       rec.where = w
@@ -461,8 +481,50 @@ function forbiddenKeysIn(value: unknown): string[] {
 
 /** Tables whose rows belong to exactly one vendor, so a read must name it. */
 const VENDOR_OWNED_TABLES = ['production_jobs', 'vendor_rates', 'vendor_settlements']
+
+/**
+ * Order-keyed tables the carrier label pulled across this boundary (#678).
+ *
+ * Neither is vendor-owned the way the three above are: `order_shipments` has no
+ * vendor column at all, and `order_consolidation.vendor_id` names the ONE vendor
+ * despatching the order rather than the row's owner. Both are still required to
+ * bind the caller's id in the SAME query's WHERE, because the only legitimate
+ * way to reach either from this boundary is joined to a vendor-scoped row —
+ * which is what `getVendorJobLabelKey` does today, and what #687's routes have
+ * to keep doing.
+ *
+ * They are written down because **Property 1 is an ALLOW-LIST**, and an
+ * allow-list fails silently: a read of a table nobody listed is not judged
+ * unscoped, it is not examined. #678 brought these two across and added neither,
+ * so every assertion below went on passing while covering none of the new
+ * surface — which is indistinguishable, from the outside, from coverage.
+ */
+const ORDER_KEYED_TABLES = ['order_consolidation', 'order_shipments']
+
+/** Every table a vendor-facing query must name the caller's vendor id in. */
+const SCOPED_TABLES = [...VENDOR_OWNED_TABLES, ...ORDER_KEYED_TABLES]
+
 /** Reachable only through a job, which is itself scoped before they are read. */
 const JOB_KEYED_TABLES = ['production_job_items', 'production_job_reviews']
+
+/** Every scoped table one query touches, in its FROM or in any of its JOINs. */
+function scopedTablesTouched(q: RecordedQuery): string[] {
+  return [q.table, ...q.joins].filter((t): t is string => t !== null && SCOPED_TABLES.includes(t))
+}
+
+/**
+ * The queries that touch a scoped table without binding the caller's vendor id.
+ *
+ * Factored out of the property so the property can be SHOWN to go red on a
+ * planted violation — see the not-vacuous test below. An allow-list assertion
+ * nobody has watched fail is indistinguishable from one that examines nothing,
+ * which is exactly the state #678 left this in.
+ */
+function unscopedReads(qs: readonly RecordedQuery[], vendorId: string): RecordedQuery[] {
+  return qs.filter(
+    (q) => scopedTablesTouched(q).length > 0 && !params(q.where).includes(vendorId)
+  )
+}
 
 async function run(path: string, init?: RequestInit) {
   const res = await buildApp().request(path, init)
@@ -516,15 +578,10 @@ describe('property 1: a vendor reaches only their own rows', () => {
       const { res } = await run(path, init)
       expect(res.status).toBe(route.okStatus)
 
-      const unscoped = queries.filter(
-        (q) =>
-          q.table !== null &&
-          VENDOR_OWNED_TABLES.includes(q.table) &&
-          !params(q.where).includes(VENDOR_B)
-      )
+      const unscoped = unscopedReads(queries, VENDOR_B)
       expect(
         unscoped.map((q) => `${q.op}:${q.table}`),
-        'a vendor-owned table was queried without the vendorId in its WHERE'
+        'a vendor-scoped table was queried without the vendorId in its WHERE'
       ).toEqual([])
 
       // Job-keyed tables are safe only because the job was scoped first.
@@ -586,6 +643,47 @@ describe('property 1: a vendor reaches only their own rows', () => {
       expect(mockPresign).not.toHaveBeenCalled()
     }
   )
+
+  it('the scoped-table vocabulary actually catches an unscoped read — not vacuous', () => {
+    // Same guard the body walker and the scope matcher already carry, and the
+    // one this property was missing. Its failure mode is SILENCE: a table
+    // outside the vocabulary is skipped, not judged, so "no route is unscoped"
+    // and "no route was examined" produce identical green. #678 put this suite
+    // in the second state for two tables and nothing went red.
+    const scoped = sql`"production_jobs"."vendor_id" = ${VENDOR_B}`
+    const q = (over: Partial<RecordedQuery>): RecordedQuery => ({
+      op: 'select',
+      table: null,
+      fields: ['id'],
+      joins: [],
+      orderBy: [],
+      ...over,
+    })
+
+    // One planted violation per shape the vocabulary now covers.
+    const planted = [
+      q({ table: 'production_jobs' }),
+      q({ table: 'order_consolidation' }),
+      q({ table: 'order_shipments' }),
+      // The FROM is innocent; the JOIN is where #678 actually reached.
+      q({ table: 'production_job_items', joins: ['order_shipments'] }),
+    ]
+    expect(unscopedReads(planted, VENDOR_B).map((p) => p.table)).toEqual([
+      'production_jobs',
+      'order_consolidation',
+      'order_shipments',
+      'production_job_items',
+    ])
+
+    // ...and it clears the same reads once they name the caller, so it is a
+    // check and not a blanket refusal.
+    expect(unscopedReads(planted.map((p) => ({ ...p, where: scoped })), VENDOR_B)).toEqual([])
+
+    // A table nobody listed is genuinely not covered. Stated out loud, because
+    // it is the property's cost: the next table to cross this boundary has to
+    // be added to ORDER_KEYED_TABLES or it enjoys the same silence.
+    expect(unscopedReads([q({ table: 'order_items' })], VENDOR_B)).toEqual([])
+  })
 })
 
 // ============================================================================
@@ -854,6 +952,19 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
     expect(objectKeyForScope('label', SAMPLE.artwork)).toBeNull()
   })
 
+  it.each(['constructor', '__proto__', 'hasOwnProperty', 'toString'])(
+    'fails CLOSED on the inherited property name %s, rather than throwing',
+    (name) => {
+      // `VENDOR_SIGNING_SCOPES[name]` resolves up the PROTOTYPE CHAIN to a
+      // function, whose truthy `.length` walks past a plain emptiness guard and
+      // then explodes inside `.some`. The scope argument is always a code
+      // literal, so this is not attacker-reachable — it is asserted because
+      // "fails closed rather than throwing" has to actually mean that.
+      expect(objectKeyForScope(name as VendorSigningScope, 'products/abc.jpg')).toBeNull()
+      expect(mockPresign).not.toHaveBeenCalled()
+    }
+  )
+
   it('the scope matcher actually finds a match — this property is not vacuous', () => {
     // Same guard as the body walker has. `scopesMatching` returning [] for
     // everything would make the "exactly one scope" test above pass by
@@ -881,6 +992,14 @@ describe('property 3: every vendor signature is short-lived and single-scoped', 
  * a signed URL that is generated and then withheld has still been generated,
  * and lives in whatever log, trace or crash dump saw it. "The response was a
  * 404" is not the property. "No signature exists" is.
+ *
+ * A fourth condition rides along that is NOT an authorisation check and cannot
+ * be a predicate: WHICH shipment. `order_shipments.order_id` is a plain indexed
+ * FK, not unique, so an order whose label was voided and re-bought has several
+ * rows with several tokens, and a bare `LIMIT 1` over them is a coin flip that
+ * can land on the dead label — or on a different one each call. It is asserted
+ * below as an explicit ORDER BY, because "deterministic" is not observable in a
+ * single-row fixture.
  *
  * There is no route here yet — `GET /api/vendor/jobs/:id/label` is #687 — so
  * this asserts the scoped module directly. The route-table property above will
@@ -922,6 +1041,46 @@ describe('property 4: the carrier label reaches only the consolidator, or is nev
     expect(bound).toContain(B_JOB_ID)
     expect(bound).toContain(VENDOR_B)
     expect(bound).not.toContain(VENDOR_A)
+  })
+
+  it('picks the shipment DETERMINISTICALLY, not whichever row Postgres reached first', async () => {
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+    await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+
+    const read = queries.find((q) => q.op === 'select')!
+    // A single-row fixture cannot see this: with one shipment every ordering
+    // agrees. The assertion is therefore on the QUERY, which is where the
+    // nondeterminism lives — an order with a voided-and-rebought label has two
+    // labelled rows, and `LIMIT 1` with no ORDER BY picks between them by luck.
+    expect(read.orderBy.length, 'the label read has no ORDER BY at all').toBeGreaterThan(0)
+
+    const ordering = read.orderBy.map((o) => sqlText(o)).join(' ')
+    expect(ordering, 'the newest label is not what decides').toContain(
+      '"order_shipments"."created_at"'
+    )
+    // Total, not merely usually stable: two labels bought in the same instant
+    // must still resolve to exactly one answer.
+    expect(ordering, 'a same-instant tie is left to the planner').toContain(
+      '"order_shipments"."id"'
+    )
+    expect(ordering.toLowerCase(), 'the OLDEST label would win').toContain('desc')
+    expect(ordering.toLowerCase()).not.toContain('asc')
+  })
+
+  it('names the caller in every scoped table it touches, JOINS included', async () => {
+    queueRows({ 'select:production_jobs': [[tokenRow()]] })
+    await getVendorJobLabelKey(VENDOR_B, B_JOB_ID)
+
+    const read = queries.find((q) => q.op === 'select')!
+    // The two tables #678 brought across are reached by JOIN, so Property 1's
+    // vocabulary covers them only if joins are part of what it looks at. If
+    // this list ever shrinks, the vocabulary has gone dormant again.
+    expect(scopedTablesTouched(read).sort()).toEqual([
+      'order_consolidation',
+      'order_shipments',
+      'production_jobs',
+    ])
+    expect(unscopedReads(queries, VENDOR_B), 'the label read is not vendor-scoped').toEqual([])
   })
 
   it('returns null for a NON-CONSOLIDATOR and the presigner is never called', async () => {

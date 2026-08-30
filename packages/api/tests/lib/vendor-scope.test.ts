@@ -23,6 +23,10 @@ describe('vendor-scope module contract', () => {
     // job-linked data like any other and refuses without a vendorId like any
     // other.
     'getVendorJobArtwork',
+    // The carrier label — the ONE object on this boundary that carries customer
+    // data, so an unscoped call to it is the worst one available. Added by
+    // #678, which shipped it without enrolling it here and left this suite red.
+    'getVendorJobLabelKey',
     // The one mutation. Enrolled here for the same reason as the reads: an
     // unscoped write is worse than an unscoped read, not exempt from the rule.
     'updateVendorJob',

@@ -69,6 +69,10 @@ import { orderItems } from '../database/schema/orders'
 import { orderConsolidation } from '../database/schema/production-transfers'
 import { orderShipments } from '../database/schema/shipping'
 import { vendorRates } from '../database/schema/vendors'
+import {
+  VENDOR_SETTABLE_STATUSES,
+  type ProductionJobStatus,
+} from './production-transitions'
 
 /**
  * The guard every export starts with. Throws rather than returning empty:
@@ -282,7 +286,21 @@ export function objectKeyForScope(
 ): string | null {
   // An unrecognised scope name fails closed rather than throwing or, worse,
   // matching nothing and being read as "no prefix restriction".
-  const prefixes: readonly string[] | undefined = VENDOR_SIGNING_SCOPES[scope]
+  //
+  // OWN properties only, and that is the whole point of the `hasOwnProperty`
+  // call. A plain index read resolves `'constructor'` and `'hasOwnProperty'` up
+  // the prototype chain to a FUNCTION, whose truthy `.length` walks straight
+  // past the emptiness guard below and then throws a TypeError inside `.some` —
+  // the one behaviour the sentence above promises it will not do. The scope
+  // argument is always a code literal, so this is not attacker-reachable; it is
+  // fixed because a guard that throws where it claims to return null is a guard
+  // nobody can reason about.
+  const prefixes: readonly string[] | undefined = Object.prototype.hasOwnProperty.call(
+    VENDOR_SIGNING_SCOPES,
+    scope
+  )
+    ? VENDOR_SIGNING_SCOPES[scope]
+    : undefined
   if (!prefixes || prefixes.length === 0) return null
 
   if (typeof ref !== 'string') return null
@@ -404,7 +422,7 @@ const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
  * key; it is never in it. The token follows the
  * `production_approvals.approval_token` precedent.
  *
- * ## All three conditions live in the WHERE
+ * ## Three AUTHORISATION conditions live in the WHERE — and a fourth does not
  *
  * The job is this vendor's; the order's consolidator (`order_consolidation`) is
  * this vendor; a label token exists. One query, three predicates, no branch in
@@ -418,6 +436,34 @@ const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
  * Only the consolidator, because only they hold the parcel. Everyone else on the
  * order shipped their piece onward by inter-vendor transfer and has no business
  * with the customer's address.
+ *
+ * ## The fourth condition: WHICH shipment
+ *
+ * It is not an authorisation check and it cannot be written as a predicate, so
+ * spelling out "all three" and stopping there was a lie of omission.
+ * `order_shipments.order_id` is a plain indexed FK, NOT unique
+ * (`schema/shipping.ts`), so an order whose label was voided and re-bought
+ * carries more than one row, each with its own `label_object_token`. A bare
+ * `LIMIT 1` over that returns whichever row Postgres happened to reach first —
+ * possibly the dead label, and possibly a different one on the next call, which
+ * is the worse half: a vendor who reloads gets a different PDF.
+ *
+ * So the row is CHOSEN, explicitly: the newest LABELLED shipment, `id` breaking
+ * a same-instant tie so the ordering is total rather than merely usually stable.
+ * The `label_object_token is not null` predicate is what makes "labelled" part
+ * of the choice — an unlabelled re-buy cannot shadow the live label.
+ *
+ * **What "correct" means here, and the limit of it.** Correct is *the label the
+ * courier will actually honour*. Newest-labelled is the closest approximation
+ * `order_shipments` can currently express: the table has no void marker at all —
+ * `shipment_status` runs pending → label_created → … → delivered/failed, and
+ * `failed` is a failed DELIVERY, not a voided label — and inventing one here
+ * would be this feature writing semantics onto another sub-project's table.
+ * **SEAM, owned by `order-dispatch-tracking` (same owner as
+ * `LABEL_OBJECT_TOKEN` above):** the day that feature lands a void /
+ * cancellation marker, or makes the live label single-valued per order, the
+ * `ORDER BY` below must become a predicate on it. Until then this is the safest
+ * available choice and is deliberately not dressed up as more than that.
  *
  * ## What it returns
  *
@@ -453,6 +499,13 @@ export async function getVendorJobLabelKey(
         sql`${LABEL_OBJECT_TOKEN} is not null`
       )
     )
+    // The fourth condition, and the reason this is not a bare LIMIT 1. Several
+    // labelled shipments can hang off one order (voided and re-bought); without
+    // an ORDER BY the row is whichever one the planner reached first. Newest
+    // labelled shipment wins, `id` making the ordering total.
+    // SEAM (`order-dispatch-tracking`): replace with a predicate on the void
+    // marker the day one exists. See the doc block above.
+    .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
     .limit(1)
 
   const token = row?.token
@@ -485,14 +538,56 @@ export async function getVendorJobLabelKey(
  *
  * Returns the re-read row (the same customer-free column list as every other
  * read), never the raw `.returning()` row, which would carry `orderId`.
+ *
+ * ## The status vocabulary is NOT written down here
+ *
+ * It used to be — `'sent' | 'received'`, a second literal beside the one in
+ * `routes/vendor.ts`. Both went stale the moment #676 landed
+ * `lib/production-transitions.ts`, where `sent` is EDGELESS in both directions:
+ * nothing enters it, nothing leaves it, because #675 retired it and
+ * `database/retire-sent-status.ts` erased it from the rows that already had it.
+ * A parallel literal here meant a vendor could PATCH a job straight back to
+ * `sent` and re-create exactly what that backfill had just removed.
+ *
+ * So the vocabulary is IMPORTED and derived. `VENDOR_SETTABLE_STATUSES` is a
+ * `filter` over the transition matrix, not a list somebody maintains, so an edge
+ * added or removed there moves this boundary with it and there is no second
+ * place to forget.
  */
-export type VendorSettableStatus = 'sent' | 'received'
+export type VendorSettableStatus = (typeof VENDOR_SETTABLE_STATUSES)[number]
+
+/**
+ * The runtime half of the same fact, tested against the derived tuple rather
+ * than a `switch`, for the same reason the type is derived.
+ */
+function isVendorSettableStatus(status: unknown): status is VendorSettableStatus {
+  return (
+    typeof status === 'string' && (VENDOR_SETTABLE_STATUSES as readonly string[]).includes(status)
+  )
+}
 
 export async function updateVendorJob(
   vendorId: string | null | undefined,
   jobId?: string,
   patch: {
-    status?: VendorSettableStatus
+    /**
+     * Typed as the whole enum and narrowed at RUNTIME below, deliberately, and
+     * only until #684. `routes/vendor.ts` still holds its own
+     * `['sent','received']` literal and #684 owns replacing it; narrowing this
+     * parameter to `VendorSettableStatus` today would break that route's
+     * COMPILE rather than its behaviour, which is the wrong thing to fix from
+     * here. The refusal below is the enforcement either way — a status outside
+     * the matrix's vendor edges never reaches the UPDATE.
+     */
+    status?: ProductionJobStatus
+    /**
+     * #684 deletes both of these from the vendor patch surface: a vendor
+     * back-dating receipt is a lie about an SLA clock, and the server stamps
+     * them. They survive here only because `routes/vendor.ts` still passes them
+     * and this ticket does not own that route. Note that neither is what the
+     * `sent` retirement was about — `retire-sent-status.ts` deliberately LEAVES
+     * `sent_at` alone, because the date the material went out is evidence.
+     */
     sentAt?: Date | null
     receivedAt?: Date | null
   } = {}
@@ -503,7 +598,20 @@ export async function updateVendorJob(
   if (!existing || !jobId) return null
 
   const fields: Record<string, unknown> = {}
-  if (patch.status !== undefined) fields.status = patch.status
+  if (patch.status !== undefined) {
+    // Throws rather than dropping the field. Silently ignoring a status the
+    // caller asked for reads as success and leaves the job where it was, which
+    // is the failure mode that hides longest. #684 replaces this with
+    // `assertTransition`, which answers 409 and names the moves this vendor
+    // actually has from here.
+    if (!isVendorSettableStatus(patch.status)) {
+      throw new Error(
+        `vendor-scope: '${patch.status}' is not a vendor-settable status. ` +
+          `A vendor may set: ${VENDOR_SETTABLE_STATUSES.join(', ')}.`
+      )
+    }
+    fields.status = patch.status
+  }
   if (patch.sentAt !== undefined) fields.sentAt = patch.sentAt
   if (patch.receivedAt !== undefined) fields.receivedAt = patch.receivedAt
   if (Object.keys(fields).length === 0) return existing
