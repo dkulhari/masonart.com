@@ -19,18 +19,79 @@ description: |-
 feature: vendor-management
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T01:14:46.335Z'
-last_updated: '2026-08-17T01:14:46.335Z'
-time_spent_minutes: 0
+last_updated: '2026-08-28T01:53:30.389Z'
+time_spent_minutes: 9
 labels:
   - database
   - tech-debt
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-28T01:44:12.679Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-28T01:53:23.938Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `7e51a559` - fix(database): rebuild drizzle meta snapshots 0014-0022
+
+      **Scope was larger than the ticket described.** The ticket was written when migrations ran to 0019; the journal now runs to 0022, so nine snapshots were missing (0014-0022), not six.
+
+      **Files Changed**:
+      - `packages/api/src/database/migrations/meta/00{14..22}_snapshot.json` - nine rebuilt snapshots
+      - `packages/api/tests/schema/migration-meta-integrity.test.ts` - regression test
+
+      Nothing existing was touched: no migration `.sql`, no `_journal.json` entry, no snapshot 0013 or earlier.
+
+      **Root Cause**: `prepareOutFolder` in drizzle-kit 0.31.8 reads `meta/`, sorts lexicographically and takes the tail as the previous state, but the new migration's number comes from the journal length. With snapshots at 0013 and the journal at 0022, every `generate` diffed the current schema against nine-migrations-stale state and replayed settled history as fresh drift — including the `frame_type` -> `frame_category` prompt, which is migration 0014's create+drop being misread as a rename.
+
+      **Approach**: For each of 0014-0022, extracted the schema tree as it stood at the commit that introduced that migration (`git archive`, so the working tree was never touched), then ran `drizzle-kit generate` against an **empty** meta directory. With no previous snapshot there is no diff, so drizzle-kit writes a full description of the state and never prompts about renames. The state sections it writes are identical to what an incremental run would produce — only `id`, `prevId` and `_meta` depend on the diff — so `id`/`prevId` were assigned afterwards to chain onto 0013.
+
+      Sanity checks on the rebuilt set matched the migration history: 0014 replaces `frame_type` with `frame_category`, 0019 adds 9 tables (matching the 9 CREATE TABLE audited on this ticket), 0021 adds 1, and every consecutive pair differs.
+
+      **Verification**:
+      - Command: `npx drizzle-kit generate --config=drizzle.config.ts`
+      - Result: PASS — `No schema changes, nothing to migrate 😴`, exit 0, migration count unchanged at 23. This is the check the ticket named as proof the drift is gone.
+
+      - Command: `npx vitest run tests/schema/`
+      - Result: PASS (7 files, 23 tests). The new file adds 5, and failed 2/5 before the fix — 9 missing snapshots, chain ending at 13 instead of 22.
+
+      - Command: `turbo run typecheck` (pre-commit gate)
+      - Result: PASS across all 3 packages.
+
+      **Cross-check that the snapshots describe the database the migrations actually build** — a no-op `generate` only proves snapshot == schema, not schema == migrations, and 0019 was hand-assembled. Applied all 23 migrations to a throwaway `postgres:16`, pushed the schema into a second database on the same server, and compared:
+      - 670/670 columns identical on name, type, nullability and default
+      - 578/578 indexes, constraints and enum labels identical
+
+      Three differences remain, all inherent rather than drift:
+      1. Physical column order — `ALTER TABLE ADD COLUMN` appends; a from-scratch build uses declaration order.
+      2. Enum `sortorder` spacing — `ALTER TYPE ADD VALUE` yields fractions (2.5). Label ordering is identical in both: `customer < trade < content-manager < admin < super-admin < vendor`.
+      3. `admin_audit_log_immutable()` and its trigger exist only in the migration-built database.
+
+      **Worth knowing (3)**: that trigger is raw SQL in migration 0021 that drizzle's schema DSL cannot express, so `db:push` does not recreate it. **`db:push` is not a substitute for `db:migrate` on this schema** — a database built by push silently loses the audit-log append-only guarantee.
+
+      **Regression guard**: the new test pins the three invariants that keep `generate` honest — a snapshot per journal entry, an unbroken `prevId` chain with unique ids, and a chain ending on the newest entry. It is pure filesystem work: no database, no drizzle-kit invocation, ~80ms.
+  - author: system
+    timestamp: '2026-08-28T01:53:25.908Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-28T01:44:13.914Z'
+    agent: claude-code
+    summary: 'Rebuilt drizzle meta snapshots 0014-0022 (nine, not the six the ticket predicted) by replaying each migration''s commit schema against an empty meta dir, then chaining ids onto 0013. db:generate is now a clean no-op. Added tests/schema/migration-meta-integrity.test.ts (5 tests, 2 failed pre-fix). Cross-verified migrations vs schema on a throwaway postgres:16: 670/670 columns and 578/578 indexes/constraints/enums match. Committed 7e51a559.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-28T01:53:30.349Z'
+    duration: '00:09:16'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -41,21 +102,39 @@ implementation_steps:
     description: 'Establish the failing condition: db:generate on an unchanged schema must produce nothing'
     command: cd packages/api && bun run db:generate
     expected_result: FAIL - prompts to rename frame_type to frame_category instead of reporting no changes
-    status: pending
+    status: done
   - id: 2
     action: implement
     description: Rebuild meta snapshots 0014-0019 to match applied migration history
     file: packages/api/src/database/migrations/meta
-    status: pending
+    status: done
   - id: 3
     action: verify-pass
     description: Confirm a no-op generate is genuinely a no-op
     command: cd packages/api && bun run db:generate
     expected_result: PASS - 'No schema changes, nothing to migrate'
-    status: pending
+    status: done
   - id: 4
     action: commit
     description: Commit the repaired snapshots
     command: 'git add packages/api/src/database/migrations/meta && git commit -m "fix(db): repair drizzle meta snapshots drifted from migration history"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 4
+started: '2026-08-28T01:44:12.679Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:09:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:09:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/schema/ && npx drizzle-kit generate --config=drizzle.config.ts
+  test_output: 'vitest tests/schema/: 7 files, 23 tests, all passing (5 new in migration-meta-integrity.test.ts). drizzle-kit generate: "No schema changes, nothing to migrate" exit 0, migration count unchanged at 23. Cross-check: all 23 migrations applied to throwaway postgres:16 vs schema pushed to a second DB — 670/670 columns identical, 578/578 indexes+constraints+enum labels identical.'
+  build_passed: true
+  build_command: turbo run typecheck (pre-commit gate)
+  verified_at: '2026-08-28T01:53:05.511Z'
+completed: '2026-08-28T01:53:25.908Z'

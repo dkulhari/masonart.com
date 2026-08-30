@@ -122,19 +122,84 @@ description: |-
 feature: code-deduplication
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T05:12:37.390Z'
-last_updated: '2026-08-17T05:12:37.390Z'
-time_spent_minutes: 0
+last_updated: '2026-08-28T03:00:40.573Z'
+time_spent_minutes: 25
 labels:
   - refactor
   - dry
   - testing
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-28T02:35:53.969Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-28T03:00:33.123Z'
+    text: |-
+      ✅ **Completed** — five commits, one per piece.
+
+      | Commit | Piece |
+      |---|---|
+      | `6a26169f` | connectLiveDb / closeLiveDb across 11 suites |
+      | `09e55e86` | freshGiftCardCode across 7 suites |
+      | `103ef5e9` | redeem/refund row factories |
+      | `8e0d9473` | header-auth + Razorpay mocks |
+      | `cf51aa51` | row factories extended to the 5 route suites |
+
+      **Baseline (the contract)**: 11 files, 138 tests. Every commit re-verified against it. Final state: **11 files, 138 tests, identical.**
+
+      **New helpers**
+      - `tests/helpers/live-db.ts` — `connectLiveDb()`, `closeLiveDb()`
+      - `tests/helpers/gift-card-fixtures.ts` — `freshGiftCardCode()`, `razorpayMocks()`
+      - `tests/helpers/gift-card-row-factories.ts` — `createGiftCardRowFactories()` (new file)
+      - `tests/helpers/admin-route-harness.ts` — `headerRequireAuth()`, `headerAdminMocks()` (extended, not forked, as asked)
+
+      **Acceptance criteria**
+      - Five pieces each a single copy under `tests/helpers/` — yes.
+      - No behaviour change — 138/138 before and after.
+      - redeem/refund no longer a clone — 139 duplicated lines (19.12%) down to 60 (10.36%); the pair went 727 lines to 579.
+      - Scan below 2.93% — **2.72%**. Clones touching gift-card files: 14 → 5.
+
+      **The purge-order trap, resolved rather than stepped in**: the suites deleted `gift_card_transactions` before `order_gift_cards`; the #630 helper does the reverse. Checked the FK edges in `src/database/schema/gift-cards.ts` — the two tables reference `gift_card` and `orders` but never each other, so their relative order is free. The only load-bearing ordering is that both precede `gift_card`, which `order_gift_cards` is FK'd to `ON DELETE RESTRICT`. Both spellings satisfy it. Unified on the helper deliberately.
+
+      **Corrections to the ticket**
+      1. redeem/refund were **400 and 365 lines**, not "~160". The 127 figure was the clone-region total.
+      2. The seven `freshCode` copies differed in **counter width as well as prefix**, and the width was load-bearing: every copy padded so prefix + pid + counter came to exactly 16. A 3-letter prefix padded to 7, a 4-letter to 6. Proved the shared version byte-identical to all seven over 63 cases before switching.
+      3. The four enumerated commits did **not** meet the acceptance criteria — 14 gift-card clones remained, 7 of them real (route-suite `makeCard`, `balanceOf`, two more hand-rolled purges). Hence the fifth commit.
+
+      **Two things worth their own tickets**
+
+      1. **The test tree is not typechecked.** `packages/api/tsconfig.json` includes only `src/**/*`, so `turbo run typecheck` never looks at `tests/`. It currently carries ~1100 type errors. This is not theoretical: a script of mine deleted six `let counter` declarations that were still used by `orderNumber`, and the pre-commit typecheck passed clean. I caught it only by building a throwaway tsconfig that includes tests, and gated every commit on a byte-identical error-set diff against that baseline. Turning it on for real needs those ~1100 fixed first.
+
+      2. **`db:push` skips the audit trigger** — carried over from #623. `admin_audit_log_immutable()` is raw SQL in migration 0021 that drizzle's DSL cannot express, so a database built with `db:push` silently lacks the append-only guarantee.
+
+      **What is left, deliberately**: 5 clones. One is production code (`src/routes/cart.ts` vs `src/routes/gift-cards.ts`) — different subject. Four are import blocks and module-level lifecycle bindings, which the ticket said not to chase and was right to: TypeScript cannot share an import list, and hiding a suite's own `beforeAll`/`afterEach` behind a helper makes it harder to read, not easier.
+
+      **Verification notes**
+      - The `requireAdmin` predicate was checked as load-bearing, not assumed: replacing `() => adminAllowed` with `() => true` fails exactly one test ("expected 200 to be 403") and no others.
+      - The #580 contract still holds: pointed a suite at a dead port and the reachability test fails rather than the suite passing empty.
+      - One early scan run reported "No duplicates found" — it had analysed **0 files**, because I ran it from `packages/api` with a `packages` path. Re-run from the repo root for the real numbers above.
+      - `poster-app-postgres` (port 5440) was stopped at the start; restarted it, and left it running.
+  - author: system
+    timestamp: '2026-08-28T03:00:35.768Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-28T02:35:54.483Z'
+    agent: claude-code
+    summary: Deduplicated the gift-card live-db harness across 11 suites in 5 commits (6a26169f, 09e55e86, 103ef5e9, 8e0d9473, cf51aa51). 138/138 tests before and after. Duplication 2.93% -> 2.72%; gift-card clones 14 -> 5. Resolved the purge-order trap via FK evidence. Found the test tree is not typechecked (~1100 errors, caught a real bug of mine that the pre-commit gate missed).
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-28T03:00:40.570Z'
+    duration: '00:24:46'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -145,13 +210,13 @@ implementation_steps:
     description: Record the green baseline for all 11 gift-card suites before touching anything
     command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes/gift-card-payment.test.ts tests/routes/gift-card-release.test.ts tests/routes/gift-card-quote.test.ts tests/routes/gift-card-purchase.test.ts tests/routes/admin-gift-card-refund.test.ts tests/routes/admin/gift-cards.test.ts tests/routes/admin/returns-store-credit.test.ts tests/routes/cart-gift-card-lines.test.ts tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts tests/services/gift-card-delivery.test.ts
     expected_result: PASS - write down the file and test counts; this is the contract for every later step
-    status: pending
+    status: done
   - id: 2
     action: implement
     description: Add connectLiveDb() / closeLiveDb() to the existing live-db helper
     file: packages/api/tests/helpers/live-db.ts
     expected_result: Helper returns { client, db, reachable } and swallows a connect failure into reachable:false, exactly as the inline blocks do
-    status: pending
+    status: done
     code: |-
       import { drizzle } from 'drizzle-orm/postgres-js'
       import postgres from 'postgres'
@@ -200,7 +265,7 @@ implementation_steps:
     description: Add freshGiftCardCode(prefix) and delete the 7 local freshCode copies
     file: packages/api/tests/helpers/gift-card-fixtures.ts
     expected_result: Same 16-char pid+counter shape as the copies it replaces, so parallel suites still cannot collide
-    status: pending
+    status: done
     code: |-
       let counter = 0
 
@@ -231,7 +296,7 @@ implementation_steps:
     description: Collapse the redeem/refund near-whole-file clone (~127 of ~160 lines) into one harness
     file: packages/api/tests/services/gift-card-redeem.test.ts
     expected_result: 'The two service suites share a harness module; check the schema first and decide the purge order deliberately - redeem and the #630 helper currently disagree'
-    status: pending
+    status: done
   - id: 9
     action: verify-pass
     description: Confirm both service suites pass unchanged
@@ -248,7 +313,7 @@ implementation_steps:
     description: Extend admin-route-harness with a requireAdmin variant and fold in the repeated Razorpay partial mock
     file: packages/api/tests/helpers/admin-route-harness.ts
     expected_result: One header-auth mock covering both requireContentManager and requireAdmin - do not add a third variant
-    status: pending
+    status: done
   - id: 12
     action: verify-pass
     description: Full re-run of all 11 suites plus typecheck
@@ -266,4 +331,22 @@ implementation_steps:
     description: Commit the auth/Razorpay mock consolidation
     command: 'git add packages/api/tests && git commit -m "test(api): share the admin auth and Razorpay mocks across the gift-card suites"'
     status: pending
-current_step: 1
+current_step: 3
+started: '2026-08-28T02:35:53.969Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:25:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:25:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run <11 gift-card suites> --no-file-parallelism
+  test_output: '11 files, 138 tests passing — identical to the baseline recorded before any change. Duplication scan: 2.93% -> 2.72% repo-wide; clones touching gift-card files 14 -> 5 (1 in production src, 4 import/lifecycle blocks the ticket said not to chase).'
+  build_passed: true
+  build_command: turbo run typecheck (pre-commit gate, all 5 commits)
+  verified_at: '2026-08-28T03:00:10.528Z'
+completed: '2026-08-28T03:00:35.768Z'

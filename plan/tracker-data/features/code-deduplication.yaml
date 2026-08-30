@@ -1,7 +1,7 @@
 name: code-deduplication
 title: Code Deduplication
 priority: medium
-created: "2026-08-17T03:40:57.377Z"
+created: '2026-08-17T03:40:57.377Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -17,25 +17,24 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 2
-  total_duration: "00:24:00"
+  total_sessions: 3
+  total_duration: '00:49:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 2
-      duration: "00:24:00"
+      sessions: 3
+      duration: '00:49:00'
       tokens: 0
 tickets:
   todo:
-    "633": Deduplicate the gift-card live-database test harness across 11 suites
-    "634": "Deduplicate OrdersTable and ProductsTable: status badges, sortable header, row menu and table shell"
+    '634': 'Deduplicate OrdersTable and ProductsTable: status badges, sortable header, row menu and table shell'
   in_progress: {}
   done:
-    "629": "Deduplicate app code: extract useScrollTrack hook and share track route types/helpers"
-    "630": Deduplicate test scaffolding and shared UI blocks across api and web packages
+    '629': 'Deduplicate app code: extract useScrollTrack hook and share track route types/helpers'
+    '630': Deduplicate test scaffolding and shared UI blocks across api and web packages
+    '633': Deduplicate the gift-card live-database test harness across 11 suites
 total_tickets: 4
-completion_percentage: 50
+completion_percentage: 75
 is_completed: false
-last_activity: "2026-08-17T04:55:31.151Z"
-started: "2026-08-17T04:29:07.040Z"
-completed: "2026-08-17T04:55:26.569Z"
+last_activity: '2026-08-28T03:00:40.628Z'
+started: '2026-08-17T04:29:07.040Z'

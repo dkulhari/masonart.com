@@ -15,19 +15,47 @@ description: |-
 feature: qa-e2e-testing
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:54.416Z'
-last_updated: '2026-08-20T12:19:54.416Z'
+last_updated: '2026-08-30T03:29:04.364Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T03:23:50.103Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-30T03:28:57.566Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T03:29:04.363Z'
+    text: |-
+      ✅ **Completed** — commit `3cbc1fa3`
+
+      **Root cause**: not a product defect. The spec clicked a button that existed for 29 minutes. The spec landed 2026-08-06 02:05 (`25e41dd2`); `0f125f66` at 02:34 replaced the single "Create collection from these" with a two-step flow — "Save as collection" reveals a panel offering "New collection" or "Overwrite an existing one". The spec was never updated, so it has been red since the day it was written, not since any recent change.
+
+      **Location**: `tests/e2e/wishlist-staging.admin.spec.ts` — three call sites, all now routed through one `createCollectionFromStaging()` helper.
+
+      **The staged order does reach the storefront intact.** That assertion — the thing this ticket suspected was broken — passes as soon as the flow is driven correctly.
+
+      **Secondary finding, worth more than the fix**: `mode: 'serial'` is configured file-wide, so the first failure SKIPPED the two tests below it. The file reported "1 failed, 5 passed" while three of its four real tests never ran — and four of those five "passes" were the auth setup projects. One of the dormant tests is the #503 guard against the edit form silently deleting a curated collection's members; it has not run in three weeks and passes now.
+
+      **Verification**:
+      - Command: `SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4321 E2E_API_URL=http://localhost:3010 bunx playwright test tests/e2e/wishlist-staging.admin.spec.ts --project=chromium-admin`
+      - Result: PASS — 8 passed (4 spec tests + 4 auth setup), run twice
+      - Before: `locator.click: Test timeout of 30000ms exceeded — waiting for getByRole('button', { name: /Create collection from these/i })`
+      - Typecheck: 4/4 packages green via the pre-commit gate
+
+      Grepped the repo: no other spec references the removed label.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T03:23:50.103Z'
+completed: '2026-08-30T03:28:57.566Z'
