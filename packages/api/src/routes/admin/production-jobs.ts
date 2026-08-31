@@ -800,6 +800,13 @@ async function despatchEvidence(
         )
       )
     )
+    // The same tiebreak every other live-shipment read uses.
+    // `order_shipments_live_label_idx` only constrains rows with a label
+    // TOKEN, so an order can legitimately hold several live rows carrying just
+    // an AWB or tracking number — without an ORDER BY, which one supplies
+    // `orderLabel` in the audit payload is planner-dependent, and a dispute
+    // wants the same answer twice.
+    .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
     .limit(1);
 
   // Admin-side, and this `detail` is an AUDIT payload rather than a

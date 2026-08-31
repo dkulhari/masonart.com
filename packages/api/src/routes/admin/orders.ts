@@ -189,13 +189,27 @@ const updateStatusSchema = z.object({
 /**
  * Schema for updating shipping details
  */
+/**
+ * Caps match the COLUMNS these now land in, not the jsonb they used to.
+ *
+ * `awb_number` and `external_shipment_id` are `varchar(64)` and `tracking_url`
+ * is `varchar(500)` (schema/shipping.ts). A value that fits the old jsonb but
+ * not the column raises Postgres `22001`, which the catch-all below turns into
+ * a generic 500 — a validation mistake reported as a server fault.
+ *
+ * `.min(1)` matters as much as the maximums. `z.string()` accepts `""`, which
+ * would be STORED as an empty string rather than NULL — and
+ * `ORDER_HAS_LABEL` asks `coalesce(token, awb, tracking) is not null`, so an
+ * empty tracking number would count as a label and satisfy the `dispatched`
+ * guard for an order carrying nothing.
+ */
 const updateShippingSchema = z.object({
-  carrier: z.string().max(100).optional(),
-  trackingNumber: z.string().max(100).optional(),
-  trackingUrl: z.string().url().optional(),
-  awbNumber: z.string().max(100).optional(),
-  shipmentId: z.string().max(100).optional(),
-  estimatedDelivery: z.string().optional(), // ISO date
+  carrier: z.string().min(1).max(100).optional(),
+  trackingNumber: z.string().min(1).max(100).optional(),
+  trackingUrl: z.string().url().max(500).optional(),
+  awbNumber: z.string().min(1).max(64).optional(),
+  shipmentId: z.string().min(1).max(64).optional(),
+  estimatedDelivery: z.string().min(1).optional(), // ISO date
 });
 
 /**
@@ -1029,6 +1043,11 @@ adminOrdersApp.patch(
             id: orderShipments.id,
             carrier: orderShipments.carrier,
             trackingNumber: orderShipments.trackingNumber,
+            // Read so the write below can MERGE. Omitting them here is what
+            // made a partial save null them — see the `values` comment.
+            awbNumber: orderShipments.awbNumber,
+            externalShipmentId: orderShipments.externalShipmentId,
+            estimatedDeliveryAt: orderShipments.estimatedDeliveryAt,
             status: orderShipments.status,
           })
           .from(orderShipments)
@@ -1058,15 +1077,27 @@ adminOrdersApp.patch(
           input.trackingUrl ??
           (trackingNumber ? generateTrackingUrl(carrier, trackingNumber) : null);
 
+        /**
+         * A MERGE, not a replace. Every field falls back to the live row.
+         *
+         * The jsonb handler this replaced only assigned a key when
+         * `input.<field> !== undefined`, and losing that is a silent data-loss
+         * bug rather than a cosmetic one: the admin modal has no AWB field at
+         * all, so correcting a typo'd tracking number would drop an AWB written
+         * by `POST /orders/:orderId/ship`, by the 0028 backfill, or by the
+         * production-pipeline flow. `ORDER_HAS_LABEL` and `despatchEvidence`
+         * read `awb_number`, so that can flip the `dispatched` guard back to
+         * unsatisfied and strand a consolidator.
+         */
         const values = {
           carrier,
           trackingNumber,
           trackingUrl,
-          awbNumber: input.awbNumber ?? null,
-          externalShipmentId: input.shipmentId ?? null,
+          awbNumber: input.awbNumber ?? liveShipment?.awbNumber ?? null,
+          externalShipmentId: input.shipmentId ?? liveShipment?.externalShipmentId ?? null,
           estimatedDeliveryAt: input.estimatedDelivery
             ? new Date(input.estimatedDelivery)
-            : null,
+            : (liveShipment?.estimatedDeliveryAt ?? null),
         };
 
         const [shipment] = liveShipment

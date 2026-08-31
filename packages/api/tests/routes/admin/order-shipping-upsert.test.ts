@@ -59,6 +59,9 @@ const SHIPMENT_ID = '00000000-0000-0000-0000-0000000000bb';
 
 const CHAIN = ['from', 'where', 'limit', 'innerJoin', 'leftJoin', 'set', 'values', 'returning', 'orderBy'];
 
+/** Captures the payload handed to `.set()` / `.values()`, so a merge is checkable. */
+const setSpy = vi.hoisted(() => vi.fn());
+
 /** What the handler walks before awaiting. Records which table it was given. */
 function thenable(rows: unknown[], log?: { tables: string[] }, table?: string) {
   const chain: Record<string, unknown> = {};
@@ -68,6 +71,7 @@ function thenable(rows: unknown[], log?: { tables: string[] }, table?: string) {
         const name = tableNameOf(arg) ?? table;
         if (name && log) log.tables.push(name);
       }
+      if (key === 'set' || key === 'values') setSpy(arg);
       return chain;
     };
   }
@@ -204,6 +208,43 @@ describe('PATCH /admin/orders/:id/shipping writes the store the customer reads',
 
     expect(res.status).toBe(400);
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it('MERGES — a partial save does not wipe the fields it was not sent', async () => {
+    // The regression this suite originally missed. The old jsonb handler
+    // assigned a key only when `input.<field> !== undefined`; writing the
+    // shipment row made it easy to null everything absent from the request
+    // instead.
+    //
+    // It bites through the UI, which has no AWB field at all: an admin
+    // correcting a typo'd tracking number would silently drop an AWB written
+    // by POST /orders/:orderId/ship, by the 0028 backfill, or by the
+    // production-pipeline flow — and since ORDER_HAS_LABEL reads awb_number,
+    // that can flip the `dispatched` guard back to unsatisfied.
+    queue(selectMock, log, [{ id: ORDER_ID, orderNumber: 'CH-1' }], [
+      {
+        id: SHIPMENT_ID,
+        carrier: 'Shiprocket',
+        courierName: 'Delhivery',
+        trackingNumber: 'OLD-TRACK',
+        awbNumber: 'AWB-KEEP-ME',
+        externalShipmentId: 'SR-KEEP',
+        estimatedDeliveryAt: new Date('2026-09-04T00:00:00Z'),
+        status: 'shipped',
+      },
+    ]);
+
+    await patchShipping({ trackingNumber: 'NEW-TRACK' });
+
+    const written = updateMock.mock.calls.length
+      ? (setSpy.mock.calls[0]?.[0] as Record<string, unknown> | undefined)
+      : undefined;
+
+    expect(written, 'no UPDATE payload was captured').toBeDefined();
+    expect(written!.trackingNumber, 'the new value did not land').toBe('NEW-TRACK');
+    expect(written!.awbNumber, 'the AWB was wiped by a partial save').toBe('AWB-KEEP-ME');
+    expect(written!.externalShipmentId, 'the external id was wiped').toBe('SR-KEEP');
+    expect(written!.estimatedDeliveryAt, 'the estimated delivery was wiped').toBeTruthy();
   });
 
   it('still 404s an unknown order', async () => {

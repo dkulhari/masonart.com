@@ -228,12 +228,23 @@ const mockOrderDetail = {
     postalCode: '400001',
     countryCode: 'IN',
   },
-  shippingDetails: {
-    carrier: 'Delhivery',
+  // The live `order_shipments` row, which is what the API returns since #712.
+  // `orders.shipping_details` is no longer written (#707), so a mock shaped
+  // like it renders the panel's empty state instead.
+  shipment: {
+    id: 'ship-001',
+    // `carrier` is the aggregator we bought through; `courierName` is who
+    // actually carries the parcel. The panel shows the courier.
+    carrier: 'Shiprocket',
+    courierName: 'Delhivery',
+    awbNumber: 'AWB123456',
     trackingNumber: 'DEL123456789',
     trackingUrl: 'https://www.delhivery.com/track/DEL123456789',
-    awbNumber: 'AWB123456',
-    estimatedDelivery: '2024-01-18',
+    status: 'in_transit',
+    shippedAt: '2024-01-15T10:00:00.000Z',
+    estimatedDeliveryAt: '2024-01-18T00:00:00.000Z',
+    deliveredAt: null,
+    costPaise: 8900,
   },
   paymentDetails: {
     method: 'razorpay',
@@ -471,12 +482,19 @@ async function setupOrderMutationMocks(page: import('@playwright/test').Page) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
+        // The route returns the SHIPMENT it wrote, not the jsonb it no longer
+        // touches (#707) — returning the old shape would tell the admin screen
+        // its edit had not taken.
         body: JSON.stringify({
           message: 'Shipping details updated successfully',
-          order: {
-            id: 'ord-001',
-            orderNumber: 'MA-20240115-001',
-            shippingDetails: body,
+          shipment: {
+            id: 'ship-001',
+            carrier: body.carrier ?? 'Shiprocket',
+            courierName: 'Delhivery',
+            awbNumber: body.awbNumber ?? 'AWB123456',
+            trackingNumber: body.trackingNumber ?? null,
+            trackingUrl: body.trackingUrl ?? null,
+            status: 'in_transit',
           },
         }),
       });
@@ -1115,7 +1133,7 @@ test.describe('Shipping Address Section', () => {
 // Shipping Details Section Tests
 // ============================================================================
 
-test.describe('Shipping Details Section', () => {
+test.describe('Shipment Section', () => {
   test.beforeEach(async ({ page }) => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
@@ -1123,18 +1141,23 @@ test.describe('Shipping Details Section', () => {
     await page.waitForLoadState('domcontentloaded');
   });
 
-  test('should display Shipping Details section', async ({ page }) => {
-    const header = page.locator('h3:has-text("Shipping Details")');
+  test('should display Shipment section', async ({ page }) => {
+    // Renamed with the panel in #712: it reads `order.shipment` now, and
+    // "Shipping Details" survives only as the edit modal's own title.
+    const header = page.locator('h3:has-text("Shipment")');
     await expect(header).toBeVisible();
   });
 
-  test('should display carrier name', async ({ page }) => {
-    const carrier = page.locator('text=Delhivery');
-    await expect(carrier).toBeVisible();
+  test('should display the courier, not the aggregator', async ({ page }) => {
+    // Delhivery carries the parcel; Shiprocket is who we bought through. The
+    // customer recognises the first one, so that is what the panel shows.
+    await expect(page.locator('text=Delhivery').first()).toBeVisible();
   });
 
   test('should display tracking number', async ({ page }) => {
-    const tracking = page.locator('text=DEL123456789');
+    // The AWB is preferred over the internal tracking number; both are
+    // DEL123456789/AWB123456 in this fixture, so assert the AWB.
+    const tracking = page.locator('text=AWB123456');
     await expect(tracking).toBeVisible();
   });
 

@@ -1100,14 +1100,27 @@ export function OrderDetail({
         <ShippingUpdateModal
           // Seeded from the shipment the API actually wrote, so the value the
           // form starts with and the value the save returns are one object.
+          //
+          // `carrier` seeds from `carrier`, NOT from `courierName`. The panel
+          // above DISPLAYS the courier because that is the name on the parcel,
+          // but this field is round-tripped straight back into
+          // `order_shipments.carrier` — seeding it with the courier would
+          // overwrite the aggregator with the courier on the first save and
+          // permanently destroy the distinction.
+          //
+          // `estimatedDelivery` feeds an `<input type="date">`, which silently
+          // renders BLANK for anything that is not `YYYY-MM-DD` — and a blank
+          // then saves as undefined. The stored value is an ISO timestamp, so
+          // it is sliced rather than passed through.
           currentDetails={
             order.shipment
               ? {
-                  carrier: order.shipment.courierName ?? order.shipment.carrier ?? undefined,
+                  carrier: order.shipment.carrier ?? undefined,
                   trackingNumber: order.shipment.trackingNumber ?? undefined,
                   trackingUrl: order.shipment.trackingUrl ?? undefined,
                   awbNumber: order.shipment.awbNumber ?? undefined,
-                  estimatedDelivery: order.shipment.estimatedDeliveryAt ?? undefined,
+                  estimatedDelivery:
+                    order.shipment.estimatedDeliveryAt?.slice(0, 10) ?? undefined,
                 }
               : null
           }
