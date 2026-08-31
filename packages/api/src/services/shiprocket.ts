@@ -72,6 +72,21 @@ export class ShiprocketError extends Error {
 }
 
 /**
+ * Thrown when Shiprocket refuses the credentials we hold.
+ *
+ * Distinct from `ShiprocketNotConfiguredError`: that one means nobody has
+ * finished the setup, this one means the setup is wrong. Both are an operator's
+ * to fix, and neither is an outage, but only this one has already spent a round
+ * trip finding out.
+ */
+export class ShiprocketAuthError extends ShiprocketError {
+  constructor(message: string) {
+    super(message, 'SHIPROCKET_AUTH_REJECTED');
+    this.name = 'ShiprocketAuthError';
+  }
+}
+
+/**
  * Thrown by every entry point that needs credentials, when there are none.
  *
  * A distinct class rather than a flag on `ShiprocketError`, because this is the
@@ -141,4 +156,131 @@ export function getShiprocketConfig(): ShiprocketConfig {
     password: readEnv('SHIPROCKET_PASSWORD')!,
     baseUrl: readEnv('SHIPROCKET_BASE_URL') ?? DEFAULT_BASE_URL,
   };
+}
+
+// ============================================================================
+// Authentication
+// ============================================================================
+
+/**
+ * How close to expiry a cached token may get before it is replaced.
+ *
+ * A day, against a token the live account issues with ten days of life. The
+ * margin only has to exceed the longest plausible gap between deciding a token
+ * is good and finishing the request that uses it, so a day is generous and
+ * costs one extra login per ten.
+ */
+const TOKEN_REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Used only when a token arrives whose `exp` we cannot read.
+ *
+ * Short on purpose. The token still works — we simply cannot say for how long,
+ * and treating an unknown expiry as a long one is how a dead token gets served
+ * for days. An hour keeps the integration running while making the uncertainty
+ * cheap.
+ */
+const UNKNOWN_EXPIRY_TTL_MS = 60 * 60 * 1000;
+
+interface CachedToken {
+  token: string;
+  expiresAt: number;
+}
+
+let cached: CachedToken | null = null;
+
+/**
+ * The login in flight, if any.
+ *
+ * Without this, N concurrent callers on a cold cache each issue their own
+ * login. The endpoint is rate-limited, so a burst of dispatches would answer
+ * its own request storm with 429s.
+ */
+let inFlight: Promise<string> | null = null;
+
+/**
+ * Read the `exp` claim out of a JWT, in seconds since the epoch.
+ *
+ * Returns null rather than throwing for anything unreadable: a token we cannot
+ * parse is still a token Shiprocket gave us, and refusing to use it would turn
+ * a format change on their side into a total outage on ours.
+ */
+function readExpiry(token: string): number | null {
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      exp?: unknown;
+    };
+    return typeof claims.exp === 'number' && Number.isFinite(claims.exp) ? claims.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Clears the cached token. Exported for tests; nothing in `src/` should call it. */
+export function resetShiprocketAuthCacheForTests(): void {
+  cached = null;
+  inFlight = null;
+}
+
+async function login(): Promise<string> {
+  const config = getShiprocketConfig();
+
+  const response = await fetch(`${config.baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: config.email, password: config.password }),
+  });
+
+  if (!response.ok) {
+    // 403, not 401, when the credentials are wrong — measured against the live
+    // account. Deliberately NOT retried: the endpoint is rate-limited and a
+    // refusal is a configuration fact, so retrying converts a wrong password
+    // into a locked-out integration.
+    throw new ShiprocketAuthError(
+      `Shiprocket rejected the API credentials (HTTP ${response.status}). ` +
+        'Check SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD against the API user in ' +
+        'your Shiprocket dashboard under Settings > API.'
+    );
+  }
+
+  const body = (await response.json()) as { token?: unknown };
+  if (typeof body.token !== 'string' || body.token === '') {
+    throw new ShiprocketAuthError('Shiprocket returned no token for a successful login.');
+  }
+
+  const exp = readExpiry(body.token);
+  const expiresAt =
+    exp === null ? Date.now() + UNKNOWN_EXPIRY_TTL_MS : exp * 1000;
+
+  cached = { token: body.token, expiresAt };
+  return body.token;
+}
+
+/**
+ * A usable Shiprocket token, logging in only when the cached one is gone or
+ * close to expiring.
+ *
+ * The expiry comes from the token's own `exp` claim, never from an assumed
+ * lifetime. Ten days is what the live account issues today; that is Shiprocket's
+ * to change, and a hardcoded ten would keep serving a dead token for the
+ * difference — failing silently, and late.
+ */
+export async function getShiprocketAuthToken(): Promise<string> {
+  // Before the network, so an unconfigured tree refuses without a round trip.
+  assertShiprocketConfigured();
+
+  if (cached && Date.now() < cached.expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+    return cached.token;
+  }
+
+  if (inFlight) return inFlight;
+
+  inFlight = login().finally(() => {
+    inFlight = null;
+  });
+
+  return inFlight;
 }
