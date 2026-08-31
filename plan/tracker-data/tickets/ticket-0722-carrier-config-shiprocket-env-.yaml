@@ -34,20 +34,85 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T10:24:24.916Z'
-last_updated: '2026-08-31T10:24:24.916Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T11:34:31.772Z'
+time_spent_minutes: 3
 labels:
   - config
   - shiprocket
   - pass-2
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T11:31:21.608Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T11:34:26.351Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `377a1597` - feat(api): make "Shiprocket is not configured" a state, not a crash
+
+      **Files Changed**:
+      - `packages/api/src/services/shiprocket.ts` — new. `isShiprocketConfigured`, `getShiprocketConfig`, `assertShiprocketConfigured`, `ShiprocketError`, `ShiprocketNotConfiguredError`, `SHIPROCKET_ENV_VARS`
+      - `packages/api/tests/services/shiprocket-config.test.ts` — 15 tests
+      - `.env.example` — a Shiprocket section, placed before Gift Cards
+
+      **No client, by design.** Auth, serviceability, AWB assignment, label PDFs and pickup scheduling are phase 6 and every one is gated on credentials nobody has. What phase 5 can deliver is the refusal, and it is worth delivering first.
+
+      **The seam held.** Under `services/`, not `lib/` — `production-readiness.ts:910` declares `PRODUCTION_LIB_FORBIDDEN_IMPORT = 'shiprocket'` and the reverse scan names `../services/shiprocket` in its own fixtures. Ran `production-seam.test.ts` with `--reporter=verbose` rather than reading a total: all 16 named tests executed, including `finds no carrier import under lib/production-*` (28ms — it really walked the tree) and all six CAN-fail cases.
+
+      **Env is read per call, and that is a deliberate departure from `lib/razorpay.ts`.** Razorpay reads credentials into module-level `const`s at import time, which freezes configuration before any test can set it — which is why `isRazorpayConfigured` has no test that observes it returning both values. The unconfigured path is the only path that exists today, so it had to be the reachable one. `isShiprocketConfigured()` is now asserted false, true, and false-on-half-set within a single run.
+
+      **Blank is absent.** A present-but-empty key is the failure mode that looks configured and is not — the same property #670 pinned one layer down, where an empty string satisfying `IS NOT NULL` let a blank tracking number count as a label. Pinned here with `SHIPROCKET_PASSWORD='   '`.
+
+      **The refusal names variables, never values.** Tested on the half-set path specifically, because that is the one where a credential exists to leak into a log line or a response body. Same rule `routes/vendor.ts:559` follows.
+
+      **`.env.example` is held to the module.** `SHIPROCKET_ENV_VARS` is exported and a test asserts every entry has a documented line, so a variable added later without documentation fails the suite instead of surprising whoever deploys. A second test refuses a real-looking login in the example.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/services/shiprocket-config.test.ts` → PASS, **15 tests**
+      - Command: `bunx vitest run tests/lib/production-seam.test.ts --reporter=verbose` → PASS, **16 tests**, each named in the output
+      - Command: `bunx vitest run tests/setup/env.test.ts` → PASS, 61 passed / 3 skipped (the other reader of `.env.example`)
+      - Command: `bun run typecheck` → 4 tasks successful, all three packages
+  - author: system
+    timestamp: '2026-08-31T11:34:29.341Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T11:31:22.536Z'
+    agent: claude-code
+    summary: '#722 complete. Added services/shiprocket.ts with isShiprocketConfigured/getShiprocketConfig/assertShiprocketConfigured and ShiprocketNotConfiguredError (code SHIPROCKET_NOT_CONFIGURED), 15 tests. Env read per call, departing from razorpay''s module-load consts so both configured states are testable. .env.example documented and held to SHIPROCKET_ENV_VARS by test. Seam test verified verbose: 16 passed. Committed 377a1597.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T11:34:31.771Z'
+    duration: '00:03:09'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-31T11:31:21.608Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/services/shiprocket-config.test.ts tests/lib/production-seam.test.ts tests/setup/env.test.ts
+  test_output: shiprocket-config 15 passed; production-seam 16 passed (verbose, reverse scan over real tree confirmed run); env.test 61 passed 3 skipped
+  build_passed: true
+  build_command: bun run typecheck (4 tasks successful)
+  verified_at: '2026-08-31T11:34:15.308Z'
+completed: '2026-08-31T11:34:29.341Z'

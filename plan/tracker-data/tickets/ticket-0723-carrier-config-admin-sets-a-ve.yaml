@@ -27,19 +27,71 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T10:24:39.434Z'
-last_updated: '2026-08-31T10:24:39.434Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T11:40:01.769Z'
+time_spent_minutes: 5
 labels:
   - admin
   - shiprocket
   - pass-2
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T11:34:43.625Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T11:39:55.861Z'
+    text: |-
+      ✅ **Completed** — phase 5 is done.
+
+      **Commit**: `fd0ca676` - feat(admin): let an admin set a vendor's Shiprocket pickup nickname
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/vendors.ts` — `shiprocketPickupLocation` on `createVendorSchema`
+      - `packages/api/tests/routes/admin/vendors.test.ts` — 8 new tests
+      - `packages/api/tests/database/vendor-shiprocket-pickup.test.ts` — the column half of the cap pairing
+      - `packages/web/app/routes/admin/vendors/VendorForm.tsx` — the field
+      - `packages/web/app/routes/admin/vendors/$id.tsx` — `AdminVendor` type and `toFormValues`
+      - `packages/web/tests/routes/admin/vendor-form-shiprocket.test.ts` — 5 tests
+
+      **The one that would have hurt.** `toFormValues` in `$id.tsx` maps the fetched vendor into form values. Omit the new line and opening the form shows an empty box for a vendor that *has* a pickup location — and the first save sends `null` and wipes it. That is #707's partial-update data loss, one form along, and I nearly shipped it: I added the field to `VendorForm` before checking the hydration path. It is now a compile error rather than a matter of remembering, since `VendorFormValues` requires the key and `packages/web` app code is typechecked.
+
+      **The cap is asserted from both sides.** The column is unbounded `text`, so the 200 cap is ours and storage cannot be what rejects a value. The route suite pins 200 accepted / 201 refused; the schema suite pins `PgText` with no `length`. The review found a 100-char zod cap over a `varchar(64)` — a value the API accepted and the database refused. Both ends are now pinned so that cannot recur here.
+
+      **`''` never reaches the column.** Zod trims and transforms blank to `null`; `VendorForm`'s existing `orNull()` already did the client half. Tested on both: `'   '` and an explicit `null` both store `null`.
+
+      **No new audit action, as the ticket asked me to check.** `vendors.ts` already emits `vendor.updated` with `diffRecords(before, after, Object.keys(body))`, so a field added to the body flows into the delta unaided, and `vendor.updated` is already declared in `AUDIT_ACTIONS` — #671's build guard is not tripped. Verified by reading the handler; I did not add a test for it, since that suite does not mock `recordAudit` and the path is generic.
+
+      **Accessibility detail worth recording**: the hint sits *outside* the `<label>`. A label that wraps its input contributes all of its text to that input's accessible name, so help text inside it becomes part of the name the field answers to — and part of every `getByLabel` for it. Linked with `aria-describedby`.
+
+      **Honest note on TDD order**: the API tests were written first and observed failing (6 of 8 red). The web test was written *after* the form change, so it never had a RED phase. It still asserts real behaviour — an omitted key reads `undefined`, not the nickname — but it was not driven out test-first.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/vendors.test.ts tests/database/vendor-shiprocket-pickup.test.ts tests/database/vendor-shiprocket-pickup-live.test.ts tests/services/shiprocket-config.test.ts`
+      - Result: PASS — **4 files, 70 tests, 0 failed**
+      - Command: `cd packages/web && bunx vitest run tests/routes/admin/`
+      - Result: PASS — **19 files, 501 tests, 0 failed**
+      - Command: `bun run typecheck` → 4 tasks successful
+      - `tests/e2e` greped for vendor shape assertions: no exact-key checks, and `admin-vendor-lifecycle.spec.ts` fills by label and submits, so an optional empty field does not disturb it.
+  - author: system
+    timestamp: '2026-08-31T11:39:59.202Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T11:34:44.333Z'
+    agent: claude-code
+    summary: '#723 complete, phase 5 done. Added shiprocketPickupLocation to createVendorSchema (trim, cap 200, blank to null), the VendorForm field with aria-describedby hint, and the toFormValues hydration line that prevents a #707-style silent wipe. Cap pinned from both sides. No new audit action needed - vendor.updated already emits a keyed delta. api 70 passed, web 501 passed, typecheck green. Committed fd0ca676.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T11:40:01.768Z'
+    duration: '00:05:17'
 related_tickets: []
 blocked_by:
   - ticket: 721
@@ -47,3 +99,21 @@ blocked_by:
     description: 'Carrier Config - Database Schema: vendors.shiprocket_pickup_location'
 blocks: []
 attachments: []
+started: '2026-08-31T11:34:43.625Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: 'api: bunx vitest run tests/routes/admin/vendors.test.ts tests/database/vendor-shiprocket-pickup*.test.ts tests/services/shiprocket-config.test.ts | web: bunx vitest run tests/routes/admin/'
+  test_output: api 70 passed (4 files), web 501 passed (19 files), 0 failed
+  build_passed: true
+  build_command: bun run typecheck (4 tasks successful)
+  verified_at: '2026-08-31T11:39:42.018Z'
+completed: '2026-08-31T11:39:59.202Z'

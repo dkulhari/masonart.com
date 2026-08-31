@@ -28,20 +28,85 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T10:24:09.394Z'
-last_updated: '2026-08-31T10:24:09.394Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T11:08:02.797Z'
+time_spent_minutes: 7
 labels:
   - database
   - shiprocket
   - pass-2
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T11:01:05.480Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T11:07:57.907Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `825be54e` - feat(api): record where a courier collects from a vendor
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/vendors.ts` — `shiprocketPickupLocation: text('shiprocket_pickup_location')`, nullable, no default, placed with the address block
+      - `packages/api/src/database/migrations/0029_vendor_shiprocket_pickup.sql` — the additive ALTER
+      - `packages/api/src/database/migrations/meta/{_journal.json,0029_snapshot.json}`
+      - `packages/api/tests/database/vendor-shiprocket-pickup.test.ts` — 5 tests, drizzle object + migration text
+      - `packages/api/tests/database/vendor-shiprocket-pickup-live.test.ts` — 3 tests, real Postgres
+
+      **Two suites, not one.** Split the way `order-shipments-dispatch` is split from `order-shipments-live-label`. The object suite asserts the DSL and the migration text — including that the ALTER carries neither NOT NULL nor DEFAULT, since either turns an additive migration into a table rewrite. The live suite asserts what a database actually does: that the column is *there* (a generated-but-never-applied migration fails exactly there while the object suite stays green), and that `Chobii Warehouse #2 (Andheri East)` comes back byte for byte. Anything normalising inner spaces or case would produce a value matching nothing on Shiprocket's side, and it would fail at dispatch rather than at the screen where it was typed.
+
+      **A guard earned its keep.** I hand-wrote the migration and the journal entry first. `production-transfers.test.ts > migration bookkeeping` failed with `missing snapshot for 0029_vendor_shiprocket_pickup` — a hand-written journal entry has no `meta/0029_snapshot.json`, and the next `db:generate` would have diffed against a stale chain. Backed it out (dropped the column, deleted the `__drizzle_migrations` row), regenerated through `drizzle-kit generate`, then renamed `0029_flaky_dragon_man` to the repo's descriptive convention and retagged the journal before applying. The generated statement was identical to the hand-written one; the snapshot was the whole difference.
+
+      **On `''` as unset.** Not enforced with a CHECK constraint — no migration in this repo uses one, and the actual write path already handles it: `VendorForm.tsx`'s `orNull()` trims and maps `''` to null. #723 adds the zod half. The live suite pins that an unconfigured vendor reads `NULL`, not `''`, which is the #670 property that matters.
+
+      **Exposure**: admin-only by construction. `src/routes/vendor.ts` never selects from `vendors`, so the column cannot reach the vendor portal.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/database/vendor-shiprocket-pickup.test.ts tests/database/vendor-shiprocket-pickup-live.test.ts tests/database/production-transfers.test.ts tests/schema/vendors.test.ts tests/routes/admin/vendors.test.ts`
+      - Result: PASS — **5 files, 92 tests passed, 0 failed**
+      - Command: `bun run db:migrate` (dev DB, port 5440) → `migrations applied successfully!`
+      - Command: `bun run typecheck` → 4 tasks successful, all three packages
+
+      Unblocks #723.
+  - author: system
+    timestamp: '2026-08-31T11:08:00.673Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T11:01:06.235Z'
+    agent: claude-code
+    summary: '#721 complete. Added vendors.shiprocket_pickup_location (nullable text) with migration 0029, plus drizzle-object and live-Postgres test suites (8 tests). Migration bookkeeping guard caught a hand-written journal entry missing its meta snapshot; backed out and regenerated through drizzle-kit. 92 tests pass across 5 files, typecheck green, migration applied to dev DB. Committed 825be54e.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T11:08:02.782Z'
+    duration: '00:06:56'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-31T11:01:05.480Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:07:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/database/vendor-shiprocket-pickup.test.ts tests/database/vendor-shiprocket-pickup-live.test.ts tests/database/production-transfers.test.ts tests/schema/vendors.test.ts tests/routes/admin/vendors.test.ts
+  test_output: Test Files 5 passed (5); Tests 92 passed (92), 0 failed
+  build_passed: true
+  build_command: bun run typecheck (4 tasks successful) + bun run db:migrate against dev DB on 5440
+  verified_at: '2026-08-31T11:07:44.872Z'
+completed: '2026-08-31T11:08:00.673Z'
