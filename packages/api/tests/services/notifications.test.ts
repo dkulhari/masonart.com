@@ -34,6 +34,13 @@ vi.mock('../../src/database', () => ({
       notificationPreferences: {
         findFirst: vi.fn(),
       },
+      // The service resolves the LIVE shipment once per notification, so the
+      // tracking link in an email and in an SMS cannot disagree. Defaults to
+      // "no shipment", which is the state most of these fixtures describe —
+      // the cases that care queue a row explicitly.
+      orderShipments: {
+        findFirst: vi.fn(),
+      },
     },
     insert: vi.fn(() => ({
       values: vi.fn(() => ({

@@ -12,6 +12,27 @@ import type { ProductionApproval, ApprovalPhoto } from "../database/schema/appro
 // Types
 // ============================================================================
 
+/**
+ * The parts of the LIVE shipment an email needs.
+ *
+ * Passed in, never queried. This module has no database import and giving it
+ * one would make every template test need a mock — and four callers each
+ * deciding which shipment is live is the defect `order-dispatch-tracking`
+ * exists to remove. `notifications.ts` resolves it once and hands it down.
+ *
+ * Structural rather than a `Pick` of the drizzle row so a caller can hand over
+ * a plain object, and so adding a dispatch column (what we paid, the parcel
+ * weight) does not silently widen what an email can reach for.
+ */
+export interface ShipmentForEmail {
+  carrier: string | null;
+  courierName: string | null;
+  awbNumber: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  estimatedDeliveryAt: Date | string | null;
+}
+
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -298,13 +319,21 @@ Thank you for choosing chobii.art!
 /**
  * Order Shipped Email Template
  */
-export function getShippedTemplate(order: Order): EmailTemplate {
+export function getShippedTemplate(
+  order: Order,
+  shipment?: ShipmentForEmail | null
+): EmailTemplate {
+  // The fallbacks STAY — "no shipment row yet" is a real state an email can be
+  // sent in. What changed is that they are reached for THAT reason, rather than
+  // because the code read a jsonb column nothing writes any more.
   const trackingUrl =
-    order.shippingDetails?.trackingUrl ||
-    `https://chobii.art/track/${order.orderNumber}`;
-  const carrier = order.shippingDetails?.carrier || "our carrier partner";
-  const trackingNumber = order.shippingDetails?.trackingNumber || "";
-  const estimatedDelivery = order.shippingDetails?.estimatedDelivery;
+    shipment?.trackingUrl || `https://chobii.art/track/${order.orderNumber}`;
+  // The COURIER first. `carrier` is the aggregator we bought through; nobody
+  // outside this office recognises its name on a delivery.
+  const carrier =
+    shipment?.courierName || shipment?.carrier || "our carrier partner";
+  const trackingNumber = shipment?.awbNumber || shipment?.trackingNumber || "";
+  const estimatedDelivery = shipment?.estimatedDeliveryAt;
 
   const content = `
     <div class="content">
@@ -373,10 +402,12 @@ Thank you for choosing chobii.art!
 /**
  * Out for Delivery Email Template
  */
-export function getOutForDeliveryTemplate(order: Order): EmailTemplate {
+export function getOutForDeliveryTemplate(
+  order: Order,
+  shipment?: ShipmentForEmail | null
+): EmailTemplate {
   const trackingUrl =
-    order.shippingDetails?.trackingUrl ||
-    `https://chobii.art/track/${order.orderNumber}`;
+    shipment?.trackingUrl || `https://chobii.art/track/${order.orderNumber}`;
 
   const content = `
     <div class="content">

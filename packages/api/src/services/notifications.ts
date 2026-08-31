@@ -5,8 +5,9 @@
  * Respects user notification preferences and logs all notifications to the database.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../database";
+import { orderShipments } from "../database/schema/shipping";
 import {
   notifications,
   notificationPreferences,
@@ -21,7 +22,41 @@ import {
   getShippedTemplate,
   getOutForDeliveryTemplate,
   getDeliveredTemplate,
+  type ShipmentForEmail,
 } from "./email-templates";
+
+/**
+ * The LIVE shipment for an order, or null.
+ *
+ * Resolved ONCE per notification and handed to every template and message
+ * builder. They must not query for it themselves: `email-templates.ts` has no
+ * database import, and several callers each deciding which shipment is live is
+ * the defect `order-dispatch-tracking` exists to remove.
+ *
+ * `voided_at IS NULL` is the same predicate `routes/tracking.ts` and
+ * `lib/vendor-scope.ts` use — a voided label and its replacement both hang off
+ * the order, and telling a customer to track a dead AWB is worse than telling
+ * them nothing.
+ */
+async function liveShipmentFor(orderId: string): Promise<ShipmentForEmail | null> {
+  const shipment = await db.query.orderShipments.findFirst({
+    where: and(
+      eq(orderShipments.orderId, orderId),
+      isNull(orderShipments.voidedAt)
+    ),
+    orderBy: (rows, { desc }) => [desc(rows.createdAt), desc(rows.id)],
+    columns: {
+      carrier: true,
+      courierName: true,
+      awbNumber: true,
+      trackingNumber: true,
+      trackingUrl: true,
+      estimatedDeliveryAt: true,
+    },
+  });
+
+  return shipment ?? null;
+}
 
 // ============================================================================
 // Types
@@ -131,16 +166,19 @@ function getEnabledChannels(
  */
 function getEmailTemplate(
   type: NotificationType,
-  order: Order
+  order: Order,
+  shipment: ShipmentForEmail | null
 ): { subject: string; html: string } {
   switch (type) {
     case "order_confirmation":
       return getOrderConfirmationTemplate(order);
     case "shipped":
-      return getShippedTemplate(order);
+      return getShippedTemplate(order, shipment);
     case "out_for_delivery":
-      return getOutForDeliveryTemplate(order);
+      return getOutForDeliveryTemplate(order, shipment);
     case "delivered":
+      // Takes no shipment because it reads none. An unused argument here would
+      // misdescribe what the template depends on.
       return getDeliveredTemplate(order);
   }
 }
@@ -148,14 +186,22 @@ function getEmailTemplate(
 /**
  * Get SMS message for notification type
  */
-function getSmsMessage(type: NotificationType, order: Order): string {
+export function getSmsMessage(
+  type: NotificationType,
+  order: Order,
+  shipment: ShipmentForEmail | null
+): string {
   const orderNumber = order.orderNumber;
 
   switch (type) {
     case "order_confirmation":
       return `chobii.art: Your order ${orderNumber} is confirmed! We'll notify you when it ships.`;
     case "shipped":
-      return `chobii.art: Your order ${orderNumber} has shipped! Track: ${order.shippingDetails?.trackingUrl || "chobii.art/orders"}`;
+      // The LIVE shipment's URL, or the orders page. This used to read
+      // `order.shippingDetails`, which #707 stopped writing — so the fallback
+      // would have become the ONLY branch and every shipped SMS would have
+      // pointed at a generic page instead of the customer's parcel.
+      return `chobii.art: Your order ${orderNumber} has shipped! Track: ${shipment?.trackingUrl || "chobii.art/orders"}`;
     case "out_for_delivery":
       return `chobii.art: Your order ${orderNumber} is out for delivery today!`;
     case "delivered":
@@ -249,6 +295,10 @@ export async function sendOrderNotification(
       return result;
     }
 
+    // Resolved once, for every channel. A per-channel read would let the email
+    // and the SMS disagree about which parcel the customer is being told about.
+    const shipment = await liveShipmentFor(orderId);
+
     // Get user preferences (use defaults for guests)
     const preferences = order.userId
       ? await getUserPreferences(order.userId)
@@ -279,7 +329,7 @@ export async function sendOrderNotification(
       }
 
       if (channel === "email" && recipientEmail) {
-        const template = getEmailTemplate(type, order);
+        const template = getEmailTemplate(type, order, shipment);
         const emailResult = await sendEmail({
           to: recipientEmail,
           subject: template.subject,
@@ -318,7 +368,7 @@ export async function sendOrderNotification(
           process.env.NODE_ENV === "development" ||
           process.env.NODE_ENV === "test"
         ) {
-          const message = getSmsMessage(type, order);
+          const message = getSmsMessage(type, order, shipment);
           console.log(`[SMS] Dev mode: Would send to ${recipientPhone}`);
           console.log(`[SMS] Message: ${message}`);
           result.channels.sms = { sent: true };
