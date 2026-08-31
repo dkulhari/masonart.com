@@ -1127,12 +1127,18 @@ test.describe('production pipeline: two-vendor consolidation', () => {
     page,
     browser,
   }) => {
-    // Manual dispatch is today's reality — the Shiprocket client is
-    // `order-dispatch-tracking`'s, explicitly out of scope for this feature
-    // (§12). Recording the AWB is the real, pre-existing admin route an office
-    // uses, and it is what `ORDER_HAS_LABEL` reads. Nothing is stubbed: the
-    // guard that refused in the previous test is satisfied by a genuine write
-    // through a genuine route.
+    // Manual dispatch is still today's reality — the Shiprocket client remains
+    // out of scope here (§12) and is `order-dispatch-tracking`'s pass 2.
+    //
+    // What HAS changed underneath this call: the route below no longer writes
+    // `orders.shipping_details`. It upserts the live `order_shipments` row
+    // (#707), and `ORDER_HAS_LABEL` now reads that table with a
+    // `voided_at IS NULL` predicate (#711). So this is still a genuine write
+    // through a genuine route satisfying a genuine guard — the guard just asks
+    // a different table, and a voided label would no longer satisfy it.
+    //
+    // Nothing is stubbed: the guard that refused in the previous test is
+    // satisfied by real data crossing two features' code.
     await apiJson(page.request, 'patch', `/api/admin/orders/${orderId}/shipping`, {
       carrier: 'Blue Dart',
       awbNumber: `E2E-AWB-${RUN}`,
