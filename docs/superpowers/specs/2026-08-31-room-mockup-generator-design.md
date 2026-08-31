@@ -221,7 +221,9 @@ one bad input never aborts a batch. Exit code is non-zero if anything failed.
 - A poster wider than its box is bounded by width; a taller one by height.
 - Output is centred within the box.
 - Shadow offset flips sign with `light`.
-- Shadow blur and opacity scale with `depthRatio`.
+- Shadow blur and offset scale with `depthRatio`; **opacity does not**. A thicker frame
+  casts a larger shadow, not a darker one — darkening with depth reads as a change in the
+  room's lighting rather than a change in the object.
 - Template validation rejects a rect outside 0..1, a missing file, and an unknown frame
   slug — each naming the offending template id.
 - `widthRatio: 0` produces no frame face.
