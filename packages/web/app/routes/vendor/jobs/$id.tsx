@@ -146,7 +146,7 @@
  * amount, no empty item list for a job that simply failed to fetch.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AlertCircle, ArrowLeft, Download } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
@@ -827,19 +827,39 @@ function formatPhotoBytes(bytes: number): string {
 export function QcPhotoImage({
   slot,
   label,
+  photoId,
   url,
 }: {
   slot: string
   label: string
+  /** `production_qc_photos.id` — WHICH photograph, as opposed to where. */
+  photoId: string
   url: string | null
 }) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
+  /**
+   * The signed URL, read at fetch time rather than depended on.
+   *
+   * `GET /jobs/:id/photos` re-signs every object on every call, so the string
+   * changes for photographs that did not. Keyed on it, every tile tore down —
+   * revoking its blob — and re-fetched full bytes whenever anything on the
+   * panel refreshed: uploading the eighth shot of a frame job re-downloaded the
+   * other seven, up to 8 × 25 MB for a one-slot change, and again on every
+   * withdraw, retry and status write.
+   */
+  const urlRef = useRef(url)
+  urlRef.current = url
+
+  // `photoId` is the identity of the bytes; a fresh signature over the same
+  // photograph is not a new photograph. `url === null` is still a change worth
+  // noticing — a scope-refused key arrives that way — so it stays in the key.
   useEffect(() => {
     setObjectUrl(null)
+    const signed = urlRef.current
 
-    if (!url) {
+    if (!signed) {
       setFailed(true)
       return
     }
@@ -850,7 +870,7 @@ export function QcPhotoImage({
 
     void (async () => {
       try {
-        const response = await fetch(url)
+        const response = await fetch(signed)
         if (!response.ok) throw new Error(`Photo fetch failed (${response.status})`)
         const blob = await response.blob()
         if (cancelled) return
@@ -867,7 +887,7 @@ export function QcPhotoImage({
       // through a frame job's eight slots would otherwise accumulate every one.
       if (created) URL.revokeObjectURL(created)
     }
-  }, [url])
+  }, [photoId, url === null])
 
   if (objectUrl) {
     return (
@@ -1044,7 +1064,12 @@ export function VendorQcShotList({ stage, qc, canUpload }: VendorQcShotListProps
 
             {entry.photo ? (
               <>
-                <QcPhotoImage slot={entry.slot} label={entry.label} url={entry.photo.url} />
+                <QcPhotoImage
+                  slot={entry.slot}
+                  label={entry.label}
+                  photoId={entry.photo.id}
+                  url={entry.photo.url}
+                />
                 <p className="text-xs text-muted-foreground">
                   {formatVendorDate(entry.photo.uploadedAt)} ·{' '}
                   {formatPhotoBytes(entry.photo.sizeBytes)} · {entry.photo.contentType}

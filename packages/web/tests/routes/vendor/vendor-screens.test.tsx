@@ -89,6 +89,7 @@ import {
   QcVerdictBanner,
   VendorJobWriteError,
   VendorQcShotList,
+  QcPhotoImage,
   mergeQcShots,
   missingRequiredQcSlots,
   missingShotsFor,
@@ -2284,6 +2285,89 @@ describe('the inbound parcel strip', () => {
     expect(
       screen.queryByTestId(`vendor-transfer-error-${outboundParcel.id}`)
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('QcPhotoImage', () => {
+  /**
+   * `GET /jobs/:id/photos` re-signs every object on every call, so the URL
+   * string changes for photos that did not. Keyed on the URL, every tile tore
+   * down and re-fetched full bytes whenever anything on the panel refreshed:
+   * uploading the eighth shot of a frame job re-downloaded the other seven —
+   * up to 8 × 25 MB for a one-slot change, and again on every withdraw, retry
+   * and status write.
+   */
+  const PHOTO_ID = 'photo-1'
+
+  let fetchMock: ReturnType<typeof vi.fn>
+  // Captured and put back: these are properties of a global other suites in
+  // this file assert call counts on, and `vi.unstubAllGlobals` does not undo a
+  // `defineProperty`.
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => ({ ok: true, blob: async () => new Blob(['x']) }))
+    vi.stubGlobal('fetch', fetchMock)
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: vi.fn(() => 'blob:stub'),
+      configurable: true,
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke)
+    else Reflect.deleteProperty(URL, 'revokeObjectURL')
+  })
+
+  it('does not re-download a photo that was merely re-signed', async () => {
+    const { rerender } = render(
+      <QcPhotoImage slot="front" label="Front" photoId={PHOTO_ID} url="https://r2/front?sig=1" />
+    )
+    await screen.findByTestId('vendor-qc-photo-front')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <QcPhotoImage slot="front" label="Front" photoId={PHOTO_ID} url="https://r2/front?sig=2" />
+    )
+
+    await waitFor(() => expect(screen.getByTestId('vendor-qc-photo-front')).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does download the photo when the slot holds a different one', async () => {
+    const { rerender } = render(
+      <QcPhotoImage slot="front" label="Front" photoId={PHOTO_ID} url="https://r2/front?sig=1" />
+    )
+    await screen.findByTestId('vendor-qc-photo-front')
+
+    rerender(
+      <QcPhotoImage slot="front" label="Front" photoId="photo-2" url="https://r2/front?sig=2" />
+    )
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('says so when there is no signed url to fetch', async () => {
+    render(<QcPhotoImage slot="front" label="Front" photoId={PHOTO_ID} url={null} />)
+
+    expect(screen.getByTestId('vendor-qc-photo-unavailable-front')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('notices a url that goes away without the photo changing', async () => {
+    const { rerender } = render(
+      <QcPhotoImage slot="front" label="Front" photoId={PHOTO_ID} url="https://r2/front?sig=1" />
+    )
+    await screen.findByTestId('vendor-qc-photo-front')
+
+    rerender(<QcPhotoImage slot="front" label="Front" photoId={PHOTO_ID} url={null} />)
+
+    await screen.findByTestId('vendor-qc-photo-unavailable-front')
   })
 })
 
