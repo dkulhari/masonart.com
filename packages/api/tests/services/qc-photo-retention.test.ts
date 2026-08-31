@@ -87,11 +87,23 @@ const rowDeleteAt = (jobId: string) =>
 const JOB_A = '11111111-1111-4111-8111-111111111111'
 const JOB_B = '22222222-2222-4222-8222-222222222222'
 
-/** The sweep's shape: one SELECT of expired jobs, then a DELETE per job. */
-const expiredJobs = (...jobIds: string[]) => {
+/**
+ * The sweep's shape: one SELECT of expired jobs, then per job a SELECT that
+ * re-checks nothing has been uploaded since, and a DELETE.
+ *
+ * `fresh` names the jobs whose re-check finds a photograph inside the window,
+ * which is the sweep's cue to leave that job entirely alone.
+ */
+const expiredJobs = (...jobIds: string[]) => seedSweep(jobIds, [])
+
+const seedSweep = (jobIds: string[], fresh: string[]) => {
   execute.mockReset()
   execute.mockResolvedValueOnce(jobIds.map((job_id) => ({ job_id })))
-  for (const _ of jobIds) execute.mockResolvedValueOnce([{ id: 'row' }])
+  for (const jobId of jobIds) {
+    // The re-check: a row here means "something arrived since".
+    execute.mockResolvedValueOnce(fresh.includes(jobId) ? [{ id: 'fresh' }] : [])
+    if (!fresh.includes(jobId)) execute.mockResolvedValueOnce([{ id: 'row' }])
+  }
   execute.mockResolvedValue([])
 }
 
@@ -184,6 +196,8 @@ describe('purgeExpiredQcPhotos', () => {
   it('reports how many rows it removed', async () => {
     execute.mockReset()
     execute.mockResolvedValueOnce([{ job_id: JOB_A }])
+    // The re-check finds nothing inside the window, then the delete removes two.
+    execute.mockResolvedValueOnce([])
     execute.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }])
 
     const removed = await purgeExpiredQcPhotos()
@@ -215,7 +229,15 @@ describe('purgeExpiredQcPhotos', () => {
   it('carries on to the next job when one job fails', async () => {
     // One unreachable prefix must not stall the sweep forever: the job that
     // failed keeps its rows and is retried tomorrow.
-    expiredJobs(JOB_A, JOB_B)
+    // Hand-rolled rather than `seedSweep`: the failing job never reaches its
+    // own DELETE, so a queue that reserved a response for it would hand that
+    // response to the NEXT job's re-check and read it as freshly photographed.
+    execute.mockReset()
+    execute.mockResolvedValueOnce([{ job_id: JOB_A }, { job_id: JOB_B }])
+    execute.mockResolvedValueOnce([]) // A: nothing inside the window
+    execute.mockResolvedValueOnce([]) // B: nothing inside the window
+    execute.mockResolvedValueOnce([{ id: 'row' }]) // B's rows
+    execute.mockResolvedValue([])
     deleteByPrefix.mockRejectedValueOnce(new Error('R2 unreachable'))
 
     await purgeExpiredQcPhotos()
@@ -251,6 +273,53 @@ describe('purgeExpiredQcPhotos', () => {
     const deletes = statements().filter((s) => /delete/i.test(s))
     expect(deletes).toHaveLength(2)
     for (const statement of deletes) expect(statement).toMatch(/job_id/i)
+  })
+
+  /**
+   * The delete under a prefix cannot spare one object, so after it runs EVERY
+   * row of that job points at nothing. Re-filtering the row delete by age —
+   * which is what it used to do — kept exactly the row whose photograph had
+   * just been destroyed: a live row, an image gone, and `shot-list-complete`
+   * passing on evidence that no longer exists.
+   */
+  it('removes every row of a job whose objects it just destroyed', async () => {
+    expiredJobs(JOB_A)
+
+    await purgeExpiredQcPhotos()
+
+    const [rowDelete] = statements().filter((s) => /delete/i.test(s))
+    expect(rowDelete).toMatch(/job_id/i)
+    expect(rowDelete).not.toMatch(/uploaded_at/i)
+  })
+
+  /**
+   * Which is only safe because the job is re-checked first. A photograph taken
+   * between the list and the sweep makes the job un-expired, and the sweep
+   * leaves it whole for the next pass rather than destroying a live shot.
+   */
+  it('leaves a job alone when a photograph arrived since the list was taken', async () => {
+    seedSweep([JOB_A, JOB_B], [JOB_A])
+
+    const removed = await purgeExpiredQcPhotos()
+
+    expect(objectDeleteAt(JOB_A)).toBe(-1)
+    expect(rowDeleteAt(JOB_A)).toBe(-1)
+    // And its neighbour is swept as usual.
+    expect(objectDeleteAt(JOB_B)).toBeGreaterThan(-1)
+    expect(rowDeleteAt(JOB_B)).toBeGreaterThan(-1)
+    expect(removed).toBe(1)
+  })
+
+  it('re-checks the job before it touches R2, not after', async () => {
+    expiredJobs(JOB_A)
+
+    await purgeExpiredQcPhotos()
+
+    const recheck = trace.findIndex(
+      (entry) => entry.startsWith('db:') && !/delete/i.test(entry) && entry.includes(JOB_A)
+    )
+    expect(recheck).toBeGreaterThan(-1)
+    expect(recheck).toBeLessThan(objectDeleteAt(JOB_A))
   })
 })
 

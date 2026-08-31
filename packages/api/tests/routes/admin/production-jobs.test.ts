@@ -28,7 +28,8 @@ import { adminSessionFor } from '../../helpers/admin-session'
 import { buildRouteApp } from '../../helpers/route-app'
 import '../../setup'
 
-import { QC_SHOT_LIST, requiredQcSlots } from '@chobii/shared'
+import { QC_SHOT_LIST, PRODUCTION_JOB_STATUSES, requiredQcSlots } from '@chobii/shared'
+import { nextStatuses } from '../../../src/lib/production-transitions'
 
 import {
   productionJobs,
@@ -81,6 +82,7 @@ vi.mock('../../../src/lib/storage', () => ({
 import {
   adminProductionApp,
   adminOrderProductionApp,
+  ADMIN_STATUS_STAMP,
 } from '../../../src/routes/admin/production-jobs'
 import { readJson } from '../../helpers/json'
 
@@ -1535,6 +1537,98 @@ describe('PATCH /api/admin/production/:jobId', () => {
       })
     }
   )
+
+  /**
+   * `lib/vendor-scope.ts` enforces TOTAL clock coverage on every vendor edge,
+   * precisely so a move cannot record THAT it happened without WHEN. The admin
+   * path wrote `{...body, updatedAt}` and stamped nothing, so an admin taking
+   * `qc_passed -> dispatched` left `dispatched_at` NULL on a job that had
+   * demonstrably been dispatched.
+   */
+  it('stamps dispatched_at when an admin dispatches the job', async () => {
+    const before = Date.now()
+
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
+      'select:production_transfer_jobs': [
+        [{ id: TRANSFER_ID, toVendorId: VENDOR_ID_2, dispatchedAt: null, receivedAt: null }],
+      ],
+      'update:production_jobs': [[jobRow({ status: 'dispatched', vendorId: VENDOR_ID })]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'dispatched' }, 'PATCH')
+    )
+    expect(res.status).toBe(200)
+
+    const set = updates(productionJobs)[0]?.values as Record<string, unknown>
+    expect(set.dispatchedAt).toBeInstanceOf(Date)
+    expect((set.dispatchedAt as Date).getTime()).toBeGreaterThanOrEqual(before)
+    // The same instant as `updated_at`, not a second reading of the clock.
+    expect((set.dispatchedAt as Date).getTime()).toBe((set.updatedAt as Date).getTime())
+  })
+
+  /**
+   * And the rule is TOTAL, the way `lib/vendor-scope.ts` makes it total: every
+   * status an admin can PATCH a job into either has its clock declared here or
+   * has no clock column at all. An edge added to the matrix tomorrow cannot
+   * quietly land without one.
+   */
+  it('declares a clock for every admin edge whose target owns one', () => {
+    const clocked: Record<string, string> = {
+      assigned: 'assignedAt',
+      received: 'receivedAt',
+      qc_submitted: 'qcSubmittedAt',
+      dispatched: 'dispatchedAt',
+    }
+
+    for (const from of PRODUCTION_JOB_STATUSES) {
+      for (const to of nextStatuses(from, 'admin')) {
+        if (to === from) continue
+        if (clocked[to] === undefined) continue
+        expect(ADMIN_STATUS_STAMP[to]).toBe(clocked[to])
+      }
+    }
+  })
+
+  it('stamps no clock on a status that has none', async () => {
+    // `qc_passed` and `qc_failed` are recorded by the review row, and a
+    // cancellation by the audit log. Inventing a column for them here would be
+    // a second, disagreeing history.
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'received', vendorId: VENDOR_ID })]],
+      'update:production_jobs': [[jobRow({ status: 'cancelled', vendorId: VENDOR_ID })]],
+    })
+
+    await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'cancelled' }, 'PATCH')
+    )
+
+    const set = updates(productionJobs)[0]?.values as Record<string, unknown>
+    expect(Object.keys(set).sort()).toEqual(['status', 'updatedAt'])
+  })
+
+  it('stamps nothing on a self-edge, because nothing moved', async () => {
+    // `assigned -> assigned` is a legal admin self-edge and lands as a no-op.
+    // Re-stamping `assigned_at` on it would move the date the job was given to
+    // this vendor every time a screen saved without changing anything.
+    queueRows({
+      'select:production_jobs': [[jobRow({ status: 'assigned', vendorId: VENDOR_ID })]],
+      'update:production_jobs': [[jobRow({ status: 'assigned', vendorId: VENDOR_ID })]],
+    })
+
+    const res = await buildApp().request(
+      `/api/admin/production/${JOB_ID}`,
+      json({ status: 'assigned' }, 'PATCH')
+    )
+    expect(res.status).toBe(200)
+
+    const set = updates(productionJobs)[0]?.values as Record<string, unknown>
+    expect(set.assignedAt).toBeUndefined()
+    expect(audits()).toHaveLength(0)
+  })
 
   it('lets qc_passed -> dispatched through when the piece is on an open transfer', async () => {
     queueRows({

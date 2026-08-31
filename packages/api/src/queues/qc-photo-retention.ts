@@ -118,17 +118,36 @@ export async function purgeExpiredQcPhotos(): Promise<number> {
 
     for (const jobId of jobIds) {
       try {
+        // Re-checked BEFORE anything is destroyed, and the job is the unit.
+        // The list above and the sweep below are separate statements, so a
+        // photograph can arrive in between — and `deleteByPrefix` cannot spare
+        // it. A job with anything inside the window is therefore not expired at
+        // all; it is left whole and the next pass decides again.
+        const fresh = await db.execute(
+          sql`SELECT 1
+              FROM production_job_photos
+              WHERE job_id = ${jobId}::uuid
+                AND uploaded_at >= now() - (${days}::text || ' days')::interval
+              LIMIT 1`
+        )
+
+        if (rowsOf(fresh).length > 0) continue
+
         // Objects FIRST. If this throws we fall into the catch below and the
-        // rows survive, which is the recoverable half of the failure.
+        // rows survive, which is the recoverable half of the failure: the row
+        // is the only handle on the object, so a row without its object is
+        // unrecoverable in the other direction.
         await deleteByPrefix(StoragePaths.productionQcJobPrefix(jobId))
 
-        // Rows SECOND, and re-checking the age rather than trusting the SELECT:
-        // a photograph uploaded between the two statements is not covered by
-        // the window, and dropping its row would strand it.
+        // Rows SECOND, and ALL of them. The delete above was by prefix, so
+        // every row of this job now points at nothing; re-filtering by age here
+        // kept exactly the row whose photograph had just been destroyed — a
+        // live row with no image, and `shot-list-complete` passing on evidence
+        // that no longer exists. The re-check above is what makes deleting the
+        // lot the safe reading rather than the destructive one.
         const deleted = await db.execute(
           sql`DELETE FROM production_job_photos
               WHERE job_id = ${jobId}::uuid
-                AND uploaded_at < now() - (${days}::text || ' days')::interval
               RETURNING id`
         )
 

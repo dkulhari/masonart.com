@@ -1207,6 +1207,34 @@ adminProductionApp.post(
   }
 );
 
+/**
+ * The clock each admin-settable status stamps on `production_jobs`.
+ *
+ * The admin twin of `VENDOR_STATUS_STAMP` in `lib/vendor-scope.ts`, and it
+ * exists for the same reason: a move that records THAT it happened without WHEN
+ * leaves an SLA argument with nothing but an `updated_at` that a dozen later
+ * writes have overwritten.
+ *
+ * Only statuses that OWN a column appear. `qc_passed` and `qc_failed` are dated
+ * by the review row and `cancelled` by the audit log; inventing a column for
+ * them here would be a second history that could disagree with the first.
+ * `sent_at` is absent because `sent` is retired and the date the material went
+ * out is evidence this route must not be able to overwrite.
+ *
+ * Partial rather than total, and a `Record<string, ...>` lookup rather than a
+ * `switch`: an admin edge into a status with no clock is legitimate, so the
+ * missing entry is the answer rather than a gap. The suite walks every admin
+ * edge in the matrix and fails if a target that owns a clock is missing here.
+ */
+export const ADMIN_STATUS_STAMP: Partial<
+  Record<ProductionJobStatus, 'assignedAt' | 'receivedAt' | 'qcSubmittedAt' | 'dispatchedAt'>
+> = {
+  assigned: "assignedAt",
+  received: "receivedAt",
+  qc_submitted: "qcSubmittedAt",
+  dispatched: "dispatchedAt",
+};
+
 // ============================================================================
 // PATCH /api/admin/production/:jobId
 // ============================================================================
@@ -1261,9 +1289,25 @@ adminProductionApp.patch(
         // a self-edge changes nothing a guard could be about.
         if (to !== from) await assertGuardSatisfied(tx, before, from, to);
 
+        // One reading of the clock for the whole write: the move and the record
+        // of when it happened are the same event, and two `new Date()`s make
+        // them disagree by however long the object literal took.
+        const movedAt = new Date();
+        const stamp = to !== from ? ADMIN_STATUS_STAMP[to] : undefined;
+
         const written = await tx
           .update(productionJobs)
-          .set({ ...body, updatedAt: new Date() })
+          .set({
+            ...body,
+            // `lib/vendor-scope.ts` enforces total clock coverage on every
+            // vendor edge precisely so a move cannot record THAT it happened
+            // without WHEN. This path had no equivalent: an admin taking
+            // `qc_passed -> dispatched` left `dispatched_at` NULL on a job that
+            // had demonstrably been dispatched, and `updated_at` is overwritten
+            // by everything so it is not evidence of anything in particular.
+            ...(stamp ? { [stamp]: movedAt } : {}),
+            updatedAt: movedAt,
+          })
           .where(
             and(
               eq(productionJobs.id, jobId),
