@@ -38,7 +38,7 @@ status: todo
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.656Z'
-last_updated: '2026-08-31T13:49:58.656Z'
+last_updated: '2026-08-31T14:07:54.136Z'
 time_spent_minutes: 0
 labels:
   - shiprocket
@@ -46,7 +46,25 @@ labels:
   - pass-2
   - phase-7
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T14:07:54.136Z'
+    text: |-
+      📌 **Decision: split the transaction. Do not hold locks across the courier call.**
+
+      Dhruv chose the second of the two options the ticket left open (2026-08-31).
+
+      So the shape is **lock → mark intent → commit → call → reconcile**, not one long transaction wrapped around the Shiprocket request.
+
+      **Why it is the more correct one.** A courier API call inside an open transaction holds `FOR UPDATE` locks on the order's job rows for as long as Shiprocket takes to answer. That is an external service with no latency guarantee: a slow response blocks every other reader of those rows, and a hung one holds them until the statement timeout. On a pool this app shares with a dev box running many sessions, that is how one dispatch takes the database down.
+
+      **What must still hold.** The concurrency property does not weaken: two admins pressing Ship at once must still produce exactly one label. That now comes from the *intent row* committed in step 2, not from a lock held through step 4 — a second caller finds the intent already recorded and refuses, instead of waiting on a lock.
+
+      **The failure mode this must not ship**, unchanged from the ticket: a bought label with no row recording it. Splitting the transaction makes this *more* likely, not less, because the commit and the purchase are now separate events. So the intent row has to be written **before** the call and reconciled **after** it, and a crash between the two must leave a row that a later reconcile can recognise as "we may have bought this — go and check" rather than as either done or never-started.
+
+      That reconcile path is part of this ticket, not a follow-up. An intent row with no reconciliation is worse than the long transaction it replaced.
+
+      **Test accordingly.** The concurrency test still has to prove one label from two simultaneous callers, and it must fail when the intent row is removed — proved by actually removing it, the way `order-shipments-live-label.test.ts` proves its index rather than asserting the index is merely defined.
 work_sessions: []
 related_tickets: []
 blocked_by:

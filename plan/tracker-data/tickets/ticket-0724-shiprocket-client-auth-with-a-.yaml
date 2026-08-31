@@ -34,21 +34,89 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.291Z'
-last_updated: '2026-08-31T13:49:58.291Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T14:11:52.111Z'
+time_spent_minutes: 4
 labels:
   - shiprocket
   - api
   - pass-2
   - phase-6
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T14:07:57.928Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T14:11:46.321Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4f06b87e` - feat(api): cache the Shiprocket token and refresh it before it dies
+
+      **Files Changed**:
+      - `packages/api/src/services/shiprocket.ts` — `getShiprocketAuthToken`, `ShiprocketAuthError`, `resetShiprocketAuthCacheForTests`
+      - `packages/api/tests/services/shiprocket-auth.test.ts` — 13 tests
+
+      **Expiry comes from the token.** `exp` is parsed out of the JWT; nothing assumes ten days. Ten days is what the live account issues *today*, and a hardcoded ten would keep serving a dead token for however long Shiprocket shortened it by — failing silently and late. A token whose `exp` cannot be parsed is still used but trusted for only an hour, so a format change on their side costs an extra login an hour rather than a total outage.
+
+      **Concurrent callers share one login.** A burst of dispatches on a cold cache would otherwise answer its own request storm with 429s from the endpoint that is rate-limited. The in-flight promise clears on rejection too — otherwise one bad login poisons every later call for the life of the process.
+
+      **A 403 caches nothing and is not retried.** Wrong credentials return 403, not 401 (measured). Caching it would turn a fixable mistake into an outage lasting until a restart; retrying it would turn a wrong password into a locked-out integration. Correcting the API user now takes effect without a restart, and there is a test for exactly that.
+
+      **On test order, stated plainly.** Ten tests were written first and observed failing. Three behaviours — in-flight de-duplication, the unknown-`exp` fallback, and `exp` parsing — I added on my own initiative, so their tests were written *after* the code and passed immediately, which proves nothing on its own. I broke the code twice and confirmed the named tests go red:
+
+      | Break | Fails |
+      |---|---|
+      | remove `if (inFlight) return inFlight` | `log in once between them, not once each` (1 failed / 12 passed) |
+      | hardcode 10 days instead of reading `exp` | `reads the expiry from the token, not from a constant` **and** `is used, but trusted only briefly` (2 failed / 11 passed) |
+
+      Restored and re-verified clean at 13/13 both times.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/services/shiprocket-auth.test.ts` → PASS, **13 tests**
+      - Command: `bunx vitest run tests/services/ tests/lib/production-seam.test.ts` → PASS, **22 files, 402 passed, 2 skipped, 0 failed** — the seam scan still refuses any `shiprocket` import under `lib/production-*`
+      - Command: `bun run typecheck` → 4 tasks successful
+
+      Unblocks #725 and #726.
+  - author: system
+    timestamp: '2026-08-31T14:11:49.599Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T14:07:58.780Z'
+    agent: claude-code
+    summary: '#724 complete. getShiprocketAuthToken caches the JWT and refreshes within a day of the exp claim read from the token itself; unknown exp falls back to one hour. Concurrent cold-cache callers share one login and the in-flight promise clears on rejection. 403 throws ShiprocketAuthError, caches nothing, does not retry. 13 tests; the three self-initiated behaviours were proved by breaking the code twice and watching the named tests fail. 402 service+seam tests pass, typecheck green. Committed 4f06b87e.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T14:11:52.109Z'
+    duration: '00:03:53'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-31T14:07:57.928Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/services/ tests/lib/production-seam.test.ts
+  test_output: 22 files, 402 passed, 2 skipped, 0 failed; shiprocket-auth.test.ts 13 passed
+  build_passed: true
+  build_command: bun run typecheck (4 tasks successful)
+  verified_at: '2026-08-31T14:11:38.129Z'
+completed: '2026-08-31T14:11:49.599Z'

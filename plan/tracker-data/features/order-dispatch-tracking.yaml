@@ -1,7 +1,7 @@
 name: order-dispatch-tracking
 title: Order Dispatch Tracking
 priority: critical
-created: "2026-08-16T21:22:56.705Z"
+created: '2026-08-16T21:22:56.705Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -141,62 +141,62 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 8
-  total_duration: "01:10:00"
+  total_sessions: 9
+  total_duration: '01:14:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 8
-      duration: "01:10:00"
+      sessions: 9
+      duration: '01:14:00'
       tokens: 0
 tickets:
   todo:
-    "724": Shiprocket Client - Auth with a cached token that refreshes before it expires
-    "725": Shiprocket Client - Serviceability and choosing a courier
-    "726": Shiprocket Client - Create the order and assign an AWB
-    "727": Shiprocket Client - Fetch the label PDF and schedule a pickup
-    "728": Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
-    "729": Admin API - POST /orders/:orderId/ship, gated on readiness
-    "730": Admin API - The ready-to-label queue
-    "731": Admin API - Void a label
-    "732": Webhook - Verify and accept Shiprocket status callbacks
-    "733": Webhook - Map Shiprocket statuses onto shipment_status, including RTO and NDR
-    "734": Admin UI - The dispatch queue, with blockers on the row
-    "735": "Admin UI - Shipment detail: pick a courier, download the label"
-    "736": E2E - An admin ships an order and the customer sees the AWB
+    '725': Shiprocket Client - Serviceability and choosing a courier
+    '726': Shiprocket Client - Create the order and assign an AWB
+    '727': Shiprocket Client - Fetch the label PDF and schedule a pickup
+    '728': Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
+    '729': Admin API - POST /orders/:orderId/ship, gated on readiness
+    '730': Admin API - The ready-to-label queue
+    '731': Admin API - Void a label
+    '732': Webhook - Verify and accept Shiprocket status callbacks
+    '733': Webhook - Map Shiprocket statuses onto shipment_status, including RTO and NDR
+    '734': Admin UI - The dispatch queue, with blockers on the row
+    '735': 'Admin UI - Shipment detail: pick a courier, download the label'
+    '736': E2E - An admin ships an order and the customer sees the AWB
   in_progress: {}
   done:
-    "702": Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
-    "703": Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
-    "704": Label Seam - Read the real column and delete the 42703 to 503 path
-    "705": Label Seam - Choose the live label by voided_at, not by recency
-    "706": One Tracking Store - Declare and emit shipment.*, and wire the orphan order.shipment_marked_delivered
-    "707": One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
-    "708": One Tracking Store - Backfill orders.shipping_details into order_shipments
-    "709": One Tracking Store - GET /api/tracking reads the live shipment
-    "710": One Tracking Store - Shipped and delivered notifications read the shipment
-    "711": One Tracking Store - The two production label guards read order_shipments
-    "712": One Tracking Store - Admin and customer order detail render the shipment
-    "713": E2E - An admin-entered tracking number reaches the customer tracking page
-    "721": "Carrier Config - Database Schema: vendors.shiprocket_pickup_location"
-    "722": Carrier Config - SHIPROCKET_* env and a not-configured refusal that names itself
-    "723": Carrier Config - Admin sets a vendor's Shiprocket pickup nickname
+    '702': Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
+    '703': Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+    '704': Label Seam - Read the real column and delete the 42703 to 503 path
+    '705': Label Seam - Choose the live label by voided_at, not by recency
+    '706': One Tracking Store - Declare and emit shipment.*, and wire the orphan order.shipment_marked_delivered
+    '707': One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
+    '708': One Tracking Store - Backfill orders.shipping_details into order_shipments
+    '709': One Tracking Store - GET /api/tracking reads the live shipment
+    '710': One Tracking Store - Shipped and delivered notifications read the shipment
+    '711': One Tracking Store - The two production label guards read order_shipments
+    '712': One Tracking Store - Admin and customer order detail render the shipment
+    '713': E2E - An admin-entered tracking number reaches the customer tracking page
+    '721': 'Carrier Config - Database Schema: vendors.shiprocket_pickup_location'
+    '722': Carrier Config - SHIPROCKET_* env and a not-configured refusal that names itself
+    '723': Carrier Config - Admin sets a vendor's Shiprocket pickup nickname
+    '724': Shiprocket Client - Auth with a cached token that refreshes before it expires
 total_tickets: 28
-completion_percentage: 54
+completion_percentage: 57
 is_completed: false
 plan:
   phases:
-    - name: "Phase 1: Database Schema"
+    - name: 'Phase 1: Database Schema'
       location: packages/api/src/database/{schema,migrations}
       tickets:
         - 702
         - 703
-    - name: "Phase 2: Close the label seam"
+    - name: 'Phase 2: Close the label seam'
       location: packages/api/src/lib/vendor-scope.ts, packages/api/src/routes/vendor.ts
       tickets:
         - 704
         - 705
-    - name: "Phase 3: One tracking store"
+    - name: 'Phase 3: One tracking store'
       location: packages/api/src/routes, packages/api/src/services, packages/web/app/components/admin
       tickets:
         - 706
@@ -206,18 +206,17 @@ plan:
         - 710
         - 711
         - 712
-    - name: "Phase 4: E2E"
+    - name: 'Phase 4: E2E'
       location: tests/e2e
       tickets:
         - 713
-    - name: "Phases 5-10: Shiprocket integration (NOT TICKETED - pass 2)"
+    - name: 'Phases 5-10: Shiprocket integration (NOT TICKETED - pass 2)'
       location: packages/api/src/services/shiprocket.ts, packages/api/src/lib/shipment-dispatch.ts, packages/api/src/routes/webhooks, packages/web/app/routes/admin/dispatch
       tickets: []
-  generated_at: "2026-08-31T02:26:30.353Z"
+  generated_at: '2026-08-31T02:26:30.353Z'
 worktree:
   branch: feature/order-dispatch-tracking
   path: /Users/dhruv/work/masonart.com/.claude/worktrees/order-dispatch-tracking
-  created_at: "2026-08-31T03:16:41.504Z"
-last_activity: "2026-08-31T11:40:01.817Z"
-started: "2026-08-31T03:57:31.133Z"
-completed: "2026-08-31T11:39:59.202Z"
+  created_at: '2026-08-31T03:16:41.504Z'
+last_activity: '2026-08-31T14:11:52.169Z'
+started: '2026-08-31T03:57:31.133Z'
