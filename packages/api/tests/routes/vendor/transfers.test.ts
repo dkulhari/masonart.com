@@ -139,13 +139,14 @@ const EXPECTED_BY = '2026-09-05T00:00:00.000Z'
 
 const buildApp = () => buildRouteApp('/api/vendor', vendorApp)
 
-/** The seven fields the design says B is told, and the eighth it computes. */
+/** The seven fields the design says B is told, and the two it computes. */
 const TRANSFER_KEYS = [
   'carrier',
   'direction',
   'dispatchedAt',
   'expectedBy',
   'id',
+  'isLost',
   'pieceCount',
   'receivedAt',
   'reference',
@@ -191,6 +192,7 @@ function transferRow(over: Record<string, unknown> = {}) {
     dispatchedAt: PAST,
     expectedBy: null,
     receivedAt: null,
+    isLost: false,
     direction: 'outbound',
     ...over,
   }
@@ -921,7 +923,11 @@ describe('POST /transfers/:id/received', () => {
     const [locked, reread] = ops('select', productionTransfers)
     expect(columnsOf(locked, 'the locked receipt read')).toContain('lostAt')
     expect(columnsOf(reread, 'the receipt re-read')).toEqual(TRANSFER_KEYS)
+    // `isLost` is the ANSWER and is theirs; `lostAt` is when, and `lostNote` is
+    // an admin writing about another vendor's failure. Neither ever crosses.
+    expect(columnsOf(reread, 'the receipt re-read')).toContain('isLost')
     expect(columnsOf(reread, 'the receipt re-read')).not.toContain('lostAt')
+    expect(columnsOf(reread, 'the receipt re-read')).not.toContain('lostNote')
 
     expect(Object.keys(body.transfer).sort()).toEqual(TRANSFER_KEYS)
     expect(forbiddenIn(body)).toEqual([])

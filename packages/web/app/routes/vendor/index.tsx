@@ -334,6 +334,11 @@ export interface VendorTransfer {
   /** The carrier's promise, off the docket. The one date that is not ours. */
   expectedBy: string | null
   receivedAt: string | null
+  /**
+   * Whether this parcel has been written off. The FACT, not `lostAt` — when it
+   * happened is not the vendor's business, but that it will never arrive is.
+   */
+  isLost?: boolean
   /** Relative to the CALLER, and the only thing they learn about the other end. */
   direction: 'inbound' | 'outbound'
 }
@@ -375,7 +380,8 @@ export interface VendorTransferPanelState {
 /**
  * Is this parcel one this vendor can confirm the arrival of?
  *
- * Three conditions, and the third is the one that was missing: **inbound**
+ * Four conditions, and the last two were each added after the control had
+ * already shipped without them: **inbound**
  * (`received_at` is settable only by the receiving end — the API answers the
  * sender 404), **not already arrived**, and **actually despatched**.
  *
@@ -395,7 +401,8 @@ export function transferAwaitsArrival(transfer: VendorTransfer): boolean {
   return (
     transfer.direction === 'inbound' &&
     transfer.dispatchedAt !== null &&
-    transfer.receivedAt === null
+    transfer.receivedAt === null &&
+    transfer.isLost !== true
   )
 }
 
@@ -410,7 +417,10 @@ export function transferAwaitsArrival(transfer: VendorTransfer): boolean {
  * A parcel nobody has despatched is EMPTY for the same reason it gets no
  * confirm button: announcing "something is in transit to you" about a box still
  * on the sender's bench sends a vendor to look for a courier who was never
- * called.
+ * called. A parcel written off as lost is empty for the same reason again: it
+ * stays inbound, despatched and unreceived for the rest of time, so without
+ * that clause it drove a permanent "Waiting on an inbound parcel" banner on
+ * every job it carried.
  */
 export function inboundAwaitingArrival(
   transfers: VendorTransfer[] | null | undefined
@@ -657,6 +667,7 @@ export function VendorTransferStrip({
           const inbound = transfer.direction === 'inbound'
           const arrived = transfer.receivedAt !== null
           const despatched = transfer.dispatchedAt !== null
+          const lost = transfer.isLost === true
           const rowError = rowErrors?.[transfer.id]
 
           return (
@@ -706,14 +717,30 @@ export function VendorTransferStrip({
                   <div>
                     {arrived
                       ? `Arrived ${formatVendorDate(transfer.receivedAt)}`
-                      : despatched
-                        ? `In transit, due ${formatVendorDate(transfer.expectedBy)}`
-                        : 'Still with the sending workshop'}
+                      : lost
+                        ? 'Written off as lost'
+                        : despatched
+                          ? `In transit, due ${formatVendorDate(transfer.expectedBy)}`
+                          : 'Still with the sending workshop'}
                   </div>
                 </div>
               </div>
 
-              {inbound && !arrived && !despatched && (
+              {inbound && !arrived && lost && (
+                // Same rule as below: never drop a control without saying why.
+                // This one will never arrive, and `markVendorTransferReceived`
+                // answers 409 `TRANSFER_LOST` to anyone who insists.
+                <p
+                  data-testid={`vendor-transfer-lost-${transfer.id}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  This parcel has been written off as lost, so there is nothing
+                  to confirm. A replacement job covers the work — nothing is owed
+                  by you for the loss.
+                </p>
+              )}
+
+              {inbound && !arrived && !lost && !despatched && (
                 // The strip never simply drops a control without saying why —
                 // an absent button is indistinguishable from one that failed to
                 // render, which is the same rule the action strip follows.

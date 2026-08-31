@@ -2074,6 +2074,17 @@ const pendingParcel: VendorTransfer = {
   receivedAt: null,
 }
 
+/**
+ * A parcel written off as lost. Despatched, never arrived, and never going to:
+ * `markVendorTransferReceived` answers 409 `TRANSFER_LOST` for the rest of
+ * time. Nothing in the vendor projection said so until `isLost`.
+ */
+const lostParcel: VendorTransfer = {
+  ...inboundParcel,
+  id: 'cccccccc-8888-4888-8888-888888888888',
+  isLost: true,
+}
+
 const transferPanel = (
   over: Partial<VendorTransferPanelState> = {}
 ): VendorTransferPanelState => ({
@@ -2276,6 +2287,42 @@ describe('the inbound parcel strip', () => {
   })
 })
 
+describe('VendorTransferStrip — a parcel written off as lost', () => {
+  it('offers no confirmation, and says why rather than dropping the control', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [lostParcel], onReceived: () => {} })}
+      />
+    )
+
+    expect(screen.queryByTestId(`vendor-transfer-received-${lostParcel.id}`)).toBeNull()
+    expect(screen.getByTestId(`vendor-transfer-lost-${lostParcel.id}`).textContent).toMatch(
+      /written off/i
+    )
+  })
+
+  it('does not go on calling it in transit', () => {
+    render(<VendorTransferStrip transfers={transferPanel({ data: [lostParcel] })} />)
+
+    const dates = screen.getByTestId(`vendor-transfer-dates-${lostParcel.id}`)
+    expect(dates.textContent).not.toMatch(/in transit/i)
+    expect(dates.textContent).toMatch(/written off/i)
+  })
+
+  it('still offers the confirmation on a parcel that is merely late', () => {
+    render(
+      <VendorTransferStrip
+        transfers={transferPanel({ data: [inboundParcel], onReceived: () => {} })}
+      />
+    )
+
+    expect(
+      screen.getByTestId(`vendor-transfer-received-${inboundParcel.id}`)
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId(`vendor-transfer-lost-${inboundParcel.id}`)).toBeNull()
+  })
+})
+
 describe('transferAwaitsArrival', () => {
   /**
    * Written longhand, one case per condition, rather than as a loop over the
@@ -2298,12 +2345,28 @@ describe('transferAwaitsArrival', () => {
   it('refuses one nobody has despatched — the API answers 409 TRANSFER_NOT_DISPATCHED', () => {
     expect(transferAwaitsArrival(pendingParcel)).toBe(false)
   })
+
+  /**
+   * The fourth refusal. A written-off parcel stays inbound, despatched and
+   * unreceived forever, so it sat at the top of /vendor under a "Confirm
+   * arrival" button whose only outcome was a 409 — and drove a permanent
+   * "Waiting on an inbound parcel" banner on the job screen.
+   */
+  it('refuses one written off as lost — the API answers 409 TRANSFER_LOST', () => {
+    expect(transferAwaitsArrival(lostParcel)).toBe(false)
+  })
 })
 
 describe('inboundAwaitingArrival', () => {
   it('is the despatched inbound parcels with no arrival stamp, and nothing else', () => {
     expect(
-      inboundAwaitingArrival([inboundParcel, outboundParcel, arrivedParcel, pendingParcel])
+      inboundAwaitingArrival([
+        inboundParcel,
+        outboundParcel,
+        arrivedParcel,
+        pendingParcel,
+        lostParcel,
+      ])
     ).toEqual([inboundParcel])
   })
 

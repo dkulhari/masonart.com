@@ -1893,6 +1893,16 @@ export interface VendorTransfer {
   dispatchedAt: Date | null
   expectedBy: Date | null
   receivedAt: Date | null
+  /**
+   * Whether this parcel has been written off.
+   *
+   * The FACT, never `lost_at` or `lost_note`: when it happened is operational
+   * history and the note is written by an admin about another vendor's failure.
+   * The fact is the vendor's own business, because `markVendorTransferReceived`
+   * answers 409 `TRANSFER_LOST` for the rest of time and a screen that cannot
+   * see it offers a confirm button whose only outcome is that refusal.
+   */
+  isLost: boolean
   /** Relative to the CALLER, and the only thing they learn about the other end. */
   direction: 'inbound' | 'outbound'
 }
@@ -1914,6 +1924,11 @@ function vendorTransferColumns(vendorId: string) {
     dispatchedAt: productionTransfers.dispatchedAt,
     expectedBy: productionTransfers.expectedBy,
     receivedAt: productionTransfers.receivedAt,
+    // The ANSWER, not the timestamp: `lost_at` is operational history and
+    // `lost_note` is an admin writing about another vendor's failure, while
+    // "this parcel is written off" is the caller's own business — without it the
+    // strip offers a confirm button the API refuses forever.
+    isLost: sql<boolean>`${productionTransfers.lostAt} is not null`,
     // Deliberately absent: orderId, fromVendorId, toVendorId, costAmount,
     // lostAt, lostNote, createdBy. Every one of them is either a person-linked
     // handle, another vendor's identity, or money that is not theirs to see.
