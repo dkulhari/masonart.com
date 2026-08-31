@@ -17,7 +17,7 @@
  * | `slug`           | yes      | Lowercase letters, numbers and hyphens only.              |
  * | `description`    | no       |                                                           |
  * | `basePrice`      | yes      | Always two decimals: `1499.00`. No symbol, no commas.     |
- * | `orientation`    | yes      | square, portrait, landscape, panoramic, round, set-of-2-3 |
+ * | `orientation`    | yes      | square, portrait, landscape or panoramic (see below)      |
  * | `styles`         | no       | list                                                      |
  * | `subjects`       | no       | list                                                      |
  * | `colors`         | no       | list                                                      |
@@ -60,12 +60,28 @@
  * mockups are cropped to the centred square, which is the right default for a
  * photograph of a wall.
  *
+ * ## Every product gets its sizes
+ *
+ * Each imported product also gets the full size ladder for its orientation,
+ * priced off its own `basePrice`. Without that it has no size to pick and no
+ * price to charge — the page renders and nothing can be bought.
+ *
+ * `round` and `set-of-2-3` have no ladder, so a row declaring one **fails**
+ * and is reported. It is not quietly sold as a portrait; that would price and
+ * size it for a rectangle it is not.
+ *
  * ## What re-running does
  *
  * Identity is `sku`. A row whose sku already exists updates that product
  * rather than making a second one. Its images are left alone unless
  * `--force-media` is passed, because reprocessing costs about 400ms and one
  * upload per image and almost never changes anything.
+ *
+ * Sizes are matched on `variantSku` and updated in place, never deleted and
+ * re-made: cart lines cascade off these rows and order history points at them.
+ * A size that leaves the ladder is deactivated, not removed. Stock is never
+ * reset by a re-import — once the shop is live, the admin's number is the real
+ * one.
  *
  * One bad row does not stop the run. Every failure is collected, the rest of
  * the manifest still imports, and the process exits non-zero with a report
@@ -77,6 +93,9 @@ import { basename, join } from 'node:path';
 
 import { orientationContradictingArt, type ProductImage } from '@chobii/shared';
 import { z } from 'zod';
+
+import { buildVariantsForOrientation } from './seed-variants';
+import type { NewProductVariant } from './schema';
 
 // ============================================================================
 // Manifest parsing
@@ -410,6 +429,57 @@ export function resolveMedia(row: MediaRefs, mediaDir: string): ResolvedMedia {
 }
 
 // ============================================================================
+// Size ladder
+// ============================================================================
+
+/** The orientations `buildVariantsForOrientation` has a ladder for. */
+const LADDERED_ORIENTATIONS = new Set(['square', 'portrait', 'landscape', 'panoramic']);
+
+/** What a manifest row needs to carry for its ladder to be built. */
+export interface VariantSource {
+  sku: string;
+  orientation: string;
+  basePrice: string;
+}
+
+/**
+ * Build the whole size ladder for one imported product.
+ *
+ * A product with no variants has no size to pick and no price to charge — the
+ * PDP renders and nothing can be bought. So this runs for every imported row,
+ * not as an extra.
+ *
+ * The ladder itself comes from `buildVariantsForOrientation`, which is the
+ * single source of truth for sizes and pricing. It is not reimplemented here:
+ * `seed-variants.ts` exists precisely because a hand-written second copy in
+ * seed.ts drifted from the shared ladder and silently won.
+ *
+ * Returns an empty array for an orientation with no ladder (`round`,
+ * `set-of-2-3`). The caller fails that row. The seeder's answer is to fall back
+ * to portrait (seed.ts:1694) and that is wrong here: a round poster sold
+ * against a portrait ladder is priced and sized for a rectangle it is not, and
+ * an unattended bulk load is exactly where nobody notices.
+ */
+export function buildVariantRows(
+  row: VariantSource
+): Omit<NewProductVariant, 'productId'>[] {
+  if (!LADDERED_ORIENTATIONS.has(row.orientation)) return [];
+
+  const templates = buildVariantsForOrientation(
+    row.orientation as Parameters<typeof buildVariantsForOrientation>[0],
+    parseFloat(row.basePrice)
+  );
+
+  return templates.map((template) => ({
+    ...template,
+    // The handle a re-import matches on. `variant_sku` carries no unique
+    // constraint in the schema, so this string is the only thing standing
+    // between a second import and a doubled size list.
+    variantSku: `${row.sku}-${template.widthInches}x${template.heightInches}`,
+  }));
+}
+
+// ============================================================================
 // Import driver
 // ============================================================================
 
@@ -438,6 +508,16 @@ export interface ImportReport {
   updated: number;
   /** Existing products whose images were left alone (no --force-media). */
   mediaSkipped: number;
+  /**
+   * Variants the validated rows call for.
+   *
+   * Reported by the dry-run too, because "the import worked" and "the
+   * catalogue is purchasable" are different claims and the pre-flight should
+   * answer both.
+   */
+  variantsPlanned: number;
+  /** Variants actually inserted or updated. */
+  variantsWritten: number;
   failures: ImportFailure[];
 }
 
@@ -509,6 +589,8 @@ export async function importCatalogue(
     created: 0,
     updated: 0,
     mediaSkipped: 0,
+    variantsPlanned: 0,
+    variantsWritten: 0,
     failures: [],
   };
 
@@ -575,12 +657,28 @@ export async function importCatalogue(
       continue;
     }
 
+    // Checked before the row counts as validated, so --dry-run refuses a
+    // catalogue that would import as unbuyable rather than reporting success.
+    const variants = buildVariantRows(row);
+    if (variants.length === 0) {
+      report.failures.push({
+        row: rowNumber,
+        sku: row.sku,
+        reason:
+          `No size ladder for orientation "${row.orientation}", so this ` +
+          `product would have nothing to sell. Give it a laddered ` +
+          `orientation (square, portrait, landscape, panoramic).`,
+      });
+      continue;
+    }
+
     report.validated++;
+    report.variantsPlanned += variants.length;
 
     if (dryRun) continue;
 
     try {
-      await writeRow(row, media, { forceMedia }, report);
+      await writeRow(row, media, variants, { forceMedia }, report);
     } catch (error) {
       report.failures.push({
         row: rowNumber,
@@ -616,6 +714,7 @@ function manifestRowNumber(manifest: string, sku: string): number {
 async function writeRow(
   row: ManifestRow,
   media: ResolvedMedia,
+  variants: Omit<NewProductVariant, 'productId'>[],
   opts: { forceMedia: boolean },
   report: ImportReport
 ): Promise<void> {
@@ -701,17 +800,120 @@ async function writeRow(
     }
   }
 
-  if (current) {
-    await db
-      .update(products)
-      .set({ ...productColumns(row), images })
-      .where(eq(products.id, current.id));
-    report.updated++;
-    return;
+  // Product and ladder land together or not at all: a product written without
+  // its variants is one nobody can buy, and a half-written ladder prices some
+  // sizes and not others.
+  await db.transaction(async (tx) => {
+    let productId: string;
+
+    if (current) {
+      await tx
+        .update(products)
+        .set({ ...productColumns(row), images })
+        .where(eq(products.id, current.id));
+      productId = current.id;
+      report.updated++;
+    } else {
+      const inserted = await tx
+        .insert(products)
+        .values({ ...productColumns(row), images })
+        .returning({ id: products.id });
+
+      const created = inserted[0];
+      if (!created) throw new Error('Insert returned no product');
+      productId = created.id;
+      report.created++;
+    }
+
+    report.variantsWritten += await syncVariants(tx, productId, variants);
+  });
+}
+
+/** The handle `db.transaction` hands its callback — it reads and writes. */
+type Tx = Parameters<Parameters<typeof import('./index').db.transaction>[0]>[0];
+
+/**
+ * Bring a product's ladder in line with the manifest, matching on `variantSku`.
+ *
+ * ## Why this upserts rather than replacing the set
+ *
+ * Delete-then-insert is simpler and it is not safe here, because two tables
+ * point at these rows:
+ *
+ *   cart_items.variant_id    ON DELETE CASCADE   (schema/cart.ts:153)
+ *   order_items.variant_id   ON DELETE SET NULL  (schema/orders.ts:351)
+ *
+ * So deleting a variant to re-insert an identical one silently empties every
+ * customer cart holding that size, and severs order history from the row it
+ * was bought as. Both happen without an error. And a re-import is most likely
+ * exactly when the store is live and someone is fixing a typo — the worst
+ * possible moment to drop carts.
+ *
+ * Matching on `variantSku` keeps the row, and with it the id everything else
+ * references.
+ *
+ * ## What it deliberately does not touch
+ *
+ * `stockQuantity` and `isInStock` are left alone on a row that already exists.
+ * The ladder's stock numbers are a seeding curve, not a measurement; once the
+ * catalogue is live the admin's figure is the true one and re-running a
+ * manifest to fix a `seoTitle` must not reset it.
+ *
+ * A variant present on the product but absent from the manifest's ladder is
+ * deactivated rather than deleted — same reason as above. It stops being
+ * offered and its cart lines survive.
+ */
+async function syncVariants(
+  tx: Tx,
+  productId: string,
+  variants: Omit<NewProductVariant, 'productId'>[]
+): Promise<number> {
+  const { eq, and, notInArray } = await import('drizzle-orm');
+  const { productVariants } = await import('./schema');
+
+  const existing = await tx
+    .select({ id: productVariants.id, variantSku: productVariants.variantSku })
+    .from(productVariants)
+    .where(eq(productVariants.productId, productId));
+
+  const byVariantSku = new Map(
+    existing
+      .filter((v): v is { id: string; variantSku: string } => v.variantSku !== null)
+      .map((v) => [v.variantSku, v.id])
+  );
+
+  let written = 0;
+
+  for (const variant of variants) {
+    const existingId = byVariantSku.get(variant.variantSku!);
+
+    if (existingId) {
+      const { stockQuantity: _stock, isInStock: _inStock, ...rest } = variant;
+      await tx
+        .update(productVariants)
+        .set({ ...rest, isActive: true })
+        .where(eq(productVariants.id, existingId));
+    } else {
+      await tx.insert(productVariants).values({ ...variant, productId });
+    }
+
+    written++;
   }
 
-  await db.insert(products).values({ ...productColumns(row), images });
-  report.created++;
+  // Anything the ladder no longer contains stops being sold. Not deleted —
+  // see the note above about cart and order rows pointing here.
+  const keep = variants.map((v) => v.variantSku!);
+  await tx
+    .update(productVariants)
+    .set({ isActive: false })
+    .where(
+      and(
+        eq(productVariants.productId, productId),
+        notInArray(productVariants.variantSku, keep)
+      )
+    );
+
+  return written;
 }
 
 // ============================================================================
@@ -841,6 +1043,14 @@ function printReport(report: ImportReport, dryRun: boolean): void {
     `\n${prefix}rows validated ${report.validated} | ` +
       `created ${report.created}, updated ${report.updated}, ` +
       `media skipped ${report.mediaSkipped}, failed ${report.failures.length}`
+  );
+
+  // Named separately from the row counts because they answer a different
+  // question: whether the catalogue this produces can actually be bought.
+  console.log(
+    dryRun
+      ? `${prefix}variants that would be written: ${report.variantsPlanned}`
+      : `variants written ${report.variantsWritten} of ${report.variantsPlanned} planned`
   );
 
   if (report.failures.length === 0) {
