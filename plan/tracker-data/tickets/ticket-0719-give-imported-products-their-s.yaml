@@ -1,0 +1,187 @@
+ticket_number: 719
+title: Give imported products their size ladder — the importer creates nothing purchasable
+description: |-
+  ## Task
+
+  `db:import-catalogue` (#672, commit `d17c1c5b`) creates products with their full image set and **zero variants**. A product with no rows in `product_variants` has no size to pick and no price to charge — the PDP renders, the size list is empty, and nothing can go in a cart. So the go-live catalogue load currently produces a storefront of things that cannot be bought.
+
+  `bun run seed` is the only thing that builds ladders today, and it is dev-only: it walks its own hardcoded `sampleProducts` array, so it cannot ladder a product that arrived any other way.
+
+  Teach `packages/api/src/database/import-catalogue.ts` to build each imported product's ladder.
+
+  ## The ladder already exists — call it, do not rebuild it
+
+  `buildVariantsForOrientation(orientation, basePrice)` (`packages/api/src/database/seed-variants.ts:107`) returns the whole `Omit<NewProductVariant, 'productId'>[]` for one product: sizes from the shared ladder, dual-unit labels, `priceForSize` scaling off the product's own base price, stock and sort order. It is the single source of truth and it is tested.
+
+  The seed's own call site (`seed.ts:1694-1721`) is the shape to copy, including the variant sku:
+
+  ```
+  variantSku: `${sku}-${widthInches}x${heightInches}`
+  ```
+
+  Do **not** write a second ladder. `seed-variants.ts` exists precisely because a hand-written copy in `seed.ts` had already drifted from the shared one and silently won — see its header comment.
+
+  ## The part that needs real thought: re-running
+
+  #672 is idempotent on `sku`, and this must be too — but `variantSku` is **not unique in the schema** (`packages/api/src/database/schema/products.ts:222` is a plain `text("variant_sku")`, no unique constraint). Nothing at the database level stops a second import from doubling every product's size list. A catalogue re-imported three times to fix a typo would offer each poster its ladder three times over, at identical prices, and the PDP would render all of them.
+
+  So the importer owns this. Decide and implement one of:
+
+  - Replace the product's variants when it rebuilds them (delete-then-insert inside a transaction), or
+  - Upsert per `variantSku`, leaving stock alone.
+
+  The second preserves `stockQuantity` that has drifted from the seeded default, which matters once the catalogue is live and someone has been editing stock in the admin. The first is simpler and is fine before launch. Pick one, and say in the code comment which and why.
+
+  Mirror #672's `--force-media` shape: an existing product's variants should not be silently rebuilt on every re-run, because rebuilding reprices. A re-import to fix a `seoTitle` must not quietly reprice the catalogue.
+
+  ## Orientations with no ladder
+
+  `LADDERED_ORIENTATIONS` (`seed.ts:23`) is `square | portrait | landscape | panoramic`. The manifest also accepts `round` and `set-of-2-3`, and `buildVariantsForOrientation` returns `[]` for both.
+
+  The seeder's answer is to **fall back to portrait** (`seed.ts:1694`). Do not copy that here. A round poster sold against a portrait ladder is priced and sized for a rectangle it is not, and an unattended bulk load is exactly where that goes unnoticed. Fail the row and report it — the operator can then decide, the same way the orientation guard already works in #672.
+
+  ## Constraints
+
+  - **`--dry-run` still writes nothing.** It should report how many variants each row *would* get, so the pre-flight tells the operator the catalogue will actually be purchasable before the real run.
+  - **Per-row isolation holds.** A row whose ladder cannot be built fails alone; the rest still import.
+  - Variants belong in the same transaction as the product, so a failure halfway cannot leave a product with a partial ladder.
+
+  ## Verification worth doing
+
+  Beyond unit tests, the thing that actually proves this: import a manifest, then check no product has zero variants —
+
+  ```sql
+  SELECT count(*) FROM products p
+  WHERE NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id);
+  ```
+
+  must be 0, and re-running the same manifest must leave the variant count unchanged.
+
+  ## Context
+
+  - Blocked by nothing; #672 is done and on `main`.
+  - `packages/api/tests/database/import-catalogue.test.ts` and `import-catalogue-media.test.ts` are the existing test files to extend. Run them with `cd packages/api && bunx vitest run tests/database/<file>` — the repo-root form does not work, the root vitest config only includes `tests/**`.
+  - `priceForSize` and `getSizesForOrientation` live in `@chobii/shared`; the importer should reach them only through `buildVariantsForOrientation`.
+feature: go-live
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T08:32:59.333Z'
+last_updated: '2026-08-31T08:41:19.351Z'
+time_spent_minutes: 6
+labels:
+  - api
+  - catalogue
+  - go-live
+  - pricing
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:34:47.628Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T08:41:12.486Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `cf331ff6` - feat(api): give imported products their size ladder
+
+      **Files Changed**:
+      - `packages/api/src/database/import-catalogue.ts` — `buildVariantRows`, `syncVariants`, transaction around product+ladder, `variantsPlanned`/`variantsWritten` on the report, header docs
+      - `packages/api/tests/database/import-catalogue-variants.test.ts` — new, 6 tests
+
+      **Summary**:
+      Every imported row now gets the full size ladder for its orientation, priced off its own `basePrice`, through `buildVariantsForOrientation`. Product and ladder are written in one transaction.
+
+      **The upsert-vs-replace decision — the ticket got this wrong and the code corrects it.**
+
+      The ticket said delete-then-insert "is simpler and is fine before launch". That is not safe, and the reason is in the schema:
+
+      ```
+      cart_items.variant_id    ON DELETE CASCADE   (packages/api/src/database/schema/cart.ts:153)
+      order_items.variant_id   ON DELETE SET NULL  (packages/api/src/database/schema/orders.ts:351)
+      ```
+
+      Deleting a variant to re-insert an identical one silently empties every customer cart holding that size, and severs order history from the row it was bought as. Neither raises an error. And nothing stops the script being re-run after launch — a re-import to fix a `seoTitle` is *most likely* when the shop is live. So: matched on `variantSku`, updated in place. Rows keep their ids, and everything pointing at them survives.
+
+      Two consequences, both deliberate:
+      - A size that leaves the ladder is **deactivated**, not deleted — same reason.
+      - `stockQuantity` / `isInStock` are never touched on an existing row. The ladder's stock numbers are a seeding curve; once live, the admin's figure is the measurement.
+
+      **Unladdered orientations fail the row.** `round` and `set-of-2-3` return `[]` from the ladder. The seeder falls back to portrait (`seed.ts:1694`); copying that would price and size a round poster for a rectangle it is not, in the one setting where nobody would notice. Checked *before* the row counts as validated, so `--dry-run` refuses a catalogue that would import as unbuyable.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/database/import-catalogue.test.ts tests/database/import-catalogue-media.test.ts tests/database/import-catalogue-variants.test.ts`
+      - Result: PASS (14 tests, 14 passing — 6 new)
+      - Command: `cd packages/api && bun run typecheck`
+      - Result: PASS (src + tests, clean)
+      - Command: full api suite, `VITEST_MAX_WORKERS=2`
+      - Result: **1 failed | 5948 passed | 187 skipped**. The pre-change baseline measured earlier today was 5942 passing with the same single failure (`tests/database/shipping.test.ts`, `shipment_status` enum drift from #703/#706). 5942 + 6 new = 5948. No regressions.
+
+      **Live proof against the dev database** (two disposable `ZZTEST-` products, deleted afterwards):
+
+      ```
+      rows validated 2 | created 2, updated 0, media skipped 0, failed 0
+      variants written 26 of 26 planned
+      ```
+      - `SELECT count(*) FROM products p WHERE NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id)` → **0**, the check the ticket asked for.
+      - Set `stock_quantity = 777` on `ZZTEST-1-12x12`, then re-ran the same manifest: `created 0, updated 2, variants written 26 of 26`.
+      - Counts after re-run: still **13 / 13**. No duplication.
+      - **md5 of the variant ids, ordered — identical before and after: `c260a49db0fcd56b6c0dd8292507bbeb`.** This is the real proof it upserts rather than delete-and-reinsert; the rows carts would point at are the same rows.
+      - Stock after re-run: **777**, preserved.
+      - Test rows removed; dev DB back to 0 products without variants.
+
+      **CLI output** now reports purchasability separately from row counts:
+      ```
+      [dry run] rows validated 2 | created 0, updated 0, media skipped 0, failed 0
+      [dry run] variants that would be written: 34
+      ```
+      and on an unladdered row:
+      ```
+      ! row 2 RND-1: No size ladder for orientation "round", so this product would have
+        nothing to sell. Give it a laddered orientation (square, portrait, landscape, panoramic).
+      ```
+
+      **Incidental finding**: the #672 orientation guard works against real artwork. The first real-import attempt was rejected — `The artwork measures square, but this row declares portrait` — because I had guessed orientations for the seed-media files. That is the guard doing its job; the manifest was wrong, not the code.
+
+      **Left alone**: images uploaded by the two test imports remain as orphan objects in the local MinIO `poster-app-dev` bucket. Dev-only, harmless, and cleaning them would mean deleting from R2 by key — out of scope here.
+  - author: system
+    timestamp: '2026-08-31T08:41:14.516Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T08:34:50.124Z'
+    agent: claude-code
+    summary: 'Added the size ladder to the bulk importer. Freeform TDD: 6 new tests written red, then buildVariantRows + syncVariants. Chose upsert-on-variantSku over delete-then-insert after finding cart_items cascades and order_items set-nulls off variant ids — delete would silently empty live carts. Proved idempotency against the dev DB with an identical variant-id fingerprint across two runs and preserved stock. Full api suite 5948 passing, no regressions. Committed as cf331ff6.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T08:41:19.350Z'
+    duration: '00:06:29'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-31T08:34:47.628Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:06:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:06:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run tests/database/import-catalogue.test.ts tests/database/import-catalogue-media.test.ts tests/database/import-catalogue-variants.test.ts
+  test_output: '14/14 pass across the three importer files (6 new). Full api suite: 1 failed | 5948 passed | 187 skipped — 5942 was the pre-change baseline plus the 6 new tests, and the single failure is the same pre-existing tests/database/shipping.test.ts enum drift. Live proof against the dev DB: real import created 2 products / 26 variants, zero products with no variants, re-run left counts at 13/13, the md5 fingerprint of variant ids was IDENTICAL before and after (c260a49db0fcd56b6c0dd8292507bbeb) proving upsert not delete-insert, and a hand-set stock_quantity of 777 survived the re-run. Test rows deleted afterwards.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T08:40:50.065Z'
+completed: '2026-08-31T08:41:14.516Z'

@@ -1,7 +1,7 @@
 name: go-live
 title: Go Live
 priority: critical
-created: "2026-07-16T14:20:30.400Z"
+created: '2026-07-16T14:20:30.400Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -25,45 +25,46 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 1
-  total_duration: "00:34:00"
+  total_sessions: 3
+  total_duration: '00:50:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 1
-      duration: "00:34:00"
+      sessions: 3
+      duration: '00:50:00'
       tokens: 0
 tickets:
   todo:
-    "293": "Ops: owner console setup + mini bootstrap execution"
-    "294": "Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE"
-    "333": "Ops: point UptimeRobot monitors at https://chobii.art"
-    "335": "Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup"
-    "458": Verify enforced CSP on production after deploy (post-#344 gate)
-    "672": "Bulk catalogue import script: CSV manifest + image folder through buildProductMedia"
+    '293': 'Ops: owner console setup + mini bootstrap execution'
+    '294': 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
+    '333': 'Ops: point UptimeRobot monitors at https://chobii.art'
+    '335': 'Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup'
+    '458': Verify enforced CSP on production after deploy (post-#344 gate)
   in_progress: {}
   done:
-    "287": "Infra: same-origin web bundle + single-hostname config"
-    "288": "Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls"
-    "289": "Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate"
-    "290": "BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start"
-    "291": "SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel"
-    "292": "Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget"
-    "295": "BUG: api tsc build broken on main — ~60 type errors block the production image build"
-    "296": "BUG: wildcard requireAuth on /api-mounted sub-apps gated health/tracking/webhooks; onError collapsed HTTPExceptions to 500"
-    "297": Upgrade TanStack Start to 1.168+ and remove custom serve.ts static-serving wrapper
-    "334": "Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)"
-total_tickets: 16
-completion_percentage: 63
+    '287': 'Infra: same-origin web bundle + single-hostname config'
+    '288': 'Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls'
+    '289': 'Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate'
+    '290': 'BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start'
+    '291': 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+    '292': 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+    '295': 'BUG: api tsc build broken on main — ~60 type errors block the production image build'
+    '296': 'BUG: wildcard requireAuth on /api-mounted sub-apps gated health/tracking/webhooks; onError collapsed HTTPExceptions to 500'
+    '297': Upgrade TanStack Start to 1.168+ and remove custom serve.ts static-serving wrapper
+    '334': 'Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)'
+    '672': 'Bulk catalogue import script: CSV manifest + image folder through buildProductMedia'
+    '719': Give imported products their size ladder — the importer creates nothing purchasable
+total_tickets: 17
+completion_percentage: 71
 is_completed: false
 design:
-  approach: "Single public hostname masonart.com path-routed at the Cloudflare edge (anchored regex ^/api/.* → api:3000, catch-all → web:3001, www → apex bulk redirect); cloudflared container dials outbound-only, TUNNEL_TRANSPORT_PROTOCOL http2. Web bundle baked same-origin via --build-arg VITE_API_URL='' with ?? fallbacks. deploy/Makefile on the dev machine: buildx linux/arm64 → GHCR (latest + git short-sha), gen-compose renders one file (build: keys stripped), scp + ssh pull/up; rollback = IMAGE_TAG=<sha>; panic switch = disable tunnel. Migrations ship in the api image and run via drizzle-kit migrate. Compose project name masonart, no host ports, mem_limits budgeted against the shared 6GB Colima VM. Gate proven from outside the LAN."
+  approach: 'Single public hostname masonart.com path-routed at the Cloudflare edge (anchored regex ^/api/.* → api:3000, catch-all → web:3001, www → apex bulk redirect); cloudflared container dials outbound-only, TUNNEL_TRANSPORT_PROTOCOL http2. Web bundle baked same-origin via --build-arg VITE_API_URL='''' with ?? fallbacks. deploy/Makefile on the dev machine: buildx linux/arm64 → GHCR (latest + git short-sha), gen-compose renders one file (build: keys stripped), scp + ssh pull/up; rollback = IMAGE_TAG=<sha>; panic switch = disable tunnel. Migrations ship in the api image and run via drizzle-kit migrate. Compose project name masonart, no host ports, mem_limits budgeted against the shared 6GB Colima VM. Gate proven from outside the LAN.'
   decisions:
-    - "Single hostname over api.masonart.com subdomain — same-origin removes the CORS/cross-subdomain-cookie class entirely (cc lesson);Tunnel path field is an anchored regex ^/api/.* — unanchored /api/* swallowed a Vite chunk named api-<hash>.js in customs-copilot (#97);Build on dev machine + GHCR pull — the 8GB mini cannot absorb builds while co-hosting customs-copilot;Tag latest AND git short-sha — sha tags are the rollback mechanism;http2 tunnel transport — QUIC through the home-router NAT degrades (cc #99);drizzle-kit migrate over db:push — push is unsafe against prod schema and the mini has no checkout (cc #93);:? guards on all silently-degrading env vars — unset RESEND/RAZORPAY/R2 vars must fail at render"
-    - "not fall back silently (cc #94/#131);cf-connecting-ip over first XFF entry — first entry is attacker-controlled behind the tunnel (cc #95);Healthcheck probes via bun -e / node -e — slim images ship no curl;Razorpay test mode = real provider code + rzp_test keys"
-    - "no separate code path;Existing #278/#283 stay in go-to-production and gate this feature rather than being duplicated"
+    - 'Single hostname over api.masonart.com subdomain — same-origin removes the CORS/cross-subdomain-cookie class entirely (cc lesson);Tunnel path field is an anchored regex ^/api/.* — unanchored /api/* swallowed a Vite chunk named api-<hash>.js in customs-copilot (#97);Build on dev machine + GHCR pull — the 8GB mini cannot absorb builds while co-hosting customs-copilot;Tag latest AND git short-sha — sha tags are the rollback mechanism;http2 tunnel transport — QUIC through the home-router NAT degrades (cc #99);drizzle-kit migrate over db:push — push is unsafe against prod schema and the mini has no checkout (cc #93);:? guards on all silently-degrading env vars — unset RESEND/RAZORPAY/R2 vars must fail at render'
+    - 'not fall back silently (cc #94/#131);cf-connecting-ip over first XFF entry — first entry is attacker-controlled behind the tunnel (cc #95);Healthcheck probes via bun -e / node -e — slim images ship no curl;Razorpay test mode = real provider code + rzp_test keys'
+    - 'no separate code path;Existing #278/#283 stay in go-to-production and gate this feature rather than being duplicated'
   approved: true
-  approved_at: "2026-07-16T14:20:49.743Z"
+  approved_at: '2026-07-16T14:20:49.743Z'
 plan:
   phases:
     - name: Infra
@@ -86,4 +87,6 @@ plan:
       location: external verification
       tickets:
         - 294
-  generated_at: "2026-07-16T14:22:39.878Z"
+  generated_at: '2026-07-16T14:22:39.878Z'
+last_activity: '2026-08-31T08:41:19.402Z'
+started: '2026-08-31T08:20:21.995Z'

@@ -21,18 +21,73 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:20:37.640Z'
-last_updated: '2026-08-31T02:20:37.640Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T05:05:39.404Z'
+time_spent_minutes: 8
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T04:57:27.482Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T05:05:31.704Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `ed691fc7` - fix(api): let a vendor actually fetch the label for the order they consolidate
+
+      **Files Changed** (157 insertions, 345 deletions):
+      - `packages/api/src/lib/vendor-scope.ts` — −163 lines: the SQL fragment, `LABEL_OBJECT_TOKEN_COLUMN`, `UNDEFINED_COLUMN`, `LabelSeamNotReady`, `causeChain`, `isMissingLabelSeam`, and the try/catch
+      - `packages/api/src/routes/vendor.ts` — the 503 branch, its import, and the doc section describing the seam
+      - `packages/api/tests/lib/vendor-label-seam.test.ts` — rewritten around what is now true
+      - `packages/api/tests/lib/vendor-scope.test.ts` — the export account no longer names a deleted class
+
+      **Summary**:
+      `GET /api/vendor/jobs/:id/label` answered **503 in every environment, production included**. The read is now an ordinary column reference plus `isNotNull`.
+
+      Nothing else about the read moved: the four authorisation conditions keep their order, and `getPresignedDownloadUrl` is still reached only after the read returns a row. A signed URL that is generated and then withheld has still been generated.
+
+      **Deleting the catch was the point, not a side effect.** It converted *every* failure of that read into "not available yet". With the column present, that would have reported a genuine outage as an ordinary empty state — a bug that hides until someone goes looking. Replaced with tests asserting a connection error and a `42703` both travel, and that neither reaches a response body.
+
+      **Test file rewritten:**
+      - Deleted: the tripwire pair. It fired on exactly the commit it was written for and named what to unwire.
+      - Kept untouched: the whole `LABEL_ACCESS_STATUSES` status-bound section — that is what stops a cancelled job fetching a customer's address.
+      - Kept: the "does NOT echo the driver on the generic 500" case, now the *only* guard on this route's error body.
+      - New: the route works end to end — 200 with a signed URL, the key built from the token and never from a path naming the order, the audit row written only after the URL exists, and a miss answering 404 rather than 503.
+
+      **Two things worth noting:**
+
+      1. Two of my new tests initially failed because `beforeEach` resets the spies and they asserted on state from a prior test without issuing their own request. My bug in the new tests, not the implementation — fixed by making each self-contained.
+      2. `tests/lib/vendor-scope.test.ts` enumerates this module's exports and named `LabelSeamNotReady`. That suite *passed* either way (the account only requires real exports to be listed), so this was not caught by a failure — I found it by grep. Left the array in place, empty, with the reason recorded, so the next error type has a documented home.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **PASS — 5825 passed | 0 failed | 188 skipped (6013)**. Fully green; #703's deliberate red is resolved.
+      - Scoped: `tests/lib/vendor-label-seam.test.ts` 12/12. Label + scope + all `tests/routes/vendor` suites: 377/377 across 7 files.
+      - Typecheck: PASS. This is the gate that would catch a stale `LabelSeamNotReady` import, since `packages/api` tests are typechecked (#662). Pre-commit `turbo run typecheck` also green across all three packages.
+      - Grep confirms only two references to the deleted names survive, both prose describing what was removed.
+  - author: system
+    timestamp: '2026-08-31T05:05:33.844Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T04:57:30.520Z'
+    agent: claude-code
+    summary: 'Done in one session. Deleted the whole 42703 to LabelSeamNotReady to 503 path (163 lines out of vendor-scope.ts) and replaced the SQL fragment with orderShipments.labelObjectToken. GET /vendor/jobs/:id/label now works instead of 503ing in every environment. Rewrote vendor-label-seam.test.ts around what is now true, keeping the status bound and the do-not-echo-the-driver guard. Commit ed691fc7. Suite fully green: 5825 passed, 0 failed.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T05:05:39.402Z'
+    duration: '00:08:08'
 related_tickets: []
 blocked_by:
   - ticket: 703
@@ -46,12 +101,12 @@ implementation_steps:
     description: Confirm the seam test is red and read its failure message as the checklist
     command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
     expected_result: FAIL - 'order_shipments.label_object_token has LANDED'
-    status: pending
+    status: done
   - id: 2
     action: implement
     description: Replace the SQL fragment with the real column and delete the seam machinery
     file: packages/api/src/lib/vendor-scope.ts
-    status: pending
+    status: done
     code: |-
       // DELETE, in full:
       //   - the LABEL_OBJECT_TOKEN doc block and `const LABEL_OBJECT_TOKEN = sql`...``
@@ -98,7 +153,7 @@ implementation_steps:
     action: implement
     description: Delete the 503 branch from the vendor label route
     file: packages/api/src/routes/vendor.ts
-    status: pending
+    status: done
     code: |-
       // In GET /jobs/:id/label:
       //   - delete the `if (error instanceof LabelSeamNotReady)` branch and the
@@ -115,7 +170,7 @@ implementation_steps:
     action: implement
     description: Delete the two seam-detection tests; keep everything else in the file
     file: packages/api/tests/lib/vendor-label-seam.test.ts
-    status: pending
+    status: done
     code: |-
       // DELETE the whole `describe('the label seam is detectable in BOTH directions')`
       // block — both its tests. It existed to notice the column arriving; it has.
@@ -140,7 +195,7 @@ implementation_steps:
     file: packages/api/tests/lib/vendor-label-seam.test.ts
     command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
     code: |
       describe('the label route works now that the column exists', () => {
         it('signs the token as fulfilment/labels/<token>.pdf and answers 200', async () => {
@@ -187,16 +242,34 @@ implementation_steps:
     description: Confirm the whole label suite passes, plus the vendor isolation suite that asserted the 503
     command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts tests/lib/vendor-scope.test.ts tests/routes/vendor
     expected_result: PASS
-    status: pending
+    status: done
   - id: 7
     action: verify-pass
     description: 'Typecheck — api tests are typechecked as of #662, so a stale LabelSeamNotReady import fails the gate'
     command: cd packages/api && bun run typecheck
     expected_result: PASS - no reference to LabelSeamNotReady remains
-    status: pending
+    status: done
   - id: 8
     action: commit
     description: Commit
     command: 'git add packages/api/src/lib/vendor-scope.ts packages/api/src/routes/vendor.ts packages/api/tests/lib/vendor-label-seam.test.ts && git commit -m "fix(api): let a vendor actually fetch the label for the order they consolidate"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 8
+started: '2026-08-31T04:57:27.482Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:08:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:08:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '5825 passed | 0 failed | 188 skipped (6013). Fully green — the deliberate red #703 left behind is resolved. Scoped runs: tests/lib/vendor-label-seam.test.ts 12/12; tests/lib/vendor-label-seam.test.ts + tests/lib/vendor-scope.test.ts + tests/routes/vendor 377/377 across 7 files. Typecheck PASS (bun run typecheck, plus pre-commit turbo run typecheck green across all three packages) — this is the gate that would catch a stale LabelSeamNotReady import, since api tests are typechecked as of #662. Grep confirms only two references to the deleted names survive, both prose describing what was removed.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T05:05:16.433Z'
+completed: '2026-08-31T05:05:33.844Z'

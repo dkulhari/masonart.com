@@ -20,17 +20,60 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:24:02.757Z'
-last_updated: '2026-08-31T02:24:02.757Z'
+last_updated: '2026-08-31T08:43:39.784Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:37:38.084Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T08:43:36.932Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5c70fe00` - fix(api): never show a customer a voided AWB
+
+      **Files Changed**:
+      - `packages/api/src/routes/tracking.ts` — `liveShipmentFor()` + `trackingPayload()` helpers; both handlers collapsed onto them
+      - `packages/api/tests/routes/tracking-live-shipment.test.ts` — new, 13 tests via `describe.each` over both handlers
+
+      **Summary**:
+      Both handlers picked a shipment with `orderBy createdAt desc` and no predicate. Harmless only while voided labels did not exist — they do now, so newest can be the dead one and the customer is shown an AWB the courier will refuse.
+
+      **The ticket description was wrong about which handlers.** It said `/lookup` and `/:orderNumber`. Reality:
+      - `/lookup` and **`/token/:token`** are the two that read a shipment, each with its own copy of the read *and* the payload — the same defect twice.
+      - `/:orderNumber` validates the contact and **302s to `/lookup`**. It has no payload of its own and is untouched.
+
+      `/token/:token` is the link in a confirmation email, so it is how most customers actually arrive — leaving it out would have fixed the less-used path.
+
+      **`trackingPayload` is an allow-list, not a spread.** `order_shipments` now carries `cost_paise`, weight and dimensions, the aggregator's ids and the label token. A spread would leak the next dispatch column somebody adds, silently. A test asserts those five never appear in the response.
+
+      Added `courierName` and `awbNumber` to what the customer sees — `carrier` is the aggregator we bought through and means nothing to them.
+
+      Both handlers stop loading `orders.shipping_details`; nothing reads it after this phase.
+
+      `tracking: null` is unchanged. It was never the bug — the bug was that nothing wrote the table it reads. A fallback would restore the second source of truth.
+
+      **Two test bugs of mine, both found by running:**
+      1. I wrote the lookup as `POST` with a JSON body. It is a **GET with query params** — my plan had that wrong from the start.
+      2. `JSON.stringify` on a drizzle `where` threw `Converting circular structure to JSON` (a column points back at its table). Replaced with a bounded, cycle-safe walk that collects column names — which also asserts `order_id` scoping, not just the void marker.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **PASS — 5987 passed | 0 failed | 188 skipped (6175)**
+      - Scoped: new suite 13/13; both tracking suites 43/43
+      - Typecheck: PASS across all three packages
+  - author: system
+    timestamp: '2026-08-31T08:43:39.784Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -215,3 +258,12 @@ implementation_steps:
     command: 'git add packages/api/src/routes/tracking.ts packages/api/tests/routes/tracking-live-shipment.test.ts && git commit -m "fix(api): never show a customer a voided AWB"'
     status: pending
 current_step: 1
+started: '2026-08-31T08:37:38.084Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '5987 passed | 0 failed | 188 skipped (6175). Scoped: tests/routes/tracking-live-shipment.test.ts 13/13 (new, both handlers via describe.each); tracking suites together 43/43. Typecheck PASS across all three packages.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T08:43:24.509Z'
+completed: '2026-08-31T08:43:39.784Z'

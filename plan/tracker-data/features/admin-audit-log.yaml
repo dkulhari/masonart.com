@@ -1,7 +1,7 @@
 name: admin-audit-log
 title: Logging and Auditing
 priority: critical
-created: "2026-08-16T21:23:26.095Z"
+created: '2026-08-16T21:23:26.095Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -73,43 +73,43 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 2
-  total_duration: "00:10:00"
+  total_sessions: 3
+  total_duration: '00:15:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 2
-      duration: "00:10:00"
+      sessions: 3
+      duration: '00:15:00'
       tokens: 0
 tickets:
-  todo:
-    "668": Bug - vendor.payable_settled and order.shipment_marked_delivered are declared but nothing ever emits them
-    "669": Bug - vendor invite creates a user and grants a role with no privilege audit row
-    "670": Tier 2 - wire the remaining declared-but-dead catalogue, config and content actions
-    "671": Guard - fail the build when AUDIT_ACTIONS declares an action nothing emits
+  todo: {}
   in_progress: {}
   done:
-    "635": Contract - shared audit action registry and zod schemas
-    "636": Database - admin_audit_log table, indexes and the immutability trigger
-    "637": Core - payload redactor and before/after delta helpers
-    "638": Core - recordAudit service that never throws and accepts a transaction
-    "639": Core - request id, bound child logger and pino redaction
-    "640": Capture - audit middleware floor over admin and vendor mutations
-    "641": Tier 1 - audit the returns money paths
-    "642": Tier 1 - audit order status changes and cancellation
-    "643": Tier 1 - audit privilege changes and gift card tender
-    "644": Tier 2 - audit catalogue and config writes
-    "645": Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
-    "646": Web - /admin/audit-log viewer with filters and a before/after drawer
-    "647": Ops - retention purge worker behind the immutability guard
-    "648": E2E and runbook - an admin action appears in the viewer
-    "649": Bug - the actor FK and the immutability trigger contradict each other
-    "650": Bug - the audit floor records anonymous 401s, flooding the table
-    "663": db:push silently builds a database without the audit-log immutability trigger, and the docs tell you to use it
-    "667": Tier 1 - audit production job assignment, status transitions and amount overrides
+    '635': Contract - shared audit action registry and zod schemas
+    '636': Database - admin_audit_log table, indexes and the immutability trigger
+    '637': Core - payload redactor and before/after delta helpers
+    '638': Core - recordAudit service that never throws and accepts a transaction
+    '639': Core - request id, bound child logger and pino redaction
+    '640': Capture - audit middleware floor over admin and vendor mutations
+    '641': Tier 1 - audit the returns money paths
+    '642': Tier 1 - audit order status changes and cancellation
+    '643': Tier 1 - audit privilege changes and gift card tender
+    '644': Tier 2 - audit catalogue and config writes
+    '645': Read - GET /api/admin/audit-log with filters, cursor paging and an entity timeline
+    '646': Web - /admin/audit-log viewer with filters and a before/after drawer
+    '647': Ops - retention purge worker behind the immutability guard
+    '648': E2E and runbook - an admin action appears in the viewer
+    '649': Bug - the actor FK and the immutability trigger contradict each other
+    '650': Bug - the audit floor records anonymous 401s, flooding the table
+    '663': db:push silently builds a database without the audit-log immutability trigger, and the docs tell you to use it
+    '667': Tier 1 - audit production job assignment, status transitions and amount overrides
+    '668': Bug - vendor.payable_settled and order.shipment_marked_delivered are declared but nothing ever emits them
+    '669': Bug - vendor invite creates a user and grants a role with no privilege audit row
+    '670': Tier 2 - wire the remaining declared-but-dead catalogue, config and content actions
+    '671': Guard - fail the build when AUDIT_ACTIONS declares an action nothing emits
 total_tickets: 22
-completion_percentage: 82
-is_completed: false
+completion_percentage: 100
+is_completed: true
 plan:
   phases:
     - name: Contract
@@ -147,6 +147,7 @@ plan:
       tickets:
         - 647
         - 648
-  generated_at: "2026-08-17T07:21:59.707Z"
-last_activity: "2026-08-31T01:42:39.215Z"
-started: "2026-08-17T07:22:12.112Z"
+  generated_at: '2026-08-17T07:21:59.707Z'
+last_activity: '2026-08-31T04:54:06.902Z'
+started: '2026-08-17T07:22:12.112Z'
+completed: '2026-08-31T04:54:02.459Z'

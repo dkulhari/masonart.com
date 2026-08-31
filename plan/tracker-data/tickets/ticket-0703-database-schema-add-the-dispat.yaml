@@ -21,18 +21,81 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:20:37.557Z'
-last_updated: '2026-08-31T02:20:37.557Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T04:47:06.277Z'
+time_spent_minutes: 15
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T04:31:45.891Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T04:46:59.151Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `ea285259` - feat(api): give order_shipments the columns a real dispatch records
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/shipping.ts` — 13 dispatch columns + the partial unique index + `pickup_vendor_id` index
+      - `packages/api/src/database/migrations/0027_order_shipments_dispatch.sql` — annotated; names no `shipment_status` literal anywhere
+      - `packages/api/src/database/migrations/meta/{_journal.json,0027_snapshot.json}`
+      - `packages/api/tests/database/order-shipments-dispatch.test.ts` — new, 15 tests (DSL shape)
+      - `packages/api/tests/database/order-shipments-live-label.test.ts` — new, 5 tests (live Postgres)
+
+      **Summary**:
+      Added `label_object_token`, `voided_at`/`voided_reason`, `awb_number`, `external_shipment_id`, `external_order_id`, `courier_name`, `shipped_weight_grams`, `length_cm`/`width_cm`/`height_cm`, `cost_paise`, `pickup_vendor_id`. All nullable — `POST /admin/orders/:orderId/ship` opens a row before any label exists.
+
+      `courier_name` is deliberately separate from `carrier`: `carrier` is the aggregator we bought through, `courier_name` is who actually carries it, and that is the only name a customer recognises on a tracking page.
+
+      The token is `text`, not `uuid` — `LABEL_TOKEN_PATTERN` admits any `[A-Za-z0-9_-]+`, and it is random rather than the order id because the key `fulfilment/labels/<token>.pdf` rides in the PATH of a signed URL.
+
+      **`order_shipments_live_label_idx`** — unique on `(order_id)`, partial on **both** `voided_at IS NULL` **and** `label_object_token IS NOT NULL`. Each half fails differently, so both are asserted against a real Postgres:
+      - drop the first → blanket unique → voiding a label permanently prevents buying another
+      - drop the second → refuses a second unlabelled row → `POST /orders/:orderId/ship` becomes a 500 on the second call
+
+      Followed the repo's split convention (`production-job-photos.test.ts` beside `production-job-photos-live-slot.test.ts`): DSL shape in one file, real predicate behaviour in another. Every live row is created inside a transaction that always rolls back, so the shared dev DB is untouched.
+
+      Migration applied — 28 migrations now.
+
+      **⚠️ EXPECTED RED — do not "fix" it:**
+      `tests/lib/vendor-label-seam.test.ts :: goes RED the day order_shipments.label_object_token lands` now fails. That assertion was written to fire on exactly this commit. Its failure message is #704's checklist:
+      ```
+      1. lib/vendor-scope.ts — replace the LABEL_OBJECT_TOKEN sql fragment
+      2. routes/vendor.ts — delete the LabelSeamNotReady branch that answers 503
+      3. Delete this test, and check the rest of this file still passes.
+      Found in: shipping.ts, 0027_order_shipments_dispatch.sql
+      ```
+      The other 10 cases in that file still pass, including the one asserting the deliberate failure path is intact.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **5823 passed | 1 failed | 188 skipped (6012)** — the 1 failure is the intended seam signal above, and nothing else
+      - Baseline before this ticket: 5804 passed / 5992 total. The +20 is exactly the two new files (15 + 5).
+      - Typecheck: PASS across all three packages (pre-commit `turbo run typecheck`)
+      - Flakiness note: two earlier full runs reported 12 then 9 failures at load 5.6–8.9 on an 8-core box. Ruled out as environmental — the four suspect files pass 114/114 in isolation, Postgres was at 12 of 100 connections (so not pool exhaustion from the new live-DB suite), and the failure set changed between runs.
+  - author: system
+    timestamp: '2026-08-31T04:47:01.549Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T04:31:48.912Z'
+    agent: claude-code
+    summary: 'Done in one session. Added 13 dispatch columns to order_shipments plus order_shipments_live_label_idx, a partial unique index on (order_id) predicated on both voided_at IS NULL and label_object_token IS NOT NULL. 20 new tests across a DSL-shape file and a live-Postgres behaviour file that rolls back. Migration 0027 applied. Commit ea285259. Suite 5823 passed with exactly 1 deliberate failure: the vendor-label seam signal that is #704''s checklist.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T04:47:06.275Z'
+    duration: '00:15:17'
 related_tickets: []
 blocked_by:
   - ticket: 702
@@ -47,7 +110,7 @@ implementation_steps:
     file: packages/api/tests/database/order-shipments-dispatch.test.ts
     command: cd packages/api && bunx vitest run tests/database/order-shipments-dispatch.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
     code: |
       /**
        * The columns real dispatch needs, and the two that other code already names.
@@ -151,12 +214,12 @@ implementation_steps:
     description: Confirm the test fails — none of the columns exist
     command: cd packages/api && bunx vitest run tests/database/order-shipments-dispatch.test.ts
     expected_result: FAIL - orderShipments.labelObjectToken is undefined and the migration file does not exist
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add the dispatch columns and the one-live-label partial unique index to the drizzle table
     file: packages/api/src/database/schema/shipping.ts
-    status: pending
+    status: done
     code: |-
       // Add inside the orderShipments column object, after `notes`:
 
@@ -251,7 +314,7 @@ implementation_steps:
     description: Generate the migration and annotate it; confirm it contains no ADD VALUE
     file: packages/api/src/database/migrations/0027_order_shipments_dispatch.sql
     command: cd packages/api && bun run db:generate
-    status: pending
+    status: done
     code: |-
       -- order-dispatch-tracking phase 1: what a real dispatch has to record.
       --
@@ -273,16 +336,34 @@ implementation_steps:
     description: Confirm the suite passes and the migration applies
     command: cd packages/api && bunx vitest run tests/database/order-shipments-dispatch.test.ts && bun run db:migrate
     expected_result: PASS - and the migration applies cleanly
-    status: pending
+    status: done
   - id: 6
     action: verify-fail
     description: Confirm the seam test is now RED, and that its failure message is the checklist for the next ticket. Do NOT fix it here
     command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
     expected_result: FAIL - 'order_shipments.label_object_token has LANDED. The label route is still wired for its absence...'
-    status: pending
+    status: done
   - id: 7
     action: commit
     description: Commit, noting the expected red
     command: 'git add packages/api/src/database packages/api/tests/database/order-shipments-dispatch.test.ts && git commit -m "feat(api): give order_shipments the columns a real dispatch records"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 7
+started: '2026-08-31T04:31:45.891Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:15:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:15:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '5823 passed | 1 failed | 188 skipped (6012). The ONE failure is deliberate and is this ticket''s step 6: tests/lib/vendor-label-seam.test.ts :: "goes RED the day order_shipments.label_object_token lands". That assertion exists to fire on this commit and its message is the checklist for #704; the other 10 cases in that file pass. Baseline before this ticket was 5804 passed / 5992 total; +20 tests are exactly the two new files (15 DSL + 5 live-Postgres). Typecheck PASS across all three packages via the pre-commit hook. Note: two earlier full runs reported 12 and 9 failures at load 5.6-8.9 on an 8-core box; the four suspect files pass 114/114 in isolation, Postgres had 12 of 100 connections in use, and the failure set changed between runs — load flakiness, not regression.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T04:46:41.462Z'
+completed: '2026-08-31T04:47:01.549Z'

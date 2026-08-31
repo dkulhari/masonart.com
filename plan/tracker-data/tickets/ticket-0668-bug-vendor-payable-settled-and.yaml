@@ -20,11 +20,11 @@ description: |-
 feature: admin-audit-log
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T11:27:28.072Z'
-last_updated: '2026-08-31T01:46:20.985Z'
+last_updated: '2026-08-31T04:41:21.498Z'
 time_spent_minutes: 0
 labels:
   - api
@@ -51,6 +51,47 @@ comments:
       **Why to defer the shipment half.** `order.shipment_marked_delivered` would go in `routes/admin/shipments.ts`, and **`order-dispatch-tracking` is about to rewrite that file entirely** — production-pipeline's amendment promoted it from "dispatch is MANUAL at launch, no Shiprocket API" to API-integrated, because vendors now despatch directly and print carrier labels. Wiring it now means writing it twice, against a route shape that is changing.
 
       Verified at head: both actions are still declared with no emitter anywhere in `packages/api/src`.
+  - author: system
+    timestamp: '2026-08-31T04:34:27.551Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T04:41:18.078Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `8199e869` — fix(api): emit the two money-tier audit actions nothing was emitting
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/vendor-payables.ts` — emits `vendor.payable_settled` on success (sharing `tx`) and on refusal (deliberately NOT sharing `tx`)
+      - `packages/api/src/routes/admin/shipments.ts` — emits `order.shipment_marked_delivered` with the status it moved from
+      - `packages/api/tests/routes/admin/vendor-payables.test.ts` — +5 tests, plus a tx-capture box so the shared-transaction assertion is identity-based
+      - `packages/api/tests/routes/admin/shipments-audit.test.ts` — new, +6 tests
+
+      **Summary**
+
+      Both actions were declared in the shared `AUDIT_ACTIONS` registry and filed under `money`, with no emitter anywhere in `packages/api/src`. The registry was left untouched — nothing needed adding there.
+
+      **Settlement** (`POST /api/admin/vendors/:id/settlements`): the success row shares the handler's `tx`, since the row would be a lie if the settlement rolled back. `recordAudit` rethrows on a shared-tx failure and that is left uncaught on purpose — catching it would return 201 over a COMMIT that Postgres executes as a ROLLBACK. There is a test pinning the 500. `after` carries the amount, reference, paidAt, note, job ids and the settled count.
+
+      The refusal row is written from the `catch`, **outside** `db.transaction(...)`, per the guidance in the earlier comment: a refusal records that a transaction was rolled back, so writing it inside that transaction erases the evidence. Two tests pin this — one asserts the third argument is `undefined`, one asserts the success path passes the *same* handle `db.transaction` created (identity, not just truthiness).
+
+      **Delivery** (`POST /api/admin/shipments/:id/mark-delivered`): records `before: { status }` so a delivery back-dated over a shipment still at `pending` is distinguishable from a normal one, with `orderId` in metadata. Written independently — the handler has no transaction and both updates have already committed. No row is written on the already-delivered 400 or the 404, so a double click cannot appear to move the start of the return window; the floor `admin.request` row still records the attempt.
+
+      **On the deferral recommendation**: the earlier comment advised deferring the shipment half because `order-dispatch-tracking` was about to rewrite `routes/admin/shipments.ts`. Checked at head — that rewrite has **not** landed (the handler is still at the shape the ticket describes, last touched by unrelated fixes `e3c2620d`/`9fe39902`), and #702/#706/#707 are still open. The emitter is ~15 lines and any consolidation carries it forward trivially, whereas deferring leaves a declared `money` action returning an empty filter for an unknown period — which is the bug. Did both halves; all six steps are complete rather than one skipped.
+
+      **Test placement**: shipment assertions went in a new `shipments-audit.test.ts` rather than into `shipments.test.ts`, which runs the real app against a real database to smoke-test route availability — a module-scope `vi.mock('src/database')` there would hollow those tests out. This matches the repo's existing split (`orders.test.ts` / `orders-audit.test.ts`, `returns.test.ts` / `returns-audit.test.ts`).
+
+      `recordAudit` is mocked in `vendor-payables.test.ts` rather than left to write, so the existing "one transaction, three statements" trace assertions keep meaning what they meant; the row's contents are asserted off the call arguments instead. No existing assertion needed weakening.
+
+      **Verification**:
+      - Command: `npx vitest run --root packages/api tests/routes/admin/vendor-payables.test.ts tests/routes/admin/shipments-audit.test.ts tests/routes/admin/shipments.test.ts`
+      - Result: PASS — Test Files 3 passed (3), Tests 71 passed (71)
+      - Baseline before the change was 26 in `vendor-payables.test.ts`; 11 tests added (5 + 6). RED was confirmed first: the positive assertions failed with "expected vi.fn() to be called 1 times, but got 0 times" while the routes still returned 200/400/404 correctly, proving the harness worked and only the emitter was missing.
+      - Build: `npx tsc --noEmit -p packages/api/tsconfig.json && npx tsc -p packages/api/tsconfig.test.json --noEmit` — 0 errors in both src and tests.
+      - No response shape changed on either route, so `packages/web/tests/routes/admin-vendor-payables.test.tsx` is unaffected.
+  - author: system
+    timestamp: '2026-08-31T04:41:21.498Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -63,7 +104,7 @@ implementation_steps:
     file: packages/api/tests/routes/admin/money-audit.test.ts
     command: cd packages/api && bunx vitest run tests/routes/admin/money-audit.test.ts
     expected_result: FAIL - recordAudit received 0 calls from either route
-    status: pending
+    status: done
     code: |-
       it('records who paid the vendor, and how much', async () => {
         // ...settlement fixtures...
@@ -104,12 +145,12 @@ implementation_steps:
     description: Confirm both assertions fail before any wiring
     command: cd packages/api && bunx vitest run tests/routes/admin/money-audit.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Emit vendor.payable_settled on the settlement route, inside the same transaction as the write
     file: packages/api/src/routes/admin/vendor-payables.ts
-    status: pending
+    status: done
     code: |-
       import { recordAudit } from '../../lib/audit'
 
@@ -127,7 +168,7 @@ implementation_steps:
     action: implement
     description: Emit order.shipment_marked_delivered with the status it moved from
     file: packages/api/src/routes/admin/shipments.ts
-    status: pending
+    status: done
     code: |-
       import { recordAudit } from '../../lib/audit'
 
@@ -146,10 +187,19 @@ implementation_steps:
     description: New suite green, both route suites unbroken
     command: cd packages/api && bunx vitest run tests/routes/admin/money-audit.test.ts tests/routes/admin/vendor-payables.test.ts tests/routes/admin/shipments.test.ts
     expected_result: PASS - no regression
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the money-tier wiring
     command: 'git add packages/api/src/routes/admin/vendor-payables.ts packages/api/src/routes/admin/shipments.ts packages/api/tests/routes/admin/money-audit.test.ts && git commit -m "fix(api): emit the declared audit actions for vendor settlement and shipment delivery"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+started: '2026-08-31T04:34:27.551Z'
+verification:
+  tests_passed: true
+  test_command: npx vitest run --root packages/api tests/routes/admin/vendor-payables.test.ts tests/routes/admin/shipments-audit.test.ts tests/routes/admin/shipments.test.ts
+  test_output: 'Test Files 3 passed (3); Tests 71 passed (71). Baseline before change was 26 in vendor-payables.test.ts; 11 new tests added (5 payables + 6 shipments-audit). Typecheck: 0 errors in both src and tests.'
+  build_passed: true
+  build_command: npx tsc --noEmit -p packages/api/tsconfig.json && npx tsc -p packages/api/tsconfig.test.json --noEmit
+  verified_at: '2026-08-31T04:40:57.510Z'
+completed: '2026-08-31T04:41:21.498Z'

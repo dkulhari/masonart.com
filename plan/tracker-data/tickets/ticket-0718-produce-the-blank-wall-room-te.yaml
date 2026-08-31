@@ -1,0 +1,133 @@
+ticket_number: 718
+title: Produce the blank-wall room templates the mockup generator needs to run at all
+description: |-
+  ## Task
+
+  The room mockup generator shipped in #701 and is on `main`, fully tested. It **cannot run**. `packages/api/src/database/room-templates.json` is an empty array, so every invocation stops with:
+
+  ```
+  No room templates defined — nothing to render.
+  ```
+
+  That is deliberate — it refuses loudly rather than producing nothing quietly. This ticket is the work that turns it on, and none of it is code.
+
+  **Everything here is documented step by step in the runbook**, including a worked example of measuring a rectangle:
+
+  - Published: https://claude.ai/code/artifact/dbd86323-9b3a-437a-967d-a48a7617a2a6
+  - Repo copy: `docs/runbooks/room-mockup-generator.html`
+
+  ## What is needed
+
+  **6-8 blank-wall room photographs.** The design spec is explicit that template quality, not code, is the real cost of this feature — the renderer cannot rescue a bad template.
+
+  Each photograph must satisfy four things:
+
+  | Requirement | Why |
+  |---|---|
+  | **Straight-on wall** | An angled wall needs a four-point perspective warp. Sharp has no homography and adding one was ruled out of scope. A poster composited flat onto an angled wall looks wrong instantly. |
+  | **Blank wall area** | Nothing already hanging where the poster goes. The tool composites on top; it does not erase what is underneath. |
+  | **Unambiguous light direction** | You declare it as `left` or `right` and the shadows follow it. If the lighting is ambiguous there is nothing correct to declare, and the composite reads as fake. |
+  | **Room for the widest aspect** | One rectangle serves every poster. Measure it against the widest artwork in the catalogue, or panoramas will sit awkwardly. |
+
+  ## Watermark hazard
+
+  If the rooms are AI-generated, do **not** seed them from the reference artwork in `.cache/seed-media/`. Those images carry a **MESON ART** watermark baked into the pixels (#546), and it will propagate into every mockup produced from them. Generate clean.
+
+  ## Then, per room
+
+  1. Put the file in `.cache/room-templates/` (gitignored on purpose — room photographs are large and get regenerated).
+  2. Measure the wall rectangle: note the pixel bounds of the area the artwork should occupy, divide each by the image's own dimensions. About a minute per room. Normalised values survive a re-export at a different resolution.
+  3. Add an entry to `packages/api/src/database/room-templates.json` (this file **is** tracked — the measurements are the intellectual content and need to be reviewable in a diff):
+
+  ```json
+  {
+    "id": "living-room-warm",
+    "file": "living-room-warm.jpg",
+    "placement": { "x": 0.286, "y": 0.047, "w": 0.483, "h": 0.622 },
+    "light": "left",
+    "frame": "wood",
+    "label": "Living room"
+  }
+  ```
+
+  ### Two constraints on that JSON
+
+  - **`id` must be lowercase alphanumeric with hyphens.** It becomes the output filename, so anything else is rejected at load.
+  - **`frame` must be one of `wood`, `black`, `white`, `gold`, `silver`, `frameless`.** These match the catalogue's real `frames.type` values. `oak` is not one of them — it matches no purchasable moulding and will be rejected. `rolled` is excluded on purpose: a rolled canvas ships in a tube and is never hung, so it has no room shot.
+
+  ## Then verify
+
+  ```
+  cd packages/api
+  bun run mockups:rooms --posters ./art --dry-run   # validates, writes nothing
+  bun run mockups:rooms --posters ./art             # renders
+  ```
+
+  Open `out/<poster-name>/contact-sheet.jpg`, look at every candidate, and tune the rectangles that sit wrong. Expect a round or two of adjustment — measuring by eye is the point at which a template is judged, not the point at which it is finished.
+
+  ## Definition of done
+
+  `room-templates.json` holds 6-8 validated entries, a real run against a sample poster produces mockups that look sellable on the contact sheet, and the survivors flow into the catalogue either through the admin product form or the bulk importer (#672).
+
+  ## Context
+
+  Everything the generator does is already built and reviewed: EXIF rotation is honoured so phone photographs are safe, the artwork is never stretched to fill a rectangle, and each frame casts a two-layer shadow whose size (not darkness) scales with its depth. `#701` carries the full implementation record.
+
+  Related: `#716` — the live admin upload pipeline still ignores EXIF orientation, which is worth fixing before uploading any photographs through it.
+feature: room-visualization
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T04:28:08.971Z'
+last_updated: '2026-08-31T04:28:08.971Z'
+time_spent_minutes: 0
+labels:
+  - room-visualization
+  - content
+  - photography
+  - catalogue
+  - blocked-on-assets
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: 'Source or generate 6-8 blank-wall room photographs: straight-on walls, unambiguous lighting, enough clear wall for the widest catalogue aspect. Keep them clear of the MESON ART watermark baked into .cache/seed-media/ artwork (#546)'
+    expected_result: Manual verification — each image has a straight-on blank wall and a light direction that can be stated as left or right
+    status: pending
+  - id: 2
+    action: implement
+    description: Place the files in .cache/room-templates/ (gitignored, machine-local)
+    expected_result: Manual verification — files present at the path the CLI defaults to
+    status: pending
+  - id: 3
+    action: implement
+    description: Measure each wall rectangle and add its entry to room-templates.json with placement, light, frame and label. Frame must be one of wood/black/white/gold/silver/frameless; id must be lowercase alphanumeric with hyphens
+    file: packages/api/src/database/room-templates.json
+    expected_result: Manual verification — one entry per photograph, normalised 0..1 rectangles
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: 'Dry run: validates every template and confirms every referenced image exists, writing nothing'
+    command: cd packages/api && bun run mockups:rooms --posters ./art --dry-run
+    expected_result: Exits 0 and lists what it would render. Any failure names the offending template and what is wrong with it
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Real run against a sample poster, then judge the contact sheet and tune any rectangle that sits wrong
+    command: cd packages/api && bun run mockups:rooms --posters ./art
+    expected_result: Manual verification — out/<poster-name>/contact-sheet.jpg shows sellable mockups; artwork sits where it should and the shadow direction matches each room's lighting
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the measurements (the photographs stay gitignored)
+    command: 'git add packages/api/src/database/room-templates.json && git commit -m "feat(room-visualization): measured room templates for the mockup generator"'
+    status: pending
+current_step: 1
