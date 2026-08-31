@@ -34,9 +34,12 @@ work_session_summary:
   agents: {}
 tickets:
   todo:
-    "701": "Room mockup generator: composite a poster into blank-wall room templates with frame shadows"
+    "718": Produce the blank-wall room templates the mockup generator needs to run at all
   in_progress: {}
-  done: {}
-total_tickets: 1
-completion_percentage: 0
+  done:
+    "701": "Room mockup generator: composite a poster into blank-wall room templates with frame shadows"
+total_tickets: 2
+completion_percentage: 50
 is_completed: false
+last_activity: "2026-08-31T04:36:53.660Z"
+started: "2026-08-31T04:36:53.660Z"

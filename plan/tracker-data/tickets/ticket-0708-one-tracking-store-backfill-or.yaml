@@ -22,17 +22,53 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:24:02.705Z'
-last_updated: '2026-08-31T02:24:02.705Z'
+last_updated: '2026-08-31T09:03:20.321Z'
 time_spent_minutes: 0
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:57:04.606Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T09:03:17.388Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e5c4933c` - fix(api): give the orders whose tracking nobody could read a shipment row
+
+      **Files Changed**:
+      - `packages/api/src/database/migrations/0028_backfill_order_shipments.sql` — new
+      - `packages/api/src/database/migrations/meta/{_journal.json,0028_snapshot.json}` — hand-written; drizzle-kit generates neither for a data migration
+      - `packages/api/tests/database/order-shipments-backfill.test.ts` — new, 8 tests
+
+      **Result on the dev database**: 3 orders carried usable `shipping_details`; all 3 now have a live shipment row; the "usable jsonb but no live shipment" count is **0**. Those are three customers who could not track their parcel and now can.
+
+      **Idempotence was verified, not asserted.** drizzle records the migration as applied, so `db:migrate` would skip it — which proves nothing about the SQL. I re-executed the body by hand against the same database: row count stayed at 3.
+
+      **Three decisions worth recording:**
+      1. **Status comes from the ORDER's timeline, not the jsonb** — which never carried one. An order already marked delivered must not arrive as `pending` and re-open a delivery the customer has seen closed.
+      2. **`estimatedDelivery` is TEXT in the source**, so one malformed value would abort the whole migration. Regex-guarded; unparseable becomes NULL rather than taking the backfill down.
+      3. **`NOT EXISTS` excludes orders that already have a live shipment.** #707 writes those, and backfilling across one would replace a tracking number an admin entered today with whatever the jsonb still remembers.
+
+      `carrier` is NOT NULL and there is nobody to ask inside a migration, so it falls back to `'Unknown'`. The interactive path refuses instead (#707) — here the alternative is dropping a real tracking number.
+
+      **Three integrity tests went red mid-change, and they were right.** My hand-written journal entry had no snapshot. `#623` exists precisely because a journal entry without one makes every later `db:generate` replay intervening migrations as fresh drift — it is what made `db:generate` unusable in this repo before. Schema is unchanged between 0027 and 0028, so the snapshot is 0027's with a deterministic new id chained to it.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **PASS — 6013 passed | 0 failed | 188 skipped (6201)**
+      - Scoped: new suite 8/8; with `migration-meta-integrity` + `production-transfers` = 55/55
+      - Typecheck: PASS across all three packages
+  - author: system
+    timestamp: '2026-08-31T09:03:20.321Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -228,3 +264,12 @@ implementation_steps:
     command: 'git add packages/api/src/database/migrations packages/api/tests/database/order-shipments-backfill.test.ts && git commit -m "fix(api): give the orders whose tracking nobody could read a shipment row"'
     status: pending
 current_step: 1
+started: '2026-08-31T08:57:04.606Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '6013 passed | 0 failed | 188 skipped (6201). Scoped: tests/database/order-shipments-backfill.test.ts 8/8 (new); with migration-meta-integrity + production-transfers = 55/55. Applied to dev DB: 3 orders had usable shipping_details, 3 rows written, 0 left without a live shipment. Idempotence VERIFIED by re-executing the migration body by hand (drizzle would skip it as applied) — row count unchanged at 3. Typecheck PASS. Three integrity tests went red mid-change because a hand-written journal entry had no snapshot (#623); fixed by shipping a 0028 snapshot chained to 0027.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T09:03:04.914Z'
+completed: '2026-08-31T09:03:20.321Z'

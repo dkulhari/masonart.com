@@ -35,11 +35,11 @@ description: |-
 feature: room-visualization
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:02:26.079Z'
-last_updated: '2026-08-31T02:44:35.818Z'
+last_updated: '2026-08-31T04:36:53.631Z'
 time_spent_minutes: 0
 labels:
   - api
@@ -153,6 +153,65 @@ comments:
       ## Still true: the tool ships unable to run
 
       `room-templates.json` is `[]`. Until blank-wall room photographs exist it fails with `No room templates defined — nothing to render.` Intended. The follow-up is photography and measurement, not code.
+  - author: mcp-client
+    timestamp: '2026-08-31T04:23:12.668Z'
+    text: |-
+      ## Shipped to main
+
+      `origin/main` is at **18f4eeaf** and contains the full feature.
+
+      Pushed with `git push origin HEAD:main` rather than merging in the shared checkout — that checkout was on `main` with 61 uncommitted files and another session committing every few minutes, so a local merge there would have landed in the middle of live work. This route updates the remote without touching their working tree.
+
+      The push was rejected once (`main` moved between fetch and push) and re-merged rather than forced. `main` advanced 63+ commits during this work; three merges were needed. Conflicts were `packages/api/package.json` (both sides added a script — kept both) and the design spec (main carried the original via the stranded commits; this branch carried the corrected copy).
+
+      Final suite on the merged tree: **873 passed, 1 skipped**. Typecheck clean for all room-mockup code.
+
+      ## Two defects found after the first "complete" call
+
+      An independent `/code-review high` on the branch found five defects that the whole-branch review had missed. Two mattered:
+
+      **EXIF orientation was silently dropped.** Verified empirically: an 800x400 image tagged `orientation: 6` came out 800x400 with the tag *stripped* — so a mockup renders rotated 90 degrees from what the operator saw, and the placement rectangle they measured against the displayed image gets applied to the stored dimensions. The runbook's own step 1 tells operators to use phone photographs, which carry exactly that tag. Fixed in 1238a8d1.
+
+      **The EXIF fix then introduced a worse regression.** `sharp(x).autoOrient().toBuffer()` with no format call re-encodes JPEG and WebP at sharp's default quality — unconditionally, including for the overwhelming majority of images with no orientation tag:
+
+      ```
+      source q95            : 781,658 bytes
+      autoOrient().toBuffer : 426,812 bytes    <- 45% smaller, silently re-encoded
+      explicit q92          : 625,519 bytes
+      source orientation tag: undefined
+      ```
+
+      Every render took an extra lossy generation before the pipeline's one deliberate `.jpeg({ quality: 92 })` step, so final images were built from already-degraded pixels. Fixed in 8aa53695 with `orientBuffer()`: read metadata first, return the input untouched when there is nothing to correct, and materialise losslessly as PNG when a rotation genuinely is needed.
+
+      Verified after the fix:
+
+      ```
+      untagged frameless   : in 781,927 -> out 781,927 | byte-identical: true
+      untagged orientBuffer: same object passthrough: true
+      tagged   frameless   : out 400x800 (correct)
+      ```
+
+      ### Why it slipped through
+
+      The EXIF fix was specified with a **dimensions-only** test. That test passes perfectly on a silently re-encoded image — the orientation was right, so nothing failed. The byte-level damage was invisible to it. The replacement test asserts **byte identity on an untagged JPEG**, which is what actually falsifies this class of bug.
+
+      Worth generalising: an assertion that checks the property you fixed will not catch what you broke on the way.
+
+      ## Documents
+
+      - Runbook: https://claude.ai/code/artifact/dbd86323-9b3a-437a-967d-a48a7617a2a6 (republished; now documents 13 error strings including the two added late)
+      - Repo copy: `docs/runbooks/room-mockup-generator.html`
+      - Spec: `docs/superpowers/specs/2026-08-31-room-mockup-generator-design.md`
+      - Plan: `docs/superpowers/plans/2026-08-31-room-mockup-generator.md`
+
+      ## Unchanged: the tool still ships unable to run
+
+      `room-templates.json` is `[]`. It fails with `No room templates defined — nothing to render.` until blank-wall room photographs exist. Intended. The remaining work is photography and measurement, not code.
+
+      Related: #716 covers the same EXIF gap in the live upload pipeline (`packages/api/src/lib/image-processing.ts`), which affects customer-facing catalogue images today and is not fixed by this branch.
+  - author: system
+    timestamp: '2026-08-31T04:36:53.631Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -210,11 +269,12 @@ implementation_steps:
     file: packages/api/src/database/generate-room-mockups.ts
     command: cd packages/api && bunx vitest run tests/lib/room-mockup/cli-args.test.ts
     expected_result: PASS expected — in progress at time of writing
-    status: pending
+    status: done
   - id: 9
     action: verify-pass
     description: Whole-branch review on the most capable model, then finish the branch
     command: cd packages/api && bun run typecheck 2>&1 | grep room-mockup && bunx vitest run tests/lib
     expected_result: typecheck grep empty; tests/lib green
-    status: pending
+    status: done
 current_step: 1
+completed: '2026-08-31T04:36:53.631Z'

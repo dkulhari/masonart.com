@@ -23,17 +23,54 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:26:01.210Z'
-last_updated: '2026-08-31T02:26:01.210Z'
+last_updated: '2026-08-31T08:48:57.813Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:43:43.069Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T08:48:54.598Z'
+    text: |-
+      ✅ **Completed** — this was the load-bearing one in Phase 3.
+
+      **Commit**: `765a4f2e` - fix(api): keep the dispatched edge takeable after the tracking stores merge
+
+      **Files Changed**:
+      - `packages/api/src/lib/vendor-scope.ts` — `ORDER_HAS_LABEL` is now an EXISTS over `order_shipments`
+      - `packages/api/src/routes/admin/production-jobs.ts` — `despatchEvidence` reads the live shipment; `orderShippingLabel` → `shipmentLabelHandle`
+      - `packages/api/tests/lib/order-label-guard.test.ts` — new, 8 tests
+      - `packages/api/tests/routes/admin/production-jobs.test.ts` — three fixtures repointed
+
+      **Why it mattered**: both guards asked "does this order carry a label" of `orders.shipping_details`, the jsonb #707 stopped writing. Left alone they would answer `false` for every order forever and `qc_passed -> dispatched` would become untakeable — the exact failure `lib/production-transitions.ts` calls "an edge nothing in the codebase can take". Not cleanup that could follow later.
+
+      **Both now require the shipment to be LIVE.** A voided label is evidence a label was bought and then killed, not that goods were handed to a courier — letting it satisfy the guard would let a job report itself despatched on a parcel that does not exist.
+
+      **The two guards keep different shapes on purpose:**
+      - `vendor-scope.ts` stays a **boolean** (EXISTS subquery). R1: no vendor-facing projection names the AWB. The vendor needs the answer, never the value.
+      - `production-jobs.ts` keeps **naming the handle** — its `detail` is an audit payload, and a dispute needs to say *which* label the edge was taken on. R1 constrains the supplier boundary, not this one.
+
+      `shipmentLabelHandle()` prefers the AWB, then the tracking number, then falls back to the shipment id when only a label token exists — so "a label exists" is never reported as "no label" just because the carrier fields have not come back yet.
+
+      **An existing test caught this properly.** `lets it through when the order already carries a shipping label` went 409 mid-change. That test is precisely the one proving a consolidator can still despatch, so I repointed its fixture from `select:orders` to `select:order_shipments` rather than touching the assertion. Two sibling fixtures got the same treatment.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **PASS — 5995 passed | 0 failed | 188 skipped (6183)**
+      - Scoped: new guard suite 8/8; production seam + readiness + transitions + vendor-scope + guard + admin production-jobs + all `tests/routes/vendor` = **676/676 across 11 files**
+      - `tests/lib/production-seam.test.ts` green — neither guard reached for a courier client, so the reverse scan still holds
+      - Typecheck: PASS across all three packages
+  - author: system
+    timestamp: '2026-08-31T08:48:57.813Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -242,3 +279,12 @@ implementation_steps:
     command: 'git add packages/api/src/lib/vendor-scope.ts packages/api/src/routes/admin/production-jobs.ts packages/api/tests/lib/order-label-guard.test.ts && git commit -m "fix(api): keep the dispatched edge takeable after the tracking stores merge"'
     status: pending
 current_step: 1
+started: '2026-08-31T08:43:43.069Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '5995 passed | 0 failed | 188 skipped (6183). Scoped: tests/lib/order-label-guard.test.ts 8/8 (new); production seam + readiness + transitions + vendor-scope + guard + admin production-jobs + all tests/routes/vendor = 676/676 across 11 files. Typecheck PASS across all three packages. An existing test (''lets it through when the order already carries a shipping label'') went red mid-change and was fixed by repointing its fixture from select:orders to select:order_shipments — that test is the one proving a consolidator can still despatch, so its fixture was corrected rather than its assertion relaxed.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T08:48:41.359Z'
+completed: '2026-08-31T08:48:57.813Z'

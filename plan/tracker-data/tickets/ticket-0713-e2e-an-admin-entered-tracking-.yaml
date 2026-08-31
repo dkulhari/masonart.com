@@ -22,17 +22,63 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:26:01.323Z'
-last_updated: '2026-08-31T02:26:01.323Z'
+last_updated: '2026-08-31T09:24:59.716Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T09:12:28.521Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T09:24:59.716Z'
+    text: |-
+      ⚠️ **Spec written and committed — NOT yet run green. Left in-progress deliberately.**
+
+      **Commit**: `629c66c6` - test(e2e): prove an admin-entered tracking number reaches the customer
+
+      **Files Changed**:
+      - `tests/e2e/order-dispatch-tracking.admin.spec.ts` — new, 2 tests, registers under `chromium-admin`
+      - `tests/e2e/production-pipeline.spec.ts` — the stale manual-dispatch note at :1130 corrected
+
+      **The gap this closes.** `guest-order-tracking.spec.ts` covers `/track` thoroughly and **would have stayed green through this entire bug** — its own header says it "uses mocked API responses since they test the UI flow, not the actual backend tracking functionality". A mocked `/api/tracking/lookup` cannot notice that nothing writes the table it reads. The unit suites cannot either: each mocks the database, so each proves a statement was *aimed* at a table. Aim is not arrival.
+
+      So this spec mocks nothing, and the customer leg runs in a **clean context** — asserting a public page through an authenticated one proves something no real customer experiences.
+
+      **What is verified:**
+      - Both tests parse and register: `playwright test --list` shows them under `chromium-admin`.
+      - **The read path is proven end to end over real HTTP against the real database.** I stood up a private pair (api `:3020`, web `:4322`) on worktree code, wrote a shipment, and called the public endpoint:
+      ```
+      order    : MA-2026-000089
+      status   : 200
+      tracking : PRESENT          <- was NULL for every admin-tracked order
+      awb      : RT1788168194478
+      courier  : Delhivery
+      leaked   : none             <- costPaise / labelObjectToken / pickupVendorId absent
+      ROUND TRIP OK
+      ```
+
+      **What is NOT verified: the browser run.** Playwright's `auth.setup.ts` fails in this environment — all four role setups end at "redirected back to login", **after the API returns `200` on `/api/auth/sign-in/email`**. Auth succeeds server-side; the web app's post-login session check is what fails. That is E2E session plumbing, not anything this feature touches, and I am not going to claim a green run I did not get.
+
+      Two environment findings worth keeping:
+      1. The api must run with `DISABLE_RATE_LIMIT=true` or the four role setups exceed the auth limiter (5 req/60s, all local traffic in one bucket). The failure message says so itself.
+      2. `kill <pid>` on a `nohup bun run` kills the wrapper, not the server child — the port stays held and the "restart" silently fails to bind. Same trap as the stray that caused the earlier Postgres outage. Check `lsof -iTCP:<port> -sTCP:LISTEN` for the real pid.
+
+      **To finish this ticket**, someone needs to get `auth.setup.ts` passing locally, then:
+      ```
+      SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4322 \
+        npx playwright test tests/e2e/order-dispatch-tracking.admin.spec.ts \
+        --project=chromium-admin --workers=1
+      ```
+      with an api on `:3020` started as `API_PORT=3020 PORT=3020 FRONTEND_URL=http://localhost:4322 DISABLE_RATE_LIMIT=true bun run --env-file=../../.env src/index.ts`, and web via `VITE_API_PROXY_TARGET=http://localhost:3020 bunx vite dev --port 4322`.
+
+      My servers are stopped; both ports are free.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -158,3 +204,4 @@ implementation_steps:
     command: 'git add tests/e2e/order-dispatch-tracking.spec.ts tests/e2e/production-pipeline.spec.ts && git commit -m "test(e2e): prove an admin-entered tracking number reaches the customer"'
     status: pending
 current_step: 1
+started: '2026-08-31T09:12:28.521Z'

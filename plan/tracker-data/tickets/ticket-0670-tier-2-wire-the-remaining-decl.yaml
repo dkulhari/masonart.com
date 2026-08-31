@@ -28,11 +28,11 @@ description: |-
 feature: admin-audit-log
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T11:27:28.198Z'
-last_updated: '2026-08-31T01:46:36.628Z'
+last_updated: '2026-08-31T04:47:10.780Z'
 time_spent_minutes: 0
 labels:
   - api
@@ -66,6 +66,62 @@ comments:
       **Everything else in this ticket's scope has a mutating route to emit from** — `products.ts` (7), `reviews.ts` (5), `ai-moderation.ts` (3), `vendor-rates.ts` (3). None of them is blocked; they are wiring work.
 
       **`user.status_changed`** is the other waiver candidate and I did not verify it. `customers.ts` has 1 mutating route and `user.role_changed` is already wired there, so check whether a status-change path actually exists before waiving it — it may be wiring work rather than a waiver.
+  - author: system
+    timestamp: '2026-08-31T04:34:47.865Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T04:42:49.962Z'
+    text: |-
+      **Decision on `admin/vendors.ts`: declared and wired — `vendor.created` and `vendor.updated`, but NOT `vendor.archived`.**
+
+      Not a waiver. The two actions are in `AUDIT_ACTIONS` under `config` and emitted from `POST /api/admin/vendors` and `PATCH /api/admin/vendors/:id` in the same commit, so #671's declared-but-dead guard stays satisfied.
+
+      **Why not the floor row.** `admin.request` answers who and when, and for the PATCH it even answers which vendor (the id is in the path). What it cannot answer is *which way*. `status` is the field that matters: suspending a supplier stops work being routed to them, and "someone PATCHed vendor X" reads identically whether they suspended it or corrected a postcode.
+
+      **Why `vendor.archived` is wrong and was not added.** `vendorStatusEnum` is `['active', 'inactive', 'suspended']` (`database/schema/vendors.ts:26`). Nothing archives. An action naming a state the column cannot hold would be dead the day it was declared — exactly the defect this tier of tickets exists to remove. Deactivating or suspending a supplier IS an update, and the delta (`{status: active} → {status: suspended}`) is what says which. The registry comment records this so the next reader does not re-add it.
+
+      **Scope held to the vendor record itself.** The seven contact and capability routes (`:531`–`:711`) keep the floor row. They are directory metadata with no money and no privilege on them, they carry the vendor id in the path, and their consequential use — assigning a job to a vendor with a given capability — is already audited as `production_job.assigned`. If that judgement turns out wrong, the fix is `vendor_contact.*` / `vendor_capability.*`, not stretching `vendor.updated` to cover child rows.
+
+      **`created_by` was considered as an alternative and is not sufficient.** It attributes the create but not the edit (there is no `updated_by`), and it is not searchable alongside the rate card. `vendor_rate.updated` is now emitted from `routes/admin/vendor-rates.ts`; a supplier appearing and a supplier being priced are one story, and reading it should not require joining two tables.
+  - author: mcp-client
+    timestamp: '2026-08-31T04:47:08.581Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `63376f5e` — feat(audit): emit the eight actions the registry declared and nothing wrote
+
+      **Files Changed**
+      - `packages/shared/src/schemas/audit-log.ts` — declares `vendor.created` / `vendor.updated` under `config`, with the comment recording why no `vendor.archived`. Purely additive; #668's and #669's registry entries untouched.
+      - `packages/api/src/routes/admin/collections.ts` — `collection.updated` on PATCH `/:id`, PUT `/discover-order`, PUT `/:id/products`.
+      - `packages/api/src/routes/admin/promotions.ts` — `promotion.created`.
+      - `packages/api/src/routes/admin/products.ts` — `product_variant.updated`, `product_variant.deleted`.
+      - `packages/api/src/routes/admin/vendor-rates.ts` — `vendor_rate.updated` on create, patch and close.
+      - `packages/api/src/routes/admin/reviews.ts` — `review.deleted`, `review_media.deleted`.
+      - `packages/api/src/routes/admin/ai-moderation.ts` — `ai_generation.moderated` on the single PATCH and both bulk routes.
+      - `packages/api/src/routes/admin/vendors.ts` — `vendor.created`, `vendor.updated`.
+      - `packages/api/tests/routes/admin/catalogue-audit.test.ts` (+10 cases), `content-config-audit.test.ts` (new, 14 cases), `vendors.test.ts` (2 fixtures updated for the new pre-write read).
+
+      **Three things the wiring had to change to have a `before` at all**
+      1. `products.ts` variant PATCH and DELETE selected only `{id, productId}`. Widened to the whole row — the read is now both the existence check and the delta's before.
+      2. `collections.ts` PUT `/:id/products` never read the membership it replaces. The DELETE inside the transaction now RETURNs the cleared rows, so the previous list is captured in the same statement that removes it rather than by a racing SELECT beside it.
+      3. `collections.ts` PUT `/discover-order` overwrites `discoverOrder` in place. The validation SELECT now carries it, so the previous rail order survives the write.
+
+      **Two judgement calls worth review**
+      - **The discover-rail reorder emits ONE row, `entityId: null`.** It is a single decision about an ordering; N rows would read as N edits in the timeline. Before/after are the id arrays.
+      - **The bulk moderation routes re-read statuses after the call and emit a row only per generation that actually moved.** `bulkApprove`/`bulkReject` swallow per-id failures and return only totals, so emitting per requested id would assert a moderation for every id in the failed count.
+
+      **Vendors decision**: declared and wired `vendor.created` + `vendor.updated`; `vendor.archived` deliberately not added (no such status in `vendor_status`). Reasoning in the preceding comment.
+
+      **Verification**
+      - Command: `npx vitest run tests/routes/admin/catalogue-audit.test.ts tests/routes/admin/content-config-audit.test.ts tests/routes/admin/vendors.test.ts tests/routes/admin/vendor-rates.test.ts tests/routes/admin/audit-log.test.ts`
+      - Result: PASS (5 files, 118 tests)
+      - Regression sweep over every touched route's own suite: collections + collection-membership + review-media + product-orientation-guard (70), reviews + promotions (124), products + product-cache-purge + products-role-access + promotion-cache-purge (146), services/ai-moderation (in the 122-test combined run). `packages/shared` registry suite: 24 passing.
+      - Typecheck: `tsc --noEmit` and `tsc -p tsconfig.test.json --noEmit` both clean in `packages/api`; clean in `packages/shared`.
+
+      **Left for #671**: the twelve-action dead list from the earlier comment is now down to four — `order.shipment_marked_delivered`, `wallet.adjusted`, `vendor.payable_settled`, `user.status_changed`, `vendor.invited`, `vendor.user_created` minus whatever #668/#669 landed in `8199e869` and `0127ad30`. `wallet.adjusted` remains the waiver candidate for the reason already recorded (no admin adjust route exists); `user.status_changed` still needs the check that comment flagged.
+  - author: system
+    timestamp: '2026-08-31T04:47:10.780Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -78,7 +134,7 @@ implementation_steps:
     file: packages/api/tests/routes/admin/catalogue-audit.test.ts
     command: cd packages/api && bunx vitest run tests/routes/admin/catalogue-audit.test.ts
     expected_result: FAIL - the new cases only
-    status: pending
+    status: done
     code: |-
       it('records a collection edit, not only a collection deletion', async () => {
         expect(recordAudit).toHaveBeenCalledWith(
@@ -115,7 +171,7 @@ implementation_steps:
     file: packages/api/tests/routes/admin/content-config-audit.test.ts
     command: cd packages/api && bunx vitest run tests/routes/admin/content-config-audit.test.ts
     expected_result: FAIL - vendor-rates, reviews and ai-moderation emit nothing
-    status: pending
+    status: done
     code: |-
       it('records a rate card edit — this is what a supplier gets paid', async () => {
         expect(recordAudit).toHaveBeenCalledWith(
@@ -146,12 +202,12 @@ implementation_steps:
     description: Confirm both suites fail on the new cases
     command: cd packages/api && bunx vitest run tests/routes/admin/catalogue-audit.test.ts tests/routes/admin/content-config-audit.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 4
     action: implement
     description: Wire the four catalogue actions
     file: packages/api/src/routes/admin/collections.ts
-    status: pending
+    status: done
     code: |-
       // collections.ts (PUT :110, PUT :175, PATCH :335), promotions.ts (POST :258),
       // products.ts (variant write + DELETE :1068). Same shape at every site:
@@ -178,7 +234,7 @@ implementation_steps:
     action: implement
     description: Wire vendor_rate.updated, the two review deletions and ai_generation.moderated
     file: packages/api/src/routes/admin/vendor-rates.ts
-    status: pending
+    status: done
     code: |-
       // vendor-rates.ts :356, :475, :565 — a rate change is effective-dated, so put
       // the effective window in the row or the trail cannot answer "what were we
@@ -198,7 +254,7 @@ implementation_steps:
     action: implement
     description: 'Decide vendors.ts: declare vendor.created/updated/archived, or record that the floor row is sufficient'
     file: packages/shared/src/schemas/audit-log.ts
-    status: pending
+    status: done
     code: |-
       // Nine mutating routes in admin/vendors.ts (:380-:656) with no declared action.
       // Either add them to AUDIT_ACTIONS under 'config':
@@ -210,10 +266,19 @@ implementation_steps:
     description: Both audit suites green, and every touched route suite unbroken
     command: cd packages/api && bunx vitest run tests/routes/admin/
     expected_result: PASS - no regression across the admin route suites
-    status: pending
+    status: done
   - id: 8
     action: commit
     description: Commit the tier 2 completion
     command: 'git add packages/shared/src/schemas/audit-log.ts packages/api/src/routes/admin packages/api/tests/routes/admin && git commit -m "feat(api): emit the catalogue, config and content audit actions the registry already declares"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 8
+started: '2026-08-31T04:34:47.865Z'
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/routes/admin/catalogue-audit.test.ts tests/routes/admin/content-config-audit.test.ts tests/routes/admin/vendors.test.ts tests/routes/admin/vendor-rates.test.ts tests/routes/admin/audit-log.test.ts (in packages/api); plus collections, collection-membership, review-media, product-orientation-guard, reviews, promotions, products, product-cache-purge, products-role-access, promotion-cache-purge, services/ai-moderation; and tests/schemas/audit-log.test.ts in packages/shared
+  test_output: 'Audit suites: 5 files, 118 tests passing (catalogue-audit 16, content-config-audit 14, vendors 38, vendor-rates, audit-log). Touched-route regression sweep: collections/collection-membership/review-media/product-orientation-guard 70 passing; reviews+promotions 124 passing; products/product-cache-purge/products-role-access/promotion-cache-purge 146 passing; services/ai-moderation + audit-log + vendor-rates green in the earlier combined run (122 passing after the one fix). packages/shared audit-log registry: 24 passing.'
+  build_passed: true
+  build_command: npx tsc --noEmit && npx tsc -p tsconfig.test.json --noEmit (packages/api); npx tsc --noEmit (packages/shared)
+  verified_at: '2026-08-31T04:46:50.119Z'
+completed: '2026-08-31T04:47:10.780Z'

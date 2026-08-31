@@ -21,17 +21,58 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:24:02.821Z'
-last_updated: '2026-08-31T02:24:02.821Z'
+last_updated: '2026-08-31T08:56:58.258Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:49:01.137Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T08:56:55.452Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `45320c2f` - fix(api): point the shipped notification at the parcel, not the orders page
+
+      **Files Changed**:
+      - `packages/api/src/services/notifications.ts` — `liveShipmentFor()` resolved once per notification; threaded into both builders
+      - `packages/api/src/services/email-templates.ts` — `ShipmentForEmail` type; shipped + out-for-delivery take it
+      - `packages/api/tests/services/shipped-notification-tracking.test.ts` — new, 10 tests
+      - `packages/api/tests/services/notifications.test.ts`, `email-templates.test.ts` — fixtures moved
+
+      **Summary**:
+      `getSmsMessage` read `order.shippingDetails?.trackingUrl` with a `|| "chobii.art/orders"` fallback. The shipped email did the same for URL, carrier, tracking number and estimated delivery; out-for-delivery for its URL.
+
+      Because the admin screen wrote that jsonb and nothing else did, the value was *sometimes* present — which is why the fallbacks were never noticed. After #707 the fallback would be the **only** branch: every shipped SMS pointing at a generic page, every shipped email saying "our carrier partner", silently and forever.
+
+      **Resolved once, passed down.** Templates must not query — `email-templates.ts` has no database import, and several callers each deciding which shipment is live is the defect this phase removes. One read also means the email and the SMS cannot disagree about which parcel the customer is being told about.
+
+      **The fallbacks stay.** "No shipment row yet" is a real state a notification can be sent in. What was wrong was *reaching* that branch because the code read a column nothing writes.
+
+      The email now names the **courier** before the carrier, and prefers the **AWB** over the internal tracking number — `carrier` is the aggregator we bought through and means nothing to a customer.
+
+      `getDeliveredTemplate` keeps its single parameter: it reads no shipment, and an unused argument for symmetry would misdescribe what it depends on. A test pins that (`getDeliveredTemplate.length === 1`).
+
+      **21 pre-existing tests went red mid-change.** Both causes were fixture drift, and I moved fixtures rather than relaxing assertions:
+      1. `notifications.test.ts` mocked a `db` with no `query.orderShipments`, so the new read threw and *every* notification failed. Added it, defaulting to "no shipment".
+      2. `email-templates.test.ts` built tracking data on `order.shippingDetails`. Added `createMockShipment()` carrying the **same values those tests already asserted on**, so what they check is unchanged and only the source moved.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **PASS — 6005 passed | 0 failed | 188 skipped (6193)**
+      - Scoped: new suite 10/10; `notifications.test.ts` 33/33; `email-templates.test.ts` 49/49
+      - Typecheck: PASS across all three packages
+  - author: system
+    timestamp: '2026-08-31T08:56:58.258Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -190,3 +231,12 @@ implementation_steps:
     command: 'git add packages/api/src/services packages/api/tests/services/shipped-notification-tracking.test.ts && git commit -m "fix(api): point the shipped notification at the parcel, not the orders page"'
     status: pending
 current_step: 1
+started: '2026-08-31T08:49:01.137Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '6005 passed | 0 failed | 188 skipped (6193). Scoped: tests/services/shipped-notification-tracking.test.ts 10/10 (new); notifications.test.ts 33/33; email-templates.test.ts 49/49. Typecheck PASS across all three packages. 21 pre-existing tests in those two suites went red mid-change and were fixed by moving fixtures, not assertions: notifications.test.ts mocked a db with no query.orderShipments so the new read threw, and email-templates.test.ts sourced tracking data from order.shippingDetails.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T08:56:42.265Z'
+completed: '2026-08-31T08:56:58.258Z'

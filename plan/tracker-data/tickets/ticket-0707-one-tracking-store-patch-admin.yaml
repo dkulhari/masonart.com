@@ -24,18 +24,80 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:24:02.648Z'
-last_updated: '2026-08-31T02:24:02.648Z'
+last_updated: '2026-08-31T09:38:32.115Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:31:25.045Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T08:37:30.805Z'
+    text: |-
+      ✅ **Completed** — this is the defect the whole feature exists for.
+
+      **Commit**: `b213a61f` - fix(api): make an admin-entered tracking number reach the customer
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/orders.ts` — the handler now upserts the live `order_shipments` row inside a transaction
+      - `packages/api/tests/routes/admin/order-shipping-upsert.test.ts` — new, 7 tests
+
+      **Root Cause**:
+      `PATCH /api/admin/orders/:id/shipping` merged into `orders.shipping_details` (jsonb). `GET /api/tracking/*` reads `order_shipments`. The only writer of `order_shipments` was `routes/admin/shipments.ts`, which has no UI. The admin screen that existed wrote to a store the customer page does not read — save returned 200, tracking page stayed empty, permanently.
+
+      **Fix**: upsert the LIVE shipment, by the same predicate `lib/vendor-scope.ts` uses (`voided_at IS NULL`, ordering as tiebreak) — a voided label and its replacement both hang off the order and only one is the one a courier honours.
+
+      **Three deliberate choices:**
+      1. **`orders.shipping_details` is not written and not cleared.** It is #708's backfill source. A pass that starts writing elsewhere *and* destroys the old store leaves nothing to re-run against.
+      2. **Missing carrier on a shipment-less order is a 400, not a default.** `carrier` is NOT NULL and the value is read by the customer; an incomplete admin form must not put "unknown" on a tracking page.
+      3. **The audit row is inside the transaction.** A tracking number a customer can read with no row naming who typed it is an unanswerable support call.
+
+      **Found in passing:** line 1009 carried a comment claiming this handler set `orders.shippedAt` when a tracking number was added. **It never did** — `shippedAt` is stamped on status change at two other sites. I deleted the comment rather than implementing it: making tracking-entry silently mark an order shipped is a behaviour change this ticket did not ask for. Flagging it in case that behaviour is actually wanted — it would be its own ticket.
+
+      **One test bug of mine:** the "does not write the jsonb" assertion first used `JSON.stringify` on the call args and threw `Converting circular structure to JSON` — a drizzle table is circular (`column.table` points back). Rewritten to read the table name off the write target, which is also a stronger assertion.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: **PASS — 5974 passed | 0 failed | 188 skipped (6162)**
+      - Scoped: new suite 7/7; admin orders + orders-audit + upsert = **140/140 across 3 files**
+      - Typecheck: PASS across all three packages
+
+      **Note for #712**: the response now returns `shipment` instead of `order.shippingDetails`. `packages/web/app/components/admin/OrderDetail.tsx` still reads the old shape and will render an empty panel until #712 lands.
+  - author: system
+    timestamp: '2026-08-31T08:37:33.754Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-31T09:38:32.115Z'
+    text: |-
+      🔴 **Follow-up: a data-loss regression this ticket introduced, found by `/code-review high`**
+
+      **Fix commit**: `cb1628cf` - fix(api): stop a partial shipping save wiping the fields it was not sent
+
+      **What I broke.** The jsonb handler this ticket replaced only assigned a key when `input.<field> !== undefined`. Writing the shipment row lost that merge: `awbNumber`, `externalShipmentId` and `estimatedDeliveryAt` were written as `input.X ?? null` straight into the UPDATE of the live row. Only `carrier` and `trackingNumber` fell back.
+
+      **Why it mattered more than it looks.** The admin modal has **no AWB field at all**, so an admin correcting a typo'd tracking number silently dropped an AWB written by `POST /orders/:orderId/ship`, by the 0028 backfill, or by the production-pipeline flow — which PATCHes `awbNumber` and nothing else. `ORDER_HAS_LABEL` and `despatchEvidence` read `awb_number`, so that could **flip the `dispatched` guard back to unsatisfied and strand a consolidator mid-order** — the exact failure #711 exists to prevent, reintroduced from the other side.
+
+      **Why my tests missed it.** The suite I wrote never exercised a partial update against an existing row — every case either created a shipment or sent both fields. A regression test now pins the merge:
+      ```
+      AssertionError: the AWB was wiped by a partial save: expected null to be 'AWB-KEEP-ME'
+      ```
+
+      **Also fixed here** (same commit, related class):
+      - `updateShippingSchema` caps matched the old jsonb, not the columns these now land in. `awbNumber`/`shipmentId` allowed 100 chars into `varchar(64)` → Postgres `22001` surfacing as a generic 500, a validation mistake reported as a server fault. `trackingUrl` had no cap against `varchar(500)`.
+      - `z.string()` accepts `""`, which stored as an empty string rather than NULL — and `ORDER_HAS_LABEL` asks `coalesce(...) is not null`, so an **empty tracking number would have counted as a label**. `.min(1)` on all of them.
+
+      **Verification**: api **6018 passed | 0 failed**; web **3805 passed | 0 failed**; typecheck green across all three packages.
+work_sessions:
+  - start: '2026-08-31T08:31:28.497Z'
+    agent: claude-code
+    summary: Make PATCH /admin/orders/:id/shipping upsert the live order_shipments row instead of the jsonb the tracking page never reads
 related_tickets: []
 blocked_by:
   - ticket: 703
@@ -297,3 +359,17 @@ implementation_steps:
     command: 'git add packages/api/src/routes/admin/orders.ts packages/api/tests/routes/admin/order-shipping-upsert.test.ts && git commit -m "fix(api): make an admin-entered tracking number reach the customer"'
     status: pending
 current_step: 1
+started: '2026-08-31T08:31:25.045Z'
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: '5974 passed | 0 failed | 188 skipped (6162). Scoped: tests/routes/admin/order-shipping-upsert.test.ts 7/7 (new); admin orders + orders-audit + upsert = 140/140 across 3 files. Typecheck PASS across all three packages.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T08:37:17.276Z'
+completed: '2026-08-31T08:37:33.754Z'

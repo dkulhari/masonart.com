@@ -24,17 +24,80 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:26:01.271Z'
-last_updated: '2026-08-31T02:26:01.271Z'
+last_updated: '2026-08-31T09:38:42.898Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T09:03:24.030Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T09:12:17.040Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a5c522e6` - feat(web): show the shipment on order detail, not the store nobody writes
+
+      **Files Changed**:
+      - `packages/api/src/routes/tracking.ts` — helpers exported as `liveShipmentForOrder` / `trackingPayloadForOrder`
+      - `packages/api/src/routes/admin/orders.ts` — admin detail returns the whole shipment row
+      - `packages/api/src/routes/orders.ts` — customer detail goes through the tracking allow-list
+      - `packages/web/app/components/admin/OrderDetail.tsx` — new `Shipment` type, panel rewritten, form reseeded
+      - `packages/api/tests/routes/order-detail-shipment.test.ts` — new, 4 tests
+      - `packages/api/tests/routes/order-promotion-pricing.test.ts` — fixture gap
+
+      **Summary**:
+      Three surfaces still projected `orders.shipping_details`. Left alone, the admin types a tracking number, the save succeeds, and the panel it was typed into goes blank.
+
+      **The two sides get different shapes, deliberately:**
+      - **Admin gets the whole row**, including `costPaise`. Shipping is baked into the item price so the customer pays nothing for it — that makes what *we* paid the only number margin can be read from, and this is the screen it belongs on.
+      - **The customer goes through the same allow-list `/api/tracking/*` uses**, by *importing* it rather than rebuilding it. One definition of "what a customer may see about a parcel" means adding a dispatch column cannot widen this surface without widening the tracking page too. A test pins that nine internal fields (`costPaise`, `labelObjectToken`, the external ids, weight, dimensions, `pickupVendorId`) never appear.
+
+      **Two UI decisions:**
+      - The panel shows the **courier**, not the aggregator — `courierName` is the name on the delivery. It prefers the AWB over the internal tracking number for the same reason.
+      - It renders an **explicit empty state** instead of hiding itself. A panel that disappears when its data is missing is precisely how `orders.shipping_details` went unread for months; "No shipment yet" is a fact.
+
+      The shipping form is seeded from the same shipment, so the value it starts with and the value the save returns are one object.
+
+      **One fixture gap**, same class as #710: `order-promotion-pricing.test.ts` mocked a `db` with no `query.orderShipments`, so order detail 500'd once it resolved a shipment. That suite is about promotion figures, so "no shipment" is the right answer — the read just has to exist.
+
+      **Verification**:
+      - api: **6017 passed | 0 failed | 188 skipped (6205)**
+      - web: **180 files, 3805 passed | 0 failed**
+      - Scoped: new suite 4/4; web `tests/routes/admin` 524/524
+      - Typecheck: PASS across all three packages, `packages/web` included
+
+      **Note**: `packages/web` tests are not typechecked in this repo, so the component change was verified by rendering and by `tsc --noEmit` on the package, not by test types.
+  - author: system
+    timestamp: '2026-08-31T09:12:20.050Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-31T09:38:42.898Z'
+    text: |-
+      🔴 **Follow-up: two UI defects this ticket introduced, found by `/code-review high`**
+
+      **Fix commit**: `cb1628cf`
+
+      **1. The modal seeded `carrier` from `courierName`.** I wrote `carrier: order.shipment.courierName ?? order.shipment.carrier`. That field round-trips straight back into `order_shipments.carrier`, so the **first save overwrote the aggregator with the courier** — permanently destroying the very distinction this ticket introduced, and the one `getShippedTemplate` and the schema doc both rely on.
+
+      The panel still *displays* the courier (that is the name on the parcel). The field that round-trips now seeds from `carrier`.
+
+      **2. An ISO timestamp fed to `<input type="date">`.** `estimatedDeliveryAt` serialises as `2026-09-05T00:00:00.000Z`; a `date` input silently renders **blank** for anything that is not `YYYY-MM-DD`, and the blank then saved as `undefined`. Sliced to `.slice(0, 10)`.
+
+      Compounded with the #707 merge bug, opening the modal to change *anything* corrupted the carrier and nulled the stored estimated delivery.
+
+      **3. Four e2e tests I never checked.** `tests/e2e/admin-orders.spec.ts` still mocked `shippingDetails` and asserted `h3:has-text("Shipping Details")`, so it would have rendered the "No shipment yet" empty state and failed on all four assertions. Repointed to the shipment shape; the PATCH mock now returns `shipment` like the real route.
+
+      That last one is a gap in my verification, not just my code: my completion note said the component was "verified by rendering", and I ran the web **unit** suite — but I never grepped the e2e specs for the shape I had renamed. `packages/web` tests are not typechecked, so nothing else would have caught it.
+
+      **Verification**: api **6018 passed | 0 failed**; web **3805 passed | 0 failed**; `tsc --noEmit` clean on `packages/web`.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -272,3 +335,12 @@ implementation_steps:
     command: 'git add packages/api/src/routes packages/api/tests/routes/order-detail-shipment.test.ts packages/web/app/components/admin/OrderDetail.tsx packages/web/tests/routes/admin/order-detail-shipment.test.tsx && git commit -m "feat(web): show the shipment on order detail, not the store nobody writes"'
     status: pending
 current_step: 1
+started: '2026-08-31T09:03:24.030Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run; cd packages/web && bunx vitest run
+  test_output: 'api: 6017 passed | 0 failed | 188 skipped (6205). web: 180 files, 3805 passed | 0 failed. Scoped: tests/routes/order-detail-shipment.test.ts 4/4 (new); web tests/routes/admin 524/524. Typecheck PASS across all three packages including packages/web. One fixture in order-promotion-pricing.test.ts mocked a db with no query.orderShipments so order detail 500''d; fixed by adding the read.'
+  build_passed: true
+  build_command: turbo run typecheck
+  verified_at: '2026-08-31T09:12:03.153Z'
+completed: '2026-08-31T09:12:20.050Z'

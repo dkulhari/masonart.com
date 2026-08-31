@@ -42,12 +42,12 @@ description: |-
 feature: go-live
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T11:40:15.063Z'
-last_updated: '2026-08-30T11:40:15.063Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T08:30:44.154Z'
+time_spent_minutes: 10
 labels:
   - api
   - catalogue
@@ -55,8 +55,80 @@ labels:
   - go-live
   - images
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T08:20:21.970Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T08:30:36.935Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d17c1c5b` - feat(api): bulk catalogue import from a CSV manifest and media folder
+
+      **Files Changed**:
+      - `packages/api/src/database/import-catalogue.ts` — new: parseManifest, resolveMedia, importCatalogue, and the CLI
+      - `packages/api/tests/database/import-catalogue.test.ts` — new: manifest parsing (4 tests)
+      - `packages/api/tests/database/import-catalogue-media.test.ts` — new: media resolution + dry-run (4 tests)
+      - `packages/api/package.json` — registered `db:import-catalogue`
+
+      **Summary**:
+      `bun run db:import-catalogue --manifest <csv> --media-dir <dir>` creates products with their full image set from a CSV plus a folder of images. Flags: `--dry-run`, `--limit <n>`, `--force-media`.
+
+      Every image goes through `buildProductMedia`, so the square contract holds: main matted at 88%, art box measured, 4-size WebP ladder built, untouched source retained under `products/originals/`. Room mockups take the centred square.
+
+      Constraints from the ticket, and how each is met:
+      - **`--dry-run` writes nothing** — the database, storage and product-media modules are imported *inside* the write path, so a dry-run never loads anything capable of writing. Not a flag checked at each write site.
+      - **Per-row isolation** — failures collect with row number + sku, the run continues, the report prints in file order, exit code 1.
+      - **Idempotent on sku** — existing sku updates rather than duplicates; images left alone unless `--force-media`.
+      - **Orientation guard (#545)** — a row whose artwork contradicts its declared orientation fails and is reported; `orientationOverride` is the CSV escape hatch.
+      - **Storage env** — a real run refuses to start when `R2_ENDPOINT`/`R2_ACCESS_KEY`/`R2_SECRET_KEY`/`R2_BUCKET` are unset, since `storage.ts` otherwise falls back to the dev bucket and reports success.
+
+      Also added beyond the letter of the ticket, because a dry-run that misses them is not a pre-flight: duplicate sku and duplicate slug **within** the manifest are caught before any write, a slug already owned by a different sku in the database fails that row, and image filenames are constrained to bare names so `../../etc/passwd` in a cell cannot be opened and uploaded.
+
+      **Deviation from the ticket description**: `basePrice` requires two decimals (`/^\d+\.\d{2}$/`), which is stricter than the `/^\d+(\.\d{2})?$/` the description quotes from `createProductSchema`. The step-1 test fixture treats a bare `1499` as invalid, and the strictness is defensible for an unattended bulk load — nobody watches a 300-row manifest go in, so a truncating spreadsheet export should fail the dry-run rather than silently reprice the catalogue. Every price in `seed.ts` is already written in this form. Documented at the field.
+
+      **Also fixed**: the ticket's step commands (`bunx vitest run packages/api/tests/...` from the repo root) do not work — the root vitest config only includes `tests/**`. Correct form is `cd packages/api && bunx vitest run tests/database/<file>`.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/database/import-catalogue.test.ts tests/database/import-catalogue-media.test.ts`
+      - Result: PASS (8 tests, 8 passing)
+      - Command: `cd packages/api && bun run typecheck`
+      - Result: PASS (src + tests, clean)
+      - Command: `cd packages/api && VITEST_MAX_WORKERS=2 bunx vitest run` (full api suite)
+      - Result: 1 failed | 5942 passed | 187 skipped (6130). The single failure is `tests/database/shipping.test.ts` — `shipment_status` enum has 12 values, the test expects 7. Pre-existing drift from the dispatch-tracking work; this ticket touched no shipping code (`git status` shows only the 3 new files + one package.json line).
+
+      **Real dry-runs** against `.cache/seed-media/`:
+      - Good 2-row manifest: `rows validated 2 | created 0, updated 0, failed 0`, exit 0.
+      - 7-row manifest exercising every failure mode: `validated 1 | failed 6`, exit 1, each reported against its own line —
+        ```
+        ! row 2 BAD-1: slug: Slug must be lowercase alphanumeric with hyphens
+        ! row 3 BAD-2: basePrice: Invalid price format — write the paise, e.g. 1499.00
+        ! row 4 BAD-3: Not in --media-dir: nope-main.webp
+        ! row 5 BAD-4: mainImage: mainImage must be a filename inside --media-dir, not a path
+        ! row 6 BAD-5: orientation: Invalid enum value. Expected 'square' | 'portrait' | ...
+        ! row 8 IMP-002: Duplicate slug "good-row" — also used by sku IMP-001
+        ```
+      - Missing R2 env on a real run: refuses with `Storage is not configured — missing R2_ENDPOINT, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET.`, exit 1.
+      - Unknown flag `--dryrun`: refused with usage, exit 1.
+
+      **Not covered by this ticket**: no product ever gets a size/variant ladder from the importer — the manifest has no variant columns and `bun run seed` is what builds those today. A catalogue loaded through this tool has products and images but nothing purchasable until variants exist. Worth its own ticket before go-live.
+  - author: system
+    timestamp: '2026-08-31T08:30:39.568Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T08:20:24.945Z'
+    agent: claude-code
+    summary: 'Built the bulk catalogue importer across all 11 steps in one session. TDD throughout: two red/green cycles (parseManifest, then resolveMedia + importCatalogue), 8 tests passing. CLI, R2 env guard, per-row report and db:import-catalogue script added. Typecheck clean; full api suite 5942 passing with one pre-existing unrelated shipping-enum failure. Committed as d17c1c5b.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T08:30:44.150Z'
+    duration: '00:10:19'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -68,7 +140,7 @@ implementation_steps:
     file: packages/api/tests/database/import-catalogue.test.ts
     command: bunx vitest run packages/api/tests/database/import-catalogue.test.ts
     expected_result: FAIL - parseManifest is not exported from import-catalogue.ts
-    status: pending
+    status: done
     code: |-
       import { describe, it, expect } from 'vitest'
       import { parseManifest } from '../../src/database/import-catalogue'
@@ -152,26 +224,26 @@ implementation_steps:
     description: Confirm the manifest tests fail before any implementation exists
     command: bunx vitest run packages/api/tests/database/import-catalogue.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: 'Implement parseManifest: CSV to zod-validated rows mirroring createProductSchema, pipe-split array columns, per-row errors collected with row number and sku rather than thrown'
     file: packages/api/src/database/import-catalogue.ts
     expected_result: parseManifest exported and typed
-    status: pending
+    status: done
   - id: 4
     action: verify-pass
     description: Confirm the manifest parsing tests pass
     command: bunx vitest run packages/api/tests/database/import-catalogue.test.ts
     expected_result: PASS
-    status: pending
+    status: done
   - id: 5
     action: write-test
     description: 'Write failing tests for media resolution and dry-run: every referenced file must exist under the media dir, a missing file is a per-row error, and dry-run performs no upload and no DB write'
     file: packages/api/tests/database/import-catalogue-media.test.ts
     command: bunx vitest run packages/api/tests/database/import-catalogue-media.test.ts
     expected_result: FAIL - resolveMedia and importCatalogue are not exported
-    status: pending
+    status: done
     code: |-
       import { describe, it, expect, vi, beforeEach } from 'vitest'
       import { mkdtempSync, writeFileSync } from 'node:fs'
@@ -255,34 +327,52 @@ implementation_steps:
     description: Confirm the media and dry-run tests fail
     command: bunx vitest run packages/api/tests/database/import-catalogue-media.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 7
     action: implement
     description: 'Implement resolveMedia and the importCatalogue driver: resolve main + room-mockup files, run each through buildProductMedia, upsert the product on sku, isolate per-row failures, and short-circuit every write under --dry-run'
     file: packages/api/src/database/import-catalogue.ts
     expected_result: resolveMedia and importCatalogue exported; dry-run reaches neither buildProductMedia nor the database
-    status: pending
+    status: done
   - id: 8
     action: verify-pass
     description: Confirm the media and dry-run tests pass
     command: bunx vitest run packages/api/tests/database/import-catalogue-media.test.ts
     expected_result: PASS
-    status: pending
+    status: done
   - id: 9
     action: implement
     description: Add the CLI entrypoint (--manifest, --media-dir, --dry-run, --limit, --force-media), fail loudly when the R2 env vars are unset, print the per-row failure report, exit non-zero on any failure, and register db:import-catalogue in packages/api/package.json
     file: packages/api/src/database/import-catalogue.ts
     expected_result: bun run db:import-catalogue --manifest ... --media-dir ... --dry-run runs end to end
-    status: pending
+    status: done
   - id: 10
     action: verify-pass
     description: Run a real dry-run against a small hand-written manifest over .cache/seed-media/ and confirm it validates every row and writes nothing; then typecheck and run the full api suite for regressions
     command: cd packages/api && bun run typecheck && cd ../.. && bunx vitest run packages/api/tests
     expected_result: PASS - typecheck clean, no new failures against the main baseline
-    status: pending
+    status: done
   - id: 11
     action: commit
     description: Commit the importer
     command: 'git add packages/api/src/database/import-catalogue.ts packages/api/tests/database packages/api/package.json && git commit -m "feat(api): bulk catalogue import from a CSV manifest and media folder"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 11
+started: '2026-08-31T08:20:21.970Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:10:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:10:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && VITEST_MAX_WORKERS=2 bunx vitest run
+  test_output: 'Full api suite: 1 failed | 5942 passed | 187 skipped (6130). Files: 1 failed | 216 passed | 5 skipped (222). The single failure is tests/database/shipping.test.ts (shipment_status enum has 12 values, test expects 7) — pre-existing drift from the dispatch-tracking work, unrelated to this ticket. Ticket''s own tests: 8/8 pass across import-catalogue.test.ts and import-catalogue-media.test.ts.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T08:29:37.153Z'
+completed: '2026-08-31T08:30:39.568Z'
