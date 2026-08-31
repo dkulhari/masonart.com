@@ -313,7 +313,12 @@ describe('vendor create / read / update', () => {
   })
 
   it('updates a vendor', async () => {
-    queueRows({ 'update:vendors': [[{ ...vendorRow, status: 'suspended' }]] })
+    // The handler reads the row before it writes, so `vendor.updated` can carry
+    // a delta rather than the whole record (#670).
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[{ ...vendorRow, status: 'suspended' }]],
+    })
 
     const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
       ...json({ status: 'suspended' }),
@@ -326,7 +331,8 @@ describe('vendor create / read / update', () => {
   })
 
   it('404s a PATCH against an unknown vendor', async () => {
-    queueRows({ 'update:vendors': [[]] })
+    // The pre-write read is what 404s now; the UPDATE is never reached.
+    queueRows({ 'select:vendors': [[]], 'update:vendors': [[]] })
 
     const res = await buildApp().request(`/api/admin/vendors/${OTHER_ID}`, {
       ...json({ name: 'Ghost' }),

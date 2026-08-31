@@ -19,6 +19,7 @@ import { z } from "zod";
 import { eq, and, desc, asc, sql, gte, inArray } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { reviews, type ReviewStatus } from "../../database/schema/reviews";
 import { reviewMedia } from "../../database/schema/review-media";
 import { products } from "../../database/schema/products";
@@ -544,12 +545,14 @@ adminReviewsApp.delete("/:reviewId", async (c) => {
   }
 
   try {
-    // Get existing review for cache invalidation
+    /**
+     * The whole row, not just the ids the cache purge needs. This is a HARD
+     * delete: a moment after the statement below there is nothing left that
+     * describes what was removed, so this read is the only chance to capture it
+     * for the audit trail.
+     */
     const existingReview = await db
-      .select({
-        id: reviews.id,
-        productId: reviews.productId,
-      })
+      .select()
       .from(reviews)
       .where(eq(reviews.id, reviewId))
       .limit(1);
@@ -566,6 +569,35 @@ adminReviewsApp.delete("/:reviewId", async (c) => {
     // Deleting takes the review's media with it (cascade), so invalidate the
     // media and site-wide feeds as well as the product list.
     await invalidateReviewMediaCaches(review.productId);
+
+    /**
+     * The delta is INVERTED from the usual shape: the removed row goes in
+     * `before` and `after` is null. A row that says only "deleted" cannot
+     * answer whether the right review was taken down — and the review itself
+     * can no longer be consulted to check.
+     */
+    await recordAudit(c, {
+      action: "review.deleted",
+      entityType: "review",
+      entityId: reviewId,
+      summary:
+        `Deleted a ${review.rating}★ review on product ${review.productId}` +
+        (review.title ? ` ('${review.title}')` : ""),
+      before: {
+        productId: review.productId,
+        userId: review.userId,
+        rating: review.rating,
+        title: review.title,
+        content: review.content,
+        status: review.status,
+        // The order item is what makes a review a verified purchase; without it
+        // the row cannot answer whether a real customer was silenced.
+        orderItemId: review.orderItemId,
+        moderatorId: review.moderatorId,
+        createdAt: review.createdAt,
+      },
+      after: null,
+    });
 
     return c.json({
       message: "Review deleted successfully",
@@ -648,6 +680,27 @@ adminReviewsApp.delete("/:reviewId/media/:mediaId", async (c) => {
     await db.delete(reviewMedia).where(eq(reviewMedia.id, mediaId));
 
     await invalidateReviewMediaCaches(media.productId);
+
+    /**
+     * Inverted delta again, and here the row is doubly the only record: the
+     * database row is gone AND the stored objects were deleted above, so the
+     * URLs cannot be re-fetched to see what was taken down.
+     */
+    await recordAudit(c, {
+      action: "review_media.deleted",
+      entityType: "review_media",
+      entityId: mediaId,
+      summary: `Stripped one attachment from review ${reviewId}`,
+      before: {
+        reviewId: media.reviewId,
+        productId: media.productId,
+        url: media.url,
+        thumbnailUrl: media.thumbnailUrl,
+        posterUrl: media.posterUrl,
+        storageKeysDeleted: keys,
+      },
+      after: null,
+    });
 
     return c.json({
       message: "Review media deleted successfully",

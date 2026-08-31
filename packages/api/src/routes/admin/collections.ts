@@ -30,7 +30,7 @@ import {
 } from "@chobii/shared";
 
 import { db } from "../../database";
-import { recordAudit } from "../../lib/audit";
+import { diffRecords, recordAudit } from "../../lib/audit";
 import {
   collections,
   collectionProducts,
@@ -122,9 +122,15 @@ adminCollectionsApp.put(
        * Every id checked up front, so a bad one fails before any write rather
        * than partway through the reorder.
        */
+      /**
+       * `discoverOrder` is selected as well as `id` because it is the ONLY
+       * record of the order being replaced. The reorder overwrites it in place,
+       * so read here or the previous rail is unrecoverable a statement later.
+       */
+      let previousOrder: string[] = [];
       if (collectionIds.length > 0) {
         const found = await db
-          .select({ id: collections.id })
+          .select({ id: collections.id, discoverOrder: collections.discoverOrder })
           .from(collections)
           .where(inArray(collections.id, collectionIds));
 
@@ -133,6 +139,10 @@ adminCollectionsApp.put(
         if (unknown.length > 0) {
           return c.json({ error: "Unknown collection ids", unknown }, 400);
         }
+
+        previousOrder = [...found]
+          .sort((a, b) => (a.discoverOrder ?? 0) - (b.discoverOrder ?? 0))
+          .map((row) => row.id);
       }
 
       /**
@@ -152,6 +162,20 @@ adminCollectionsApp.put(
       });
 
       await bustCollectionCache();
+
+      /**
+       * One row for the rail, not one per collection: this is a single decision
+       * about an ordering, and N rows would make the timeline read as N edits.
+       * `entityId` is null for the same reason — the entity is the rail.
+       */
+      await recordAudit(c, {
+        action: "collection.updated",
+        entityType: "collection",
+        entityId: null,
+        summary: `Reordered the discover rail (${collectionIds.length} collections)`,
+        before: { discoverOrder: previousOrder },
+        after: { discoverOrder: collectionIds },
+      });
 
       return c.json({ success: true, ordered: collectionIds.length });
     } catch (error) {
@@ -222,10 +246,17 @@ adminCollectionsApp.put(
        * Clear and re-insert inside one transaction. A collection must never be
        * observable as empty midway through a reorder.
        */
-      await db.transaction(async (tx) => {
-        await tx
+      const previousMembers = await db.transaction(async (tx) => {
+        // RETURNING on the clear, rather than a SELECT before it: the rows are
+        // read and removed in one statement inside the same transaction, so
+        // there is no window where the two could disagree about what was there.
+        const cleared = await tx
           .delete(collectionProducts)
-          .where(eq(collectionProducts.collectionId, id));
+          .where(eq(collectionProducts.collectionId, id))
+          .returning({
+            productId: collectionProducts.productId,
+            position: collectionProducts.position,
+          });
 
         if (productIds.length > 0) {
           await tx.insert(collectionProducts).values(
@@ -236,9 +267,23 @@ adminCollectionsApp.put(
             }))
           );
         }
+
+        return [...cleared]
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+          .map((row) => row.productId);
       });
 
       await bustCollectionCache(collection.slug);
+
+      // A whole-list replace: what LEFT the collection is only visible here.
+      await recordAudit(c, {
+        action: "collection.updated",
+        entityType: "collection",
+        entityId: collection.id,
+        summary: `Set the member list of '${collection.slug}' to ${productIds.length} product(s)`,
+        before: { productIds: previousMembers },
+        after: { productIds },
+      });
 
       return c.json({ success: true, members: productIds.length });
     } catch (error) {
@@ -281,6 +326,27 @@ adminCollectionsApp.get("/:id", async (c) => {
     return c.json({ error: "Failed to fetch collection" }, 500);
   }
 });
+
+/**
+ * The keys a `collection.updated` delta reports on. Deliberately the same set
+ * the PATCH handler writes, minus `updatedAt` — a timestamp that moves on every
+ * patch would make every row look like a change and bury the one that was.
+ */
+const AUDITED_COLLECTION_KEYS = [
+  "slug",
+  "title",
+  "subtitle",
+  "description",
+  "kind",
+  "rule",
+  "imageUrl",
+  "isActive",
+  "showInDiscover",
+  "discoverOrder",
+  "sortOrder",
+  "seoTitle",
+  "seoDescription",
+] as const;
 
 // ============================================================================
 // POST / — create
@@ -365,6 +431,16 @@ adminCollectionsApp.patch(
     }
 
     try {
+      // Read before the write, so the audit row can carry a delta rather than
+      // the whole record. A patch touches a handful of keys out of thirteen.
+      const [before] = await db
+        .select()
+        .from(collections)
+        .where(eq(collections.id, id))
+        .limit(1);
+
+      if (!before) return c.json({ error: "Collection not found" }, 404);
+
       const [row] = await db
         .update(collections)
         .set(patch)
@@ -374,6 +450,22 @@ adminCollectionsApp.patch(
       if (!row) return c.json({ error: "Collection not found" }, 404);
 
       await bustCollectionCache(row.slug);
+
+      const delta = diffRecords(
+        before as unknown as Record<string, unknown>,
+        row as unknown as Record<string, unknown>,
+        // `updatedAt` moves on every patch and says nothing about intent.
+        AUDITED_COLLECTION_KEYS
+      );
+
+      await recordAudit(c, {
+        action: "collection.updated",
+        entityType: "collection",
+        entityId: row.id,
+        summary: `Updated collection '${row.slug}'`,
+        before: delta.before,
+        after: delta.after,
+      });
 
       return c.json({ collection: row });
     } catch (error) {

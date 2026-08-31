@@ -122,6 +122,20 @@ export const AUDIT_ACTIONS = [
   'shipping_config.updated',
   'wallet_config.updated',
   'vendor_rate.updated',
+  /**
+   * The supplier directory. `config`, not `money` — the rate card is what we
+   * PAY and it has its own action above; this pair is the record of who we buy
+   * from at all, and a vendor's `status` is what stops work being routed to
+   * them.
+   *
+   * There is deliberately NO `vendor.archived`. `vendor_status` is
+   * `active | inactive | suspended` (database/schema/vendors.ts) — nothing
+   * archives, and an action naming a state the column cannot hold would be
+   * dead the day it was declared. Suspending a supplier IS an update, and the
+   * delta is what says which way it went.
+   */
+  'vendor.created',
+  'vendor.updated',
 
   // Content
   'review.deleted',
@@ -207,6 +221,8 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'shipping_config.updated': 'config',
   'wallet_config.updated': 'config',
   'vendor_rate.updated': 'config',
+  'vendor.created': 'config',
+  'vendor.updated': 'config',
 
   'review.deleted': 'content',
   'review_media.deleted': 'content',

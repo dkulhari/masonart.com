@@ -65,6 +65,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../database";
+import { diffRecords, recordAudit } from "../../lib/audit";
 import {
   vendors,
   vendorContacts,
@@ -419,6 +420,21 @@ adminVendorsApp.post("/", zValidator("json", createVendorSchema), async (c) => {
       .values({ ...body, createdBy: user.id })
       .returning();
 
+    /**
+     * The `created_by` column already names the creator, so this row is not
+     * about attribution — it is about the DIRECTORY being searchable as one
+     * history alongside the rate card, which is audited from
+     * `routes/admin/vendor-rates.ts`. A supplier appearing and a supplier being
+     * priced are one story, and reading it should not require joining two.
+     */
+    await recordAudit(c, {
+      action: "vendor.created",
+      entityType: "vendor",
+      entityId: vendor!.id,
+      summary: `Added supplier '${vendor!.name}'`,
+      after: vendor as unknown as Record<string, unknown>,
+    });
+
     return c.json({ message: "Vendor created", vendor }, 201);
   } catch (error) {
     return c.json(failed("create vendor", error), 500);
@@ -486,6 +502,17 @@ adminVendorsApp.patch(
     const body = c.req.valid("json");
 
     try {
+      // Read first, so the row carries a delta. The one field that matters most
+      // is `status`: suspending a supplier stops work being routed to them, and
+      // the floor `admin.request` row can say WHO and WHEN but never WHICH WAY.
+      const [before] = await db
+        .select()
+        .from(vendors)
+        .where(eq(vendors.id, id))
+        .limit(1);
+
+      if (!before) return c.json({ error: "Vendor not found" }, 404);
+
       const [vendor] = await db
         .update(vendors)
         .set({ ...body, updatedAt: new Date() })
@@ -493,6 +520,26 @@ adminVendorsApp.patch(
         .returning();
 
       if (!vendor) return c.json({ error: "Vendor not found" }, 404);
+
+      const delta = diffRecords(
+        before as unknown as Record<string, unknown>,
+        vendor as unknown as Record<string, unknown>,
+        // Everything the PATCH body can carry. `updatedAt` moves on every write
+        // and would make a no-op patch look like a change.
+        Object.keys(body)
+      );
+
+      await recordAudit(c, {
+        action: "vendor.updated",
+        entityType: "vendor",
+        entityId: vendor.id,
+        summary:
+          before.status !== vendor.status
+            ? `Set supplier '${vendor.name}' to ${vendor.status} (was ${before.status})`
+            : `Updated supplier '${vendor.name}' (${Object.keys(delta.after ?? {}).join(", ") || "no change"})`,
+        before: delta.before,
+        after: delta.after,
+      });
 
       return c.json({ message: "Vendor updated", vendor });
     } catch (error) {

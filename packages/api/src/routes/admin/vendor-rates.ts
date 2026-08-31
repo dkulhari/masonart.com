@@ -57,6 +57,7 @@ import { z } from "zod";
 import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
 
 import { db } from "../../database";
+import { diffRecords, recordAudit } from "../../lib/audit";
 import {
   vendors,
   vendorRates,
@@ -349,6 +350,21 @@ adminVendorRatesApp.get(
   }
 );
 
+/**
+ * The band fields a `vendor_rate.updated` delta reports on. `updatedAt` is
+ * excluded deliberately: it moves on every write and would make a no-op patch
+ * look like a repricing.
+ */
+const AUDITED_RATE_KEYS = [
+  "kind",
+  "finish",
+  "longestEdgeMinInches",
+  "longestEdgeMaxInches",
+  "amount",
+  "effectiveFrom",
+  "effectiveTo",
+] as const;
+
 // ============================================================================
 // POST /api/admin/vendors/:id/rates
 // ============================================================================
@@ -450,6 +466,41 @@ adminVendorRatesApp.post(
           "It has been left in place, so this new rate expires then."
       );
 
+      /**
+       * Filed as `vendor_rate.updated` rather than a `.created` of its own: the
+       * audited thing is the CARD, and a new band for an already-priced band is
+       * a price change — the incumbent was closed in the same breath. The
+       * supersession is the delta, because a row showing only the new amount
+       * cannot answer "by how much did we just agree to pay more".
+       */
+      await recordAudit(c, {
+        action: "vendor_rate.updated",
+        entityType: "vendor_rate",
+        entityId: rate!.id,
+        summary: incumbent
+          ? `Repriced the ${candidate.kind} band ${candidate.longestEdgeMinInches}–${candidate.longestEdgeMaxInches}" ` +
+            `from ₹${incumbent.amount} to ₹${candidate.amount}`
+          : `Priced the ${candidate.kind} band ${candidate.longestEdgeMinInches}–${candidate.longestEdgeMaxInches}" at ₹${candidate.amount}`,
+        before: incumbent
+          ? {
+              rateId: incumbent.id,
+              amount: incumbent.amount,
+              effectiveFrom: incumbent.effectiveFrom,
+              effectiveTo: incumbent.effectiveTo,
+            }
+          : null,
+        after: {
+          amount: candidate.amount,
+          kind: candidate.kind,
+          finish: candidate.finish,
+          longestEdgeMinInches: candidate.longestEdgeMinInches,
+          longestEdgeMaxInches: candidate.longestEdgeMaxInches,
+          effectiveFrom: startsAt,
+          effectiveTo: candidate.effectiveTo,
+        },
+        metadata: { vendorId: id, supersededRateId: incumbent?.id ?? null },
+      });
+
       return c.json(
         {
           message: "Rate created",
@@ -548,6 +599,24 @@ adminVendorRatesApp.patch(
 
       if (!rate) return c.json({ error: "Rate not found" }, 404);
 
+      // `target` is the band as it stood, read above for the overlap check;
+      // reusing it costs nothing and gives the delta a real before.
+      const delta = diffRecords(
+        target as unknown as Record<string, unknown>,
+        candidate as unknown as Record<string, unknown>,
+        AUDITED_RATE_KEYS
+      );
+
+      await recordAudit(c, {
+        action: "vendor_rate.updated",
+        entityType: "vendor_rate",
+        entityId: rate.id,
+        summary: `Edited the ${candidate.kind} rate band (${Object.keys(delta.after ?? {}).join(", ") || "no change"})`,
+        before: delta.before,
+        after: delta.after,
+        metadata: { vendorId: id },
+      });
+
       return c.json({ message: "Rate updated", rate });
     } catch (error) {
       return c.json(failed("update vendor rate", error), 500);
@@ -602,6 +671,21 @@ adminVendorRatesApp.post(
         .returning();
 
       if (!rate) return c.json({ error: "Rate not found" }, 404);
+
+      // Closing is the only way a band ever ends — there is no DELETE — so this
+      // is the row that explains why a job assigned tomorrow prices differently
+      // from one assigned today.
+      await recordAudit(c, {
+        action: "vendor_rate.updated",
+        entityType: "vendor_rate",
+        entityId: rate.id,
+        summary:
+          `Closed the ${target.kind} band ${target.longestEdgeMinInches}–${target.longestEdgeMaxInches}" ` +
+          `(₹${target.amount}) with effect from ${endsAt.toISOString()}`,
+        before: { effectiveTo: target.effectiveTo },
+        after: { effectiveTo: endsAt },
+        metadata: { vendorId: id },
+      });
 
       return c.json({ message: "Rate closed", rate });
     } catch (error) {

@@ -298,6 +298,36 @@ adminPromotionsApp.post(
 
     await invalidatePricingCaches();
 
+    /**
+     * A promotion is created DISABLED. The row has to say so, or `promotion.
+     * enabled` later reads as the moment the discount was decided rather than
+     * the moment it went live — and the discount is the money question.
+     */
+    await recordAudit(c, {
+      action: "promotion.created",
+      entityType: "promotion",
+      entityId: created.id,
+      summary:
+        `Created promotion '${created.name}': ` +
+        `${created.discountValue}${created.discountType === "percentage" ? "%" : "₹"} off, ` +
+        `${created.isEnabled ? "enabled" : "disabled"}`,
+      after: {
+        name: created.name,
+        headline: created.headline,
+        discountType: created.discountType,
+        discountValue: created.discountValue,
+        scopeType: created.scopeType,
+        scopeFilter: created.scopeFilter,
+        membersOnly: created.membersOnly,
+        startsAt: created.startsAt,
+        endsAt: created.endsAt,
+        isEnabled: created.isEnabled,
+        priority: created.priority,
+        productIds: pinned,
+        excludedProductIds: excluded,
+      },
+    });
+
     return c.json(
       serialize(
         created,

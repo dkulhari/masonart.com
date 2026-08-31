@@ -1000,12 +1000,11 @@ adminProductsApp.patch(
     }
 
     try {
-      // Check if variant exists and belongs to product
+      // The whole row, not just the ids: this read is both the existence check
+      // and the `before` half of the audit delta. A price or stock edit is
+      // unexplainable without the value it replaced.
       const existingVariant = await db
-        .select({
-          id: productVariants.id,
-          productId: productVariants.productId,
-        })
+        .select()
         .from(productVariants)
         .where(
           and(
@@ -1018,6 +1017,8 @@ adminProductsApp.patch(
       if (existingVariant.length === 0) {
         return c.json({ error: "Variant not found" }, 404);
       }
+
+      const before = existingVariant[0]!;
 
       // Build update object
       const updateData: Record<string, unknown> = {};
@@ -1051,6 +1052,25 @@ adminProductsApp.patch(
 
       await purgeProductResponseCache();
 
+      // Narrow, like the product patch above it: only the keys this write
+      // touched, and only those that actually moved.
+      const delta = diffRecords(
+        before as unknown as Record<string, unknown>,
+        (updatedVariant ?? {}) as unknown as Record<string, unknown>,
+        Object.keys(updateData)
+      );
+
+      await recordAudit(c, {
+        action: "product_variant.updated",
+        entityType: "product_variant",
+        entityId: variantId,
+        // The size, not the id: a variant uuid names nothing to a reader, and
+        // "the 12x18 went up 50%" is the sentence the list column needs.
+        summary: `Edited the ${before.sizeLabel} variant (${Object.keys(delta.after ?? {}).join(", ") || "no change"})`,
+        before: delta.before,
+        after: delta.after,
+      });
+
       return c.json({
         message: "Variant updated successfully",
         variant: updatedVariant,
@@ -1076,12 +1096,10 @@ adminProductsApp.delete("/:id/variants/:variantId", async (c) => {
   }
 
   try {
-    // Check if variant exists and belongs to product
+    // The whole row, for the same reason the patch above reads one: it is the
+    // existence check AND the description of what was withdrawn.
     const existingVariant = await db
-      .select({
-        id: productVariants.id,
-        productId: productVariants.productId,
-      })
+      .select()
       .from(productVariants)
       .where(
         and(
@@ -1095,13 +1113,37 @@ adminProductsApp.delete("/:id/variants/:variantId", async (c) => {
       return c.json({ error: "Variant not found" }, 404);
     }
 
+    const before = existingVariant[0]!;
+
     // Delete variant (or soft delete by setting isActive = false)
-    await db
+    const [after] = await db
       .update(productVariants)
       .set({ isActive: false })
-      .where(eq(productVariants.id, variantId));
+      .where(eq(productVariants.id, variantId))
+      .returning();
 
     await purgeProductResponseCache();
+
+    /**
+     * A soft delete, so the row survives — but the storefront stops offering
+     * that size, and nothing on the row says who withdrew it or when. The
+     * `before` names the size and its price rather than only flipping a
+     * boolean, because "which size did we stop selling" is the question.
+     */
+    await recordAudit(c, {
+      action: "product_variant.deleted",
+      entityType: "product_variant",
+      entityId: variantId,
+      summary: `Withdrew the ${before.sizeLabel} variant of product ${id}`,
+      before: {
+        sizeLabel: before.sizeLabel,
+        variantSku: before.variantSku,
+        price: before.price,
+        stockQuantity: before.stockQuantity,
+        isActive: before.isActive,
+      },
+      after: { isActive: after?.isActive ?? false },
+    });
 
     return c.json({
       message: "Variant deleted successfully",

@@ -16,9 +16,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 import { db } from "../../database";
+import { recordAudit } from "../../lib/audit";
 import { aiGenerations } from "../../database/schema/ai-generations";
 import {
   aiGenerationReviews,
@@ -304,6 +305,69 @@ adminModerationApp.get("/:id", async (c) => {
 });
 
 // ============================================================================
+// Audit
+// ============================================================================
+
+/**
+ * Read the moderation status of the generations about to be acted on.
+ *
+ * The service layer returns only a count and a new status, so the state a
+ * generation moved FROM has to be captured here, before the call. It is the
+ * half of the row that makes a decision reviewable: "approved" says nothing;
+ * "approved, from flagged" says a second reviewer overrode the first.
+ *
+ * `ai_generation_reviews` already carries its own reviewer column, and this
+ * duplicates it deliberately — the `admin_audit_log` header states the reason:
+ * one table answers "who did what", always, without a reader having to know
+ * which feature keeps its own log.
+ */
+async function moderationStatuses(
+  ids: string[]
+): Promise<Map<string, string | null>> {
+  if (ids.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      id: aiGenerations.id,
+      moderationStatus: aiGenerations.moderationStatus,
+    })
+    .from(aiGenerations)
+    .where(inArray(aiGenerations.id, ids));
+
+  return new Map(rows.map((row) => [row.id, row.moderationStatus ?? null]));
+}
+
+/**
+ * One row per generation that ACTUALLY moved.
+ *
+ * The bulk helpers swallow per-id failures and return only totals, so the
+ * statuses are re-read afterwards and compared. Emitting a row per requested id
+ * would claim a moderation that never happened for every id in the failed
+ * count — the one thing an audit trail must never do.
+ */
+async function recordModerations(
+  c: Parameters<typeof recordAudit>[0],
+  before: Map<string, string | null>,
+  after: Map<string, string | null>,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  for (const [id, was] of before) {
+    const now = after.get(id) ?? null;
+    if (now === was) continue;
+
+    await recordAudit(c, {
+      action: "ai_generation.moderated",
+      entityType: "ai_generation",
+      entityId: id,
+      summary: `Moderated AI generation ${id}: ${was ?? "unset"} → ${now ?? "unset"}`,
+      before: { moderationStatus: was },
+      after: { moderationStatus: now },
+      metadata,
+    });
+  }
+}
+
+// ============================================================================
 // PATCH /api/admin/ai-moderation/:id - Moderate Generation
 // ============================================================================
 
@@ -333,6 +397,12 @@ adminModerationApp.patch(
     }
 
     try {
+      // Before the service call: it reports the new status but not the old one.
+      const before = await moderationStatuses([id]);
+      if (!before.has(id)) {
+        return c.json({ error: "Generation not found" }, 404);
+      }
+
       let result;
 
       switch (action) {
@@ -346,6 +416,25 @@ adminModerationApp.patch(
           result = await flagGeneration(id, user.id, reason || "Flagged for senior review");
           break;
       }
+
+      await recordAudit(c, {
+        action: "ai_generation.moderated",
+        entityType: "ai_generation",
+        entityId: id,
+        summary:
+          `Moderated AI generation ${id}: ` +
+          `${before.get(id) ?? "unset"} → ${result?.newStatus ?? action}`,
+        before: { moderationStatus: before.get(id) ?? null },
+        after: { moderationStatus: result?.newStatus ?? action },
+        // The reason and category are the decision itself, not a side note —
+        // a rejection with no recorded reason is unappealable.
+        metadata: {
+          decision: action,
+          reason: reason ?? null,
+          category: category ?? null,
+          reviewId: result?.reviewId ?? null,
+        },
+      });
 
       return c.json({
         message: `Generation ${action} successfully`,
@@ -374,7 +463,15 @@ adminModerationApp.post(
     const { generationIds } = c.req.valid("json");
 
     try {
+      const before = await moderationStatuses(generationIds);
       const result = await bulkApprove(generationIds, user.id);
+      const after = await moderationStatuses(generationIds);
+
+      await recordModerations(c, before, after, {
+        decision: "approved",
+        bulk: true,
+        requested: generationIds.length,
+      });
 
       return c.json({
         message: `Bulk approve completed`,
@@ -408,7 +505,17 @@ adminModerationApp.post(
     }
 
     try {
+      const before = await moderationStatuses(generationIds);
       const result = await bulkReject(generationIds, user.id, category, reason);
+      const after = await moderationStatuses(generationIds);
+
+      await recordModerations(c, before, after, {
+        decision: "rejected",
+        bulk: true,
+        requested: generationIds.length,
+        reason,
+        category,
+      });
 
       return c.json({
         message: `Bulk reject completed`,
