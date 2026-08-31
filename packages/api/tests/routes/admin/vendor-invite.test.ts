@@ -132,6 +132,17 @@ vi.mock('../../../src/auth', () => ({
   },
 }))
 
+// Stubbed rather than exercised, for the same reason `privilege-audit.test.ts`
+// stubs it: what matters here is WHICH action this route claims and what it
+// snapshots, not the insert `lib/audit.ts` already has its own suite for. It
+// also keeps the audit table out of `queries`, so the refusal assertions below
+// keep meaning "this route wrote nothing".
+const recordAudit = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+vi.mock('../../../src/lib/audit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/audit')>()),
+  recordAudit: (...args: unknown[]) => recordAudit(...args),
+}))
+
 import { adminVendorInviteApp } from '../../../src/routes/admin/vendor-invite'
 import { requireAuth } from '../../../src/middleware/auth'
 import { requireVendor } from '../../../src/middleware/vendor'
@@ -203,10 +214,23 @@ const json = (body: unknown, method = 'POST') => ({
 const invite = (body: unknown = { email: 'shop@printworks.test', name: 'Chennai Print Works' }) =>
   buildApp().request(`/api/admin/vendors/${VENDOR_ID}/invite`, json(body))
 
+/** The `AuditEntryInput` this route handed `recordAudit` for a given action. */
+function auditFor(action: string): Record<string, any> | undefined {
+  const call = recordAudit.mock.calls.find(
+    (args) => (args[1] as { action?: string } | undefined)?.action === action
+  )
+  return call?.[1] as Record<string, any> | undefined
+}
+
+const auditedActions = () =>
+  recordAudit.mock.calls.map((args) => (args[1] as { action: string }).action)
+
 beforeEach(() => {
   queries.length = 0
   rowQueues.clear()
   failNext.clear()
+  recordAudit.mockClear()
+  recordAudit.mockResolvedValue(undefined)
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('admin'))
   mockSignUpEmail.mockReset()
@@ -410,6 +434,158 @@ describe('invite refusals', () => {
 
     const bad = await invite({ email: 'not-an-email' })
     expect(bad.status).toBe(400)
+  })
+})
+
+// ============================================================================
+// The privilege trail
+// ============================================================================
+
+describe('the privilege trail', () => {
+  const NEW_ACCOUNT = {
+    'select:vendors': [[{ id: VENDOR_ID, name: 'Chennai Print Works' }]],
+    'select:user': [[]],
+    'update:user': [[{ id: NEW_USER_ID, email: 'shop@printworks.test', role: 'vendor' }]],
+    'insert:vendor_users': [[{ id: 'link-1', vendorId: VENDOR_ID, userId: NEW_USER_ID }]],
+  }
+
+  it('records BOTH the minted account and the invite that minted it', async () => {
+    queueRows(NEW_ACCOUNT)
+
+    const res = await invite()
+    expect(res.status).toBe(201)
+
+    // This is the only route in the codebase that mints a privileged account.
+    // Before this, the sole trace was the middleware's floor row, filed under
+    // `config` — so the `privilege` filter, one of the two launch-gate
+    // categories, did not show it at all.
+    expect(auditedActions()).toEqual(['vendor.user_created', 'vendor.invited'])
+
+    const created = auditFor('vendor.user_created')
+    expect(created).toMatchObject({ entityType: 'user', entityId: NEW_USER_ID })
+    expect(created?.outcome ?? 'success').toBe('success')
+    expect(created?.before ?? null).toBeNull()
+
+    // `actor_email` is the admin who SENT the invite. The invitee's address is
+    // the subject of the action, so it is snapshotted into the row itself —
+    // the account can be renamed or deleted afterwards and the row still says
+    // who was let in.
+    expect(created?.after).toMatchObject({
+      id: NEW_USER_ID,
+      email: 'shop@printworks.test',
+      role: 'vendor',
+      vendorId: VENDOR_ID,
+    })
+
+    const invited = auditFor('vendor.invited')
+    expect(invited).toMatchObject({ entityType: 'vendor', entityId: VENDOR_ID })
+    expect(invited?.after).toMatchObject({
+      email: 'shop@printworks.test',
+      userId: NEW_USER_ID,
+      created: true,
+    })
+  })
+
+  it('writes the rows independently, not inside the grant transaction', async () => {
+    queueRows(NEW_ACCOUNT)
+
+    expect((await invite()).status).toBe(201)
+
+    // `recordAudit(c, entry, tx)` rethrows into the caller's transaction on
+    // failure. These rows are written after that transaction has already
+    // committed, so they assert something true and cannot take the grant down
+    // with them — two arguments, never three.
+    expect(recordAudit).toHaveBeenCalledTimes(2)
+    for (const call of recordAudit.mock.calls) expect(call).toHaveLength(2)
+
+    expect(queries.filter((q) => q.on === 'tx').map((q) => `${q.op}:${q.table}`)).toEqual([
+      'update:user',
+      'insert:vendor_users',
+    ])
+  })
+
+  it('records an adopted existing account as an invite and not as a new account', async () => {
+    queueRows({
+      'select:vendors': [[{ id: VENDOR_ID, name: 'Chennai Print Works' }]],
+      'select:user': [[{ id: 'user_existing', email: 'shop@printworks.test', role: 'vendor' }]],
+      'select:vendor_users': [[]],
+      'insert:vendor_users': [[{ id: 'link-2', vendorId: VENDOR_ID, userId: 'user_existing' }]],
+    })
+
+    const res = await invite()
+    expect(res.status).toBe(201)
+
+    // Nothing was minted, but access to a vendor's data was granted, which is
+    // the privilege change worth filing.
+    expect(auditedActions()).toEqual(['vendor.invited'])
+    expect(auditFor('vendor.invited')?.after).toMatchObject({
+      email: 'shop@printworks.test',
+      userId: 'user_existing',
+      created: false,
+    })
+  })
+
+  it('leaves evidence in both directions when the invite is rolled back', async () => {
+    // Better Auth mints the account outside the transaction, so a link failure
+    // means created-then-deleted. Unrecorded, that sequence is invisible from
+    // both ends: no account to find, and nothing saying one ever existed.
+    queueRows({
+      'select:vendors': [[{ id: VENDOR_ID, name: 'Chennai Print Works' }]],
+      'select:user': [[]],
+      'update:user': [[{ id: NEW_USER_ID, email: 'shop@printworks.test', role: 'vendor' }]],
+    })
+    failNext.set('insert:vendor_users', new Error('link insert exploded'))
+
+    const res = await invite()
+    expect(res.status).toBeGreaterThanOrEqual(400)
+
+    const created = auditFor('vendor.user_created')
+    expect(created).toMatchObject({
+      entityType: 'user',
+      entityId: NEW_USER_ID,
+      outcome: 'failure',
+    })
+    expect(created?.before).toMatchObject({ id: NEW_USER_ID, email: 'shop@printworks.test' })
+    expect(created?.after ?? null).toBeNull()
+    expect(created?.metadata).toMatchObject({ orphanRemoved: true })
+
+    expect(auditFor('vendor.invited')).toMatchObject({
+      entityType: 'vendor',
+      entityId: VENDOR_ID,
+      outcome: 'failure',
+    })
+  })
+
+  it('says in the row when the cleanup failed and the account is still out there', async () => {
+    queueRows({
+      'select:vendors': [[{ id: VENDOR_ID, name: 'Chennai Print Works' }]],
+      'select:user': [[]],
+      'update:user': [[{ id: NEW_USER_ID, email: 'shop@printworks.test', role: 'vendor' }]],
+    })
+    const uniqueViolation = Object.assign(new Error('duplicate key value'), { code: '23505' })
+    failNext.set('insert:vendor_users', uniqueViolation)
+    failNext.set('delete:user', new Error('cleanup delete exploded'))
+
+    const res = await invite()
+    expect(res.status).toBe(422)
+
+    // The logged orphan warning is for us; the row is for whoever reads the
+    // privilege filter later and needs to know the account was NOT removed.
+    expect(auditFor('vendor.user_created')?.metadata).toMatchObject({ orphanRemoved: false })
+  })
+
+  it('claims the request, so the floor row does not also file it under config', async () => {
+    queueRows(NEW_ACCOUNT)
+
+    await invite()
+
+    // `recordAudit` sets `audited` on the context and `middleware/audit.ts`
+    // skips its coarse `admin.request` row when it sees it. Stubbed here, so
+    // the guarantee is that the route calls it at all — one action, one row.
+    expect(recordAudit).toHaveBeenCalled()
+    for (const call of recordAudit.mock.calls) {
+      expect(typeof (call[0] as { set?: unknown })?.set).toBe('function')
+    }
   })
 })
 

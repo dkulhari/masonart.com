@@ -40,6 +40,26 @@
  * Suspension is deliberately NOT handled here. `requireVendor` already refuses
  * a login whose vendor is not active; a second mechanism would be a second
  * thing to get wrong.
+ *
+ * **The privilege trail is written here or nowhere.** This is the only route
+ * that mints an account and attaches a role to it, so `vendor.user_created` and
+ * `vendor.invited` — both `privilege`, one of the two launch-gate categories —
+ * have no other emitter. Three rules govern how they are written:
+ *
+ * 1. *After the transaction, never inside it.* The grant has already committed
+ *    by then, so the row asserts something true, and a shared transaction would
+ *    rethrow an audit failure into a grant that had nothing wrong with it.
+ * 2. *The rollback path writes its own pair.* Better Auth mints the account
+ *    outside our transaction, so a link failure means created-then-deleted —
+ *    a sequence that, unrecorded, is invisible from both ends. The failure rows
+ *    say the account existed and whether the compensating delete actually got
+ *    it.
+ * 3. *The invitee's address goes in the row.* `actor_email` is the admin who
+ *    sent the invite; who was let in is the subject of the action, and the
+ *    account it names can be renamed or deleted afterwards.
+ *
+ * The refusals above (409, 422) mint nothing and grant nothing, so they claim
+ * no precise row — `middleware/audit.ts` still files the attempt.
  */
 
 import { Hono } from "hono";
@@ -59,6 +79,7 @@ import {
 } from "../../middleware/auth";
 import { isUniqueViolation } from "../../lib/pg-errors";
 import { logger } from "../../lib/logger";
+import { recordAudit } from "../../lib/audit";
 
 // ============================================================================
 // Validation
@@ -171,6 +192,17 @@ const adminVendorInviteRoute = adminVendorInviteApp.post(
           throw error;
         }
 
+        // Nothing was minted, but an existing login just gained access to this
+        // vendor's orders, payables and artwork. That is a privilege grant and
+        // is filed as one.
+        await recordAudit(c, {
+          action: "vendor.invited",
+          entityType: "vendor",
+          entityId: id,
+          summary: `Linked the existing vendor login ${email} to ${vendor.name ?? id}`,
+          after: { email, userId: existing.id, created: false },
+        });
+
         return c.json(
           {
             message: "Existing vendor account linked",
@@ -236,14 +268,50 @@ const adminVendorInviteRoute = adminVendorInviteApp.post(
         // masking a UNIQUE violation turns a clear 422 ("already linked to a
         // vendor") into an opaque 500. The orphan account is the lesser
         // problem and is recoverable; a misreported cause is not.
+        let orphanRemoved = false;
         try {
           await db.delete(users).where(eq(users.id, newUserId));
+          orphanRemoved = true;
         } catch (cleanupError) {
           logger.error(
             { err: cleanupError, userId: newUserId, vendorId: id },
             "vendor invite rollback left an orphan account"
           );
         }
+
+        // Evidence in both directions. Written independently of the
+        // transaction that just rolled back — a row describing a rollback,
+        // written inside it, rolls back with it and erases the thing it exists
+        // to preserve.
+        //
+        // `orphanRemoved` is the one fact a reader cannot get anywhere else:
+        // the logged warning above is ours, but whoever opens the privilege
+        // filter next month needs to know whether that account is still out
+        // there with a role on it.
+        const reason = error instanceof Error ? error.message : "Unknown error";
+
+        await recordAudit(c, {
+          action: "vendor.user_created",
+          entityType: "user",
+          entityId: newUserId,
+          outcome: "failure",
+          summary: orphanRemoved
+            ? `Rolled back: the account minted for ${email} was removed again because the vendor link failed`
+            : `Rolled back: the account minted for ${email} could NOT be removed and is an orphan with no vendor link`,
+          before: { id: newUserId, email },
+          after: null,
+          metadata: { orphanRemoved, reason },
+        });
+
+        await recordAudit(c, {
+          action: "vendor.invited",
+          entityType: "vendor",
+          entityId: id,
+          outcome: "failure",
+          summary: `Refused: ${email} could not be linked to ${vendor.name ?? id}`,
+          after: { email, userId: newUserId, created: false },
+          metadata: { orphanRemoved, reason },
+        });
 
         if (isUniqueViolation(error)) {
           return c.json(
@@ -255,6 +323,34 @@ const adminVendorInviteRoute = adminVendorInviteApp.post(
         }
         throw error;
       }
+
+      // The account and the link are committed. Two rows, because they answer
+      // two different questions: `vendor.user_created` is "a new login exists
+      // and it carries a role", which an intrusion review starts from, and
+      // `vendor.invited` is "this vendor gained a user", which is what someone
+      // auditing a single supplier filters on.
+      await recordAudit(c, {
+        action: "vendor.user_created",
+        entityType: "user",
+        entityId: newUserId,
+        summary: `Created the vendor login ${email} for ${vendor.name ?? id}`,
+        before: null,
+        after: {
+          id: newUserId,
+          email,
+          name: invitedUser.user.name ?? name ?? null,
+          role: "vendor",
+          vendorId: id,
+        },
+      });
+
+      await recordAudit(c, {
+        action: "vendor.invited",
+        entityType: "vendor",
+        entityId: id,
+        summary: `Invited ${email} to ${vendor.name ?? id} as a new vendor login`,
+        after: { email, userId: newUserId, created: true },
+      });
 
       // Delivery of the credential is best-effort ON PURPOSE. The account and
       // the link are committed; failing the request now would send the admin
