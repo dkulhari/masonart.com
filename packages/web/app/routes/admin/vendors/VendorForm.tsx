@@ -24,6 +24,7 @@ export interface VendorFormValues {
   state: string
   postalCode: string
   country: string
+  shiprocketPickupLocation: string
   notes: string
 }
 
@@ -36,6 +37,7 @@ export const EMPTY_VENDOR: VendorFormValues = {
   state: '',
   postalCode: '',
   country: 'IN',
+  shiprocketPickupLocation: '',
   notes: '',
 }
 
@@ -55,6 +57,7 @@ export function vendorPayload(values: VendorFormValues) {
     state: orNull(values.state),
     postalCode: orNull(values.postalCode),
     country: orNull(values.country),
+    shiprocketPickupLocation: orNull(values.shiprocketPickupLocation),
     notes: orNull(values.notes),
   }
 }
@@ -202,6 +205,38 @@ export function VendorForm({
             className={field}
           />
         </label>
+
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          {/* The hint sits OUTSIDE the label on purpose. A <label> that wraps
+              its input contributes all of its text to that input's accessible
+              name, so help text inside it becomes part of the name the field
+              answers to — and every getByLabel for it. */}
+          <label
+            className="flex flex-col gap-1 text-sm font-medium"
+            htmlFor="vendor-shiprocket-pickup"
+          >
+            Shiprocket pickup location
+            <input
+              id="vendor-shiprocket-pickup"
+              maxLength={200}
+              placeholder="e.g. Andheri Warehouse"
+              value={values.shiprocketPickupLocation}
+              onChange={(e) => set('shiprocketPickupLocation', e.target.value)}
+              className={field}
+              aria-describedby="vendor-shiprocket-pickup-hint"
+              data-testid="vendor-form-shiprocket-pickup"
+            />
+          </label>
+          <span
+            id="vendor-shiprocket-pickup-hint"
+            className="text-xs text-muted-foreground"
+          >
+            The pickup location's nickname as registered in your Shiprocket
+            dashboard — not the address above. An address typed here is accepted
+            by us and rejected by Shiprocket at dispatch. Leave empty if this
+            vendor has none.
+          </span>
+        </div>
 
         <label className="flex flex-col gap-1 text-sm font-medium sm:col-span-2">
           Notes

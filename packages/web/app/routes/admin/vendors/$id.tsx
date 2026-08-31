@@ -74,6 +74,7 @@ export interface AdminVendor {
   state: string | null
   postalCode: string | null
   country: string | null
+  shiprocketPickupLocation: string | null
   notes: string | null
   createdAt: string
   updatedAt: string
@@ -987,6 +988,10 @@ function toFormValues(vendor: AdminVendor): VendorFormValues {
     state: vendor.state ?? '',
     postalCode: vendor.postalCode ?? '',
     country: vendor.country ?? '',
+    // Load-bearing. Omit this and opening the form shows an empty box for a
+    // vendor that HAS a pickup location, and the first save sends null and
+    // wipes it — the #707 partial-update failure, one form along.
+    shiprocketPickupLocation: vendor.shiprocketPickupLocation ?? '',
     notes: vendor.notes ?? '',
   }
 }

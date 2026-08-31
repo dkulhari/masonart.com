@@ -520,3 +520,131 @@ describe('module exports', () => {
     expect(source).toContain('app.route("/api/admin/vendors", adminVendorsApp)')
   })
 })
+
+// ============================================================================
+// Shiprocket pickup nickname (#723)
+// ============================================================================
+
+describe('the Shiprocket pickup nickname', () => {
+  /** Long enough to be legal, so the cap is the only thing that can reject it. */
+  const NICKNAME = 'Chobii Warehouse #2 (Andheri East)'
+
+  it('accepts a pasted nickname and writes it to the column', async () => {
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[{ ...vendorRow, shiprocketPickupLocation: NICKNAME }]],
+    })
+
+    const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: NICKNAME }),
+      method: 'PATCH',
+    })
+    expect(res.status).toBe(200)
+
+    const written = recorder.updates(vendors)[0]?.values as Record<string, unknown>
+    expect(written.shiprocketPickupLocation).toBe(NICKNAME)
+  })
+
+  it('keeps inner spaces, case and punctuation exactly as pasted', async () => {
+    // The nickname is whoever registered it in Shiprocket's dashboard. Any
+    // normalisation here produces a value that looks right and matches nothing
+    // on their side, and it fails at dispatch rather than on this screen.
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[vendorRow]],
+    })
+
+    await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: NICKNAME }),
+      method: 'PATCH',
+    })
+
+    const written = recorder.updates(vendors)[0]?.values as Record<string, unknown>
+    expect(written.shiprocketPickupLocation).toBe('Chobii Warehouse #2 (Andheri East)')
+  })
+
+  it('trims the surrounding whitespace a paste drags in', async () => {
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[vendorRow]],
+    })
+
+    await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: `  ${NICKNAME}  ` }),
+      method: 'PATCH',
+    })
+
+    const written = recorder.updates(vendors)[0]?.values as Record<string, unknown>
+    expect(written.shiprocketPickupLocation).toBe(NICKNAME)
+  })
+
+  it('stores null, never an empty string, when the field is cleared', async () => {
+    // #670: an empty string satisfies `IS NOT NULL`, so "" would read as a
+    // configured pickup location to anything that checks for one.
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[vendorRow]],
+    })
+
+    const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: '   ' }),
+      method: 'PATCH',
+    })
+    expect(res.status).toBe(200)
+
+    const written = recorder.updates(vendors)[0]?.values as Record<string, unknown>
+    expect(written.shiprocketPickupLocation).toBeNull()
+  })
+
+  it('accepts an explicit null', async () => {
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[vendorRow]],
+    })
+
+    const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: null }),
+      method: 'PATCH',
+    })
+    expect(res.status).toBe(200)
+
+    const written = recorder.updates(vendors)[0]?.values as Record<string, unknown>
+    expect(written.shiprocketPickupLocation).toBeNull()
+  })
+
+  it('refuses a nickname past the cap', async () => {
+    // The column is unbounded `text` (pinned in
+    // tests/database/vendor-shiprocket-pickup.test.ts), so this cap is ours and
+    // cannot be exceeded by the storage. The dispatch review found a 100-char
+    // zod cap over a varchar(64); the pairing is asserted on both sides so that
+    // cannot recur here.
+    const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: 'x'.repeat(201) }),
+      method: 'PATCH',
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('accepts a nickname exactly at the cap', async () => {
+    queueRows({
+      'select:vendors': [[vendorRow]],
+      'update:vendors': [[vendorRow]],
+    })
+
+    const res = await buildApp().request(`/api/admin/vendors/${VENDOR_ID}`, {
+      ...json({ shiprocketPickupLocation: 'x'.repeat(200) }),
+      method: 'PATCH',
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it('is settable when a vendor is created', async () => {
+    queueRows({ 'insert:vendors': [[{ ...vendorRow, shiprocketPickupLocation: NICKNAME }]] })
+
+    const res = await buildApp().request('/api/admin/vendors', {
+      ...json({ name: 'New Framer', shiprocketPickupLocation: NICKNAME }),
+      method: 'POST',
+    })
+    expect(res.status).toBe(201)
+  })
+})

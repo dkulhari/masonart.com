@@ -59,6 +59,18 @@ describe('vendors carries a Shiprocket pickup nickname', () => {
     expect(config.foreignKeys.some((fk) => fk.reference().columns.some((c) => c.name === 'shiprocket_pickup_location'))).toBe(false);
   });
 
+  it('is unbounded, so the zod cap is the only limit', () => {
+    // The other side of this pairing is `routes/admin/vendors.ts`, which caps
+    // the field at 200. That cap is a product decision, not a storage one, and
+    // it is safe only while the column has no length of its own. The dispatch
+    // review found a 100-char zod cap sitting over a varchar(64) — a value the
+    // API accepted and the database refused. Asserting from both sides is what
+    // stops that recurring.
+    const column = columnByName.get('shiprocket_pickup_location');
+    expect(column!.columnType).toBe('PgText');
+    expect((column as unknown as { length?: number }).length).toBeUndefined();
+  });
+
   it('leaves the address columns alone', () => {
     // The whole point of the decision: these coexist with the nickname and
     // never produce it.

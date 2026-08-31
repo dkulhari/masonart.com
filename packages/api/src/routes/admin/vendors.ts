@@ -175,6 +175,25 @@ const createVendorSchema = z.object({
   postalCode: z.string().max(20).nullish(),
   country: z.string().max(2).nullish(),
   notes: z.string().max(2000).nullish(),
+  /**
+   * The nickname of a pickup address as registered in Shiprocket's own
+   * dashboard. An admin pastes it; nothing derives it from the address fields
+   * above (#721).
+   *
+   * Trimmed, and a blank becomes NULL rather than "". An empty string
+   * satisfies `IS NOT NULL`, so "" would read as a configured pickup location
+   * to anything that checks for one - the #670 property.
+   *
+   * The cap is ours: the column is unbounded `text`, so storage cannot be the
+   * thing that rejects a value. Asserted from both sides, because the dispatch
+   * review found a 100-char cap sitting over a varchar(64).
+   */
+  shiprocketPickupLocation: z
+    .string()
+    .trim()
+    .max(200)
+    .transform((value) => (value === "" ? null : value))
+    .nullish(),
 });
 
 const updateVendorSchema = createVendorSchema
