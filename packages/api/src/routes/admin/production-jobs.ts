@@ -114,7 +114,7 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { qcShotsForStage, requiredQcSlots } from "@chobii/shared";
 
 import { db } from "../../database";
@@ -127,11 +127,8 @@ import {
   productionJobStatusEnum,
   productionJobVerdictEnum,
 } from "../../database/schema/production-jobs";
-import {
-  orders,
-  orderItems,
-  type OrderShippingDetails,
-} from "../../database/schema/orders";
+import { orders, orderItems } from "../../database/schema/orders";
+import { orderShipments } from "../../database/schema/shipping";
 import {
   orderConsolidation,
   productionTransfers,
@@ -709,11 +706,23 @@ const GUARD_OWNER: Record<
   "shot-list-complete": "the vendor portal's QC submission",
 };
 
-/** An AWB, a tracking number or a shipment id — any one of them is a label. */
-function orderShippingLabel(details: OrderShippingDetails | null): string | null {
-  return details
-    ? (details.awbNumber ?? details.trackingNumber ?? details.shipmentId ?? null)
-    : null;
+/** A label object token, an AWB or a tracking number — any one is a label. */
+function shipmentLabelHandle(shipment: {
+  id: string;
+  labelObjectToken: string | null;
+  awbNumber: string | null;
+  trackingNumber: string | null;
+} | undefined): string | null {
+  if (!shipment) return null;
+
+  // The AWB first: it is the handle a courier and a dispute both use. The row
+  // id is the last resort, so "a label exists" is never reported as "no label"
+  // just because the carrier fields have not come back yet.
+  return (
+    shipment.awbNumber ??
+    shipment.trackingNumber ??
+    (shipment.labelObjectToken ? shipment.id : null)
+  );
 }
 
 /**
@@ -763,13 +772,41 @@ async function despatchEvidence(
     };
   }
 
-  const [order] = await tx
-    .select({ shippingDetails: orders.shippingDetails })
-    .from(orders)
-    .where(eq(orders.id, job.orderId))
+  // The order already carries a label: the consolidator handed the goods to
+  // the courier. `evaluateLabelReadiness` reads this same case as "dispatched
+  // and on no inter-vendor transfer".
+  //
+  // LIVE only. A voided label is evidence a label was bought and then killed,
+  // not that anything left the building — and it must not satisfy the edge.
+  // Reads `order_shipments`, not `orders.shipping_details`: #707 stopped
+  // writing that jsonb, so this guard would otherwise answer `false` for every
+  // order forever and make the `dispatched` edge untakeable.
+  const [shipment] = await tx
+    .select({
+      id: orderShipments.id,
+      labelObjectToken: orderShipments.labelObjectToken,
+      awbNumber: orderShipments.awbNumber,
+      trackingNumber: orderShipments.trackingNumber,
+    })
+    .from(orderShipments)
+    .where(
+      and(
+        eq(orderShipments.orderId, job.orderId),
+        isNull(orderShipments.voidedAt),
+        or(
+          isNotNull(orderShipments.labelObjectToken),
+          isNotNull(orderShipments.awbNumber),
+          isNotNull(orderShipments.trackingNumber)
+        )
+      )
+    )
     .limit(1);
 
-  const label = orderShippingLabel(order?.shippingDetails ?? null);
+  // Admin-side, and this `detail` is an AUDIT payload rather than a
+  // vendor-facing projection — naming the handle is what lets a dispute say
+  // WHICH label the edge was taken on. R1 constrains the supplier boundary
+  // (`lib/vendor-scope.ts`), not this one.
+  const label = shipmentLabelHandle(shipment);
 
   return label
     ? { satisfied: true, detail: { basis: "order_label", orderLabel: label } }

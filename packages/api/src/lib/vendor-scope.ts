@@ -857,18 +857,38 @@ const VENDOR_JOB_COLUMNS = {
 }
 
 /**
- * Does the order carry a shipping label?
+ * Does the order carry a LIVE shipping label?
  *
- * The same three fields `routes/admin/production-jobs.ts` reads for the same
- * guard, asked as a BOOLEAN rather than fetched: the AWB is a courier's handle
- * on a customer's parcel, and R1 says no vendor-facing projection names it. The
- * vendor needs the answer, never the value.
+ * Asked as a BOOLEAN rather than fetched: the AWB is a courier's handle on a
+ * customer's parcel, and R1 says no vendor-facing projection names it. The
+ * vendor needs the answer, never the value. That part is unchanged.
+ *
+ * What changed is the STORE. This used to coalesce three fields out of
+ * `orders.shipping_details`, which `order-dispatch-tracking` stopped writing in
+ * #707 — so the guard would have answered `false` for every order forever, and
+ * a consolidator could never have taken the `dispatched` edge again. An edge
+ * nothing in the codebase can take is the failure
+ * `lib/production-transitions.ts` exists to prevent.
+ *
+ * Three handles, any one of which is a label: the token means we bought one,
+ * the AWB and the tracking number mean a courier acknowledged it.
+ *
+ * `voided_at is null` is not decoration. A dead label is evidence that a label
+ * was bought and then killed, not that anything was handed to a courier — and
+ * letting it satisfy this guard would let a job report itself despatched on a
+ * parcel that does not exist.
  */
-const ORDER_HAS_LABEL = sql<boolean>`coalesce(
-  ${orders.shippingDetails} ->> 'awbNumber',
-  ${orders.shippingDetails} ->> 'trackingNumber',
-  ${orders.shippingDetails} ->> 'shipmentId'
-) is not null`
+const ORDER_HAS_LABEL = sql<boolean>`exists (
+  select 1
+  from ${orderShipments}
+  where ${orderShipments.orderId} = ${orders.id}
+    and ${orderShipments.voidedAt} is null
+    and coalesce(
+      ${orderShipments.labelObjectToken},
+      ${orderShipments.awbNumber},
+      ${orderShipments.trackingNumber}
+    ) is not null
+)`
 
 /**
  * The guard the matrix NAMES on this edge, evaluated or refused.
