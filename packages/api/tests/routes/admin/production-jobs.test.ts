@@ -2750,6 +2750,41 @@ describe('POST /api/admin/orders/:orderId/consolidator', () => {
     expect(audits()).toHaveLength(0)
   })
 
+  /**
+   * An empty body is the SYSTEM proposing, and the system may confirm what it
+   * would have chosen anyway — it may not un-decide what a person decided.
+   *
+   * The no-op short-circuit required `decided_by` to match too, so on a
+   * sole-vendor order an admin had already confirmed, a bare repost fell past
+   * it, past the override guard (the vendor has not changed) and rewrote the
+   * row with `decided_by = NULL` — which the trail documents as "there was
+   * nothing to choose".
+   */
+  it('never downgrades an admin decision to a system default', async () => {
+    seed({ existing: { vendorId: VENDOR_ID, decidedBy: 'admin-user-1' } })
+
+    const res = await setConsolidator()
+    const body = await readJson<{ changed: boolean; systemDefault: boolean }>(res)
+
+    expect(res.status).toBe(200)
+    expect(body.changed).toBe(false)
+    expect(body.systemDefault).toBe(false)
+    expect(consolidationRows()).toHaveLength(0)
+    expect(audits()).toHaveLength(0)
+  })
+
+  /** Naming the vendor explicitly is still an act, and still upgrades the row. */
+  it('still lets an admin confirm a system default explicitly', async () => {
+    seed({ existing: { vendorId: VENDOR_ID, decidedBy: null } })
+
+    const res = await setConsolidator({ vendorId: VENDOR_ID })
+
+    expect(res.status).toBe(200)
+    expect((updates(orderConsolidation)[0]?.values as { decidedBy: string }).decidedBy).toBe(
+      'admin-user-1'
+    )
+  })
+
   // --------------------------------------------------------------------
   // Concurrency — two admins must not set two consolidators
   // --------------------------------------------------------------------

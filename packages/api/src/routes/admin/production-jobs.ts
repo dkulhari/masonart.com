@@ -1915,17 +1915,33 @@ adminOrderProductionApp.post(
         // Nothing moved and nobody changed their mind. One row per ACT, so
         // there is no write and no audit row: re-confirming what already stands
         // is not an act.
-        if (
+        //
+        // An empty body is the SYSTEM proposing, and it may confirm what it
+        // would have chosen anyway — it may NOT un-decide what a person decided.
+        // Requiring `decided_by` to match in that case let a bare repost on an
+        // admin-confirmed sole-vendor order fall past this check, past the
+        // override guard (the vendor has not changed), and rewrite the row with
+        // `decided_by = NULL`, which the trail documents as "there was nothing
+        // to choose". Naming the vendor explicitly is still an act, and still
+        // upgrades a system default.
+        const standsAlready =
           existing &&
           existing.vendorId === vendorId &&
-          (existing.decidedBy ?? null) === decidedBy
-        ) {
+          (chosenVendorId === undefined || (existing.decidedBy ?? null) === decidedBy);
+
+        if (standsAlready) {
           return {
             changed: false as const,
             consolidation: { orderId, ...existing },
             vendor,
             basis,
-            decision,
+            // The row's own provenance, not the request's: an empty body
+            // reaching here must not report a standing admin decision as the
+            // system's.
+            decision:
+              (existing.decidedBy ?? null) === null
+                ? ("system_default" as const)
+                : ("admin_confirmed" as const),
             proposal,
           };
         }
