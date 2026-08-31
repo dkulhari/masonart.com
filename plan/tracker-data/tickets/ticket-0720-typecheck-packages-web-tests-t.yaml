@@ -1,0 +1,46 @@
+ticket_number: 720
+title: 'Typecheck packages/web tests, the way #662 did for packages/api'
+description: |-
+  ## Task
+
+  `packages/api` tests are typechecked (#662 wired `tsconfig.test.json` into the `typecheck` script, so the gate refuses broken tests). `packages/web` tests are still not. Do the same for web.
+
+  ## Why now
+
+  The order-dispatch-tracking review found four e2e specs left broken by a rename: #712 renamed the shipment shape, the specs kept mocking `shippingDetails` and asserting the old header. The web unit suite passed and nothing else looked. That class of miss is exactly what typechecking the test tree catches for free.
+
+  ## Scope
+
+  - Add `packages/web/tsconfig.test.json` covering the web test tree (`app/**/*.test.ts(x)`, `tests/**`), mirroring `packages/api/tsconfig.test.json`.
+  - Extend `packages/web`'s `typecheck` script to `tsc --noEmit && tsc -p tsconfig.test.json --noEmit`.
+  - Fix whatever errors that surfaces. Expect a batch — the tree has never been checked.
+  - `tests/e2e/` is at the repo root, not under `packages/web`. Decide whether it belongs in this config or its own; the four specs that broke were e2e ones, so leaving e2e out defeats the point.
+
+  ## Gotchas
+
+  - `types: []` in `packages/api/tsconfig.test.json` is load-bearing — without it the config silently suppresses everything and reports 0 errors on a broken tree. Verify the new config actually fails on a deliberate error before trusting a green run.
+  - Never run prettier in this repo; it has no config and its defaults rewrite files away from the repo's style.
+
+  ## Done when
+
+  `bun run typecheck` fails on a deliberately broken web test and passes on the real tree.
+feature: qa-testing
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T09:53:52.088Z'
+last_updated: '2026-08-31T09:53:52.088Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - typecheck
+  - tooling
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

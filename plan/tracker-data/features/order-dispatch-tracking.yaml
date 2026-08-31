@@ -151,8 +151,7 @@ work_session_summary:
       tokens: 0
 tickets:
   todo: {}
-  in_progress:
-    "713": E2E - An admin-entered tracking number reaches the customer tracking page
+  in_progress: {}
   done:
     "702": Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
     "703": Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
@@ -165,9 +164,10 @@ tickets:
     "710": One Tracking Store - Shipped and delivered notifications read the shipment
     "711": One Tracking Store - The two production label guards read order_shipments
     "712": One Tracking Store - Admin and customer order detail render the shipment
+    "713": E2E - An admin-entered tracking number reaches the customer tracking page
 total_tickets: 12
-completion_percentage: 92
-is_completed: false
+completion_percentage: 100
+is_completed: true
 plan:
   phases:
     - name: "Phase 1: Database Schema"
@@ -202,5 +202,6 @@ worktree:
   branch: feature/order-dispatch-tracking
   path: /Users/dhruv/work/masonart.com/.claude/worktrees/order-dispatch-tracking
   created_at: "2026-08-31T03:16:41.504Z"
-last_activity: "2026-08-31T09:12:28.545Z"
+last_activity: "2026-08-31T10:16:44.794Z"
 started: "2026-08-31T03:57:31.133Z"
+completed: "2026-08-31T10:16:44.776Z"

@@ -22,11 +22,11 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:26:01.323Z'
-last_updated: '2026-08-31T09:24:59.716Z'
+last_updated: '2026-08-31T10:16:44.776Z'
 time_spent_minutes: 0
 labels:
   - testing
@@ -79,6 +79,62 @@ comments:
       with an api on `:3020` started as `API_PORT=3020 PORT=3020 FRONTEND_URL=http://localhost:4322 DISABLE_RATE_LIMIT=true bun run --env-file=../../.env src/index.ts`, and web via `VITE_API_PROXY_TARGET=http://localhost:3020 bunx vite dev --port 4322`.
 
       My servers are stopped; both ports are free.
+  - author: mcp-client
+    timestamp: '2026-08-31T10:16:34.780Z'
+    text: |-
+      ✅ **Completed — and the spec from the previous session had never actually run.**
+
+      **Commit**: `3d621ecd` - test(e2e): make the dispatch spec actually run, and unblock the pipeline beside it
+
+      ## The browser run, unblocked
+
+      The previous comment attributed the block to `auth.setup.ts` "session plumbing, not anything this feature touches". Half right. The real cause:
+
+      `packages/web/app/lib/auth-client.ts:20` builds the auth client from `getApiUrl()`, which returns an **absolute** URL — `VITE_API_URL ?? "http://localhost:3000"` (`utils.ts:245`). `packages/web` has no `.env` and `vite.config.ts` sets no `envDir`, so `VITE_API_URL` is undefined in the browser bundle and the fallback wins. **`VITE_API_PROXY_TARGET` never touches the auth client** — it only configures the Vite dev proxy. So the browser signed in against whatever was on `:3000`, never the private API, and the session read from origin `:4322` could not succeed. `CORS_ORIGIN` compounds it: `index.ts:95` defaults to `http://localhost:3001`, not `FRONTEND_URL`.
+
+      Corrected private-pair recipe, `--project=setup` **4 passed**:
+
+      ```
+      # api
+      API_PORT=3020 PORT=3020 \
+        BETTER_AUTH_URL=http://localhost:3020 \
+        FRONTEND_URL=http://localhost:4322 \
+        CORS_ORIGIN=http://localhost:4322 \
+        DISABLE_RATE_LIMIT=true \
+        bun run --env-file=<repo>/.env src/index.ts
+
+      # web
+      VITE_API_URL=http://localhost:3020 \
+        VITE_API_PROXY_TARGET=http://localhost:3020 \
+        bunx vite dev --port 4322 --strictPort
+      ```
+
+      Inline env beats `--env-file` in bun (verified), which is what makes the overrides stick over the `.env` values for `CORS_ORIGIN` and `API_PORT`.
+
+      ## What the first browser run found
+
+      **Both tests skipped.** `findTrackableOrder` read `body.orders`; the endpoint pages as `{items, total, page, …}`. It found nothing every time, `test.skip` fired, and the file passed. The spec written to refuse vacuous green was itself vacuously green — and `--list` showing both tests registered is exactly what made it look verified.
+
+      Fixed, plus a failed listing now throws rather than returning null: a 401 from an expired admin state was indistinguishable from an empty environment, and a skip reads as a pass.
+
+      **6 passed, 0 skipped.** The AWB is unique per run and asserted visible on the public page from a clean context, so it cannot pass on a previous run's value.
+
+      ## Three stale expectations in production-pipeline.spec.ts
+
+      Step 5 asked for a regression run. The file could not complete one — nobody had been able to run it since `auth.setup.ts` broke, so it had accumulated failures that only a live run surfaces.
+
+      1. **`REFUSAL: a non-consolidator gets no carrier label`** expected 503 `LABEL_NOT_AVAILABLE`, got 404. Its own comment said the documented answer is 404 and "cannot be the answer today" because `label_object_token` did not exist. **#703 added the column, #704 deleted the 42703→503 path** — so the documented answer is now the real one. App is correct; the assertion and its comment were the stale half. The screen assertion flipped with it: 404 takes the `status === 404` branch at `vendor/jobs/$id.tsx:1457`, not the seam copy at :1451.
+      2. **Vendor transfer allow-list** gained `isLost` (from `a0f0bcb4`, lost-parcel work). Admitted deliberately — a fact about the vendor's own parcel, naming no vendor and no order, so the guard's intent holds.
+      3. **`markThroughPortal` never waited for the move to land.** It asserted `vendor-job-action-error` has count 0 — an absence, true the instant the click returns. The portal also drops the action optimistically, so waiting for the button to vanish proves nothing either. Callers followed by a `page.goto` got away with it; the one followed by a direct API call read the pre-move status and failed three steps later inside a transition guard (`JOB_NOT_ACCEPTING_PHOTOS`, `status: assigned`). It now polls the vendor route until the status equals the target.
+
+      `production-pipeline.spec.ts`: **20 passed, 1 skipped, 0 failed.** The skip is the documented `test.fixme` at :1150 for label signing — pass 2, no label is bought yet.
+
+      ## Note for #720
+
+      The pre-commit typecheck reported FULL TURBO — every package cached — on a commit that changed two test files. `tests/e2e/` is typechecked by nothing. That is the gap #720 exists to close, and this ticket is the evidence for it.
+  - author: system
+    timestamp: '2026-08-31T10:16:44.776Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -205,3 +261,4 @@ implementation_steps:
     status: pending
 current_step: 1
 started: '2026-08-31T09:12:28.521Z'
+completed: '2026-08-31T10:16:44.776Z'
