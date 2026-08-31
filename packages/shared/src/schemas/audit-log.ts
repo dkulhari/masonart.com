@@ -56,11 +56,23 @@ export const auditOutcomeSchema = z.enum(['success', 'failure'])
  * is legible.
  *
  * **An action is declared in the same phase as its emitter, or not at all.**
- * #671 adds a build guard that fails when this tuple names an action no source
- * file emits, so parking a name here for a later phase to fill in breaks the
- * build the day that guard lands. The production actions below are the one
- * deliberate window: they are declared by #679 and emitted by #680/#681/#684 in
- * the same feature, ahead of the guard existing.
+ * That is enforced, not advisory: `packages/api/tests/lib/audit-action-coverage.test.ts`
+ * (#671) scans every file under `packages/api/src` for each name in this tuple
+ * and fails on the ones nothing writes, naming them. Adding an action here for
+ * a later phase to fill in breaks that test the moment it is committed.
+ *
+ * The way out is to wire the emitter. The other way out — for an action naming
+ * something the API genuinely cannot do yet — is a reasoned entry in
+ * `DEAD_AUDIT_ACTION_WAIVERS` in `packages/api/tests/lib/audit-action-waivers.ts`,
+ * which currently holds exactly two: `wallet.adjusted` and `user.status_changed`,
+ * both write routes that do not exist. A waiver without a one-line reason is
+ * rejected, and so is one for an action that has since been wired.
+ *
+ * The guard proves each action is *written* somewhere, not that the write is
+ * reachable — a string literal on a dead branch still counts. The production
+ * actions below were the one deliberate declare-ahead window, declared by #679
+ * and emitted by #680/#681/#684 before the guard existed; nothing but a note in
+ * a prompt held that window open, which is why it is a test now.
  */
 export const AUDIT_ACTIONS = [
   // Floor
