@@ -30,20 +30,77 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.515Z'
-last_updated: '2026-08-31T13:49:58.515Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T14:50:29.020Z'
+time_spent_minutes: 4
 labels:
   - shiprocket
   - api
   - pass-2
   - phase-6
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T14:46:42.377Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T14:50:13.736Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c4838860` - feat(api): ask which couriers serve a route, and pick one
+
+      **Files Changed**:
+      - `packages/api/src/services/shiprocket.ts` — `checkServiceability`, `selectCourier`, `selectCourierFor`, `ShiprocketNotServiceableError`, `CourierOption`
+      - `packages/api/tests/services/shiprocket-serviceability.test.ts` — 18 tests
+
+      **Verified against the live account through this code, not only fixtures:**
+
+      ```
+      mapped options: 1
+        {"courierCompanyId":1,"courierName":"Blue Dart Air","ratePaise":15315,
+         "etd":"Sep 03, 2026","supportsCod":true,"blocked":false}
+      selected: Blue Dart Air @ 15315 paise
+      COD selected: Blue Dart Air 20880 paise
+      ```
+
+      ## A finding the fixtures could not have produced
+
+      **The COD flag changes the price.** Same route, same weight: ₹153.15 prepaid, ₹208.80 COD. So a quote is only valid for the COD status it was requested with. Quoting prepaid and then shipping COD books a rate we will not be charged, and the difference surfaces on the invoice rather than on the order. Written into the `ServiceabilityQuery` doc comment with the measured numbers, because **#728 will need to quote with the order's real status** rather than quoting once and reusing it.
+
+      ## Design notes
+
+      **Zero couriers is an answer, not a fault.** `ShiprocketNotServiceableError` / `SHIPROCKET_NOT_SERVICEABLE`, naming both pincodes so nobody reads logs to learn which leg failed. It must not share a bucket with "Shiprocket is unreachable" — different sentence, different status. #729 maps it to a 422-style refusal, never a 500.
+
+      **The SLA fields are deliberately unused.** Each record carries ~50 fields including `SLA_Adherence`, `SLA_Breach`, `RTO w/o_Attempt` and `Attempt_Speed`. None tie-break. We have no evidence they mean what their names suggest, and a ranking on a misread field is worse than one on price alone because it *looks* considered. Ties keep the earlier entry, so the result is deterministic without a second invented criterion.
+
+      **Money rounding is reused, not rewritten.** `toPaise` from `lib/razorpay.ts:410`. An odd home, but duplicating `Math.round(x * 100)` is how two paths drift a paisa apart, and `cost_paise` is an integer column. A test pins `153.15 → 15315` and `0.1 + 0.2 → 30`, since `153.15 * 100` is `15314.999…` in binary floating point and truncating would lose a paisa per shipment.
+
+      **Written for one courier, because that is what exists.** The live account offers exactly one. Zero and one lead the tests; "several, pick the cheapest" follows. This is the constraint #735 inherits for its layout.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/services/shiprocket-serviceability.test.ts` → PASS, **18 tests**
+      - Command: `bunx vitest run tests/services/ tests/lib/production-seam.test.ts` → PASS, **23 files, 420 passed, 2 skipped, 0 failed**
+      - Command: `bun run typecheck` → 4 tasks successful
+  - author: system
+    timestamp: '2026-08-31T14:50:17.434Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T14:46:43.543Z'
+    agent: claude-code
+    summary: '#725 complete. checkServiceability maps Shiprocket''s ~50-field records onto six fields; selectCourier picks the cheapest usable one respecting blocked and COD; selectCourierFor refuses with SHIPROCKET_NOT_SERVICEABLE naming both pincodes. 18 tests plus a live probe through the real code. Found that the COD flag changes the quoted rate (153.15 vs 208.80) and fed that back to #728. 420 service+seam tests pass, typecheck green. Committed c4838860.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T14:50:29.019Z'
+    duration: '00:03:45'
 related_tickets: []
 blocked_by:
   - ticket: 724
@@ -51,3 +108,21 @@ blocked_by:
     description: Shiprocket Client - Auth with a cached token that refreshes before it expires
 blocks: []
 attachments: []
+started: '2026-08-31T14:46:42.377Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/services/ tests/lib/production-seam.test.ts
+  test_output: 23 files, 420 passed, 2 skipped, 0 failed; shiprocket-serviceability.test.ts 18 passed; plus a live probe through the real code
+  build_passed: true
+  build_command: bun run typecheck (4 tasks successful)
+  verified_at: '2026-08-31T14:50:02.885Z'
+completed: '2026-08-31T14:50:17.434Z'

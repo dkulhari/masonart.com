@@ -141,17 +141,16 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 9
-  total_duration: '01:14:00'
+  total_sessions: 10
+  total_duration: '01:18:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 9
-      duration: '01:14:00'
+      sessions: 10
+      duration: '01:18:00'
       tokens: 0
 tickets:
   todo:
-    '725': Shiprocket Client - Serviceability and choosing a courier
     '726': Shiprocket Client - Create the order and assign an AWB
     '727': Shiprocket Client - Fetch the label PDF and schedule a pickup
     '728': Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
@@ -181,8 +180,9 @@ tickets:
     '722': Carrier Config - SHIPROCKET_* env and a not-configured refusal that names itself
     '723': Carrier Config - Admin sets a vendor's Shiprocket pickup nickname
     '724': Shiprocket Client - Auth with a cached token that refreshes before it expires
+    '725': Shiprocket Client - Serviceability and choosing a courier
 total_tickets: 28
-completion_percentage: 57
+completion_percentage: 61
 is_completed: false
 plan:
   phases:
@@ -218,5 +218,5 @@ worktree:
   branch: feature/order-dispatch-tracking
   path: /Users/dhruv/work/masonart.com/.claude/worktrees/order-dispatch-tracking
   created_at: '2026-08-31T03:16:41.504Z'
-last_activity: '2026-08-31T14:11:52.169Z'
+last_activity: '2026-08-31T14:50:29.213Z'
 started: '2026-08-31T03:57:31.133Z'

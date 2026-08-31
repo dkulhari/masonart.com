@@ -38,7 +38,7 @@ status: todo
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.656Z'
-last_updated: '2026-08-31T14:07:54.136Z'
+last_updated: '2026-08-31T14:50:23.503Z'
 time_spent_minutes: 0
 labels:
   - shiprocket
@@ -65,6 +65,23 @@ comments:
       That reconcile path is part of this ticket, not a follow-up. An intent row with no reconciliation is worse than the long transaction it replaced.
 
       **Test accordingly.** The concurrency test still has to prove one label from two simultaneous callers, and it must fail when the intent row is removed — proved by actually removing it, the way `order-shipments-live-label.test.ts` proves its index rather than asserting the index is merely defined.
+  - author: mcp-client
+    timestamp: '2026-08-31T14:50:23.503Z'
+    text: |-
+      ⚠️ **Input from #725: quote with the order's real COD status, not once and reused.**
+
+      Measured on the live account while implementing serviceability — same route, same weight:
+
+      | | rate |
+      |---|---|
+      | prepaid | ₹153.15 → 15315 paise |
+      | COD | ₹208.80 → 20880 paise |
+
+      A Shiprocket quote is only valid for the COD flag it was requested with. So `buyLabelForOrder` must read the order's actual payment method and pass it into `selectCourierFor({ ..., cod })`. Quoting prepaid and then shipping COD books a rate we will not be charged, and the ~₹55 difference lands on the Shiprocket invoice rather than on the order — where nothing reconciles it.
+
+      This matters more under the split-transaction shape decided above: the quote happens before the commit and the purchase happens after, so if anything can change the order's COD status in between, the reconcile step has to notice that the rate it booked no longer matches the shipment it bought.
+
+      `selectCourierFor` already refuses with `SHIPROCKET_NOT_SERVICEABLE` when a COD order has only non-COD couriers, so that path is handled — the risk here is the quieter one of quoting the wrong flag and getting a valid answer.
 work_sessions: []
 related_tickets: []
 blocked_by:
