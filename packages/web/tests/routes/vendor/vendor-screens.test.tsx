@@ -70,6 +70,10 @@ import {
   VendorJobsListBody,
   DueCell,
   VendorTransferStrip,
+  VendorDespatchPanel,
+  type VendorDespatchPanelState,
+  type VendorTransferCandidateGroup,
+  type VendorTransferCandidateJob,
   VENDOR_TRANSFERS_MAX_LIMIT,
   VENDOR_TRANSFERS_MAX_PAGES,
   fetchInboundAwaitingArrival,
@@ -2285,6 +2289,199 @@ describe('the inbound parcel strip', () => {
     expect(
       screen.queryByTestId(`vendor-transfer-error-${outboundParcel.id}`)
     ).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// Despatching a parcel — the screen that closes the handover loop
+// ============================================================================
+
+/**
+ * `POST /api/vendor/transfers` existed with nothing to drive it, so unless an
+ * order already carried an AWB the `open-transfer-or-order-label` guard could
+ * never be satisfied from the vendor's side and "Mark handed over" was a dead
+ * end.
+ *
+ * The grouping is the SERVER'S — `GET /transfers/candidates` — because no
+ * vendor-facing projection carries `order_id` and the POST refuses jobs that
+ * span orders. The panel therefore never composes a selection of its own: it
+ * sends a bucket back exactly as it was handed one.
+ */
+describe('VendorDespatchPanel', () => {
+  const candidateJob = (over: Partial<VendorTransferCandidateJob> = {}): VendorTransferCandidateJob => ({
+    id: 'job-print-1',
+    stage: 'print',
+    dueAt: null,
+    ...over,
+  })
+
+  const GROUP_A: VendorTransferCandidateGroup = {
+    jobs: [candidateJob(), candidateJob({ id: 'job-frame-1', stage: 'frame' })],
+  }
+  const GROUP_B: VendorTransferCandidateGroup = {
+    jobs: [candidateJob({ id: 'job-print-2', dueAt: '2026-09-05T00:00:00.000Z' })],
+  }
+
+  const despatchPanel = (
+    over: Partial<VendorDespatchPanelState> = {}
+  ): VendorDespatchPanelState => ({
+    data: [GROUP_A, GROUP_B],
+    isLoading: false,
+    error: null,
+    onRetry: () => {},
+    onDespatch: () => {},
+    ...over,
+  })
+
+  const KEY_A = 'job-print-1'
+  const KEY_B = 'job-print-2'
+
+  it('shows a skeleton while the buckets are being read', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: null, isLoading: true })} />)
+
+    expect(screen.getByTestId('vendor-despatch-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId(`vendor-despatch-group-${KEY_A}`)).toBeNull()
+  })
+
+  it('shows a failed read with a retry, and claims nothing about what is ready', () => {
+    const onRetry = vi.fn()
+    render(
+      <VendorDespatchPanel
+        despatch={despatchPanel({ data: null, error: 'Failed to load', onRetry })}
+      />
+    )
+
+    expect(screen.getByTestId('vendor-despatch-error')).toHaveTextContent(/failed to load/i)
+    expect(screen.queryByTestId('vendor-despatch-empty')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('vendor-despatch-retry'))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('says there is nothing to send rather than rendering an empty box', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [] })} />)
+
+    expect(screen.getByTestId('vendor-despatch-empty')).toBeInTheDocument()
+  })
+
+  it('renders one form per bucket, naming the jobs that travel together', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    const groupA = screen.getByTestId(`vendor-despatch-group-${KEY_A}`)
+    expect(groupA.textContent).toMatch(/print/i)
+    expect(groupA.textContent).toMatch(/frame/i)
+    expect(screen.getByTestId(`vendor-despatch-group-${KEY_B}`)).toBeInTheDocument()
+  })
+
+  /** One parcel usually holds the lot, so the count of jobs is the honest start. */
+  it('starts the piece count at the number of jobs in the bucket', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    expect(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`)).toHaveValue(2)
+    expect(screen.getByTestId(`vendor-despatch-pieces-${KEY_B}`)).toHaveValue(1)
+  })
+
+  it('sends the bucket back exactly as it was handed one', async () => {
+    const onDespatch = vi.fn()
+    render(<VendorDespatchPanel despatch={despatchPanel({ onDespatch })} />)
+
+    fireEvent.change(screen.getByTestId(`vendor-despatch-carrier-${KEY_A}`), {
+      target: { value: '  Delhivery  ' },
+    })
+    fireEvent.change(screen.getByTestId(`vendor-despatch-reference-${KEY_A}`), {
+      target: { value: 'DL-9911' },
+    })
+    fireEvent.change(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`), {
+      target: { value: '3' },
+    })
+    fireEvent.submit(screen.getByTestId(`vendor-despatch-form-${KEY_A}`))
+
+    expect(onDespatch).toHaveBeenCalledWith({
+      jobIds: ['job-print-1', 'job-frame-1'],
+      carrier: 'Delhivery',
+      reference: 'DL-9911',
+      pieceCount: 3,
+      expectedBy: null,
+    })
+  })
+
+  it('sends null for a carrier and docket nobody filled in', () => {
+    const onDespatch = vi.fn()
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_B], onDespatch })} />)
+
+    fireEvent.submit(screen.getByTestId(`vendor-despatch-form-${KEY_B}`))
+
+    expect(onDespatch).toHaveBeenCalledWith({
+      jobIds: ['job-print-2'],
+      carrier: null,
+      reference: null,
+      pieceCount: 1,
+      expectedBy: null,
+    })
+  })
+
+  /**
+   * The date input answers `2026-09-05`; the API's schema is
+   * `z.string().datetime()`, so a bare date is a 400 "Invalid request body"
+   * with nothing on screen to explain it.
+   */
+  it('sends the carrier`s promised date as an instant, not as a bare date', () => {
+    const onDespatch = vi.fn()
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_B], onDespatch })} />)
+
+    fireEvent.change(screen.getByTestId(`vendor-despatch-expected-${KEY_B}`), {
+      target: { value: '2026-09-05' },
+    })
+    fireEvent.submit(screen.getByTestId(`vendor-despatch-form-${KEY_B}`))
+
+    expect(onDespatch.mock.calls[0]?.[0].expectedBy).toBe('2026-09-05T00:00:00.000Z')
+  })
+
+  it('refuses to send a parcel of no pieces', () => {
+    const onDespatch = vi.fn()
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_B], onDespatch })} />)
+
+    fireEvent.change(screen.getByTestId(`vendor-despatch-pieces-${KEY_B}`), {
+      target: { value: '0' },
+    })
+
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).toBeDisabled()
+    fireEvent.submit(screen.getByTestId(`vendor-despatch-form-${KEY_B}`))
+    expect(onDespatch).not.toHaveBeenCalled()
+  })
+
+  /** A refusal belongs to the bucket that caused it, never to the panel. */
+  it('keeps a refusal on its own bucket', () => {
+    render(
+      <VendorDespatchPanel
+        despatch={despatchPanel({
+          groupErrors: { [KEY_A]: 'These jobs have already been sent on a parcel.' },
+        })}
+      />
+    )
+
+    expect(screen.getByTestId(`vendor-despatch-error-${KEY_A}`)).toHaveTextContent(
+      /already been sent/i
+    )
+    expect(screen.queryByTestId(`vendor-despatch-error-${KEY_B}`)).toBeNull()
+    // The other bucket is still sendable.
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).not.toBeDisabled()
+  })
+
+  it('locks the bucket with a write in flight, and only that one', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel({ busyGroupId: KEY_A })} />)
+
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_A}`)).toBeDisabled()
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).not.toBeDisabled()
+  })
+
+  it('names no counterparty, because it is told none', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    const panel = screen.getByTestId('vendor-despatch')
+    // The destination is DERIVED server-side. A vendor picking one would be a
+    // vendor learning who else is working the order.
+    expect(panel.textContent).not.toMatch(/vendor|consolidator|shop/i)
   })
 })
 

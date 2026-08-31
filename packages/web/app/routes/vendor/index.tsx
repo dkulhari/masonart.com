@@ -65,7 +65,7 @@
  * a surface where it would read as "we owe you nothing".
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { z } from 'zod'
 import { AlertCircle, RefreshCw } from 'lucide-react'
@@ -796,6 +796,325 @@ export function VendorTransferStrip({
 // The three list states
 // ============================================================================
 
+// ============================================================================
+// Despatching a parcel — the screen that closes the handover loop
+// ============================================================================
+
+/** One job that may ride a parcel, and the three things a vendor is told. */
+export interface VendorTransferCandidateJob {
+  id: string
+  stage: VendorJobStage
+  dueAt: string | null
+}
+
+/**
+ * The jobs that can ride ONE parcel together, as the server grouped them.
+ *
+ * The bucket has no id, and must not be given one here. `POST /transfers`
+ * refuses jobs that span orders, and no vendor-facing projection carries
+ * `order_id` — so the grouping is the server's, and a synthetic key invented on
+ * this side would be a stable handle on an order that a vendor could hold and
+ * correlate. The bucket IS its jobs.
+ */
+export interface VendorTransferCandidateGroup {
+  jobs: VendorTransferCandidateJob[]
+}
+
+export interface VendorTransferCandidatesResponse {
+  groups: VendorTransferCandidateGroup[]
+}
+
+/** What one bucket is called on screen: its first job. Stable, and not new. */
+export function despatchGroupKey(group: VendorTransferCandidateGroup): string {
+  return group.jobs[0]?.id ?? ''
+}
+
+/** What the vendor may say when despatching. The destination is not on it. */
+export interface VendorDespatchInput {
+  jobIds: string[]
+  carrier: string | null
+  reference: string | null
+  pieceCount: number
+  expectedBy: string | null
+}
+
+export interface VendorDespatchPanelState {
+  data: VendorTransferCandidateGroup[] | null
+  isLoading: boolean
+  error: string | null
+  onRetry: () => void
+  onDespatch: (input: VendorDespatchInput) => void | Promise<void>
+  /** The bucket with a write in flight. Locks that form, not the panel. */
+  busyGroupId?: string | null
+  /** A refused despatch, keyed by the bucket that caused it. */
+  groupErrors?: Record<string, string>
+}
+
+export async function fetchVendorTransferCandidates(): Promise<VendorTransferCandidatesResponse> {
+  const response = await fetch(`${getApiUrl()}/api/vendor/transfers/candidates`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to load what you can send')
+  }
+
+  return (await response.json()) as VendorTransferCandidatesResponse
+}
+
+export async function despatchVendorTransfer(input: VendorDespatchInput): Promise<void> {
+  const response = await fetch(`${getApiUrl()}/api/vendor/transfers`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    // The API's own sentence, kept whole. Every refusal on this route is
+    // written for the vendor who will read it — "we will route it and it will
+    // appear in your queue" is not a message this screen could improve on.
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to despatch the parcel')
+  }
+}
+
+/**
+ * A date input answers `2026-09-05`; `createTransferSchema` wants
+ * `z.string().datetime()`.
+ *
+ * The whole date, as an instant, rather than a 400 "Invalid request body" with
+ * nothing on screen to explain it. This is the carrier's promise off the
+ * docket, not an SLA clock about the vendor — `dispatched_at` is that, and the
+ * server stamps it — so a day's precision is all the field ever carries.
+ */
+function promisedInstant(date: string): string | null {
+  if (!date) return null
+  return `${date}T00:00:00.000Z`
+}
+
+function DespatchSkeleton() {
+  return (
+    <div
+      data-testid="vendor-despatch-skeleton"
+      className="space-y-2"
+      aria-busy="true"
+      aria-label="Loading what you can send"
+    >
+      {['a', 'b'].map((key) => (
+        <div key={key} className="h-24 animate-pulse rounded-lg bg-muted" aria-hidden="true" />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * One bucket, and the docket that goes with it.
+ *
+ * The form holds its own draft, so two buckets being filled in at once do not
+ * share fields, and a refusal on one does not clear the other.
+ */
+function DespatchGroup({
+  group,
+  onDespatch,
+  busy,
+  error,
+}: {
+  group: VendorTransferCandidateGroup
+  onDespatch: (input: VendorDespatchInput) => void | Promise<void>
+  busy: boolean
+  error?: string
+}) {
+  const key = despatchGroupKey(group)
+  const [carrier, setCarrier] = useState('')
+  const [reference, setReference] = useState('')
+  const [pieces, setPieces] = useState(String(group.jobs.length))
+  const [expectedBy, setExpectedBy] = useState('')
+
+  const pieceCount = Number.parseInt(pieces, 10)
+  // The API's own bounds, asked here so a doomed round trip is not spent. A
+  // parcel of no pieces is not a parcel.
+  const piecesValid = Number.isInteger(pieceCount) && pieceCount >= 1 && pieceCount <= 999
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    if (!piecesValid || busy) return
+
+    void onDespatch({
+      jobIds: group.jobs.map((job) => job.id),
+      carrier: carrier.trim() || null,
+      reference: reference.trim() || null,
+      pieceCount,
+      expectedBy: promisedInstant(expectedBy),
+    })
+  }
+
+  return (
+    <div
+      data-testid={`vendor-despatch-group-${key}`}
+      className="space-y-3 rounded-lg border border-border p-4"
+    >
+      <ul className="space-y-1 text-sm">
+        {group.jobs.map((job) => (
+          <li key={job.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="capitalize">{job.stage}</span>
+            <span className="text-xs text-muted-foreground">
+              {job.dueAt ? `Due ${formatVendorDate(job.dueAt)}` : 'No due date'}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <form
+        data-testid={`vendor-despatch-form-${key}`}
+        onSubmit={handleSubmit}
+        className="space-y-3"
+      >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Carrier
+          <input
+            type="text"
+            data-testid={`vendor-despatch-carrier-${key}`}
+            value={carrier}
+            onChange={(e) => setCarrier(e.target.value)}
+            placeholder="Delhivery"
+            className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Docket reference
+          <input
+            type="text"
+            data-testid={`vendor-despatch-reference-${key}`}
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="DL-9911"
+            className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Pieces
+          <input
+            type="number"
+            min={1}
+            max={999}
+            data-testid={`vendor-despatch-pieces-${key}`}
+            value={pieces}
+            onChange={(e) => setPieces(e.target.value)}
+            className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Due by, off the docket
+          <input
+            type="date"
+            data-testid={`vendor-despatch-expected-${key}`}
+            value={expectedBy}
+            onChange={(e) => setExpectedBy(e.target.value)}
+            className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+          />
+        </label>
+      </div>
+
+      {!piecesValid && (
+        <p
+          data-testid={`vendor-despatch-pieces-invalid-${key}`}
+          className="text-xs text-destructive"
+        >
+          A parcel holds between 1 and 999 pieces.
+        </p>
+      )}
+
+      <Button
+        type="submit"
+        data-testid={`vendor-despatch-submit-${key}`}
+        disabled={!piecesValid || busy}
+      >
+        {busy ? 'Sending…' : 'Send this group'}
+      </Button>
+      </form>
+
+      {error && (
+        <p
+          data-testid={`vendor-despatch-error-${key}`}
+          role="alert"
+          className="text-sm text-destructive"
+        >
+          {/* On the BUCKET. One refused despatch must not take the panel down. */}
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * What this vendor can send right now, and the docket for each parcel.
+ *
+ * The panel never composes a selection of its own: it renders the buckets the
+ * server handed it and sends one back unchanged. That is what makes
+ * `JOBS_SPAN_ORDERS` unreachable from the UI, and it is also why nothing here
+ * names a destination — the routing is derived server-side, and a vendor
+ * choosing one would be a vendor learning who else is working the order.
+ */
+export function VendorDespatchPanel({ despatch }: { despatch: VendorDespatchPanelState }) {
+  const { data, isLoading, error, onRetry, onDespatch, busyGroupId, groupErrors } = despatch
+
+  return (
+    <div data-testid="vendor-despatch" className="space-y-3">
+      {error ? (
+        <div
+          data-testid="vendor-despatch-error"
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+        >
+          <p className="mb-1 font-medium">{error}</p>
+          <p className="mb-4 text-muted-foreground">
+            We could not read what you have ready to send. That is not the same
+            as having nothing — nothing below is a complete list right now.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="vendor-despatch-retry"
+            onClick={onRetry}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : isLoading ? (
+        <DespatchSkeleton />
+      ) : (data?.length ?? 0) === 0 ? (
+        <p
+          data-testid="vendor-despatch-empty"
+          className="rounded-lg border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground"
+        >
+          Nothing is ready to send. A job appears here once it has passed our
+          inspection and the goods are due somewhere else.
+        </p>
+      ) : (
+        (data ?? []).map((group) => {
+          const key = despatchGroupKey(group)
+          return (
+            <DespatchGroup
+              key={key}
+              group={group}
+              onDespatch={onDespatch}
+              busy={busyGroupId === key}
+              error={groupErrors?.[key]}
+            />
+          )
+        })
+      )}
+    </div>
+  )
+}
+
 function JobsSkeleton() {
   return (
     <div
@@ -972,6 +1291,14 @@ function VendorJobsPage() {
   const [transferErrors, setTransferErrors] = useState<Record<string, string>>({})
   const [olderNotListed, setOlderNotListed] = useState(false)
 
+  // What can be SENT, read separately again and for the same reason: a bucket
+  // list that would not load must not blank the parcels that did.
+  const [candidates, setCandidates] = useState<VendorTransferCandidateGroup[] | null>(null)
+  const [candidatesLoading, setCandidatesLoading] = useState(true)
+  const [candidatesError, setCandidatesError] = useState<string | null>(null)
+  const [busyGroupId, setBusyGroupId] = useState<string | null>(null)
+  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({})
+
   const load = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -1029,6 +1356,46 @@ function VendorJobsPage() {
     }
   }, [])
 
+  const loadCandidates = useCallback(async () => {
+    setCandidatesLoading(true)
+    try {
+      const { groups } = await fetchVendorTransferCandidates()
+      setCandidates(groups)
+      setCandidatesError(null)
+    } catch (candidatesLoadError) {
+      // Dropped with the error, like the queue and the strip: a half-read list
+      // of what can be sent under a failure banner is a parcel somebody packs.
+      setCandidates(null)
+      setCandidatesError((candidatesLoadError as Error).message)
+    } finally {
+      setCandidatesLoading(false)
+    }
+  }, [])
+
+  const despatch = async (input: VendorDespatchInput) => {
+    const key = input.jobIds[0] ?? ''
+    setBusyGroupId(key)
+    setGroupErrors((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+
+    try {
+      await despatchVendorTransfer(input)
+      // Both lists: the jobs leave the bucket list and the parcel appears on
+      // the strip as outbound. Re-read rather than patched — the server stamps
+      // `dispatched_at` from its own clock and picks the destination.
+      await Promise.all([loadCandidates(), loadTransfers()])
+    } catch (despatchError) {
+      // On the BUCKET. Every refusal this route answers with is written for the
+      // vendor reading it, so it is shown whole.
+      setGroupErrors((current) => ({ ...current, [key]: (despatchError as Error).message }))
+    } finally {
+      setBusyGroupId(null)
+    }
+  }
+
   const confirmArrival = async (id: string) => {
     setBusyTransferId(id)
     setTransferErrors((current) => {
@@ -1057,6 +1424,10 @@ function VendorJobsPage() {
   useEffect(() => {
     void loadTransfers()
   }, [loadTransfers])
+
+  useEffect(() => {
+    void loadCandidates()
+  }, [loadCandidates])
 
   const updateSearch = (updates: Partial<VendorJobsSearch>) => {
     void navigate({
@@ -1128,6 +1499,25 @@ function VendorJobsPage() {
       {/* Parcels, above the queue: a piece that has not landed is the reason a
           job in the list below cannot be started, and it is vendor-level news
           rather than job-level, so it belongs on the screen a vendor lands on. */}
+      {/* Ready to send, above the parcels already moving: this is the one
+          control that turns finished work into a parcel, and without it "Mark
+          handed over" on a job could only be satisfied by an order that already
+          carried an AWB. */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Ready to send</h2>
+        <VendorDespatchPanel
+          despatch={{
+            data: candidates,
+            isLoading: candidatesLoading,
+            error: candidatesError,
+            onRetry: () => void loadCandidates(),
+            onDespatch: despatch,
+            busyGroupId,
+            groupErrors,
+          }}
+        />
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Parcels</h2>
         <VendorTransferStrip

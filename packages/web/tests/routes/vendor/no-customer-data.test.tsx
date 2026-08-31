@@ -47,6 +47,8 @@ vi.mock('@tanstack/react-router', () => ({
 import {
   VendorJobsListBody,
   VendorTransferStrip,
+  VendorDespatchPanel,
+  type VendorTransferCandidateGroup,
   type VendorJobListItem,
   type VendorTransfer,
 } from '~/routes/vendor/index'
@@ -449,6 +451,51 @@ describe('the parcel strip tells a vendor nothing about the other end', () => {
       screen.getByTestId(`vendor-transfer-direction-${pollutedTransfer.id}`).textContent ?? ''
     expect(badge).toMatch(/you/i)
     expect(badge).not.toMatch(/sunrise|bandra|vendor/i)
+  })
+})
+
+describe('the despatch panel names no destination, because it is told none', () => {
+  /**
+   * `POST /transfers` DERIVES `to_vendor_id` from the order's consolidator, and
+   * there is no field in which a vendor could name one. The panel must not
+   * reconstruct what the API refuses to accept: a destination on this screen
+   * would be a vendor learning who else is working the order.
+   */
+  const pollutedGroup = {
+    jobs: [
+      {
+        id: 'job-print-1',
+        stage: 'print',
+        dueAt: '2026-09-05T00:00:00.000Z',
+        ...POLLUTION,
+        toVendorName: 'Bandra Framing Co',
+        orderId: '55555555-5555-4555-8555-555555555555',
+      },
+    ],
+  } as unknown as VendorTransferCandidateGroup
+
+  it('renders the work and nothing about where it is going', () => {
+    const { container } = render(
+      <VendorDespatchPanel
+        despatch={{
+          data: [pollutedGroup],
+          isLoading: false,
+          error: null,
+          onRetry: () => {},
+          onDespatch: () => {},
+        }}
+      />
+    )
+
+    // Non-vacuous: the bucket IS on screen, with its stage and its docket
+    // fields.
+    const group = screen.getByTestId('vendor-despatch-group-job-print-1')
+    expect(group).toHaveTextContent(/print/i)
+    expect(screen.getByTestId('vendor-despatch-carrier-job-print-1')).toBeInTheDocument()
+
+    expectNoCustomerData(container.innerHTML)
+    expect(container.innerHTML).not.toContain('Bandra Framing Co')
+    expect(container.innerHTML).not.toContain('55555555-5555-4555-8555-555555555555')
   })
 })
 
