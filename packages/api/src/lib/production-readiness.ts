@@ -34,7 +34,16 @@
  *   - every job in `J` is `qc_passed` or `dispatched`, and
  *   - every `qc_passed` job has `vendor_id = C`, and
  *   - every `dispatched` job is on a transfer `T` with `T.to_vendor_id = C`,
- *     `T.received_at IS NOT NULL` and `T.lost_at IS NULL`.
+ *     `T.received_at IS NOT NULL` and `T.lost_at IS NULL` — unless some job in
+ *     `J` has `replaces_job_id` = that job, which retires it.
+ *
+ * That last clause is the write-off. A parcel declared lost leaves its job
+ * `dispatched` on purpose, so the vendor keeps the payable for work they did,
+ * and `dispatched` has no out-edge — the job can never be cancelled out of `J`.
+ * The replacement raised alongside it is what carries the order forward, and
+ * the original goes quiet the moment that replacement exists. Quiet is not the
+ * same as satisfied: the replacement is in `J` too, so the order stays blocked
+ * on it until it reaches the consolidator like any other job.
  *
  * The single exception is an order with nothing to produce — a gift card buys
  * no goods — which is ready with an empty `J`. That exception is exactly why
@@ -136,6 +145,14 @@ export interface ReadinessJob {
   vendorId: string | null
   assignedAt: Date | null
   orderItemIds: readonly string[]
+  /**
+   * The job this one was raised to replace, after its parcel was declared lost.
+   *
+   * Written by `POST /admin/transfers/:id/lost` and read here only: a live job
+   * pointing at a `dispatched` original is what retires that original's
+   * `transfer_lost` blocker. Null on every job raised the ordinary way.
+   */
+  replacesJobId: string | null
 }
 
 /**
@@ -322,6 +339,15 @@ export function evaluateLabelReadiness(snapshot: OrderProductionSnapshot): Label
     for (const jobId of transfer.jobIds) transferByJobId.set(jobId, transfer)
   }
 
+  // The originals a LIVE job has been raised to replace. Live is the whole
+  // point: cancelling the replacement puts the order back where the write-off
+  // left it — goods owed, nothing making them — so the original's blocker has
+  // to come back with it.
+  const supersededJobIds = new Set<string>()
+  for (const job of jobs) {
+    if (job.replacesJobId) supersededJobIds.add(job.replacesJobId)
+  }
+
   for (const job of jobs) {
     if (job.status === 'qc_passed') {
       // Nobody has moved these goods, so they are wherever the job is. When a
@@ -355,7 +381,18 @@ export function evaluateLabelReadiness(snapshot: OrderProductionSnapshot): Label
 
       if (transfer.lostAt) {
         // The job stays `dispatched` with its payable intact — we owe the
-        // vendor for work they did. A replacement job is what unblocks this.
+        // vendor for work they did. A replacement job is what unblocks this,
+        // and `dispatched` has no out-edge, so being superseded is the ONLY
+        // way this original ever stops blocking: without the check below the
+        // blocker outlives the replacement being produced, dispatched and
+        // received, and no route in the system can clear it.
+        if (supersededJobIds.has(job.id)) {
+          // Silent, not satisfied. The replacement is itself in `jobs`, so it
+          // faces every clause of the predicate in its own right — a `draft`
+          // one is `job_not_qc_passed` until it reaches the consolidator.
+          continue
+        }
+
         blockers.push({
           code: 'transfer_lost',
           message: `The parcel carrying job ${job.id} was declared lost. A replacement job has to be produced.`,
@@ -435,6 +472,7 @@ export async function loadOrderProductionSnapshot(
       status: productionJobs.status,
       vendorId: productionJobs.vendorId,
       assignedAt: productionJobs.assignedAt,
+      replacesJobId: productionJobs.replacesJobId,
       orderItemId: productionJobItems.orderItemId,
     })
     .from(productionJobs)
@@ -485,6 +523,7 @@ interface JobRow {
   status: ProductionJobStatus
   vendorId: string | null
   assignedAt: Date | null
+  replacesJobId?: string | null
   orderItemId: string | null
 }
 
@@ -502,6 +541,7 @@ function collapseJobRows(rows: readonly JobRow[]): ReadinessJob[] {
         vendorId: row.vendorId,
         assignedAt: row.assignedAt,
         orderItemIds: [],
+        replacesJobId: row.replacesJobId ?? null,
       }
       jobs.set(row.id, job)
     }

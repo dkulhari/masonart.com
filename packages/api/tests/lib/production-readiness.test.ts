@@ -79,6 +79,7 @@ function job(over: Partial<ReadinessJob> = {}): ReadinessJob {
     vendorId: A,
     assignedAt: ASSIGNED,
     orderItemIds: ['item-1'],
+    replacesJobId: null,
     ...over,
   }
 }
@@ -314,6 +315,110 @@ describe('evaluateLabelReadiness — dispatched jobs and their transfers', () =>
     })
 
     expect(readiness.ready).toBe(true)
+  })
+})
+
+describe('a lost parcel, and the replacement job that is supposed to clear it', () => {
+  // `POST /admin/transfers/:id/lost` deliberately leaves the original
+  // `dispatched` so the vendor keeps their payable, and raises a `draft`
+  // replacement linked by `replaces_job_id`. `dispatched` has no out-edge, so
+  // the original can never be cancelled — if the replacement did not supersede
+  // it, `transfer_lost` would be emitted forever and no route could clear it.
+
+  /** The original, written off: dispatched at B, on a parcel declared lost. */
+  function lostOriginal(): ReadinessJob {
+    return job({ vendorId: B, status: 'dispatched' })
+  }
+
+  function lostParcel(): ReadinessTransfer {
+    return transfer({ toVendorId: A, receivedAt: null, lostAt: NOW, jobIds: ['job-1'] })
+  }
+
+  it('blocks on the replacement, not on the parcel, once a replacement exists', () => {
+    const readiness = evaluate({
+      items: [item(), consolidatorItem()],
+      jobs: [
+        lostOriginal(),
+        job({
+          id: 'job-1r',
+          status: 'draft',
+          vendorId: null,
+          assignedAt: null,
+          replacesJobId: 'job-1',
+        }),
+        consolidatorJob(),
+      ],
+      transfers: [lostParcel()],
+    })
+
+    expect(codes(readiness)).toEqual(['job_not_qc_passed'])
+    expect(readiness.blockers[0]?.jobId).toBe('job-1r')
+  })
+
+  it('is ready once the replacement has passed QC at the consolidator', () => {
+    const readiness = evaluate({
+      items: [item(), consolidatorItem()],
+      jobs: [
+        lostOriginal(),
+        job({ id: 'job-1r', vendorId: A, replacesJobId: 'job-1' }),
+        consolidatorJob(),
+      ],
+      transfers: [lostParcel()],
+    })
+
+    expect(readiness.ready).toBe(true)
+  })
+
+  it('blocks on the parcel again when the replacement is cancelled', () => {
+    // Cancelling the replacement puts the order back where the write-off left
+    // it: goods owed, nothing live making them. The blocker has to come back.
+    const readiness = evaluate({
+      items: [item(), consolidatorItem()],
+      jobs: [
+        lostOriginal(),
+        job({ id: 'job-1r', status: 'cancelled', vendorId: A, replacesJobId: 'job-1' }),
+        consolidatorJob(),
+      ],
+      transfers: [lostParcel()],
+    })
+
+    expect(codes(readiness)).toEqual(['transfer_lost'])
+  })
+
+  it('does not let a replacement for some other job clear this parcel', () => {
+    const readiness = evaluate({
+      items: [item(), consolidatorItem()],
+      jobs: [
+        lostOriginal(),
+        job({ id: 'job-1r', vendorId: A, replacesJobId: 'job-elsewhere' }),
+        consolidatorJob(),
+      ],
+      transfers: [lostParcel()],
+    })
+
+    expect(codes(readiness)).toEqual(['transfer_lost'])
+  })
+
+  it('does not make a superseded original ready on its own', () => {
+    // The original is silent, not satisfied. Without the replacement reaching
+    // the consolidator there is nothing at the consolidator to ship.
+    const readiness = evaluate({
+      items: [item(), consolidatorItem()],
+      jobs: [
+        lostOriginal(),
+        job({
+          id: 'job-1r',
+          status: 'received',
+          vendorId: A,
+          replacesJobId: 'job-1',
+        }),
+        consolidatorJob(),
+      ],
+      transfers: [lostParcel()],
+    })
+
+    expect(readiness.ready).toBe(false)
+    expect(codes(readiness)).toEqual(['job_not_qc_passed'])
   })
 })
 
