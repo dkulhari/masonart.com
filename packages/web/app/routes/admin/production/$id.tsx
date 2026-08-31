@@ -105,6 +105,7 @@ import {
   type TransitionGuard,
 } from '@chobii/shared'
 import { cn, getApiUrl } from '~/lib/utils'
+import { useLatestOnly } from '~/lib/latest-request'
 import { Button } from '~/components/ui/Button'
 import { ADMIN_PRODUCTION_SEARCH } from '~/lib/admin-nav'
 import {
@@ -1632,33 +1633,48 @@ function AdminProductionJobPage() {
   const [refusal, setRefusal] = useState<TransitionRefusalBody | null>(null)
   const [transitionError, setTransitionError] = useState<string | null>(null)
 
+  const claimDetail = useLatestOnly()
+
   const load = useCallback(async () => {
+    const isCurrent = claimDetail()
     setIsLoading(true)
     try {
-      setDetail(await fetchJob(id))
+      const result = await fetchJob(id)
+      if (!isCurrent()) return
+      setDetail(result)
       setError(null)
     } catch (loadError) {
       // The stale job goes with the error — a payable rendered under a failure
       // banner is a number somebody will believe.
+      if (!isCurrent()) return
       setDetail(null)
       setError((loadError as Error).message)
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [id])
+  }, [id, claimDetail])
 
+  const claimPhotos = useLatestOnly()
+
+  // Guarded: navigating between jobs keeps this component mounted, so the
+  // previous job's photographs could land after the new job's and overwrite
+  // them — a shot list attributed to the wrong piece.
   const loadPhotos = useCallback(async () => {
+    const isCurrent = claimPhotos()
     setPhotosLoading(true)
     try {
-      setPhotos(await fetchPhotos(id))
+      const result = await fetchPhotos(id)
+      if (!isCurrent()) return
+      setPhotos(result)
       setPhotosError(null)
     } catch (loadError) {
+      if (!isCurrent()) return
       setPhotos(null)
       setPhotosError((loadError as Error).message)
     } finally {
-      setPhotosLoading(false)
+      if (isCurrent()) setPhotosLoading(false)
     }
-  }, [id])
+  }, [id, claimPhotos])
 
   useEffect(() => {
     void load()
@@ -1680,23 +1696,31 @@ function AdminProductionJobPage() {
    */
   const refusedAssign = detail ? assignRefusal(detail.job) : null
 
+  const claimCandidates = useLatestOnly()
+
+  // Guarded like the others: the candidate list is re-read whenever the job's
+  // size or stage changes, and the slower of two answers must not win.
   const loadCandidates = useCallback(async () => {
     if (!stage || longestEdge === null || refusedAssign !== null) {
       setCandidates([])
       return
     }
 
+    const isCurrent = claimCandidates()
     setCandidatesLoading(true)
     try {
-      setCandidates(await fetchCandidates(stage, longestEdge))
+      const result = await fetchCandidates(stage, longestEdge)
+      if (!isCurrent()) return
+      setCandidates(result)
       setCandidatesError(null)
     } catch (loadError) {
+      if (!isCurrent()) return
       setCandidates([])
       setCandidatesError((loadError as Error).message)
     } finally {
-      setCandidatesLoading(false)
+      if (isCurrent()) setCandidatesLoading(false)
     }
-  }, [stage, longestEdge, refusedAssign])
+  }, [stage, longestEdge, refusedAssign, claimCandidates])
 
   useEffect(() => {
     void loadCandidates()

@@ -106,6 +106,7 @@ import {
   type ProductionJobStatus,
 } from '@chobii/shared'
 import { cn, getApiUrl } from '~/lib/utils'
+import { useLatestOnly } from '~/lib/latest-request'
 import { Button } from '~/components/ui/Button'
 import { PRODUCTION_PAGE_SIZE } from '~/lib/admin-nav'
 
@@ -1152,21 +1153,31 @@ function AdminProductionQueuePage() {
   const [outcomes, setOutcomes] = useState<AssignOutcome[]>([])
   const [outcomeVendorName, setOutcomeVendorName] = useState<string | null>(null)
 
+  const claimQueue = useLatestOnly()
+
+  // Guarded because the queue is reloaded by every filter and page change, and
+  // the response that ARRIVES last is not the one asked for last. Double-click
+  // Next and page 2 landing after page 3 left the URL at `page=3`, the table on
+  // page 2 and the footer reading "Page 2 of N" — so pressing Next again
+  // appeared to do nothing at all.
   const load = useCallback(async () => {
+    const isCurrent = claimQueue()
     setIsLoading(true)
     try {
       const data = await fetchProductionJobs(search)
+      if (!isCurrent()) return
       setPage(data)
       setError(null)
     } catch (loadError) {
       // The stale page is dropped along with the error: showing last page's
       // rows under a failure banner is how a stale number gets believed.
+      if (!isCurrent()) return
       setPage(null)
       setError((loadError as Error).message)
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [search])
+  }, [search, claimQueue])
 
   useEffect(() => {
     void load()

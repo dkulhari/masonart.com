@@ -75,6 +75,7 @@ import { Link } from '@tanstack/react-router'
 import { AlertCircle, CheckCircle2, Truck } from 'lucide-react'
 import type { ProductionJobStatus } from '@chobii/shared'
 import { cn, getApiUrl } from '~/lib/utils'
+import { useLatestOnly } from '~/lib/latest-request'
 import { Button } from '~/components/ui/Button'
 import {
   STAGE_LABELS,
@@ -1441,18 +1442,27 @@ function useAsyncRead<T>(read: () => Promise<T>): AsyncRead<T> {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const claim = useLatestOnly()
+
+  // Guarded because the panel reloads: a pre-save readiness response landing
+  // after the post-save one put the OLD consolidator back on screen, over a
+  // saved decision, with nothing to say it had happened.
   const run = useCallback(async () => {
+    const isCurrent = claim()
     setIsLoading(true)
     try {
-      setData(await read())
+      const result = await read()
+      if (!isCurrent()) return
+      setData(result)
       setError(null)
     } catch (readError) {
+      if (!isCurrent()) return
       setData(null)
       setError((readError as Error).message)
     } finally {
-      setIsLoading(false)
+      if (isCurrent()) setIsLoading(false)
     }
-  }, [read])
+  }, [read, claim])
 
   useEffect(() => {
     void run()
