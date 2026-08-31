@@ -28,6 +28,7 @@ import {
   gte,
   lte,
   inArray,
+  isNull,
 } from "drizzle-orm";
 
 import { db } from "../../database";
@@ -36,9 +37,10 @@ import { isOrderNumber } from "../../lib/order-number";
 import {
   orders,
   type PaymentStatus,
-  type OrderShippingDetails,
   type OrderPaymentDetails,
 } from "../../database/schema/orders";
+import { orderShipments } from "../../database/schema/shipping";
+import { generateTrackingUrl } from "../shipments";
 import { users } from "../../database/schema/users";
 import {
   requireAuth,
@@ -971,7 +973,7 @@ adminOrdersApp.patch(
       const existing = await db
         .select({
           id: orders.id,
-          shippingDetails: orders.shippingDetails,
+          orderNumber: orders.orderNumber,
         })
         .from(orders)
         .where(whereCondition)
@@ -986,51 +988,117 @@ adminOrdersApp.patch(
         return c.json({ error: "Order not found" }, 404);
       }
 
-      // Merge shipping details
-      const currentShippingDetails =
-        (existingOrder.shippingDetails as OrderShippingDetails) || {};
-      const newShippingDetails: OrderShippingDetails = {
-        ...currentShippingDetails,
-      };
+      /**
+       * Written to `order_shipments`, NOT to `orders.shipping_details`.
+       *
+       * This handler used to merge into that jsonb column while
+       * `GET /api/tracking/*` read `order_shipments`, and the only writer of
+       * `order_shipments` had no UI. So an admin typed a tracking number here,
+       * the save succeeded, and the customer's tracking page stayed empty
+       * forever — and the whole `order-tracking-notifications` feature was
+       * starved by the same gap.
+       *
+       * The jsonb column is deliberately NOT written and NOT cleared. It is the
+       * backfill's source (#708), and a pass that starts writing elsewhere AND
+       * destroys the old store leaves nothing to re-run against.
+       *
+       * One transaction: the shipment write and the row that says who made it
+       * have to become true together. A tracking number a customer can read,
+       * with no row naming who typed it, is the shape of an unanswerable
+       * support call.
+       */
+      const result = await db.transaction(async (tx) => {
+        // The LIVE shipment, by the same predicate `lib/vendor-scope.ts` uses:
+        // not the newest, because a voided label and its replacement both hang
+        // off the order and only one is the one a courier will honour.
+        const [liveShipment] = await tx
+          .select({
+            id: orderShipments.id,
+            carrier: orderShipments.carrier,
+            trackingNumber: orderShipments.trackingNumber,
+            status: orderShipments.status,
+          })
+          .from(orderShipments)
+          .where(
+            and(
+              eq(orderShipments.orderId, existingOrder.id),
+              isNull(orderShipments.voidedAt)
+            )
+          )
+          .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
+          .limit(1);
 
-      if (input.carrier !== undefined)
-        newShippingDetails.carrier = input.carrier;
-      if (input.trackingNumber !== undefined)
-        newShippingDetails.trackingNumber = input.trackingNumber;
-      if (input.trackingUrl !== undefined)
-        newShippingDetails.trackingUrl = input.trackingUrl;
-      if (input.awbNumber !== undefined)
-        newShippingDetails.awbNumber = input.awbNumber;
-      if (input.shipmentId !== undefined)
-        newShippingDetails.shipmentId = input.shipmentId;
-      if (input.estimatedDelivery !== undefined)
-        newShippingDetails.estimatedDelivery = input.estimatedDelivery;
+        // `carrier` is NOT NULL. An admin who typed a tracking number and no
+        // carrier has made a mistake worth telling them about — defaulting it
+        // puts a placeholder on the page the CUSTOMER reads.
+        if (!liveShipment && !input.carrier) {
+          return {
+            error: "A carrier is required to open a shipment for this order",
+            status: 400 as const,
+          };
+        }
 
-      // If tracking number is being added and shippedAt is not set, set it now
-      const updateData: Record<string, unknown> = {
-        shippingDetails: newShippingDetails,
-        updatedAt: new Date(),
-      };
+        const carrier = input.carrier ?? liveShipment!.carrier;
+        const trackingNumber =
+          input.trackingNumber ?? liveShipment?.trackingNumber ?? null;
+        const trackingUrl =
+          input.trackingUrl ??
+          (trackingNumber ? generateTrackingUrl(carrier, trackingNumber) : null);
 
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
+        const values = {
+          carrier,
+          trackingNumber,
+          trackingUrl,
+          awbNumber: input.awbNumber ?? null,
+          externalShipmentId: input.shipmentId ?? null,
+          estimatedDeliveryAt: input.estimatedDelivery
+            ? new Date(input.estimatedDelivery)
+            : null,
+        };
 
-      const updatedOrder = updatedOrders[0];
-      if (!updatedOrder) {
-        return c.json({ error: "Failed to update shipping details" }, 500);
+        const [shipment] = liveShipment
+          ? await tx
+              .update(orderShipments)
+              .set({ ...values, updatedAt: new Date() })
+              .where(eq(orderShipments.id, liveShipment.id))
+              .returning()
+          : await tx
+              .insert(orderShipments)
+              .values({ ...values, orderId: existingOrder.id, status: "pending" })
+              .returning();
+
+        // `tx`, not `db`: this row asserts something the transaction must make
+        // true, so it shares the transaction's failures rather than leaving a
+        // tracking number nobody is accountable for. See lib/audit.ts.
+        await recordAudit(
+          c,
+          {
+            action: "shipment.tracking_updated",
+            entityType: "order_shipment",
+            entityId: shipment?.id ?? liveShipment?.id ?? null,
+            summary: `Tracking set on order ${existingOrder.orderNumber}`,
+            before: liveShipment
+              ? {
+                  carrier: liveShipment.carrier,
+                  trackingNumber: liveShipment.trackingNumber,
+                }
+              : null,
+            after: { carrier, trackingNumber },
+            metadata: { orderId: existingOrder.id },
+          },
+          tx
+        );
+
+        return { shipment };
+      });
+
+      if ("error" in result) {
+        return c.json({ error: result.error }, result.status);
       }
 
       return c.json({
         message: "Shipping details updated successfully",
-        order: {
-          id: updatedOrder.id,
-          orderNumber: updatedOrder.orderNumber,
-          shippingDetails: updatedOrder.shippingDetails,
-        },
+        shipment: result.shipment,
       });
     } catch (error) {
       return c.json({ error: "Failed to update shipping details" }, 500);
