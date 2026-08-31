@@ -34,6 +34,12 @@
  * @see packages/api/src/lib/production-readiness.ts
  */
 
+// Money rounding is reused rather than rewritten. `toPaise` lives under
+// `lib/razorpay.ts` because payments needed it first, but it is generic and
+// duplicating `Math.round(x * 100)` here is how two code paths drift a paisa
+// apart on different orders.
+import { toPaise } from '../lib/razorpay';
+
 /**
  * Every environment variable this module reads.
  *
@@ -83,6 +89,22 @@ export class ShiprocketAuthError extends ShiprocketError {
   constructor(message: string) {
     super(message, 'SHIPROCKET_AUTH_REJECTED');
     this.name = 'ShiprocketAuthError';
+  }
+}
+
+/**
+ * Thrown when no courier will carry this parcel on this route.
+ *
+ * A distinct type because it is NOT an outage and must not be reported as one.
+ * It means "nobody delivers from here to there today", which an admin can act
+ * on — by using a different courier account, or by telling the customer. A
+ * generic error would put it in the same bucket as Shiprocket being unreachable,
+ * and the two need different sentences and different HTTP statuses.
+ */
+export class ShiprocketNotServiceableError extends ShiprocketError {
+  constructor(message: string) {
+    super(message, 'SHIPROCKET_NOT_SERVICEABLE');
+    this.name = 'ShiprocketNotServiceableError';
   }
 }
 
@@ -283,4 +305,152 @@ export async function getShiprocketAuthToken(): Promise<string> {
   });
 
   return inFlight;
+}
+
+// ============================================================================
+// Serviceability and courier selection
+// ============================================================================
+
+/** One courier that will carry this parcel, in our vocabulary rather than theirs. */
+export interface CourierOption {
+  courierCompanyId: number;
+  courierName: string;
+  /** Integer paise, matching `order_shipments.cost_paise`. */
+  ratePaise: number;
+  /** Shiprocket's estimated delivery date, as the free text they send. */
+  etd: string | null;
+  supportsCod: boolean;
+  blocked: boolean;
+}
+
+/**
+ * The COD flag is NOT cosmetic — it changes the price.
+ *
+ * Measured on the live account, same route and weight:
+ *   prepaid  153.15  ->  15315 paise
+ *   COD      208.80  ->  20880 paise
+ *
+ * So a quote is only valid for the COD status it was requested with. Quoting
+ * prepaid and then shipping COD books a rate we will not be charged, and the
+ * difference turns up on the invoice rather than in the order.
+ */
+export interface ServiceabilityQuery {
+  pickupPincode: string;
+  deliveryPincode: string;
+  weightKg: number;
+  cod: boolean;
+}
+
+/**
+ * Shiprocket sends ~50 fields per courier, including `SLA_Adherence`,
+ * `SLA_Breach`, `RTO w/o_Attempt` and `Attempt_Speed`.
+ *
+ * We read six. The SLA metrics are deliberately ignored: we have no evidence
+ * they mean what their names suggest, and a ranking built on a misread field is
+ * worse than one built on price alone because it looks considered.
+ */
+function toCourierOption(raw: Record<string, unknown>): CourierOption | null {
+  const id = Number(raw.courier_company_id);
+  const name = raw.courier_name;
+  const rate = Number(raw.rate);
+
+  if (!Number.isFinite(id) || typeof name !== 'string' || !Number.isFinite(rate)) return null;
+
+  return {
+    courierCompanyId: id,
+    courierName: name,
+    ratePaise: toPaise(rate),
+    etd: typeof raw.etd === 'string' && raw.etd !== '' ? raw.etd : null,
+    // Shiprocket sends 1/0, not booleans.
+    supportsCod: Number(raw.cod) === 1,
+    blocked: Number(raw.blocked) === 1,
+  };
+}
+
+/**
+ * Which couriers will carry this parcel on this route.
+ *
+ * An empty list is an ordinary answer meaning nobody serves the route today —
+ * not an error. The live account currently returns exactly one courier, so
+ * callers must not assume a rich list.
+ */
+export async function checkServiceability(query: ServiceabilityQuery): Promise<CourierOption[]> {
+  const config = getShiprocketConfig();
+  const token = await getShiprocketAuthToken();
+
+  const params = new URLSearchParams({
+    pickup_postcode: query.pickupPincode,
+    delivery_postcode: query.deliveryPincode,
+    weight: String(query.weightKg),
+    cod: query.cod ? '1' : '0',
+  });
+
+  const response = await fetch(`${config.baseUrl}/courier/serviceability/?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    throw new ShiprocketError(
+      `Shiprocket could not answer serviceability for ${query.pickupPincode} to ` +
+        `${query.deliveryPincode} (HTTP ${response.status}).`,
+      'SHIPROCKET_SERVICEABILITY_FAILED'
+    );
+  }
+
+  const body = (await response.json()) as {
+    data?: { available_courier_companies?: unknown };
+  };
+  const raw = body?.data?.available_courier_companies;
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((entry) => toCourierOption(entry as Record<string, unknown>))
+    .filter((option): option is CourierOption => option !== null);
+}
+
+/**
+ * The courier we would use, or null if none of them will do.
+ *
+ * Cheapest usable option wins. `blocked` is respected because a blocked courier
+ * in the list is not an option, and a COD order refuses a courier that cannot
+ * collect cash. Ties keep the earlier entry, so the result is deterministic
+ * without inventing a second ranking criterion.
+ */
+export function selectCourier(
+  options: readonly CourierOption[],
+  { cod }: { cod: boolean }
+): CourierOption | null {
+  let best: CourierOption | null = null;
+
+  for (const option of options) {
+    if (option.blocked) continue;
+    if (cod && !option.supportsCod) continue;
+    // Strictly cheaper, so an equal price keeps the earlier entry.
+    if (best === null || option.ratePaise < best.ratePaise) best = option;
+  }
+
+  return best;
+}
+
+/**
+ * Ask, choose, and refuse readably if nothing will carry it.
+ *
+ * The refusal names both pincodes: an admin reading it has to know which leg
+ * failed without going to the logs.
+ */
+export async function selectCourierFor(query: ServiceabilityQuery): Promise<CourierOption> {
+  const options = await checkServiceability(query);
+  const chosen = selectCourier(options, { cod: query.cod });
+
+  if (chosen === null) {
+    const qualifier = query.cod ? ' that can collect cash on delivery' : '';
+    throw new ShiprocketNotServiceableError(
+      `No courier${qualifier} will carry this parcel from ${query.pickupPincode} to ` +
+        `${query.deliveryPincode}. ${options.length === 0
+          ? 'Shiprocket offered none for this route.'
+          : `All ${options.length} courier(s) offered were unusable.`}`
+    );
+  }
+
+  return chosen;
 }
