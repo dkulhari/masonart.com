@@ -8,9 +8,24 @@
 
 import type { RoomTemplate } from './templates';
 
+/**
+ * The single source of truth for the `--templates` default. Exported so the
+ * driver can resolve the "flag omitted" case (see `RunOptions.templates`
+ * below) without duplicating the literal.
+ */
+export const DEFAULT_TEMPLATES_DIR = '.cache/room-templates';
+
 export interface RunOptions {
   posters: string;
-  templates: string;
+  /**
+   * `null` means the flag was not supplied at all — the driver resolves that
+   * to a repo-root-anchored default. Any string, including one that happens
+   * to equal `DEFAULT_TEMPLATES_DIR`, means the caller passed `--templates`
+   * explicitly and it stays relative to the caller's own cwd, same as every
+   * other flag. Distinguishing these here (rather than folding "omitted"
+   * into the default string) is what lets the driver tell them apart.
+   */
+  templates: string | null;
   out: string;
   only: string[] | null;
   frame: string | null;
@@ -59,7 +74,7 @@ export function parseArgs(argv: string[]): RunOptions {
 
   return {
     posters,
-    templates: values.get('--templates') ?? '.cache/room-templates',
+    templates: values.get('--templates') ?? null,
     out: values.get('--out') ?? './out',
     only: only ? only.split(',').map((s) => s.trim()).filter(Boolean) : null,
     frame: values.get('--frame') ?? null,

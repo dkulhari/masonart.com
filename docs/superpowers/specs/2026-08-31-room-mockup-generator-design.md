@@ -96,7 +96,7 @@ if a template is re-cropped, and they must be reviewable in a diff.
   "file": "living-room-warm.jpg",
   "placement": { "x": 0.286, "y": 0.047, "w": 0.483, "h": 0.622 },
   "light": "left",
-  "frame": "oak",
+  "frame": "wood",
   "label": "Living room"
 }
 ```

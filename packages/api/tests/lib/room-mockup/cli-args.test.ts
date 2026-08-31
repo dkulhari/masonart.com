@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseArgs, selectTemplates } from '../../../src/lib/room-mockup/cli-args';
+import { DEFAULT_TEMPLATES_DIR, parseArgs, selectTemplates } from '../../../src/lib/room-mockup/cli-args';
 import type { RoomTemplate } from '../../../src/lib/room-mockup/templates';
 
 const argv = (...args: string[]) => ['bun', 'generate-room-mockups.ts', ...args];
@@ -29,7 +29,12 @@ describe('parseArgs', () => {
     const opts = parseArgs(argv('--posters', './art'));
 
     expect(opts.posters).toBe('./art');
-    expect(opts.templates).toBe('.cache/room-templates');
+    // `--templates` omitted entirely -> null, distinct from any string the
+    // caller could pass. The driver is what resolves null to a repo-root
+    // path; parseArgs itself must not collapse "omitted" into the default
+    // string, or an explicit `--templates .cache/room-templates` becomes
+    // indistinguishable from not passing the flag at all.
+    expect(opts.templates).toBeNull();
     expect(opts.out).toBe('./out');
     expect(opts.only).toBeNull();
     expect(opts.frame).toBeNull();
@@ -44,6 +49,17 @@ describe('parseArgs', () => {
     expect(opts.templates).toBe('./rooms');
     expect(opts.out).toBe('./build');
     expect(opts.dryRun).toBe(true);
+  });
+
+  it('returns the literal default string when --templates is passed explicitly, not null', () => {
+    // Proves the omitted case (null) and an explicit flag that happens to
+    // spell out the same default are distinguishable — the bug this fixes
+    // was that both collapsed to the same value before the driver could
+    // tell them apart.
+    const opts = parseArgs(argv('--posters', './art', '--templates', DEFAULT_TEMPLATES_DIR));
+
+    expect(opts.templates).toBe(DEFAULT_TEMPLATES_DIR);
+    expect(opts.templates).not.toBeNull();
   });
 
   it('splits --only on commas and trims', () => {

@@ -13,7 +13,13 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import { MAT_COLOR } from '@chobii/shared';
-import { renderFramedMain, buildContactSheet } from '../../../src/lib/room-mockup/outputs';
+import {
+  renderFramedMain,
+  buildContactSheet,
+  truncateCaptionLine,
+  LABEL_CHARS_PER_CELL_PX,
+  FILE_CHARS_PER_CELL_PX,
+} from '../../../src/lib/room-mockup/outputs';
 import type { FrameRender } from '../../../src/lib/room-mockup/templates';
 
 const OAK: FrameRender = { widthRatio: 0.05, color: [178, 141, 94], depthRatio: 0.024 };
@@ -88,5 +94,90 @@ describe('buildContactSheet', () => {
 
   it('refuses an empty set rather than writing a blank sheet', async () => {
     await expect(buildContactSheet([], 2, 200)).rejects.toThrow(/empty/i);
+  });
+
+  it('with a file line, the caption band is taller than the old single-line band alone would allow', async () => {
+    const entries = [
+      {
+        label: 'Coastal bedroom',
+        file: 'room-coastal-bedroom-north.jpg',
+        image: await cell(200, 200, { r: 255, g: 0, b: 0 }),
+      },
+    ];
+
+    const sheet = await buildContactSheet(entries, 1, 200);
+    const meta = await sharp(sheet).metadata();
+
+    // One row, one column: height = cellSize + GUTTER*2 + captionBand. Before
+    // this fix the caption band was a fixed 34px, sized for one line only —
+    // asserting the real height clears what a 34px band could ever produce
+    // (with the same cellSize/GUTTER) proves the band actually grew to fit a
+    // second line, not just that some caption rendered without throwing.
+    const oldSingleLineBandHeight = 200 + 16 * 2 + 34;
+    expect(meta.height!).toBeGreaterThan(oldSingleLineBandHeight);
+  });
+
+  it('still renders an entry with no file, at the same dimensions as one that has one', async () => {
+    const withFile = [
+      { label: 'One', file: 'room-one.jpg', image: await cell(200, 200, { r: 255, g: 0, b: 0 }) },
+    ];
+    const withoutFile = [{ label: 'One', image: await cell(200, 200, { r: 255, g: 0, b: 0 }) }];
+
+    const a = await sharp(await buildContactSheet(withFile, 1, 200)).metadata();
+    const b = await sharp(await buildContactSheet(withoutFile, 1, 200)).metadata();
+
+    // The band is sized for the two-line case regardless of any one entry —
+    // omitting `file` (the pre-existing, single-line SheetEntry shape) must
+    // still render, at the same sheet dimensions, not throw or shrink.
+    expect(b.format).toBe('jpeg');
+    expect(b.width).toBe(a.width);
+    expect(b.height).toBe(a.height);
+  });
+
+  it('does not change sheet dimensions when a label or filename is far longer than its budget', async () => {
+    const veryLongLabel = 'An extremely long, hand-written room description '.repeat(5);
+    const veryLongFile = 'room-a-very-long-template-id-indeed.jpg'.repeat(5);
+
+    const normal = [{ label: 'One', image: await cell(200, 200, { r: 255, g: 0, b: 0 }) }];
+    const long = [
+      { label: veryLongLabel, file: veryLongFile, image: await cell(200, 200, { r: 255, g: 0, b: 0 }) },
+    ];
+
+    const a = await sharp(await buildContactSheet(normal, 1, 200)).metadata();
+    const b = await sharp(await buildContactSheet(long, 1, 200)).metadata();
+
+    // Truncation bounds the text before it ever reaches the SVG, so runaway
+    // label/filename length must not throw, and must not change the sheet's
+    // own geometry (there is no wrapping to grow the cell into).
+    expect(b.width).toBe(a.width);
+    expect(b.height).toBe(a.height);
+  });
+});
+
+describe('truncateCaptionLine', () => {
+  it('leaves a string within budget unchanged', () => {
+    expect(truncateCaptionLine('Coastal bedroom', 42)).toBe('Coastal bedroom');
+  });
+
+  it('truncates a string over budget to exactly the budget, marking the cut with an ellipsis', () => {
+    const long = '1. Coastal bedroom, north-facing, warm afternoon light through sheers';
+    const result = truncateCaptionLine(long, 42);
+
+    expect(result.length).toBe(42);
+    expect(result.endsWith('…')).toBe(true);
+    // The kept text is a genuine prefix of the original — truncation cuts
+    // the tail, it does not otherwise rewrite the string.
+    expect(long.startsWith(result.slice(0, -1))).toBe(true);
+  });
+
+  it('derives the label and filename budgets from cellSize rather than a fixed cell', () => {
+    // Documents the values this was specced against — ~42 label characters
+    // and ~56 filename characters (it renders smaller) at the default 420px
+    // cell — and proves the budget scales with a different cellSize instead
+    // of staying pinned to numbers tuned for a cell the caller never asked
+    // for.
+    expect(Math.round(420 * LABEL_CHARS_PER_CELL_PX)).toBe(42);
+    expect(Math.round(420 * FILE_CHARS_PER_CELL_PX)).toBe(56);
+    expect(Math.round(210 * LABEL_CHARS_PER_CELL_PX)).toBe(21);
   });
 });

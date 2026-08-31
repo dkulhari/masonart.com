@@ -47,11 +47,27 @@ export async function renderFramedMain(art: Buffer, frame: FrameRender): Promise
 
 export interface SheetEntry {
   label: string;
+  /**
+   * The file a reviewer would delete to reject this candidate
+   * (`room-<id>.jpg`). Optional so existing callers that only ever set
+   * `label` keep compiling and rendering a single-line caption.
+   */
+  file?: string;
   image: Buffer;
 }
 
 const GUTTER = 16;
-const CAPTION = 34;
+const CAPTION = 52;
+
+// Character budgets are expressed as "chars per pixel of cellSize" rather
+// than flat numbers, derived from the values this was tuned against: ~42
+// characters for the numbered label and ~56 for the filename (it renders in
+// a smaller face) at the default 420px cell. A caller passing a different
+// cellSize gets a budget scaled to match, instead of a number tuned for a
+// cell it never asked for. Exported so tests can derive the same budget the
+// implementation uses rather than duplicating the magic numbers.
+export const LABEL_CHARS_PER_CELL_PX = 42 / 420;
+export const FILE_CHARS_PER_CELL_PX = 56 / 420;
 
 /**
  * One image showing every candidate side by side, each numbered.
@@ -74,6 +90,9 @@ export async function buildContactSheet(
   const width = columns * cellSize + (columns + 1) * GUTTER;
   const height = rows * cellH + (rows + 1) * GUTTER;
 
+  const labelBudget = Math.max(1, Math.round(cellSize * LABEL_CHARS_PER_CELL_PX));
+  const fileBudget = Math.max(1, Math.round(cellSize * FILE_CHARS_PER_CELL_PX));
+
   const layers: sharp.OverlayOptions[] = [];
 
   for (const [i, entry] of entries.entries()) {
@@ -89,9 +108,16 @@ export async function buildContactSheet(
 
     layers.push({ input: thumb, left, top });
 
+    // The filename is reference text, not the headline — it renders smaller
+    // and dimmer, on its own line, so a long label can't push it off the
+    // edge of the cell the way concatenating them into one string did.
+    const labelLine = escapeXml(truncateCaptionLine(`${i + 1}. ${entry.label}`, labelBudget));
+    const fileLine = entry.file ? escapeXml(truncateCaptionLine(entry.file, fileBudget)) : null;
+
     const caption = Buffer.from(
       `<svg width="${cellSize}" height="${CAPTION}">
-         <text x="0" y="22" font-family="sans-serif" font-size="20" fill="#111">${i + 1}. ${escapeXml(entry.label)}</text>
+         <text x="0" y="22" font-family="sans-serif" font-size="20" fill="#111">${labelLine}</text>
+         ${fileLine ? `<text x="0" y="42" font-family="sans-serif" font-size="13" fill="#767676">${fileLine}</text>` : ''}
        </svg>`
     );
 
@@ -113,4 +139,17 @@ function escapeXml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * Truncates to a fixed character budget with a trailing ellipsis, so a caption
+ * line can never overflow the fixed-width SVG cell it is rendered into (there
+ * is no wrapping or clipping at the sharp/SVG layer to fall back on). Exported
+ * so its behaviour can be asserted directly — the rendered SVG text content
+ * isn't something a test can otherwise check without image diffing.
+ */
+export function truncateCaptionLine(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  if (maxChars <= 1) return value.slice(0, maxChars);
+  return `${value.slice(0, maxChars - 1)}…`;
 }

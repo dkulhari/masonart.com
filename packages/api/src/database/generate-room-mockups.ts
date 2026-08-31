@@ -20,17 +20,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadTemplates } from '../lib/room-mockup/templates';
-import { parseArgs, selectTemplates } from '../lib/room-mockup/cli-args';
+import { DEFAULT_TEMPLATES_DIR, parseArgs, selectTemplates } from '../lib/room-mockup/cli-args';
 import { renderRoomMockup } from '../lib/room-mockup/render';
 import { buildContactSheet, renderFramedMain, type SheetEntry } from '../lib/room-mockup/outputs';
 
 const POSTER_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-
-// The literal default `parseArgs` falls back to for `--templates`. Compared
-// against below so the repo-root anchoring only applies when the caller
-// didn't override the flag — an explicit `--templates` stays relative to the
-// caller's own cwd, same as every other flag.
-const DEFAULT_TEMPLATES_DIR = '.cache/room-templates';
 
 // Read at runtime with JSON.parse rather than a static `import ... from
 // './x.json'`: this package builds as a `composite` TS project, and a
@@ -55,10 +49,13 @@ async function main(): Promise<void> {
 
   const opts = parseArgs(process.argv);
 
+  // `opts.templates` is `null` only when `--templates` was not supplied at
+  // all — that's when the repo-root anchoring below applies. An explicit
+  // `--templates`, even one that spells out the same default string, is
+  // taken as-is and stays relative to the caller's own cwd, same as every
+  // other flag.
   const templatesDir =
-    opts.templates === DEFAULT_TEMPLATES_DIR
-      ? join(REPO_ROOT, DEFAULT_TEMPLATES_DIR)
-      : opts.templates;
+    opts.templates === null ? join(REPO_ROOT, DEFAULT_TEMPLATES_DIR) : opts.templates;
 
   const { templates: allTemplates, frames } = loadTemplates(
     templatesJson,
@@ -133,8 +130,10 @@ async function main(): Promise<void> {
 
         writeFileSync(join(dir, `room-${template.id}.jpg`), image);
         // The id is what a reviewer deletes (room-<id>.jpg); the label alone
-        // doesn't say which file that is, and labels aren't unique.
-        sheet.push({ label: `${template.label} — room-${template.id}.jpg`, image });
+        // doesn't say which file that is, and labels aren't unique. Passed as
+        // a separate field rather than appended to the label so the contact
+        // sheet can render it on its own line instead of clipping it.
+        sheet.push({ label: template.label, file: `room-${template.id}.jpg`, image });
       }
 
       // The main image uses the first template's frame, so the framed main and
