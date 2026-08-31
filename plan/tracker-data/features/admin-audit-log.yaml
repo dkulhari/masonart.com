@@ -73,13 +73,20 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 2
+  total_duration: "00:10:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 2
+      duration: "00:10:00"
+      tokens: 0
 tickets:
   todo:
-    "663": db:push silently builds a database without the audit-log immutability trigger, and the docs tell you to use it
+    "668": Bug - vendor.payable_settled and order.shipment_marked_delivered are declared but nothing ever emits them
+    "669": Bug - vendor invite creates a user and grants a role with no privilege audit row
+    "670": Tier 2 - wire the remaining declared-but-dead catalogue, config and content actions
+    "671": Guard - fail the build when AUDIT_ACTIONS declares an action nothing emits
   in_progress: {}
   done:
     "635": Contract - shared audit action registry and zod schemas
@@ -98,8 +105,10 @@ tickets:
     "648": E2E and runbook - an admin action appears in the viewer
     "649": Bug - the actor FK and the immutability trigger contradict each other
     "650": Bug - the audit floor records anonymous 401s, flooding the table
-total_tickets: 17
-completion_percentage: 94
+    "663": db:push silently builds a database without the audit-log immutability trigger, and the docs tell you to use it
+    "667": Tier 1 - audit production job assignment, status transitions and amount overrides
+total_tickets: 22
+completion_percentage: 82
 is_completed: false
 plan:
   phases:
@@ -139,6 +148,5 @@ plan:
         - 647
         - 648
   generated_at: "2026-08-17T07:21:59.707Z"
-last_activity: "2026-08-17T08:16:29.642Z"
+last_activity: "2026-08-31T01:42:39.215Z"
 started: "2026-08-17T07:22:12.112Z"
-completed: "2026-08-17T08:16:29.621Z"

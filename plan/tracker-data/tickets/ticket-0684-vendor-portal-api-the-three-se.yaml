@@ -18,19 +18,82 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.530Z'
-last_updated: '2026-08-30T12:02:20.530Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T16:20:31.060Z'
+time_spent_minutes: 13
 labels:
   - api
   - vendor-portal
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T16:07:20.912Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T16:20:20.700Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f9a17196` — feat(api): put the vendor portal's PATCH on the production state machine (branch `feature/production-pipeline-design`)
+
+      **Both defects verified live before any code was written** (throwaway probe against the recording harness):
+      - a **cancelled** job PATCHed to `received` answered **200** and issued the UPDATE — walking around the freeze #680 installed on the admin side, through a different door;
+      - `receivedAt: 2020-01-01` was written **verbatim from the request body**;
+      - `status: 'sent'` passed the route's zod enum and was stopped only by the lib's derived check, as a **500 leaking `vendor-scope:` internals** rather than a 409.
+
+      **Files Changed**
+      - `packages/api/src/routes/vendor.ts` — deleted the `["sent","received"]` literal; `updateJobSchema` narrows to `{ status }` over the IMPORTED `VENDOR_SETTABLE_STATUSES`; the handler translates the discriminated result into 404 / 409 / 422 and writes the two audit rows on opposite sides of the transaction.
+      - `packages/api/src/lib/vendor-scope.ts` — `updateVendorJob` rewritten: locked re-read → `assertTransition(from, to, 'vendor')` → the edge's guard → server-stamped write with the predicate repeated → audit inside the tx → re-read, all in one transaction. Adds `assertVendorGuardSatisfied`, `VENDOR_STATUS_STAMP` (checked total at module load), the `VendorJobUpdateResult` discriminated union, and `readVendorJob` so `getVendorJob` and the post-write re-read share ONE column list.
+      - `packages/api/src/lib/production-transitions.ts` — comment only; the `#684 deletes that literal` note is now past tense.
+      - `packages/api/tests/routes/vendor/jobs.test.ts` — PATCH suite rewritten (24 → 74 tests).
+      - `packages/api/tests/routes/vendor/isolation.test.ts` — recorder gained `.for()` (it had none, so the locked read would have crashed the suite); `OWNED_ROWS` gained an `update:production_jobs` row for the new `.returning()`; **`production_job_photos` added to `JOB_KEYED_TABLES`** — that vocabulary is an allow-list, so an unlisted table is not judged unscoped, it is *not examined*, which is the silence #678 was caught by.
+
+      **Decisions worth recording**
+      1. **The route keeps its load-first pre-read AND the module re-reads under `FOR UPDATE`.** The pre-read preserves the documented 404-before-any-write invariant; by the time the write is built that answer is a round trip old, so the decision rests on the locked read.
+      2. **`cancelled` is checked BEFORE `settled`.** Both refuse, but the cancellation message exists precisely to stop wasted work, and that is the more actionable fact for a vendor even on a job that was also settled.
+      3. **Shot-list incomplete is 422; everything else is 409.** 422 in this router means "the caller can fix this" — upload the photos. A transition conflict is not that.
+      4. **The audit hook is a callback taking the tx as an opaque insert surface.** That is what lets the success row share the transaction while `routes/vendor.ts` keeps its zero-database-import invariant — asserted by a source scan in the suite.
+      5. **`VENDOR_STATUS_STAMP` is validated at load, not by the type checker.** `VENDOR_SETTABLE_STATUSES` is derived by a runtime `filter`, so its element type is the whole enum and `Record<VendorSettableStatus, …>` would demand a clock for `draft` and `cancelled`. A type satisfied with lies is worse than a check that runs.
+      6. **`qc_failed → received` re-stamps `receivedAt`.** Rework is a second attempt at the piece and its clock restarts.
+
+      **Scope held**: no photo upload (#685), no transfers (#686), no label route (#687). No route added, so `ROUTE_TABLE` is unchanged and the route-table-covers-the-router test still passes.
+
+      **Verification**
+      - Command: `npx vitest run tests/routes/vendor/jobs.test.ts tests/routes/vendor/isolation.test.ts tests/routes/vendor/artwork.test.ts`
+      - Result: **PASS — 163 tests, 3 files** (jobs 74, isolation 69, artwork 20)
+      - Regression sweep: `+ tests/lib/vendor-scope.test.ts tests/lib/production-transitions.test.ts tests/routes/admin/production-jobs.test.ts tests/routes/admin/vendor-payables.test.ts` → **400 passed (7 files)**; `packages/shared tests/schemas/audit-log.test.ts` → **24 passed**
+      - Typecheck: `turbo run typecheck` green in the pre-commit hook — `tsc --noEmit && tsc -p tsconfig.test.json --noEmit`, 0 errors in src and tests.
+  - author: system
+    timestamp: '2026-08-30T16:20:31.060Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T16:07:22.742Z'
+    agent: claude-code
+    summary: Vendor portal PATCH is now a guarded transition. Verified both defects live first (cancelled -> received returned 200 and wrote; receivedAt taken verbatim from the body; `sent` reached the lib and 500'd leaking internals). Deleted the ["sent","received"] literal in favour of the matrix-derived VENDOR_SETTABLE_STATUSES; updateVendorJob is now locked re-read -> assertTransition -> edge guard -> server-stamped write with the predicate repeated -> audit in the tx -> re-read, returning a discriminated 404/409/422 result. Both vendor guards evaluated (shot list 422 naming missing slots, despatch evidence 409). sentAt/receivedAt off the patch surface entirely. transitioned shares the tx, transition_refused never does, 404 gets no row. Zero-database-import invariant kept and asserted. 163 tests green in the three vendor suites (74 in jobs, up from 24), 400 across the seven affected api suites, 24 in shared; both typechecks clean. Commit f9a17196.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T16:20:28.912Z'
+    duration: '00:13:06'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T16:07:20.912Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:13:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:13:00'
+      tokens: 0
+completed: '2026-08-30T16:20:31.060Z'

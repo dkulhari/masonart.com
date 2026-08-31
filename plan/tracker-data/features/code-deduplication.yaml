@@ -17,24 +17,25 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 3
-  total_duration: '00:49:00'
+  total_sessions: 5
+  total_duration: '01:00:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 3
-      duration: '00:49:00'
+      sessions: 5
+      duration: '01:00:00'
       tokens: 0
 tickets:
-  todo:
-    '634': 'Deduplicate OrdersTable and ProductsTable: status badges, sortable header, row menu and table shell'
+  todo: {}
   in_progress: {}
   done:
     '629': 'Deduplicate app code: extract useScrollTrack hook and share track route types/helpers'
     '630': Deduplicate test scaffolding and shared UI blocks across api and web packages
     '633': Deduplicate the gift-card live-database test harness across 11 suites
+    '634': 'Deduplicate OrdersTable and ProductsTable: status badges, sortable header, row menu and table shell'
 total_tickets: 4
-completion_percentage: 75
-is_completed: false
-last_activity: '2026-08-28T03:00:40.628Z'
+completion_percentage: 100
+is_completed: true
+last_activity: '2026-08-30T06:17:07.001Z'
 started: '2026-08-17T04:29:07.040Z'
+completed: '2026-08-30T06:17:03.177Z'

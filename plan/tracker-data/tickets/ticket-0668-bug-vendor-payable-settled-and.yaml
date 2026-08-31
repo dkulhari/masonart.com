@@ -1,0 +1,155 @@
+ticket_number: 668
+title: Bug - vendor.payable_settled and order.shipment_marked_delivered are declared but nothing ever emits them
+description: |-
+  ## Task
+
+  `AUDIT_ACTIONS` declares both actions and `AUDIT_ACTION_CATEGORY` files them under `money`, so the audit viewer offers them in its action filter. Neither string appears anywhere in `packages/api/src` outside the shared registry. Selecting either filter returns an empty list forever, and the emptiness reads as "this never happened" rather than "this was never recorded".
+
+  Both routes exist and both move money or close a money window:
+
+  - `POST /api/admin/vendors/:id/settlements` (`routes/admin/vendor-payables.ts:226`) — pays a supplier. It already takes `FOR UPDATE` on the jobs so two admins cannot double-settle, which is exactly the contention the audit row is wanted for.
+  - `POST /api/admin/shipments/:id/mark-delivered` (`routes/admin/shipments.ts:569`) — delivery is what starts the return window, so a disputed return date turns on who marked it and when.
+
+  ## Context
+
+  Both files currently import no audit helper. They are covered only by the floor row (`admin.request`, category `config`) — which means a `money` category filter, the launch gate the feature was built around, misses a supplier payment entirely.
+
+  Existing tests to extend rather than duplicate: `packages/api/tests/routes/admin/vendor-payables.test.ts` and `packages/api/tests/routes/admin/shipments.test.ts`. The audit assertion shape lives in `packages/api/tests/routes/admin/orders-audit.test.ts`.
+
+  Record the settlement amount and the job ids in `after` — a settlement with no amount in the trail answers none of the questions a settlement dispute asks. Record refusals too: a settlement rejected because a job was already settled is evidence.
+feature: admin-audit-log
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T11:27:28.072Z'
+last_updated: '2026-08-31T01:46:20.985Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - audit
+  - money
+  - bug
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T01:46:20.985Z'
+    text: |-
+      Note from the production-pipeline run (feature complete, PR #3).
+
+      **Recommendation: do the `vendor.payable_settled` half now; defer `order.shipment_marked_delivered`.**
+
+      **Why the payables half got more valuable.** production-pipeline made cancellation a routine, reachable transition and reworked payables around it (#695). The shipped predicate is `settlement_id IS NULL AND (status <> 'cancelled' OR amount_actual IS NOT NULL)` — on a cancelled job the rate card's `amount_expected` is a guess, only an admin-stated `amount_actual` is a debt. The rule now has one owner in `lib/vendor-payables`, in both a JS and a SQL form.
+
+      That makes "who settled this, when, against which jobs" a question with real weight. Today it lands only as a coarse `admin.request POST /api/admin/vendors/:id/settlements → 201` with no amount, no reference, no job ids. `routes/admin/vendor-payables.ts` has the settlement POST and already does `SELECT … FOR UPDATE` + row-count-mismatch rollback, so there is a clean transaction to attach to.
+
+      Two constraints from this run, both now enforced elsewhere in the codebase:
+      - **Share `tx`** — a settlement row that rolled back must not leave an audit row claiming a supplier was paid. `recordAudit` now **rethrows** when given a `tx` (it swallows only when writing independently), so a shared-tx audit failure fails the handler rather than silently rolling the settlement back behind a 201. That was a HIGH found in Phase 2.
+      - **Never share `tx` for the refusal row.** `SettlementRejected` currently writes no precise row. A refusal records that a transaction was rolled back, so writing it inside that transaction erases the evidence it exists to preserve. Write it from a `catch` outside `db.transaction(...)`.
+
+      **Why to defer the shipment half.** `order.shipment_marked_delivered` would go in `routes/admin/shipments.ts`, and **`order-dispatch-tracking` is about to rewrite that file entirely** — production-pipeline's amendment promoted it from "dispatch is MANUAL at launch, no Shiprocket API" to API-integrated, because vendors now despatch directly and print carrier labels. Wiring it now means writing it twice, against a route shape that is changing.
+
+      Verified at head: both actions are still declared with no emitter anywhere in `packages/api/src`.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert a settlement and a delivery each emit their declared money action
+    file: packages/api/tests/routes/admin/money-audit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/money-audit.test.ts
+    expected_result: FAIL - recordAudit received 0 calls from either route
+    status: pending
+    code: |-
+      it('records who paid the vendor, and how much', async () => {
+        // ...settlement fixtures...
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'vendor.payable_settled',
+            entityType: 'vendor',
+            entityId: VENDOR_ID,
+            after: expect.objectContaining({ amount: '1200.00', jobIds: [JOB_ID] }),
+          })
+        )
+      })
+
+      it('records who closed the return window', async () => {
+        // ...mark-delivered fixtures...
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'order.shipment_marked_delivered',
+            entityType: 'order_shipment',
+            entityId: SHIPMENT_ID,
+            before: { status: 'in_transit' },
+            after: { status: 'delivered' },
+          })
+        )
+      })
+
+      it('records a refused settlement as a failure row', async () => {
+        // already-settled job -> 4xx, one row with outcome: 'failure'
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'vendor.payable_settled', outcome: 'failure' })
+        )
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm both assertions fail before any wiring
+    command: cd packages/api && bunx vitest run tests/routes/admin/money-audit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Emit vendor.payable_settled on the settlement route, inside the same transaction as the write
+    file: packages/api/src/routes/admin/vendor-payables.ts
+    status: pending
+    code: |-
+      import { recordAudit } from '../../lib/audit'
+
+      // recordAudit accepts a transaction, so the trail and the settlement commit or
+      // roll back together — a settlement that failed to commit must not leave a row
+      // claiming a supplier was paid.
+      await recordAudit(c, {
+        action: 'vendor.payable_settled',
+        entityType: 'vendor',
+        entityId: id,
+        after: { settlementId: settlement.id, amount, reference, paidAt, jobIds },
+        summary: `Settled ${amount} to vendor ${id} across ${jobIds.length} job(s), ref ${reference}`,
+      }, tx)
+  - id: 4
+    action: implement
+    description: Emit order.shipment_marked_delivered with the status it moved from
+    file: packages/api/src/routes/admin/shipments.ts
+    status: pending
+    code: |-
+      import { recordAudit } from '../../lib/audit'
+
+      // `existing` is already read above for the already-delivered guard, so the
+      // prior status is in hand — no extra query.
+      await recordAudit(c, {
+        action: 'order.shipment_marked_delivered',
+        entityType: 'order_shipment',
+        entityId: shipmentId,
+        before: { status: existing.status },
+        after: { status: 'delivered', deliveredAt: now.toISOString() },
+        summary: `Shipment ${shipmentId} on order ${existing.orderId} marked delivered`,
+      })
+  - id: 5
+    action: verify-pass
+    description: New suite green, both route suites unbroken
+    command: cd packages/api && bunx vitest run tests/routes/admin/money-audit.test.ts tests/routes/admin/vendor-payables.test.ts tests/routes/admin/shipments.test.ts
+    expected_result: PASS - no regression
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the money-tier wiring
+    command: 'git add packages/api/src/routes/admin/vendor-payables.ts packages/api/src/routes/admin/shipments.ts packages/api/tests/routes/admin/money-audit.test.ts && git commit -m "fix(api): emit the declared audit actions for vendor settlement and shipment delivery"'
+    status: pending
+current_step: 1

@@ -17,19 +17,99 @@ description: |-
 feature: production-pipeline
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.669Z'
-last_updated: '2026-08-30T12:02:20.669Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T18:44:09.333Z'
+time_spent_minutes: 14
 labels:
   - web
   - admin
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T18:29:59.527Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T18:30:17.600Z'
+    text: |-
+      **Implementation steps** (derived; freeform ticket, TDD per /tt-work-ticket)
+
+      1. RED — vocabulary: tests that `PRODUCTION_STATUSES` carries `qc_submitted` + `dispatched`, excludes `sent`, and that every member has a label AND a style. Plus a mechanical drift test that reads `packages/api/src/database/schema/production-jobs.ts` so a status added to the enum fails here.
+      2. GREEN — reshape `PRODUCTION_STATUSES` / `STATUS_LABELS` / `STATUS_STYLES`; relabel `received` away from the neutral "Received" and label `qc_submitted` as blocked-on-us; `StatusPill` falls back to the raw value so a legacy row is never a blank badge.
+      3. RED/GREEN — search schema: `?status=qc_submitted` and `?status=dispatched` round-trip through router.tsx's string-only serialisation; `?status=sent` degrades to no filter rather than blanking the route.
+      4. RED/GREEN — selection: `isAssignable(job)` derived from the matrix rows that have an admin edge to `assigned` (`draft`, `assigned`, `qc_failed`) and settled jobs frozen; checkbox column + select-all-on-page.
+      5. RED/GREEN — `BulkAssignBar`: vendor picker with its own loading / empty / error states, two-step inline confirm (no native `confirm()`), one POST per selected job to `POST /:jobId/assign`.
+      6. RED/GREEN — `assignJobsToVendor`: per-job atomic, batch-level partial. One 422 does not abort the rest; returns an outcome per job carrying the `unpriced` array.
+      7. RED/GREEN — `BulkAssignResults`: names each refused job and each unpriced item with its size and longest edge, mirroring `AssignmentFailure` in `$id.tsx`.
+      8. VERIFY — `bun run vitest run tests/routes/admin/production-queue.test.tsx` from `packages/web`, path-scoped (888-test suite, shared 8-core box, two sibling agents live).
+      9. COMMIT — `packages/web/app/routes/admin/production/index.tsx` + its test only, staged by explicit path.
+
+      **Deviation to flag on step 2**: the ticket asks to re-export the tuple from `packages/api/src/lib/production-transitions.ts`. That module does not export a status tuple, and `packages/web` cannot import it either way — `@chobii/api`'s `exports` map publishes only `./dist/index.js`, web's `node_modules/@chobii` holds `shared` alone, and the module's transitive import of `database/schema/production-jobs` would pull drizzle-orm into the browser bundle for a nine-string list. So the tuple stays a mirror and is pinned mechanically instead, which is the pattern `packages/shared/src/schemas/production-qc.ts` already documents for the same enum ("Two lists, kept in step by …").
+  - author: mcp-client
+    timestamp: '2026-08-30T18:44:07.044Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `31f62013` — feat(web): reshape the production queue around the new statuses, and assign in bulk
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/production/index.tsx` — vocabulary derived from the shared matrix, relabelled for the workflow, multi-select assign, per-job refusal panel
+      - `packages/web/tests/routes/admin/production-queue.test.tsx` — 47 → 114 tests
+
+      **Summary**
+
+      1. **The vocabulary now exists once.** The step-2 deviation recorded above is *withdrawn*: mid-ticket, #689 landed `@chobii/shared/schemas/production-transitions` (commit `1f829294`), which puts `PRODUCTION_JOB_STATUSES` and `PRODUCTION_TRANSITIONS` somewhere `packages/web` can actually import. So the queue writes no status list at all:
+         - `PRODUCTION_STATUSES` = `PRODUCTION_JOB_STATUSES` minus `UNREACHABLE_STATUSES`. A status with no in-edge and no out-edge is retired, so decision 9's retirement is *read off the matrix* rather than restated — and it moves when the matrix moves.
+         - `ASSIGNABLE_STATUSES` = every status `nextStatuses(from, 'admin')` gives an edge to `assigned` from. Not the three words; #684 is the bill for a hardcoded copy of the matrix.
+      2. **`sent` is offered nowhere** — not in the tuple, the labels, the styles or the filter, and there is no string literal for it in the file (asserted). `?status=sent` degrades to an unfiltered queue rather than error-boundarying the route.
+      3. **Relabelled.** "Sent"/"Received" was the neutral wording that let the ambiguity survive; `received` → "In production", `qc_submitted` → "Awaiting our QC" (blocked on us, the admin QC queue's content), `dispatched` → "Dispatched by vendor" (custody ended). Amber is reserved for `qc_submitted` so our own backlog is a glance.
+      4. **`StatusPill` never indexes blind** — an unlabelled status renders its raw value in a dashed pill, so #696's blank badge cannot return for the next enum value.
+      5. **Multi-select assign** (D2, no batch entity): tick N assignable jobs, one vendor, N independent `POST /:jobId/assign` calls. `assignJobsToVendor` is sequential, never throws, and returns one outcome per job — **per-job atomic, batch-level partial**, so one unpriced job does not block nine good ones. A thrown request becomes that job's refusal, not the batch's.
+      6. **Refusals are actionable.** `BulkAssignResults` names each refused job and, for the 422, each unpriced item with its size and longest edge — mirroring `AssignmentFailure` in `$id.tsx`. Unknown size is said in words, never a `0`.
+      7. **No native dialog.** Two-step inline confirm naming the vendor and the count (`reviews.tsx:270`).
+      8. **Only assignable rows are selectable** — matrix edge *and* `settlementId === null`, since a settled job is frozen; disabled rather than omitted, with a title saying which refusal applies. Select-all reaches only the assignable rows on the current page.
+      9. **List state in the URL.** Filters and page stay in `validateSearch` with the `router.tsx` coercion + comma-split rules intact; the *selection* deliberately does not (twenty job ids is not a link anyone sends) and is dropped whenever the filters change.
+      10. **Three states on every list** — the queue keeps its skeleton/empty/error, and the supplier picker inside the bulk bar gets its own three.
+
+      **Verification**
+      - Command: `bun run vitest run tests/routes/admin/production-queue.test.tsx`
+      - Result: PASS (114 tests, 114 passing, 0 failing) — was 47 before this ticket
+      - Command: `bun run vitest run tests/routes/admin/production-queue.test.tsx tests/routes/admin/production-detail.test.tsx tests/routes/admin/order-production-panel.test.tsx`
+      - Result: PASS (232 tests passing) — the two sibling screens that import from this module are unaffected
+      - Command: `bun run typecheck` (@chobii/web) — 0 errors. The pre-commit `turbo run typecheck` gate passed across all three packages.
+      - RED evidence before implementation: the same file reported `61 failed | 47 passed (108)`.
+
+      **Note for #689**: making `ProductionStatus` the full shared union retired the temporary `statusLabel` / `isQueueStatus` shim in `$id.tsx` (its own comment says "deleted by #688 widening that tuple"). It still compiles and all 63 of its tests pass — the else branch is simply now unreachable and can be deleted.
+  - author: system
+    timestamp: '2026-08-30T18:44:09.333Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T18:30:00.066Z'
+    agent: claude-code
+    summary: 'Reshaped /admin/production around the new status set and added multi-select assign-to-vendor. Vocabulary now derived from @chobii/shared''s transition matrix (landed mid-ticket by #689), so the queue writes no status list of its own; sent retired out of the tuple, labels and filter; qc_submitted and dispatched render and filter. Multi-select assign is per-job atomic and batch-level partial with per-job refusals naming each unpriced item and its size. Committed 31f62013 with 114 tests in the queue file, 232 across the three production suites, 0 type errors.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T18:43:44.961Z'
+    duration: '00:13:44'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T18:29:59.527Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:14:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:14:00'
+      tokens: 0
+completed: '2026-08-30T18:44:09.333Z'

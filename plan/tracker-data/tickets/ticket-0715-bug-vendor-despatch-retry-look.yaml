@@ -1,0 +1,139 @@
+ticket_number: 715
+title: 'Bug: vendor despatch retry looks inert and queues reads; carrier length only validated server-side'
+description: |-
+  ## Task
+
+  Two operator-facing defects in `packages/web/app/routes/vendor/index.tsx` from `5652a799`. Verified against the file directly.
+
+  Filed by a different session working on an unrelated branch — not fixed here, because the file belongs to live work elsewhere.
+
+  ### 1. "Try again" gives no feedback and each click queues another read (`:1080`)
+
+  The panel checks `error` before `isLoading` in its render chain (confirmed: the `error ? ... : isLoading ? <DespatchSkeleton /> : ...` ternary), and `loadCandidates` only calls `setCandidatesError(null)` **on success** (`:1364`), inside the `try`.
+
+  So when a read fails and the operator clicks "Try again": the error banner stays, the button stays enabled, and no skeleton or spinner appears. Nothing on screen changes. They click again, and again — each firing an unguarded `GET /transfers/candidates`.
+
+  This compounds the stale-response defect filed alongside this ticket: repeated clicking is exactly what produces out-of-order responses.
+
+  Fix: clear the error (or disable the button) when the retry starts, not when it succeeds.
+
+  ### 2. Carrier and reference length is validated server-side only (`:912`)
+
+  `createTransferSchema` in `packages/api/src/routes/vendor.ts` caps both at `max(120)`. The panel pre-validates only `pieceCount` — confirmed: no `maxLength` attribute anywhere in `vendor/index.tsx`.
+
+  Repro: paste a 150-character carrier name and submit. `.strict()` rejects it and the bucket shows `Invalid request body` verbatim, with nothing indicating which field is wrong. That is precisely the bare-400 outcome the `promisedInstant` handling was written to prevent for the date field.
+
+  Fix: add `maxLength={120}` to both inputs plus the same local check that `piecesValid` already does, so the operator sees which field is wrong before a round trip.
+
+  ## Context
+
+  Both are small, but they land on the same screen and on the same person — a vendor who cannot tell whether their click did anything, and cannot tell which field the server rejected.
+feature: production-pipeline
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T03:43:09.147Z'
+last_updated: '2026-08-31T04:03:22.119Z'
+time_spent_minutes: 3
+labels:
+  - web
+  - vendor-portal
+  - validation
+  - production-pipeline
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T04:00:35.520Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T04:03:15.963Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d0a1069c` - fix(vendor): name the field the despatch docket got wrong, and pin the retry
+
+      **Files Changed**:
+      - `packages/web/app/routes/vendor/index.tsx` — `VENDOR_TRANSFER_TEXT_MAX`, `maxLength` on both inputs, `overLongField` check, `canSubmit`
+      - `packages/web/tests/routes/vendor/vendor-screens.test.tsx` — 6 new tests
+
+      **Summary**:
+
+      **Defect 2 (carrier/reference length)** — fixed here, TDD'd. Both inputs carry `maxLength={120}`, and a local `overLongField` check names which of the two is too long, mirroring what `piecesValid` already did for the count. The check exists as well as the attribute because `maxLength` stops typing, and neither a paste nor a scripted change is typing. `canSubmit` now folds pieces, length and busy into one predicate.
+
+      **Defect 1 (retry feedback)** — **already fixed, not by this commit.** Extracting the loader into `useVendorDespatch` for #714 moved `setError(null)` from the success path to the start of the read. Its two tests passed the first time they ran, so they were never driven red here. They are committed as regression cover, not as a claim of work done. The observable behaviour: clicking "Try again" clears the banner immediately, the panel falls to the `data === null` branch and shows the skeleton, and the retry button disappears with the banner — so the "each click queues another read" half is closed too, since there is no button to click during the read.
+
+      **Root Cause** (defect 2): `packages/web/app/routes/vendor/index.tsx` — the form pre-validated `pieceCount` only, so carrier and reference reached a `.strict()` schema that answers with an unfielded 400.
+
+      **Verification**:
+      - Command: `npx vitest run tests/routes/vendor/` (in `packages/web`)
+      - Result: PASS (3 files, 299 tests, 299 passing, 0 failing)
+      - Defect 2's 3 tests confirmed failing before the fix; defect 1's 2 tests passed on arrival, as recorded above
+      - Build: `npm run typecheck` PASS
+  - author: system
+    timestamp: '2026-08-31T04:03:18.234Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T04:00:38.580Z'
+    agent: claude-code
+    summary: 'Fixed defect 2 in d0a1069c: maxLength=120 on carrier and reference plus a local overLongField check that names the field, folded into canSubmit. Defect 1 was already closed by #714''s loader extraction; its two tests passed on arrival and are committed as regression cover, recorded honestly rather than claimed. 299/299 vendor tests pass, typecheck clean.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T04:03:22.118Z'
+    duration: '00:02:43'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: clicking Try again clears the error banner and shows a loading state immediately; an over-length carrier is rejected client-side with a field-specific message rather than reaching the API'
+    file: packages/web/app/routes/vendor/__tests__/despatch.test.tsx
+    expected_result: FAIL - the banner persists and the over-length value reaches the API
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm both fail before any fix
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Clear candidatesError at the start of loadCandidates rather than on success; add maxLength=120 and a local length check to the carrier and reference inputs, mirroring piecesValid
+    file: packages/web/app/routes/vendor/index.tsx
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Confirm both pass and the existing vendor portal tests still pass
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/web/app/routes/vendor && git commit -m "fix(web): make the despatch retry visible and catch over-length carrier names locally"'
+    status: done
+current_step: 5
+started: '2026-08-31T04:00:35.520Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/routes/vendor/ (in packages/web)
+  test_output: '3 files, 299 tests, 299 passing, 0 failing. 6 new tests. Defect 2''s 3 tests failed before the fix; defect 1''s 2 tests passed on arrival because #714''s loader extraction had already moved setError(null) to the start of the read.'
+  build_passed: true
+  build_command: npm run typecheck
+  verified_at: '2026-08-31T04:02:47.673Z'
+completed: '2026-08-31T04:03:18.234Z'

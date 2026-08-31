@@ -20,20 +20,109 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.090Z'
-last_updated: '2026-08-30T12:02:20.090Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T13:14:49.290Z'
+time_spent_minutes: 8
 labels:
   - database
   - schema
   - audit
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T13:05:57.588Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T13:06:12.388Z'
+    text: |-
+      **Implementation steps** (derived — ticket had no pre-written `implementation_steps`)
+
+      1. `[write-test]` `packages/api/tests/schema/production-jobs.test.ts` — expect `productionJobStatusEnum.enumValues` to be `draft, assigned, sent, received, qc_submitted, qc_passed, qc_failed, dispatched, cancelled`, and add a test pinning `sent` as retained-but-retired (it stays in the type; the matrix retires it in #676, the backfill is #675). Expected: FAIL.
+      2. `[write-test]` `packages/api/tests/database/audit-log-schema.test.ts` — `auditCategoryEnum.enumValues` includes `fulfilment` (six tiers). Expected: FAIL.
+      3. `[write-test]` `packages/shared/tests/schemas/audit-log.test.ts` — `auditCategorySchema` accepts `fulfilment`. Expected: FAIL.
+      4. `[write-test]` `packages/web/tests/routes/admin/audit-log.test.tsx` — the viewer's `CATEGORIES` keeps `fulfilment` as a filter rather than dropping it, and `CATEGORY_STYLES` has an entry for it. Expected: FAIL.
+      5. `[write-test]` new suite asserting the migration invariant this feature is governed by: no migration SQL contains any of the new enum values as a *literal* (only as the operand of `ALTER TYPE … ADD VALUE`), because drizzle-kit replays the whole pending batch in one transaction (0018:6-8). Expected: FAIL (0023 does not exist yet) then guard forever.
+      6. `[implement]` `packages/api/src/database/schema/production-jobs.ts` — add the two values in workflow position.
+      7. `[implement]` `packages/api/src/database/schema/audit-log.ts` + `packages/shared/src/schemas/audit-log.ts` + `packages/web/app/routes/admin/audit-log/index.tsx` (`CATEGORIES` **and** `CATEGORY_STYLES`) — the three sites move in lockstep.
+      8. `[implement]` `migrations/0023_production_pipeline_statuses.sql` — `ALTER TYPE … ADD VALUE` only. No CHECK constraints (zero in the repo; `raw-sql-objects.test.ts` scans only FUNCTION|TRIGGER|POLICY, so one would be silently absent from every push-built DB). No backfill (that is #675).
+      9. `[implement]` journal entry idx 23 + `meta/0023_snapshot.json` chained onto 0022, so `migration-meta-integrity.test.ts` stays green and `db:generate` stays usable (#623).
+      10. `[verify-pass]` scoped runs of the five suites above + `raw-sql-objects.test.ts` + `migration-meta-integrity.test.ts`; apply the full chain to a throwaway database to prove a FRESH database survives the one-transaction replay.
+      11. `[commit]` explicit paths only.
+  - author: system
+    timestamp: '2026-08-30T13:14:24.069Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T13:14:49.290Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `83ee1c8f` — feat(database): add the production workflow statuses and the fulfilment audit tier (on `feature/production-pipeline-design`, directly atop the design commit `4924ab3d`)
+
+      **Files Changed** (12, staged by explicit path — the tree carried unrelated dirty files from other sessions)
+      - `packages/api/src/database/migrations/0023_production_pipeline_statuses.sql` — three `ALTER TYPE … ADD VALUE` statements and nothing else
+      - `packages/api/src/database/migrations/meta/_journal.json` — idx 23, additive only
+      - `packages/api/src/database/migrations/meta/0023_snapshot.json` — 0022's state with both enums advanced, `prevId` chained onto 0022
+      - `packages/api/src/database/schema/production-jobs.ts` — `qc_submitted`, `dispatched`
+      - `packages/api/src/database/schema/audit-log.ts`, `packages/shared/src/schemas/audit-log.ts`, `packages/web/app/routes/admin/audit-log/index.tsx` — the three `fulfilment` sites, plus `CATEGORY_STYLES`
+      - 5 test files, one of them new (`migration-enum-literals.test.ts`)
+
+      **Summary**
+
+      `qc_submitted` and `dispatched` are positioned with `BEFORE` rather than appended, so the enum's sort order reads as the sequence of work and matches the drizzle DSL array — confirmed identical in both databases below, which is what keeps drizzle-kit from reading the difference as drift.
+
+      `sent` stays in the type **and in the DSL array**. Beyond the stated reason (dropping a value means recreating the type and rewriting every dependent column, and rows carry it until #675 runs), there is a second one worth recording for **#676**: spec §10 property 1 asserts the transition matrix is *total* over every `(status, status, actor)` triple and that `sent` has zero edges in both directions. That test is unwritable if `sent` is not a member. The retirement is the matrix's job, never this enum's.
+
+      `fulfilment` is appended — the audit tiers have no workflow order to preserve.
+
+      Deliberately **not** here: no backfill (script, #675), no CHECK constraint (zero exist in the repo, and `raw-sql-objects.test.ts` scans only `FUNCTION|TRIGGER|POLICY`, so one would be silently absent from every push-built database — the exact shape of #663).
+
+      **New guard for the tickets that follow.** `packages/api/tests/database/migration-enum-literals.test.ts` turns the feature's governing rule into a test: no value introduced by `ALTER TYPE … ADD VALUE` may appear as a literal in any migration. It is a pure filesystem check, because the failure only reproduces on a fresh database. Its one escape hatch is an explicit `::text` cast — the construction that makes `0014:10` safe today. **#674 and #675, taking 0024 and 0025, will fail this test if they put `qc_submitted`, `dispatched` or `fulfilment` in SQL.** The `::text` exemption is statement-scoped and therefore coarse; that limitation is documented in the file rather than papered over.
+
+      **Verification**
+      - Command: `vitest run` scoped to each path, no pathless runs
+        - `packages/api` — `tests/schema/production-jobs.test.ts`, `tests/database/audit-log-schema.test.ts`, `tests/database/migration-enum-literals.test.ts`, `tests/schema/migration-meta-integrity.test.ts`, `tests/database/raw-sql-objects.test.ts`, `tests/routes/admin/audit-log.test.ts` → **41 passed (6 files)**
+        - `packages/shared/tests/schemas/audit-log.test.ts` → **18 passed**
+        - `packages/web/tests/routes/admin/audit-log.test.tsx` → **20 passed**
+        - Total **79 passing**. RED first: 10 of these failed before the implementation, each for the intended reason.
+      - Typecheck: `turbo run typecheck` via the pre-commit hook → 4/4 successful (api src + `tsconfig.test.json`, shared, web), 0 errors.
+      - **Fresh database** (the case that matters, and the one no already-migrated database can prove): created an empty database on :5440 and ran `drizzle-kit migrate` over all 24 migrations. Applied successfully — the one-transaction batch replay the enum-literal rule exists to protect.
+      - Dev database :5440 via `bun run db:migrate` → now at 24. **Never `db:push`.**
+      - Both databases report the same order as the DSL:
+        - `production_job_status` = `draft,assigned,sent,received,qc_submitted,qc_passed,qc_failed,dispatched,cancelled`
+        - `audit_category` = `money,privilege,catalogue,config,content,fulfilment`
+        - `0` CHECK constraints in `public`.
+      - Negative control on the new guard: injected `UPDATE production_jobs SET status = 'dispatched'` into 0023 and it failed, naming file, line, value, origin migration and both remedies. Reverted; green again.
+      - Throwaway database dropped.
+
+      **Note for the feature owner**: `packages/web/app/routes/admin/production/index.tsx` (`PRODUCTION_STATUSES`), `packages/web/app/lib/vendor-nav.ts` (`VENDOR_JOB_STATUSES`), `packages/api/src/routes/vendor.ts:81` (`VENDOR_SETTABLE_STATUSES`) and `packages/api/src/lib/vendor-scope.ts:303` (`VendorSettableStatus`) all still carry the old vocabulary including `sent`. Left untouched on purpose — they belong to #676, #684, #688 and #691. Nothing breaks meanwhile: they are independent consts, they typecheck, and a widened enum cannot invalidate a narrower list.
+work_sessions:
+  - start: '2026-08-30T13:05:58.450Z'
+    agent: claude-code
+    summary: TDD red/green on 5 suites, then migration 0023 (ADD VALUE only) + journal idx 23 + meta/0023_snapshot.json. Verified on a FRESH throwaway database (all 24 migrations in one transaction) and on dev :5440. 79 tests passing, typecheck clean. Commit 83ee1c8f.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T13:14:22.068Z'
+    duration: '00:08:23'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T13:05:57.588Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:08:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:08:00'
+      tokens: 0
+completed: '2026-08-30T13:14:24.069Z'

@@ -21,21 +21,17 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 23
-  total_duration: "04:53:00"
+  total_sessions: 28
+  total_duration: "05:23:00"
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 23
-      duration: "04:53:00"
+      sessions: 28
+      duration: "05:23:00"
       tokens: 0
 tickets:
   todo:
-    "696": Bug - the two new job statuses are settable and unrenderable before the guard lands
-    "697": Ops - retention sweep for QC photos, deleting R2 objects before their rows
-    "698": Admin API - expose the consolidator decision, so the panel stops reading it from the audit log
     "699": Ops - R2 bucket CORS must allow GET from the app origin, or every QC photo fails to display
-    "700": Docs - DEV_ENVIRONMENT.md still tells you to use db:push, which silently omits triggers
   in_progress: {}
   done:
     "673": Database Schema - production job workflow statuses and the fulfilment audit category
@@ -61,8 +57,15 @@ tickets:
     "693": Vendor Portal UI - inbound transfers and the label handover card
     "694": E2E - two-vendor consolidation happy path and the access-denied cases
     "695": Bug - a cancelled job strands a phantom payable in the vendor's own portal
-total_tickets: 28
-completion_percentage: 82
+    "696": Bug - the two new job statuses are settable and unrenderable before the guard lands
+    "697": Ops - retention sweep for QC photos, deleting R2 objects before their rows
+    "698": Admin API - expose the consolidator decision, so the panel stops reading it from the audit log
+    "700": Docs - DEV_ENVIRONMENT.md still tells you to use db:push, which silently omits triggers
+    "714": "Bug: vendor despatch screen loses draft dockets and resurrects already-sent buckets under concurrent use"
+    "715": "Bug: vendor despatch retry looks inert and queues reads; carrier length only validated server-side"
+    "717": Vendor-facing handbook for the production portal
+total_tickets: 31
+completion_percentage: 97
 is_completed: false
 design:
   approach: |-
@@ -269,5 +272,5 @@ plan:
       tickets:
         - 695
   generated_at: "2026-08-30T12:04:22.546Z"
-last_activity: "2026-08-30T21:35:33.497Z"
+last_activity: "2026-08-31T04:17:11.688Z"
 started: "2026-08-30T13:05:57.612Z"

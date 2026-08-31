@@ -35,7 +35,8 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "665": Checkout says nothing is due, then payment 503s, when the cart holds a gift card line
   in_progress: {}
   done:
     "511": Schema - gift_card, gift_card_transaction and order_gift_card tables
@@ -68,9 +69,9 @@ tickets:
     "579": Let a gift card be bought in the same checkout as a poster
     "580": The gift card suites hit the shared dev database
   undefined: {}
-total_tickets: 29
-completion_percentage: 100
-is_completed: true
+total_tickets: 30
+completion_percentage: 97
+is_completed: false
 plan:
   phases:
     - name: Schema + contracts

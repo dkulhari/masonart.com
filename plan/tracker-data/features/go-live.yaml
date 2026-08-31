@@ -40,6 +40,7 @@ tickets:
     "333": "Ops: point UptimeRobot monitors at https://chobii.art"
     "335": "Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup"
     "458": Verify enforced CSP on production after deploy (post-#344 gate)
+    "672": "Bulk catalogue import script: CSV manifest + image folder through buildProductMedia"
   in_progress: {}
   done:
     "287": "Infra: same-origin web bundle + single-hostname config"
@@ -52,8 +53,8 @@ tickets:
     "296": "BUG: wildcard requireAuth on /api-mounted sub-apps gated health/tracking/webhooks; onError collapsed HTTPExceptions to 500"
     "297": Upgrade TanStack Start to 1.168+ and remove custom serve.ts static-serving wrapper
     "334": "Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)"
-total_tickets: 15
-completion_percentage: 67
+total_tickets: 16
+completion_percentage: 63
 is_completed: false
 design:
   approach: "Single public hostname masonart.com path-routed at the Cloudflare edge (anchored regex ^/api/.* → api:3000, catch-all → web:3001, www → apex bulk redirect); cloudflared container dials outbound-only, TUNNEL_TRANSPORT_PROTOCOL http2. Web bundle baked same-origin via --build-arg VITE_API_URL='' with ?? fallbacks. deploy/Makefile on the dev machine: buildx linux/arm64 → GHCR (latest + git short-sha), gen-compose renders one file (build: keys stripped), scp + ssh pull/up; rollback = IMAGE_TAG=<sha>; panic switch = disable tunnel. Migrations ship in the api image and run via drizzle-kit migrate. Compose project name masonart, no host ports, mem_limits budgeted against the shared 6GB Colima VM. Gate proven from outside the LAN."

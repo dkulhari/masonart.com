@@ -1,0 +1,67 @@
+ticket_number: 665
+title: Checkout says nothing is due, then payment 503s, when the cart holds a gift card line
+description: |-
+  ## Finding
+
+  Found while diagnosing #661, and it is a real customer-facing defect, not a test artifact.
+
+  Gift card **tender** is capped to exclude gift card **lines** — a card may not buy another card (#579). The cap lives only on the server: `giftCardTenderCapPaise` in `packages/api/src/routes/orders.ts:1120`.
+
+  The checkout page has no idea. It applies an offered card against the **whole** order total, so the "amount due" panel renders ₹0 and the pay button is enabled.
+
+  Then `POST /api/orders/:id/payment/initiate` recomputes with the cap, finds a real remainder, and needs a gateway. In dev none is configured, so it throws `PaymentGatewayUnavailableError` and returns **503 "Payment gateway not configured"**. The transaction rolls the gift card debit back with it — correct, and invisible.
+
+  The client's catch calls `syncCartWithServer()`. The cart was already emptied by order creation, so the page swaps to "Your cart is empty" and the customer is left on `/checkout` with no explanation. Nothing in the network trace looks wrong to them.
+
+  In production, with a gateway configured, the failure mode is different but still wrong: the customer is told ₹0 is due and is then shown a payment modal asking for the balance.
+
+  ## Reproduced
+
+  Order `MA-2026-000080` on the dev database (2026-08-30):
+
+  | line | qty | line total |
+  |---|---|---|
+  | Synthetic Nature (poster) | 2 | 3398.00 |
+  | Gift card — ₹2,500 | 1 | 2500.00 |
+
+  total 5898.00, tender cap 3398, card applied 0, `payment_status` = `pending`.
+
+  The page had shown "₹0" due before the pay click.
+
+  ## What to decide
+
+  Two coherent answers; this needs the product call, not just a patch.
+
+  1. **Tell the truth in the UI** — the checkout quote asks the server what a card can actually tender, and the amount-due panel shows the uncoverable remainder with a line saying gift card items must be paid for another way.
+  2. **Refuse earlier** — block applying a card at all while the cart contains a gift card line, with that reason on screen.
+
+  Either way, a 503 must not present as an empty cart.
+
+  ## Steps
+
+  - Write a failing API test: an order with a poster line and a gift card line, tendered a card that covers the total, returns a remainder rather than `fullyCoveredByGiftCard`
+  - Write a failing component test for the amount-due panel with a gift card line in the cart
+  - Surface the cap to the client (extend the gift card quote/apply response), or refuse at apply time
+  - Give `PaymentButton`'s catch a visible error state for a 503 rather than falling through to the empty-cart panel
+  - E2E: a cart with a poster and a gift card line, paid with a card, ends somewhere honest
+feature: gift-cards
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T10:01:43.964Z'
+last_updated: '2026-08-30T10:01:43.964Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - backend
+  - gift-cards
+  - payments
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

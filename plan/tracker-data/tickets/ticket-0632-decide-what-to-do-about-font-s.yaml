@@ -35,19 +35,73 @@ description: |-
 feature: admin-panel
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T03:51:13.668Z'
-last_updated: '2026-08-17T03:51:13.668Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T07:13:36.879Z'
+time_spent_minutes: 9
 labels:
   - frontend
   - design-system
   - needs-decision
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T07:13:14.230Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T07:13:32.692Z'
+    text: |-
+      ✅ **Completed** — option 1 (sweep to the real weights), as recommended.
+
+      **Commit**: `288c8536` — refactor(web): sweep font-semibold out, and move the weight guard to 600
+
+      **Step 1 re-check (the recommendation still held)**
+      - `docs/design/mesonart/mesonart-parity-analysis.md` §2, re-read: Poppins **300** body, Urbanist **300** headings, Poppins **500** product title, Urbanist **500** nav. No 600 anywhere in the measured spec.
+      - Re-counted by element type across `packages/web/app`: **176** occurrences — **116 on `h1`–`h6`** (66%), **60** on non-heading emphasis (span 13, button 13, a 11, p 11, div 6, Link 2, strong 1). 146 in storefront scope, 30 in the exempt trees. The plan's assumption (most are headings) is still correct.
+      - `globals.css` base layer confirmed: `h1–h6 { font-family: var(--font-heading); font-weight: 300; line-height: 1 }`, so deleting the class on a heading lands on the measured spec rather than on nothing.
+
+      **Files Changed** (62)
+      - 58 × `packages/web/app/**/*.tsx` — 116 heading deletions, 60 → `font-medium`
+      - `packages/web/tests/styles/storefront-token-compliance.test.ts` — rule widened to `font-(semibold|bold|extrabold|black)` on the `everywhere` scope, with the reasoning recorded in the comment so the next person does not re-derive it
+      - `packages/web/tests/components/product/DeliveryEstimate.test.tsx` — asserted `font-semibold` on the `<strong>`; now `font-medium`, test renamed
+      - `packages/web/tests/components/tracking/GuestOrderLookup.test.tsx` — fixture `<h2>` carried the class
+      - `packages/web/tests/components/home/ProductRail.test.tsx` — stale comment
+
+      **Verification**
+
+      1. Guard bites (RED, then GREEN):
+      - Command: `bunx vitest run tests/styles/storefront-token-compliance.test.ts` with a temporary `font-semibold` planted in `app/components/product/__tmp-red.tsx` and `app/routes/admin/__tmp-red.tsx`
+      - Result: FAIL — offenders `["components/product/__tmp-red.tsx", "routes/admin/__tmp-red.tsx"]`. Both scopes caught, so `everywhere` really does reach the internal tools.
+      - Same command after removing the temp files: PASS (10 tests)
+
+      2. Full web unit suite (ticket step 7):
+      - Command: `ALLOW_FULL_SUITE=1 bunx vitest run` in `packages/web`
+      - Result: PASS — **179 files, 3348 tests, 0 failing**, 87.3s
+
+      3. Pre-commit gate: `turbo run typecheck` — 4 successful, 4 total.
+
+      4. Visual, against a live build (dev servers on :3000/:3001), before and after on **home, PDP, cart, checkout, login, track**:
+      - Computed-style sweep of the PDP after the change returned **no element outside weight 300/400/500** — nothing is being synthesised any more.
+      - The cases the ticket flagged as most at risk — `AT A GLANCE` (`text-xs uppercase tracking-[0.18em]`, `ProductTabs`) and the `track` uppercase section labels — read clearly at Urbanist 300. No size, tracking or colour compensation was needed, and no fake weight was restored.
+
+      **Note on scope**: because the widened rule is `everywhere`-scoped, the 30 uses in the admin / vendor / ai-generator trees were swept too. That is deliberate and matches #631's reasoning: a synthesised weight is a rendering defect, not a matter of taste, so the exempt trees do not get to opt out of it.
+
+      **Screenshots**: before/after pairs for the six pages were captured to the session scratchpad for the comparison; they are not committed.
+work_sessions:
+  - start: '2026-08-30T07:04:15.320Z'
+    agent: claude-code
+    summary: 'Swept all 176 font-semibold uses (116 heading deletions, 60 to font-medium), widened the everywhere-scoped weight guard to 600, fixed 4 test references. Verified: guard RED/GREEN, full web suite 3348 pass, typecheck gate, live before/after on 6 pages. Committed 288c8536.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T07:13:36.856Z'
+    duration: '00:09:21'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -58,43 +112,54 @@ implementation_steps:
     description: 'Confirm the recommendation still holds before acting on it: re-read the measured weights in docs/design/mesonart/mesonart-parity-analysis.md §2, and re-count the font-semibold sites by element type (heading vs emphasis). The plan assumes most are headings — if that has changed, so does the split.'
     command: grep -rn "font-semibold" packages/web/app | wc -l
     expected_result: Manual verification — the counts and the spec agree with the recommendation, or the plan is revised
-    status: pending
+    status: done
   - id: 2
     action: implement
     description: 'Capture the before screenshots: home, PDP, checkout and account, at the current build. These are the comparison, and they have to exist before anything changes.'
     expected_result: Manual verification — four baseline screenshots
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Delete font-semibold from h1–h6 sites — the base layer already supplies Urbanist 300, which is the measured spec.
     file: packages/web/app
-    status: pending
+    status: done
   - id: 4
     action: implement
     description: Replace font-semibold with font-medium on non-heading emphasis (strong, spans, labels, captions). 500 is real, and is what mesonart uses for product titles and nav.
     file: packages/web/app
-    status: pending
+    status: done
   - id: 5
     action: write-test
-    description: Widen the everywhere-scoped weight rule added in #631 to font-(semibold|bold|extrabold|black), so 600 cannot return. Extend the fixtures alongside it.
+    description: Widen the everywhere-scoped weight rule added in
     file: packages/web/tests/styles/storefront-token-compliance.test.ts
     command: npx vitest run tests/styles/storefront-token-compliance.test.ts
     expected_result: PASS after the sweep — and FAIL if run before it, which is the proof the rule bites
-    status: pending
+    status: done
   - id: 6
     action: verify-pass
-    description: 'Screenshot the same four pages and compare against the baselines. Small uppercase tracking labels lose the most apparent weight — if any read too faint, fix size, tracking or colour rather than restoring a fake weight. Hold the commit if anything reads wrong.'
+    description: Screenshot the same four pages and compare against the baselines. Small uppercase tracking labels lose the most apparent weight — if any read too faint, fix size, tracking or colour rather than restoring a fake weight. Hold the commit if anything reads wrong.
     expected_result: Manual verification — no page reads worse than its baseline
-    status: pending
+    status: done
   - id: 7
     action: verify-pass
     description: Full web unit suite, since several screens assert on their own headings.
     command: npx vitest run tests
     expected_result: PASS - 0 failing
-    status: pending
+    status: done
   - id: 8
     action: commit
     description: Commit the sweep and the widened rule, recording in the message which of the three options was taken and why.
     command: 'git add packages/web && git commit -m "fix(web): stop rendering faux-semibold across the storefront"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 8
+started: '2026-08-30T07:04:15.320Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:09:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:09:00'
+      tokens: 0
+completed: '2026-08-30T07:13:14.230Z'

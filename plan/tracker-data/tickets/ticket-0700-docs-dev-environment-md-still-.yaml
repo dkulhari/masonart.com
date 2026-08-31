@@ -1,0 +1,54 @@
+ticket_number: 700
+title: Docs - DEV_ENVIRONMENT.md still tells you to use db:push, which silently omits triggers
+description: |-
+  ## Task
+  Correct `docs/DEV_ENVIRONMENT.md`, which still documents `drizzle-kit push --force`. Add the private server-pair recipe while you are there.
+
+  ## Context
+  Found by #694 while setting up an E2E environment.
+
+  #663 swept the whole repo to `db:migrate` and documented why: `drizzle-kit push` diffs the **drizzle DSL**, which cannot express a function or a trigger, so it creates the table and neither — silently. That commit fixed `README.md`, `docs/deployment.md`, `scripts/run-tests.sh` and all fourteen `docs/manual-tests/*.md`. `DEV_ENVIRONMENT.md` was missed, so it now contradicts every other document in the repo.
+
+  The consequence is not theoretical. A database built by following this file has:
+  - no `admin_audit_log_immutable_trg`, so the audit log is editable and deletable — the property the whole audit design rests on;
+  - and now also none of production-pipeline's three migrations applied the way `db:migrate` applies them.
+
+  `packages/api/src/database/raw-sql-objects.ts` exists precisely to detect this, and its test names `db:push` as the cause — but only if someone runs it.
+
+  ## Also add: the private server-pair recipe
+
+  The file documents no way to run an isolated pair, so every agent rediscovers it. The working recipe, learned repeatedly the hard way:
+
+  - `:5173` is a **DIFFERENT APP**. E2E pointed at it passes vacuously — this has bitten more than once.
+  - A private pair is `:3010` (API) and `:4321` (web).
+  - `FRONTEND_URL` must match the web port or all auth setup fails.
+  - `VITE_API_PROXY_TARGET` overrides the hardcoded `:3000` proxy; there is no Vite `/api` proxy by default.
+  - The real database is on **:5440**, not :5433.
+  - Several sessions share this machine. `pkill -f "src/index.ts"` kills every session's API server, not just your own — #694 did exactly that and had to restore them.
+
+  Design constraints:
+  - Do not merely delete the `push` line — say why, so nobody reinstates it. #663's commit message is the reference.
+  - `README.md:346-355` keeps `db:push` in its command reference **with a warning attached**; match that treatment rather than pretending the command does not exist.
+feature: production-pipeline
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T21:15:31.293Z'
+last_updated: '2026-08-31T01:01:20.478Z'
+time_spent_minutes: 0
+labels:
+  - docs
+  - database
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T01:01:20.478Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-31T01:01:20.478Z'

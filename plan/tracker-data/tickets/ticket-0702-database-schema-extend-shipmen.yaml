@@ -18,18 +18,76 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T02:20:37.476Z'
-last_updated: '2026-08-31T02:20:37.476Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T04:12:24.690Z'
+time_spent_minutes: 15
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T03:57:31.099Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T04:12:16.230Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `ec23d418` - feat(api): teach shipment_status the states a courier actually reports
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/shipping.ts` — enum grows 7 → 12, in lifecycle order
+      - `packages/api/src/database/migrations/0026_shipment_dispatch_statuses.sql` — five ADD VALUE statements, nothing else
+      - `packages/api/src/database/migrations/meta/{_journal.json,0026_snapshot.json}` — journal tag renamed off drizzle's generated name
+      - `packages/api/tests/database/shipment-status-enum.test.ts` — new, 7 tests
+      - `packages/api/tests/database/migration-enum-literals.test.ts` — fixed a latent false positive (below)
+      - `packages/api/tests/database/shipping.test.ts` — three hand-maintained copies of the enum collapsed to one ordered list
+
+      **Summary**:
+      Added `undelivered`, `rto_initiated`, `rto_delivered`, `lost`, `cancelled`. `cancelled` is the load-bearing one: a dead LABEL is not a failed DELIVERY, and having no word for it is why `lib/vendor-scope.ts` guesses the live label by recency. #705 consumes it.
+
+      Placement uses `BEFORE` anchors so `enumsortorder` reads as the sequence of work. Verified against the live catalog, not just the DSL.
+
+      **Two things found in passing, both real:**
+
+      1. `migration-enum-literals.test.ts` (#673/#580 guard) had a latent false positive. Its `ADD_VALUE` regex matched only as far as the added value, leaving ` BEFORE 'x'` in the residue it scans for unsafe uses. So adding `'cancelled'` to `shipment_status` was reported as `0023` unsafely using it — on `production_job_status`, a different type. `addedEnumValues()` is keyed by value NAME across all enums while Postgres blacklists a (type, value) pair. It had stayed green only because no added value had yet collided with an anchor. Regex now consumes the anchor; a pinning test was added so nobody "fixes" it later by weakening the scan.
+
+      2. `shipping.test.ts` pinned the enum in three places, two as `toHaveLength(7)`. Now one `SHIPMENT_STATUS_LIFECYCLE` list asserted three ways.
+
+      **Migration applied to the shared dev DB on :5440** (user approved — it turns other sessions' copy of `shipping.test.ts` red until this branch merges, since theirs expects 7 values):
+      ```
+      applied migrations: 27
+      shipment_status: pending, label_created, shipped, in_transit, out_for_delivery,
+                       undelivered, delivered, rto_initiated, rto_delivered, lost,
+                       cancelled, failed
+      ```
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run`
+      - Result: PASS — Test Files 205 passed | 6 skipped (211); Tests 5804 passed | 188 skipped (5992)
+      - Baseline before this ticket: 204 files / 5796 tests. The +1 file and +8 tests are exactly this ticket's additions (7 new + 1 anchor regression test).
+      - Typecheck: PASS (`bun run typecheck`, and the pre-commit hook ran `turbo run typecheck` green across all three packages)
+      - Note: one intermediate full run reported 1 failed test at load average 11.42 on an 8-core box. It did not reproduce on the two runs either side. Known flakiness on this machine, not a regression.
+  - author: system
+    timestamp: '2026-08-31T04:12:19.423Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T03:57:34.268Z'
+    agent: claude-code
+    summary: 'Done in one session. Extended shipment_status 7 to 12 values via ADD VALUE-only migration 0026, applied to the dev DB. Fixed a latent false positive in the #673 enum-literal guard (BEFORE anchors were being read as unsafe uses) and collapsed three hand-maintained copies of the enum in shipping.test.ts into one ordered list. Commit ec23d418. Full api suite 5804 passed, 0 failed.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T04:12:24.687Z'
+    duration: '00:14:50'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -41,7 +99,7 @@ implementation_steps:
     file: packages/api/tests/database/shipment-status-enum.test.ts
     command: cd packages/api && bunx vitest run tests/database/shipment-status-enum.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
     code: |
       /**
        * `shipment_status` carries the states a real courier reports.
@@ -137,12 +195,12 @@ implementation_steps:
     description: Confirm the test fails — the values are absent and the migration does not exist
     command: cd packages/api && bunx vitest run tests/database/shipment-status-enum.test.ts
     expected_result: FAIL - ENOENT on 0026_shipment_dispatch_statuses.sql, and enumValues is missing all five new values
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add the five values to the drizzle enum, in lifecycle order
     file: packages/api/src/database/schema/shipping.ts
-    status: pending
+    status: done
     code: |-
       /**
        * Shipment status enum for tracking order delivery lifecycle.
@@ -175,7 +233,7 @@ implementation_steps:
     description: Generate the migration, then annotate it and strip anything that is not an ADD VALUE
     file: packages/api/src/database/migrations/0026_shipment_dispatch_statuses.sql
     command: cd packages/api && bun run db:generate
-    status: pending
+    status: done
     code: |-
       -- order-dispatch-tracking phase 1: the states a real courier reports.
       --
@@ -211,16 +269,34 @@ implementation_steps:
     description: Confirm the suite passes
     command: cd packages/api && bunx vitest run tests/database/shipment-status-enum.test.ts
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: verify-pass
     description: Apply the migration and confirm the whole api suite is no worse than the branch baseline
     command: cd packages/api && bun run db:migrate && bunx vitest run tests/database tests/schema
     expected_result: PASS - migration applies, no new failures
-    status: pending
+    status: done
   - id: 7
     action: commit
     description: Commit
     command: 'git add packages/api/src/database/schema/shipping.ts packages/api/src/database/migrations packages/api/tests/database/shipment-status-enum.test.ts && git commit -m "feat(api): teach shipment_status the states a courier actually reports"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 7
+started: '2026-08-31T03:57:31.099Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:15:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:15:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run
+  test_output: 'Test Files 205 passed | 6 skipped (211); Tests 5804 passed | 188 skipped (5992). Baseline before this ticket was 204 files / 5796 tests; +1 file and +8 tests are exactly this ticket''s additions. Migration applied to dev DB: 27 migrations, shipment_status = pending, label_created, shipped, in_transit, out_for_delivery, undelivered, delivered, rto_initiated, rto_delivered, lost, cancelled, failed.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-31T04:10:56.388Z'
+completed: '2026-08-31T04:12:19.423Z'

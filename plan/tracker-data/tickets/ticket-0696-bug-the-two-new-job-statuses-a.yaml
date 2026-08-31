@@ -1,0 +1,134 @@
+ticket_number: 696
+title: Bug - the two new job statuses are settable and unrenderable before the guard lands
+description: |-
+  ## Task
+  Close the window #673 opened. Add `dispatched` to `CLOSED_JOB_STATUSES`, and extend the status vocabularies in the admin queue and the vendor portal so the two new values render and filter.
+
+  ## Context
+  Found by the Phase 1 adversarial review. Feature: production-pipeline.
+
+  #673 added `qc_submitted` and `dispatched` to `production_job_status`. Three places derive from that enum automatically and were widened without anyone touching them; three more are hardcoded 7-value lists and were NOT widened. The mismatch is live right now, before the state machine (#676) and the guarded PATCH (#680) exist.
+
+  Widened automatically, with no guard:
+  - `packages/api/src/routes/admin/production-jobs.ts:141` — `status: z.enum(productionJobStatusEnum.enumValues).optional()`, and the handler at `:522-530` does a blind `.set({ ...body, updatedAt })`. Its own comment admits there is no transition guard. So `PATCH {status:'dispatched'}` on a `draft` job succeeds today: terminal state, `dispatched_at` NULL, no vendor, no QC photo, no review row. `{status:'qc_submitted'}` puts a job into the exact state the future label gate reads as its precondition, with an empty shot list.
+
+  NOT widened, so the rows become invisible:
+  - `packages/api/src/routes/admin/vendors.ts:101` — `CLOSED_JOB_STATUSES = ['qc_passed','cancelled']` omits `dispatched`, used at `:297` via `notInArray`. **A dispatched job counts as an open job against its vendor forever.** This is the one that survives Phase 2, because no other ticket touches this file.
+  - `packages/web/app/routes/admin/production/index.tsx:66-101` — `STATUS_LABELS['dispatched']` is `undefined`, so the badge renders blank; `:143-144` `z.enum(PRODUCTION_STATUSES).catch(undefined)` silently drops `?status=dispatched`, so the row cannot be filtered for.
+  - `packages/web/app/lib/vendor-nav.ts:42-69` — same gap in the vendor portal.
+
+  ## Scope boundary
+
+  #680 closes the unguarded PATCH by routing it through `assertTransition`, and #688/#691 rebuild the two UI vocabularies. **This ticket exists for `CLOSED_JOB_STATUSES`, which nothing else touches** — do that one regardless. Treat the rest as the checklist that proves the window is shut, and close it here only if Phase 2 has not reached it yet.
+
+  Design constraints:
+  - `dispatched` is a terminal state and means this vendor's custody ended, so it is closed for the purpose of an open-job count. `qc_submitted` is NOT closed — the ball is in our court and the job is still live.
+  - Do not add a transition guard here. That is #676 plus #680, and half a state machine in a route is what this feature exists to unpick.
+  - Regression test must assert the open-job count against a vendor with a dispatched job, not just that the constant contains the string.
+feature: production-pipeline
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T13:53:31.936Z'
+last_updated: '2026-08-31T01:08:00.401Z'
+time_spent_minutes: 7
+labels:
+  - bug
+  - phase-1-fallout
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T01:01:26.331Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T01:07:56.503Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `47267c0d` — fix(api): stop a despatched job counting against its vendor forever
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/vendors.ts` — `CLOSED_JOB_STATUSES` is now `[...TERMINAL_STATUSES]` from `lib/production-transitions`, not a literal
+      - `packages/api/tests/routes/admin/vendor-open-jobs.test.ts` — new live-Postgres regression suite over `openJobCount` (15 tests)
+
+      **Which of the ticket's sites were still open**
+
+      Only one. The other three were closed during Phase 2 and were verified against head before touching anything:
+
+      | Site | State at head | Closed by |
+      |---|---|---|
+      | `routes/admin/vendors.ts` — `CLOSED_JOB_STATUSES` | **STILL OPEN** — fixed here | #696 (this) |
+      | `web/app/routes/admin/production/index.tsx` — `STATUS_LABELS`, `?status=` filter | already fixed; `PRODUCTION_STATUSES` is `PRODUCTION_JOB_STATUSES` minus `UNREACHABLE_STATUSES` from `@chobii/shared`, and `StatusPill` never indexes blind | **#688** (`31f62013`) |
+      | `web/app/lib/vendor-nav.ts` | already fixed; derived as the closure of the shared matrix from `assigned` | **#691** (`2bdacf65`) |
+      | `routes/admin/production-jobs.ts` — blind `.set({...body})` PATCH | already fixed; reads `FOR UPDATE` in a transaction and asks `assertTransition`, 409 on refusal | **#680** (`8ca07d63`) |
+
+      **The bug was two bugs, and they hid each other**
+
+      `["qc_passed", "cancelled"]` was wrong in both directions after #673:
+
+      - **`dispatched` was missing.** Terminal — this vendor's custody ended — so every despatched job stayed inside the `notInArray` and counted as open work against its vendor forever. The directory's open-job number could only ever go up.
+      - **`qc_passed` should no longer have been in it.** It was the end of the line when dispatch was in-house and the piece came back to us. Vendors despatch directly now, so a passed job is a piece still on that vendor's shelf — real work in hand, reported as closed.
+
+      They cancelled in the total: nine statuses minus two was 7 either way, which is why no aggregate assertion could have caught it.
+
+      **The fix derives rather than declares**
+
+      `TERMINAL_STATUSES` is "reachable, with nowhere to go", computed from the matrix's out-edges — the same way `lib/vendor-scope.ts` and `routes/vendor.ts` get their vocabularies. Two things fall out instead of being asserted: `qc_submitted` stays open (the ball is in our court, but the vendor still holds the piece), and the retired `sent` stays open (no way out, but no way in either, so it is retired rather than terminal, and old rows carrying it keep counting). **No transition guard was added** — this route reads a count, it does not move a job. That stays #676 + #680.
+
+      **Why the test is a live-Postgres suite**
+
+      `tests/routes/admin/vendors.test.ts` mocks `db` with the recording builder, which answers whatever rows the test queued — `openJobCount` there is a reading of the fixture, so the only thing assertable over it is that the constant contains a string. That is exactly the assertion this bug walks through. The new suite creates a vendor (isolated by a 4096-inch capability, since the dev seed already uses 999x999 as its "unbounded" stand-in), seeds real jobs in every status the enum has, and reads the number the route actually answers with. Its expectation table is written out longhand on purpose: deriving it from `TERMINAL_STATUSES` would be a tautology that passes with the old list in place.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/vendor-open-jobs.test.ts tests/routes/admin/vendors.test.ts` (in `packages/api`)
+      - Result: PASS — 2 files, **53 tests passing** (15 new + 38 existing)
+      - Typecheck: `tsc --noEmit && tsc -p tsconfig.test.json --noEmit` clean; the pre-commit turbo gate passed across all three packages
+      - RED first: before the fix, 4 of the new tests failed — `dispatched` answered 1 where 0 was expected, `qc_passed` answered 0 where 1 was expected
+
+      **Non-vacuity — 6 mutations, all RED**:
+
+      | Mutation | Result |
+      |---|---|
+      | restore the old literal `["qc_passed","cancelled"]` | RED (5 failing) |
+      | drop `dispatched` from the derived set | RED (4 failing) |
+      | add `qc_submitted` to the closed set | RED (3 failing) |
+      | close nothing (`[]`) | RED (5 failing) |
+      | invert the query (`notInArray` → `inArray`) | RED (13 failing) |
+      | give `dispatched` an out-edge in the **shared** matrix | RED (4 failing) |
+
+      The last one is the important one: it proves the route reads the live matrix rather than a snapshot of it, so a future status with no out-edge closes itself.
+
+      Rows are created and deleted by the suite and nothing is dropped; the dev database was verified clean afterwards (no leftover vendors, orders or jobs; `production_jobs` back to its pre-run count).
+  - author: system
+    timestamp: '2026-08-31T01:08:00.401Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T01:01:27.238Z'
+    agent: claude-code
+    summary: Derived CLOSED_JOB_STATUSES from TERMINAL_STATUSES in routes/admin/vendors.ts, fixing both a despatched job counting as open forever and a qc_passed job wrongly counting as closed. Added a 15-test live-Postgres regression suite asserting the route's real openJobCount per status; 53 tests passing, typecheck clean, 6 mutations verified red. Commit 47267c0d.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T01:07:58.463Z'
+    duration: '00:06:31'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-31T01:01:26.331Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:07:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
+completed: '2026-08-31T01:08:00.401Z'

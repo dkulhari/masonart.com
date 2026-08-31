@@ -1,0 +1,220 @@
+ticket_number: 701
+title: 'Room mockup generator: composite a poster into blank-wall room templates with frame shadows'
+description: |-
+  ## Task
+
+  Producing a product's room-mockup gallery images was not a process at all. Every product in the seeded catalogue has the shape `1 main + 3 room mockups` (`packages/api/src/database/seed-images.ts:131` globs `<prefix>-main.webp` plus `<prefix>-room-N.webp`), but those came in as finished reference imagery. For a real product the only options were photographing the framed piece in a styled room, per poster, or compositing by hand in an image editor and uploading one file at a time through `/admin/products/new`.
+
+  This builds an offline CLI that takes poster artwork plus a library of blank-wall room templates and emits candidate room mockups, a framed main image, and a numbered contact sheet for human review. Output filenames feed directly into the #672 bulk import manifest.
+
+  ## Origin
+
+  Started as a feasibility spike on 2026-08-30. The question was whether Sharp alone could composite a poster into a room photo convincingly. It could, and the finding that made it work is the shadow: a single drop shadow always reads as a sticker pasted onto a photo, while a **tight dark contact shadow plus a wide faint ambient shadow** reads as an object with real thickness. That pair, scaled off a per-frame `depthRatio`, is what sells frame depth on a straight-on wall — including for frameless stretched canvas, where the shadow is the only depth cue available.
+
+  ## Documents
+
+  - Design spec: `docs/superpowers/specs/2026-08-31-room-mockup-generator-design.md`
+  - Implementation plan: `docs/superpowers/plans/2026-08-31-room-mockup-generator.md`
+  - Runbook (HTML artifact): see comments
+  - Branch: `feature/room-mockup-generator`, worktree `/Users/dhruv/work/masonart-room-mockups`
+
+  ## Deliberately out of scope
+
+  - **Generating the AI room photographs** — supplied, not produced here.
+  - **Angled / perspective rooms.** Straight-on walls only. Sharp offers `.affine()` but no four-point homography; perspective would be a different design, not an extension.
+  - **Any admin UI.** Review is a contact sheet and deleting files.
+  - **Auto-detecting the wall rectangle.** Measured by eye once per template.
+  - **Per-frame room variants.** `selectedFrame` in `packages/web/app/components/product/ProductDetail.tsx:159` feeds price and the cart payload only — it never swaps the gallery image, so the storefront has no consumer for a room shot per frame.
+  - **Writing to the database or R2.** The tool reads local files and writes local files.
+
+  ## Known follow-up
+
+  The tool ships **unable to run**: `room-templates.json` is `[]` until blank-wall room photographs exist, and `loadTemplates` fails loudly with `No room templates defined` rather than rendering nothing. That is intended — the spec is explicit that template quality, not code, is the real cost of this feature.
+
+  When generating the rooms, keep them clear of the MESON ART watermark baked into `.cache/seed-media/` artwork (#546).
+feature: room-visualization
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:02:26.079Z'
+last_updated: '2026-08-31T02:44:35.818Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - images
+  - sharp
+  - cli
+  - catalogue
+  - room-visualization
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T02:14:35.559Z'
+    text: |-
+      ## Documents produced
+
+      **Runbook (HTML):** https://claude.ai/code/artifact/dbd86323-9b3a-437a-967d-a48a7617a2a6
+      Operating manual — pipeline, how the two-shadow model works, how to measure a template rectangle, the full command reference, every error message with its fix, and the list of deliberate non-goals with reasoning.
+
+      **Design spec:** `docs/superpowers/specs/2026-08-31-room-mockup-generator-design.md` (commit 709d94fd on this branch; originally c025a2b2)
+      12 sections. Problem, scope and non-goals, architecture, template format, frame render specs, renderer, review flow, framed main image, handoff, CLI contract, testing strategy, risks.
+
+      **Implementation plan:** `docs/superpowers/plans/2026-08-31-room-mockup-generator.md` (commit e087aaa2; originally f7c37a22)
+      Five TDD tasks with complete test and implementation code, global constraints, and the follow-up work that is not code.
+
+      **Branch:** `feature/room-mockup-generator`, off `main` at 3402b848.
+      Worktree: `/Users/dhruv/work/masonart-room-mockups`.
+
+      ## Commits so far
+
+      | Commit | Task | Tests |
+      |---|---|---|
+      | 00fe2a2b | Geometry — `fitIntoBox`, `shadowParams` | 14/14 |
+      | a7f18831 | Template and frame-render validation | 13/13 |
+      | e19520d5 | Renderer — frame, shadow layers, composite | 10/10 |
+      | 8e29a97e | Framed main image, numbered contact sheet | 6/6 |
+      | 955f9206 | CLI argument parsing and template selection | 10/10 |
+
+      Task 5's driver, data files and package script are in progress at the time of writing.
+
+      ## Decisions worth keeping
+
+      **Two shadows, not one.** A single drop shadow reads as a sticker pasted onto a photograph. A tight dark contact shadow plus a wide faint ambient shadow reads as an object with thickness. This was the spike's central finding.
+
+      **Depth changes shadow size, not darkness.** Blur and offset scale with `depthRatio`; opacity is fixed. Darkening with depth reads as the room's lighting changing rather than the object changing. The spec's testing section originally said opacity scales too — corrected during plan review.
+
+      **`placement` is a bounding box, not a stretch target.** Artwork is fitted inside at its own aspect ratio and centred, so a portrait and a landscape poster both land correctly in the same room.
+
+      **One moulding per room template, not a matrix.** `selectedFrame` in `ProductDetail.tsx:159` drives price and the cart payload only — it never swaps the gallery image. Rendering every frame against every room would turn ~8 candidates into ~40 with nowhere to display them.
+
+      **Plan defect found during implementation.** The plan's `renderFramedMain` derived one margin from the framed image's longer edge and applied it to all four sides. Adding the same absolute margin to numerator and denominator always pulls a ratio toward 1, so this squared the very image the function exists to keep unsquared (500x1000 art came out at ratio 0.577 against an asserted 0.5). Fixed by scaling each axis by its own edge. The test was not weakened.
+
+      ## Known state on delivery
+
+      The tool ships **unable to run**. `room-templates.json` is `[]` and `loadTemplates` fails with `No room templates defined — nothing to render.` until blank-wall room photographs exist. Intended behaviour — the spec is explicit that template quality, not code, is the real cost.
+
+      Follow-up, none of it code:
+      1. Generate 6-8 blank-wall room images, straight-on, consistently lit. Keep them clear of the MESON ART watermark baked into `.cache/seed-media/` artwork (#546).
+      2. Put them in `.cache/room-templates/`.
+      3. Measure each wall rectangle and add an entry to `room-templates.json` with its `light` direction and moulding.
+      4. Dry run, real run, then look at a contact sheet and tune the rectangles.
+
+      ## Unrelated defect found on the way
+
+      `main` does not typecheck. `packages/api/src/lib/audit.ts:233` and `packages/api/src/routes/admin/audit-log.ts:101` both fail TS2769 — the `"fulfilment"` audit category is used in code but absent from `auditCategoryEnum` at `packages/api/src/database/schema/audit-log.ts:66`. This breaks the `.githooks/pre-commit` typecheck gate for every TypeScript commit on main, not just this branch. Confirmed pre-existing: this branch differs from `main` only by the room-mockup files and the two documents. Not fixed here — it belongs to whichever ticket introduced the category. Worth its own ticket.
+  - author: mcp-client
+    timestamp: '2026-08-31T02:44:35.818Z'
+    text: |-
+      ## Implementation complete — all five tasks, reviewed
+
+      | Commit | What | Tests |
+      |---|---|---|
+      | 00fe2a2b | Geometry — `fitIntoBox`, `shadowParams` | 14/14 |
+      | a7f18831 | Template + frame-render validation | 13/13 |
+      | e19520d5 | Renderer — frame, shadow layers, composite | 10/10 |
+      | 8e29a97e | Framed main image, numbered contact sheet | 6/6 |
+      | 955f9206 | CLI argument parsing, template selection | 10/10 |
+      | f578ed57 | CLI driver, data files, package script | — |
+      | 7f738b34 | Runbook (`docs/runbooks/room-mockup-generator.html`) | — |
+      | d3567f57 | Whole-branch review corrections | 53/53 |
+
+      Full `tests/lib`: 660 passed, 0 failed. `typecheck | grep room-mockup`: empty.
+
+      Each task got its own scoped review; the branch then got a whole-branch review on the strongest model, one fix wave, and a scoped re-review. Final verdict: all findings addressed, no Critical or Important breakage.
+
+      ## The one Important finding, and why no task review could have caught it
+
+      `frame-renders.json` shipped the slugs `oak`, `black`, `white`, `gold`, `frameless`. The catalogue's `frames.type` values (`packages/api/src/database/seed-frames.ts:53,68,84,100,116,132,148`) are `rolled`, `frameless`, `gold`, `silver`, `black`, `white`, `wood`.
+
+      `oak` matches no purchasable frame — it came from the storefront's `FRAME_SWATCH` map in `ChooseOptions.tsx:136-143`, a different vocabulary. Meanwhile `wood` and `silver` are sellable and were unrenderable. `oak` was also the first key and the spec's own example, so it is exactly what a template author would have reached for.
+
+      Origin was the design spec's illustrative example; the plan copied it and the implementer transcribed it faithfully. Every scoped review checked the file against the plan and was right to pass it. Only a whole-branch reviewer looking across to `seed-frames.ts` could see it. Fixed in d3567f57 — now `wood`, `black`, `white`, `gold`, `silver`, `frameless`. `rolled` is deliberately excluded: a rolled canvas ships in a tube and is never hung, so it has no room shot.
+
+      Caught while `room-templates.json` was still `[]`, so it cost nothing. After templates existed it would have been a re-render of the whole catalogue.
+
+      ## Verified end to end
+
+      The whole-branch reviewer did not only read — it executed the driver's sequence against a synthetic room and poster, and confirmed:
+
+      - All three contract filenames produced at correct dimensions.
+      - Aspect ratio preserved (`framed-main.jpg` at 0.682, matching the framed rectangle).
+      - The spec §8 handoff works: `framed-main.jpg` → `matToSquare()` → `measureArtBox()` returns a real art box, not `undefined`, with no change to the upload pipeline.
+      - The `white` moulding clears `ART_MAT_TOLERANCE` against `MAT_COLOR`, so the mat scan does not eat into a white frame.
+      - `.cache/` and `out/` are gitignored at any depth, so no generated image can pollute the tree.
+
+      ## Parked — real, small, not blocking
+
+      1. **Residual `oak` in two worked examples** — `docs/superpowers/specs/…-design.md:99` and `docs/runbooks/room-mockup-generator.html:699`. The data file, spec §5 and the runbook's reference table are all correct; these two illustrations still show the dead slug. Anyone copy-pasting one gets a loud named failure at load (`templates.ts:116-120`), not a silent bad render.
+      2. **Contact-sheet caption clipping** — `generate-room-mockups.ts:137` appends `— room-<id>.jpg` so the operator can see which file to delete, but `outputs.ts:92-98` renders captions into a fixed 420×34 cell with no truncation, and the id is what clips first. Verified empirically. Not a regression, but it under-delivers its own intent.
+      3. **`--templates` default detection is a string sentinel** — `generate-room-mockups.ts:58-61` compares against the literal `.cache/room-templates`, so an explicit `--templates .cache/room-templates` is also repo-root-anchored, contradicting the comment at `:29-32`. The literal is duplicated at `cli-args.ts:62` with no shared constant and no driver-level test.
+
+      ## Still true: the tool ships unable to run
+
+      `room-templates.json` is `[]`. Until blank-wall room photographs exist it fails with `No room templates defined — nothing to render.` Intended. The follow-up is photography and measurement, not code.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: 'Spike: prove a straight-on composite with layered shadows produces a sellable image using Sharp alone'
+    expected_result: Confirmed — ~1.2s per 1600x1600 render, no new dependency. Two-shadow pair (contact + ambient) is what conveys thickness; a single shadow reads as a sticker.
+    status: done
+  - id: 2
+    action: implement
+    description: Write and commit the design spec
+    file: docs/superpowers/specs/2026-08-31-room-mockup-generator-design.md
+    expected_result: 'Committed. Later corrected: shadow blur and offset scale with depthRatio, opacity does NOT — a thicker frame casts a larger shadow, not a darker one.'
+    status: done
+  - id: 3
+    action: implement
+    description: Write and commit the five-task TDD implementation plan
+    file: docs/superpowers/plans/2026-08-31-room-mockup-generator.md
+    expected_result: Committed. Self-review caught a spec contradiction, a flaky JPEG byte-equality assertion, a noUncheckedIndexedAccess violation, and an empty --only edge case.
+    status: done
+  - id: 4
+    action: write-test
+    description: 'Task 1 — geometry: fitIntoBox (aspect-preserving, centred) and shadowParams (two-layer, depth-scaled)'
+    file: packages/api/src/lib/room-mockup/geometry.ts
+    command: cd packages/api && bunx vitest run tests/lib/room-mockup/geometry.test.ts
+    expected_result: PASS — 14/14. Commit 00fe2a2b. Review clean.
+    status: done
+  - id: 5
+    action: write-test
+    description: Task 2 — template and frame-render validation, every failure naming the offending id or slug
+    file: packages/api/src/lib/room-mockup/templates.ts
+    command: cd packages/api && bunx vitest run tests/lib/room-mockup/templates.test.ts
+    expected_result: PASS — 13/13. Commit a7f18831. Review clean.
+    status: done
+  - id: 6
+    action: write-test
+    description: 'Task 3 — renderer: frameArtwork, shadowLayer, renderRoomMockup'
+    file: packages/api/src/lib/room-mockup/render.ts
+    command: cd packages/api && bunx vitest run tests/lib/room-mockup/render.test.ts
+    expected_result: PASS — 10/10. Commit e19520d5. Review clean; composite order and short-edge frame sizing independently verified in code, not just in comments.
+    status: done
+  - id: 7
+    action: write-test
+    description: Task 4 — framed main image and numbered contact sheet
+    file: packages/api/src/lib/room-mockup/outputs.ts
+    command: cd packages/api && bunx vitest run tests/lib/room-mockup/outputs.test.ts
+    expected_result: PASS — 6/6. Commit 8e29a97e. Review clean. Implementer found a real bug in the plan's reference code and fixed it without weakening the test.
+    status: done
+  - id: 8
+    action: write-test
+    description: 'Task 5 — CLI: argument parsing, template selection, driver, data files, package script'
+    file: packages/api/src/database/generate-room-mockups.ts
+    command: cd packages/api && bunx vitest run tests/lib/room-mockup/cli-args.test.ts
+    expected_result: PASS expected — in progress at time of writing
+    status: pending
+  - id: 9
+    action: verify-pass
+    description: Whole-branch review on the most capable model, then finish the branch
+    command: cd packages/api && bun run typecheck 2>&1 | grep room-mockup && bunx vitest run tests/lib
+    expected_result: typecheck grep empty; tests/lib green
+    status: pending
+current_step: 1

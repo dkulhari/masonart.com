@@ -141,13 +141,16 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: '00:00:00'
+  total_sessions: 1
+  total_duration: '00:15:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:15:00'
+      tokens: 0
 tickets:
   todo:
-    '702': Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
     '703': Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
     '704': Label Seam - Read the real column and delete the 42703 to 503 path
     '705': Label Seam - Choose the live label by voided_at, not by recency
@@ -160,9 +163,10 @@ tickets:
     '712': One Tracking Store - Admin and customer order detail render the shipment
     '713': E2E - An admin-entered tracking number reaches the customer tracking page
   in_progress: {}
-  done: {}
+  done:
+    '702': Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
 total_tickets: 12
-completion_percentage: 0
+completion_percentage: 8
 is_completed: false
 plan:
   phases:
@@ -194,3 +198,9 @@ plan:
       location: packages/api/src/services/shiprocket.ts, packages/api/src/lib/shipment-dispatch.ts, packages/api/src/routes/webhooks, packages/web/app/routes/admin/dispatch
       tickets: []
   generated_at: '2026-08-31T02:26:30.353Z'
+worktree:
+  branch: feature/order-dispatch-tracking
+  path: /Users/dhruv/work/masonart.com/.claude/worktrees/order-dispatch-tracking
+  created_at: '2026-08-31T03:16:41.504Z'
+last_activity: '2026-08-31T04:12:24.765Z'
+started: '2026-08-31T03:57:31.133Z'

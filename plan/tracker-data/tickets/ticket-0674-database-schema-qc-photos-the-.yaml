@@ -19,20 +19,145 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.141Z'
-last_updated: '2026-08-30T12:02:20.141Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T13:29:24.483Z'
+time_spent_minutes: 11
 labels:
   - database
   - schema
   - storage
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T13:17:03.369Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T13:17:17.788Z'
+    text: |-
+      **Derived implementation steps** (ticket carried no `implementation_steps`; TDD order)
+
+      1. [write-test] `packages/shared/tests/schemas/production-qc.test.ts` — QC_SHOT_LIST: print + frame slot sets, required flags, unique slot keys, helper lookups. Expected: FAIL (module missing).
+      2. [verify-fail] `bunx vitest run tests/schemas/production-qc.test.ts` in packages/shared → FAIL.
+      3. [implement] `packages/shared/src/schemas/production-qc.ts` + wire into `src/schemas/index.ts` and `src/index.ts` (the barrel enumerates modules; index.ts alone leaves it unreachable).
+      4. [verify-pass] same command → PASS.
+      5. [write-test] `packages/api/tests/lib/storage.test.ts` — `StoragePaths.productionQcPhoto(jobId, slot, filename)` → `production-qc/<jobId>/<slot>/<filename>`, traversal-safe on all three segments. Expected: FAIL.
+      6. [verify-fail] `bunx vitest run tests/lib/storage.test.ts` → FAIL.
+      7. [implement] add `productionQcPhoto` to `StoragePaths` in `packages/api/src/lib/storage.ts`, reusing `sanitizeKeySegment`, following the `reviewMedia` precedent.
+      8. [verify-pass] same command → PASS.
+      9. [write-test] `packages/api/tests/database/production-job-photos.test.ts` — drizzle shape assertions (columns, FK delete actions, partial unique index predicate, `object_key` not a URL, no CHECK). Expected: FAIL.
+      10. [verify-fail] `bunx vitest run tests/database/production-job-photos.test.ts` → FAIL.
+      11. [implement] `productionJobPhotos` in `src/database/schema/production-jobs.ts` + relations + types; `slot` stays `text` (no pgEnum, no value import from @chobii/shared inside schema/).
+      12. [verify-pass] same command → PASS.
+      13. [implement] generate `0024_production_job_photos.sql` + `meta/0024_snapshot.json` + journal idx 24 via `drizzle-kit generate --name production_job_photos`. Index predicate `WHERE superseded_at IS NULL` — no enum literal.
+      14. [verify-pass] `bunx vitest run tests/database/migration-enum-literals.test.ts` and `tests/database/raw-sql-objects.test.ts` → PASS; `db:migrate` applies against :5440 (never `db:push`, #663).
+      15. [verify-pass] `bun run typecheck` (the pre-commit gate).
+      16. [commit] stage only the files this ticket touched, by explicit path.
+  - author: mcp-client
+    timestamp: '2026-08-30T13:28:07.644Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `1f68d31b` — feat(database): add production_job_photos, the QC shot list and its storage keys
+      (on `feature/production-pipeline-design`, directly on top of #673's `83ee1c8f`)
+
+      **Files Changed**
+      - `packages/api/src/database/schema/production-jobs.ts` — `productionJobPhotos` table, relations, types
+      - `packages/api/src/database/migrations/0024_production_job_photos.sql` — new, with the design header
+      - `packages/api/src/database/migrations/meta/0024_snapshot.json`, `meta/_journal.json` — idx 24, snapshots unbroken 0000–0024
+      - `packages/api/src/lib/storage.ts` — `StoragePaths.productionQcPhoto(jobId, slot, filename)`
+      - `packages/shared/src/schemas/production-qc.ts` — new: `QC_SHOT_LIST`, `QC_SHOT_SLOTS`, `QC_STAGES`, `qcSlotSchema`, `qcStageSchema`, `qcShotsForStage`, `requiredQcSlots`
+      - `packages/shared/src/schemas/index.ts`, `packages/shared/src/index.ts` — barrel wiring (the entry barrel enumerates modules, so schemas/index.ts alone leaves it unreachable)
+      - `packages/api/src/database/schema/index.ts` — barrel comment
+      - tests: `tests/database/production-job-photos.test.ts` (new), `tests/database/production-job-photos-live-slot.test.ts` (new), `tests/lib/storage.test.ts`, `packages/shared/tests/schemas/production-qc.test.ts` (new)
+
+      **Summary**
+
+      Data layer only — no routes, no upload handler (#685).
+
+      `production_job_photos`: `job_id` (cascade), `slot` text, `object_key`, `content_type`, `size_bytes`, `uploaded_by` (set null), `uploaded_at`, `superseded_at`, `review_id` (set null). Partial unique index `production_job_photos_live_slot_unique` on `(job_id, slot) WHERE superseded_at IS NULL`, plus `production_job_photos_job_id_idx`. No `updated_at`, no CHECK.
+
+      Shot list — print: `print_full`, `print_colour_reference`, `print_raking_light`, `print_detail` (optional). Frame: `frame_front`, `frame_raking_light`, four separate corner slots, `frame_back`, `frame_detail` (optional). Each corner is its own slot because one slot holds one live photo — a single "corners" entry would be one photograph asserting four mitre joins are clean.
+
+      Storage: `production-qc/<jobId>/<slot>/<filename>` via the existing `sanitizeKeySegment`, following the `reviewMedia` precedent. All three segments sanitised — `slot` too, since the column is text and a value that skipped `qcSlotSchema` can reach the builder.
+
+      Constraints held: `slot` is text not a pgEnum; no enum literal anywhere in 0024; object KEY never a URL (and no `*url*` column exists to tempt one); no CHECK constraints; applied with `db:migrate` against :5440, never `db:push`.
+
+      **Verification**
+
+      - Command: `bunx vitest run tests/database/production-job-photos.test.ts tests/database/production-job-photos-live-slot.test.ts tests/lib/storage.test.ts tests/database/migration-enum-literals.test.ts tests/database/raw-sql-objects.test.ts` (packages/api)
+      - Result: PASS — `Test Files 5 passed (5)` / `Tests 152 passed (152)`
+      - Command: `bunx vitest run tests/schemas/production-qc.test.ts` (packages/shared)
+      - Result: PASS — `Test Files 1 passed (1)` / `Tests 18 passed (18)`
+      - Command: `bun run typecheck` (the pre-commit gate, all 3 packages)
+      - Result: PASS — `Tasks: 4 successful, 4 total`
+
+      170 tests across the six touched files; 51 of them new.
+
+      **Live database evidence** (:5440, after `db:migrate`)
+
+      ```
+      CREATE UNIQUE INDEX production_job_photos_live_slot_unique
+        ON public.production_job_photos USING btree (job_id, slot)
+        WHERE (superseded_at IS NULL)
+      FK job_id     -> production_jobs(id)        ON DELETE CASCADE
+      FK uploaded_by-> "user"(id)                 ON DELETE SET NULL
+      FK review_id  -> production_job_reviews(id) ON DELETE SET NULL
+      ```
+
+      **The live-slot suite is not vacuous.** The same insert sequence was re-run against the index dropped and against a blanket (non-partial) unique, both inside rolled-back transactions:
+
+      ```
+      [no-index]        second-live ACCEPTED   | reshoot ACCEPTED
+      [blanket-unique]  second-live REFUSED    | reshoot REFUSED
+      [shipped partial] second-live REFUSED    | reshoot ACCEPTED, 2 history rows kept
+      ```
+
+      Only the shipped predicate passes both assertions — dropping the index breaks "refuses a second live photo", and making it non-partial breaks "allows a reshoot once superseded".
+
+      **Note for #685**: `it.runIf(reachable)` cannot be used in live-DB suites here — the modifier is evaluated at collection time, before `beforeAll` connects, so every test reports as skipped against a perfectly healthy database. The repo's guard is an `if (!reachable) return;` inside the body, with one `it` calling `assertLiveDbReachable`. Caught this suite passing 5-skipped-of-6 before it was fixed.
+  - author: system
+    timestamp: '2026-08-30T13:28:14.470Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T13:29:24.483Z'
+    text: |-
+      Deviation found in review, corrected in #675.
+
+      `production_job_photos.uploaded_at` and `.superseded_at` landed as bare `timestamp`. The feature design states every NEW column in production-pipeline is `timestamptz` — the point being that `admin_audit_log.created_at` is timestamptz while `production_jobs`' five existing date columns are not, so a year later a job's dates and the audit row proving who set them are not comparable across a server timezone change. Adding two more bare columns recreates exactly the debt the design named.
+
+      Not the implementer's error: the constraint was written into #675's ticket text and omitted from this one. The table was new and empty, so the conversion is free.
+
+      Fixed by `ALTER COLUMN ... TYPE timestamptz` in migration 0025 (#675), with the drizzle DSL updated to match.
+
+      Everything else verified against the ticket's constraints and passing: `slot` is `text` rather than a pgEnum (an ESM value import from @chobii/shared inside schema/ breaks drizzle-kit generate); the column is `object_key`, not a URL, so it can be re-signed under the scope allow-list; the partial unique index predicate is `WHERE superseded_at IS NULL`, touching no enum; FKs are cascade on job_id, set null on uploaded_by and review_id. The migration-enum-literals guard added by #673 is still green.
+work_sessions:
+  - start: '2026-08-30T13:17:08.189Z'
+    agent: claude-code
+    summary: 'Landed #674 in one session, commit 1f68d31b. production_job_photos with the partial unique index on (job_id, slot) WHERE superseded_at IS NULL, migration 0024 (journal idx 24, snapshot chain unbroken), QC_SHOT_LIST in packages/shared/src/schemas/production-qc.ts, and StoragePaths.productionQcPhoto. 170 tests passing across six files (51 new); typecheck green. Index proven behaviourally against live Postgres and proven non-vacuous by re-running with the index dropped and with a blanket unique.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T13:28:12.694Z'
+    duration: '00:11:04'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T13:17:03.369Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:11:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:11:00'
+      tokens: 0
+completed: '2026-08-30T13:28:14.470Z'

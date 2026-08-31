@@ -21,19 +21,94 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.228Z'
-last_updated: '2026-08-30T12:02:20.228Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T14:13:56.539Z'
+time_spent_minutes: 9
 labels:
   - core
   - state-machine
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T14:05:07.850Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T14:05:18.763Z'
+    text: |-
+      **Derived implementation steps** (ticket carried no `implementation_steps`; TDD order):
+
+      1. [write-test] `packages/api/tests/lib/production-transitions.test.ts` — exhaustiveness over all 9x9x3 triples asserted against a literal allowed set (17 edges); anti-drift key-set vs `productionJobStatusEnum.enumValues`; `sent` zero in/out edges; `dispatched`/`cancelled` zero out-edges; every live status reaches `cancelled`; no path to `qc_passed` bypassing `qc_submitted`; `VENDOR_SETTABLE_STATUSES` agrees with the vendor edges; self-edge `assigned->assigned` is a legal no-op; `assertTransition` throws a 409-shaped error carrying `{ error, code, from, to, allowed }`.
+      2. [verify-fail] `cd packages/api && bunx vitest run tests/lib/production-transitions.test.ts` — expect FAIL (module does not exist).
+      3. [implement] `packages/api/src/lib/production-transitions.ts` — mapped-type-total `PRODUCTION_TRANSITIONS`, `isTransitionAllowed`, `assertTransition`, `nextStatuses`, derived `VENDOR_SETTABLE_STATUSES` / `TERMINAL_STATUSES` / `UNREACHABLE_STATUSES`, `ProductionTransitionError`. Pure: no `db`, no Hono.
+      4. [verify-pass] same scoped command — expect PASS.
+      5. [verify-pass] `bunx tsc --noEmit` (src) + `tsc -p tsconfig.test.json --noEmit` (tests) in `packages/api`.
+      6. [commit] stage only the two new files by explicit path.
+
+      Out of scope here, per the ticket split: route wiring (#680 admin, #684 vendor), the reviews-route restriction (#681), and the FOR UPDATE / row-count-mismatch concurrency pattern (#680). `routes/vendor.ts:81`'s hardcoded literal is left in place for #684 to replace.
+  - author: mcp-client
+    timestamp: '2026-08-30T14:13:48.634Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `09dbcf7d` — feat(api): add the production job transition matrix
+
+      **Files Changed**:
+      - `packages/api/src/lib/production-transitions.ts` (new) — the matrix, `assertTransition`, `nextStatuses`, `isTransitionAllowed`, `guardFor`, `ProductionTransitionError`, and the derived `VENDOR_SETTABLE_STATUSES` / `TERMINAL_STATUSES` / `UNREACHABLE_STATUSES`.
+      - `packages/api/tests/lib/production-transitions.test.ts` (new) — 47 tests.
+
+      **Summary**:
+      `PRODUCTION_TRANSITIONS` is a mapped type over `ProductionJobStatus`, so it is total by construction — a status added to the enum with no row is a *compile* error, not a silent denial — and the anti-drift test deep-equals its key set against `productionJobStatusEnum.enumValues`. 17 legal triples out of 243 possible ones.
+
+      - `sent`: zero in-edges, zero out-edges. The empty row is the retirement.
+      - `dispatched` / `cancelled`: terminal, derived as "has in-edges, has no out-edges", which is what distinguishes them from `sent` rather than a hand-written list.
+      - `assigned -> assigned` is the only self-edge and is permitted, not refused — reassign + reprice.
+      - `qc_passed` has exactly one in-edge, from `qc_submitted`; asserted as a reachability property (delete `qc_submitted` from the graph and BFS from every node) rather than edge-by-edge, so a future edge routing around QC fails.
+      - `system` has no edge anywhere: creation has no `from`, so it is not a transition.
+      - Every edge names the `guard` a route must still evaluate (`shot-list-complete`, `review-verdict-pass|fail`, `open-transfer-or-order-label`, `priced-from-rate-card`), so the checklist for #680/#681/#684 sits beside the edge instead of only in the design doc.
+      - `ProductionTransitionError` carries `httpStatus: 409`, `code: 'ILLEGAL_TRANSITION'` and `toResponseBody() -> { error, code, from, to, allowed }`, with `allowed` scoped to the *asking* actor.
+      - `VENDOR_SETTABLE_STATUSES` is derived from the vendor edges and comes out `['received', 'qc_submitted', 'dispatched']`, typed as a non-empty tuple so it drops straight into `z.enum`. `routes/vendor.ts:81`'s stale `['sent', 'received']` literal was deliberately left alone for #684.
+
+      Pure module — its only import is the schema's enum declaration, which never reaches the connection. No Hono, no `db`, no concurrency logic (that is #680).
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/lib/production-transitions.test.ts`
+      - Result: PASS (47 tests, 47 passing, 0 failing)
+      - Output: `Test Files 1 passed (1) / Tests 47 passed (47)`
+      - Command: `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` (packages/api) — PASS, 0 errors. The pre-commit gate (`turbo run typecheck`, all 3 packages) also passed on the commit.
+      - **Mutation-checked, not just green**: temporarily adding a `cancelled -> dispatched` edge failed 7 tests (the literal allowed-set, `TERMINAL_STATUSES`, the no-resurrection test, the live-status set, both reachability tests, and the empty-remedy message). Reverted before committing.
+
+      **Note for whoever picks up #680/#684**: the commit was initially refused by the pre-commit gate because a parallel agent's `lib/vendor-scope.ts` tests were mid-red-phase (10 TS2305/TS6133 errors in `tests/routes/vendor/*.test.ts`). Waited for their green rather than `--no-verify`, and committed by pathspec so their staged `lib/audit.ts` was not swept into this commit.
+  - author: system
+    timestamp: '2026-08-30T14:13:56.539Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T14:05:09.399Z'
+    agent: claude-code
+    summary: Delivered lib/production-transitions.ts + 47 tests via TDD (red confirmed on missing module, then green). Total mapped-type matrix over all 9 statuses, 17 legal triples pinned as a literal, assertTransition/nextStatuses/guardFor, 409 ProductionTransitionError with actor-scoped `allowed`, and derived VENDOR_SETTABLE_STATUSES/TERMINAL_STATUSES/UNREACHABLE_STATUSES. Mutation-checked (a rogue cancelled->dispatched edge fails 7 tests). Committed 09dbcf7d by pathspec after waiting out a sibling agent's red typecheck; no route wiring touched.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T14:13:54.655Z'
+    duration: '00:08:45'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T14:05:07.850Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:09:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:09:00'
+      tokens: 0
+completed: '2026-08-30T14:13:56.539Z'

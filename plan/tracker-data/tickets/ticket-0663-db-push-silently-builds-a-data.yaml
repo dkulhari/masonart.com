@@ -4,20 +4,177 @@ description: "## Problem\n\n`admin_audit_log` is append-only. That guarantee is 
 feature: admin-audit-log
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T04:08:25.292Z'
-last_updated: '2026-08-30T04:08:25.292Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T09:22:22.041Z'
+time_spent_minutes: 10
 labels:
   - database
   - security
   - docs
   - tech-debt
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T07:17:09.437Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T07:25:21.333Z'
+    text: |-
+      Steps 2-7 done and committed. Step 1 (production check) is BLOCKED — see below. Ticket stays in-progress.
+
+      **Commit**: `d1126c55` - fix(database): stop the docs building databases without the audit-log trigger
+
+      ## Reproduced first
+
+      Built two databases from this same schema in the local postgres container, one each way:
+
+      ```
+      chobii_migrate_test  table=1 trigger=1 function=1
+      chobii_push_test     table=1 trigger=0 function=0
+      ```
+
+      Exactly the ticket's finding. Both throwaway databases were dropped afterwards.
+
+      ## Files changed
+
+      - `packages/api/src/database/raw-sql-objects.ts` (new) — manifest of the objects only a migration can create (`admin_audit_log_immutable`, `admin_audit_log_immutable_trg`), each with the migration that creates it and what breaks when it is absent, plus the shared failure message.
+      - `packages/api/tests/database/raw-sql-objects.test.ts` (new) — the guard, in two halves. Without a database: scans every migration for CREATE FUNCTION / TRIGGER / POLICY and fails on anything not declared in the manifest. Against a real database: asserts each declared object is present in `pg_proc` / `pg_trigger` / `pg_policy`.
+      - `packages/api/src/database/schema/audit-log.ts` — the "append-only" section now says out loud that the trigger is **not** in this file, that push does not create it, and where the manifest is.
+      - `README.md` — setup step 5 now `db:migrate`. The command reference still lists `db:push` but with the warning attached instead of presenting it as a peer.
+      - `docs/manual-tests/*.md` (14 files) — precondition now `db:migrate`, with "not db:push" and the ticket number.
+      - `docs/deployment.md` — both prod-compose `db:push` commands replaced with `db:migrate`. The file no longer contradicts its own banner.
+      - `docs/TEST-EXECUTION-REMEDIATION.md` — both occurrences.
+      - `scripts/run-tests.sh` — `setup_database()` ran `db:push`, so the project's own test-setup path built unprotected databases. Now `db:migrate`, with the reason in a comment.
+      - `packages/api/package.json` — `db:migrate` gains `--env-file=../../.env`.
+
+      ## Why the package.json change
+
+      The README told people to `cd packages/api && bun run db:push`, and that errors: neither `db:push` nor `db:migrate` picks up the root `.env` on its own. Both failed identically, so this is pre-existing and not a regression — but shipping a corrected setup step that still errors is not a fix. `--env-file` matches the existing `dev` and `seed` scripts. Verified that an explicit `DATABASE_URL=...` still overrides the file (bun gives the shell precedence), so pointing drizzle-kit at a throwaway database still works.
+
+      ## Verification
+
+      - **Guard RED on push-built database** — fails naming both objects:
+        ```
+        This database is missing 2 object(s) that only a migration creates:
+          - function admin_audit_log_immutable (0021_admin_audit_log.sql) — ...
+          - trigger admin_audit_log_immutable_trg (0021_admin_audit_log.sql) — ...
+        That is the signature of a database built with `drizzle-kit push`.
+        Rebuild it with `bun run db:migrate`.
+        ```
+      - **Guard GREEN on migrate-built database** — 4 passed.
+      - **Recurrence guard proved red** — added a throwaway `9999_tmp_probe.sql` with an undeclared function and trigger; the test failed naming `tmp_probe_fn` and `tmp_probe_trg` and the migration file. Probe removed.
+      - **Audit-log suite on migrate-built database** — 20 passed across `raw-sql-objects`, `audit-log-immutability`, `audit-log-schema`.
+      - **`bunx vitest run tests/database/`** — 465 passed, 178 skipped, 0 failed. (The skips are the pre-existing `getDestructiveDbUrl` gate on a non-disposable database.)
+      - **`bun run typecheck`** — exit 0, including `tsconfig.test.json`. Pre-commit turbo typecheck across all 3 packages passed.
+      - **`bash -n scripts/run-tests.sh`** — syntax OK. `db:migrate` confirmed a safe no-op on an up-to-date database (dev journal 23 rows, 23 migration files, still 23 after).
+
+      ## Step 1 is blocked, and it is the reason this ticket is not done
+
+      The prod check could not be run. SSH to the deploy host fails host key verification:
+
+      ```
+      WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!
+      The fingerprint for the ED25519 key sent by the remote host is
+      SHA256:5BQgFmz/mojh18UWLILRclqK1uV96v2gLquzqZvt/EU
+      Offending ED25519 key in /Users/dhruv/.ssh/known_hosts:24
+      ```
+
+      I did not bypass it with `StrictHostKeyChecking=no` — that is the one thing that warning exists to prevent, and on 192.168.29.26 it is most likely a rebuilt/reimaged mini but that has to be confirmed by a human, not assumed by an agent.
+
+      `deploy/Makefile:99-100` runs `drizzle-kit migrate`, so production is very likely fine, but that remains inference. The read-only check to run once SSH is trusted again:
+
+      ```bash
+      make -C deploy ssh-mini   # or, directly:
+      ssh dhruv@192.168.29.26 "export PATH=/opt/homebrew/bin:\$PATH; \
+        docker compose -f ~/chobii-docker-compose.yml exec -T postgres \
+        psql -U chobii -d chobii -tAc \"SELECT 'trigger=' || count(*) FROM pg_trigger WHERE tgname='admin_audit_log_immutable_trg'\""
+      ```
+
+      Expect `trigger=1`. If it comes back `0`, prod's audit log is rewritable and that is a separate critical ticket, not a docs fix.
+
+      ## Left alone deliberately
+
+      Three dated plan documents still say `db:push`: `docs/plans/2026-02-17-ai-content-moderation-plan.md:377`, `docs/plans/2026-02-01-gemini-direct-provider-plan.md:65`, `docs/plans/2026-02-01-verified-purchase-reviews-plan.md:59`. These are historical records of what was done at the time, not setup paths, so rewriting them would falsify the record. Flagging rather than fixing — say the word if you want them annotated.
+  - author: mcp-client
+    timestamp: '2026-08-30T09:22:16.622Z'
+    text: |-
+      ## Step 1 unblocked and answered: production is NOT affected
+
+      The SSH host key warning that blocked this was a **false alarm**, and the diagnosis matters because it was misleading in a specific way.
+
+      `deploy/.env` had `DEPLOY_HOST=192.168.29.26`. That address no longer belongs to the mini — DHCP reassigned it. Reverse mDNS says 192.168.29.26 is now `dkmac.local`, a different machine with a different MAC. Fingerprints settle it:
+
+      ```
+      dkmacmini2.local   SHA256:6PY41e6guZ41Qh4mCJ2ZydysOAML/HSYNg9RsyDS5/c
+      known_hosts stored SHA256:6PY41e6guZ41Qh4mCJ2ZydysOAML/HSYNg9RsyDS5/c   <- identical
+      192.168.29.26 live SHA256:5BQgFmz/mojh18UWLILRclqK1uV96v2gLquzqZvt/EU   <- a different host
+      ```
+
+      The mini never rotated its key. The config was pointing at the wrong computer. No man-in-the-middle.
+
+      Changed `deploy/.env` to `DEPLOY_HOST=dkmacmini2.local` — a name rather than a DHCP lease, so this cannot recur. (`deploy/.env` is gitignored, `.gitignore:89`, so this is a local config change and not part of any commit.) The mini's IPv4 record `192.168.29.229` is stale and answers neither ping nor port 22; it is reachable over IPv6, which resolving by name handles automatically. Connection confirmed: `hostname` returns `dkmacmini2`, Darwin 25.5.0 arm64.
+
+      ### The production result
+
+      ```
+      table=0  trigger=0  function=0  migrations=15
+      ```
+
+      **`admin_audit_log` does not exist in production at all.** There is no unprotected audit log there, because there is no audit log there. This ticket's vulnerability does not apply to prod, and no remediation is needed.
+
+      The reason is that prod is 8 migrations behind — last migrated 2026-08-07, stopped at `0014_admin_editable_frames`:
+
+      ```
+       15 0014_admin_editable_frames               applied  (2026-08-07 10:40)
+       16 0015_gift_card_delivery_index            MISSING
+       17 0016_return_store_credit                 MISSING
+       18 0017_mixed_cart_gift_cards               MISSING
+       19 0018_gift_card_delivery_index_predicate  MISSING
+       20 0019_vendor_management_phase_1           MISSING
+       21 0020_production_job_fk_restrict          MISSING
+       22 0021_admin_audit_log                     MISSING
+       23 0022_audit_log_drop_actor_fk             MISSING
+      ```
+
+      So the inference in the original report — that prod is fine because the deploy path is `make -C deploy migrate` — is correct in conclusion but not for the reason given. Prod is fine because the feature was never deployed. When 0021 does ship, it ships through `drizzle-kit migrate` (`deploy/Makefile:99`), which replays the raw SQL and creates the trigger. The guard added in `d1126c55` will confirm that rather than assume it.
+
+      ### Two things this surfaced, both outside this ticket
+
+      1. **Production is 8 migrations behind.** Whether that is deliberate (the vendor, gift-card and audit work not yet released) or drift, it is a deploy-state question, not a docs bug. Not filing a ticket unasked — say the word.
+      2. **`~/.ssh/known_hosts:24` is now actively wrong.** It maps the mini's key to 192.168.29.26, which is `dkmac`. Anyone connecting to that IP gets the same alarming warning for the same non-reason. Clean it with `ssh-keygen -R 192.168.29.26`. I did not run it — it is outside this ticket and it is your known_hosts. A backup of the file as it stood before I appended the `dkmacmini2.local` entry is at `~/.ssh/known_hosts.bak-663`.
+
+      All 7 implementation steps are now done. Moving the ticket to done.
+  - author: system
+    timestamp: '2026-08-30T09:22:19.506Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T07:17:10.542Z'
+    agent: claude-code
+    summary: Reproduced the push-vs-migrate gap on two throwaway databases, added a raw-SQL object manifest plus a two-part guard test (RED on push-built, GREEN on migrate-built, recurrence guard proved red with a probe migration), fixed every db:push setup path in README/manual-tests/deployment.md/TEST-EXECUTION-REMEDIATION/run-tests.sh, and made db:migrate actually runnable. Committed d1126c55. Step 1 (prod check) blocked on an SSH host key change that I did not bypass.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T07:25:26.231Z'
+    duration: '00:08:15'
+  - start: '2026-08-30T09:20:01.751Z'
+    agent: claude-code
+    summary: 'Diagnosed the SSH warning as a stale DHCP address (192.168.29.26 now belongs to dkmac, not the mini; mini''s host key unchanged), repointed deploy/.env at dkmacmini2.local, and ran the prod check: admin_audit_log does not exist in production (migrations stopped at 0014, 8 behind), so the vulnerability does not apply there. All 7 steps done, ticket closed.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T09:22:22.029Z'
+    duration: '00:02:20'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -30,12 +187,12 @@ implementation_steps:
       # against the production database, read-only
       psql "$PROD_DATABASE_URL" -At -c "SELECT count(*) FROM pg_trigger WHERE tgname='admin_audit_log_immutable_trg';"
     expected_result: 1 = production is fine, this is a dev/docs bug. 0 = production audit log is mutable; stop and escalate before continuing, and apply 0021's trigger block to prod first.
-    status: pending
+    status: done
   - id: 2
     action: write-test
     description: Add a schema-level guard that fails loudly on any database missing the trigger, independent of whether the behavioural suite runs
     file: packages/api/tests/database/audit-log-immutability.test.ts
-    status: pending
+    status: done
     code: |-
       it("has the immutability trigger installed at all", async () => {
         if (!reachable) return;
@@ -60,11 +217,11 @@ implementation_steps:
     description: Confirm the new guard fails on a push-built database and passes on a migrate-built one
     command: cd packages/api && docker run -d --name gap-check -e POSTGRES_PASSWORD=x -e POSTGRES_USER=x -e POSTGRES_DB=x -p 55663:5432 postgres:16 && sleep 5 && DATABASE_URL='postgresql://x:x@localhost:55663/x' bunx drizzle-kit push --force && DATABASE_URL='postgresql://x:x@localhost:55663/x' bunx vitest run tests/database/audit-log-immutability.test.ts; docker rm -f gap-check
     expected_result: FAIL on the push-built database, naming the missing trigger. Then passes against the normal migrate-built dev database.
-    status: pending
+    status: done
   - id: 4
     action: implement
     description: Fix the docs — the root cause. Replace db:push with db:migrate in every setup path, and delete the two prod-compose push commands that contradict deployment.md's own banner.
-    status: pending
+    status: done
     code: |-
       # README.md:64, README.md:352
       -   bun run db:push
@@ -91,7 +248,7 @@ implementation_steps:
     action: implement
     description: 'Guard the recurrence: make the raw-SQL dependency visible where the next person will look, rather than only in a migration nobody re-reads'
     file: packages/api/src/database/schema/audit-log.ts
-    status: pending
+    status: done
     code: |-
       /**
        * Append-only is enforced by a Postgres trigger, NOT by anything in this
@@ -111,10 +268,28 @@ implementation_steps:
     description: Full audit-log suite green against a properly migrated database, and no doc still recommends push for setup
     command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/database/audit-log-immutability.test.ts tests/database/audit-log-schema.test.ts && cd ../.. && grep -rn 'db:push' README.md docs/ | grep -v 'never\|not a substitute\|cannot create'
     expected_result: Suites pass. The grep returns only lines that warn against push — no remaining line that recommends it as a setup step.
-    status: pending
+    status: done
   - id: 7
     action: commit
     description: Commit the guard, the docs fix and the schema note together
     command: 'git add packages/api/tests/database/audit-log-immutability.test.ts packages/api/src/database/schema/audit-log.ts packages/api/package.json README.md docs/ && git commit -m "fix(audit): stop db:push producing a mutable audit log"'
-    status: pending
+    status: done
 current_step: 1
+started: '2026-08-30T07:17:09.437Z'
+work_session_summary:
+  total_sessions: 2
+  total_duration: '00:10:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 2
+      duration: '00:10:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/database/ (and the audit trio against push- vs migrate-built databases)
+  test_output: 'tests/database/: 465 passed, 178 skipped, 0 failed. New guard: FAILS on push-built DB naming both missing objects, 4 passed on migrate-built DB. Audit-log trio on migrate-built DB: 20 passed.'
+  build_passed: true
+  build_command: bun run typecheck (packages/api, incl. tsconfig.test.json)
+  verified_at: '2026-08-30T07:24:50.922Z'
+completed: '2026-08-30T09:22:19.506Z'
