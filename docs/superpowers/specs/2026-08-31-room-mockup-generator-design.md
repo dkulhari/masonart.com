@@ -120,7 +120,7 @@ frame name is a startup error naming the offending template id — not a silent 
 slug so an entry corresponds to a real catalogue moulding:
 
 ```json
-{ "oak": { "widthRatio": 0.032, "color": [178, 141, 94], "depthRatio": 0.024 } }
+{ "wood": { "widthRatio": 0.032, "color": [138, 106, 74], "depthRatio": 0.024 } }
 ```
 
 - `widthRatio` — frame face width as a fraction of the artwork's short edge.
@@ -130,6 +130,8 @@ slug so an entry corresponds to a real catalogue moulding:
   the render needs a value relative to the image, not an absolute one.
 - `widthRatio: 0` means frameless. A stretched canvas has no face, so the shadow becomes
   the **only** cue for depth and gets a larger `depthRatio` to compensate.
+- `rolled` has no entry. A rolled canvas ships in a tube and is never hung, so it has no
+  room shot to render.
 
 **One frame per room template, not a matrix.** `selectedFrame` in
 `packages/web/app/components/product/ProductDetail.tsx:159` feeds price

@@ -463,7 +463,7 @@ room templates ──┘                      ├── room-&lt;template-id&gt;
         </li>
         <li>
           <code>framed-main.jpg</code>
-          <span class="what">The artwork framed on a plain mat ground. Upload this as the product's main image.</span>
+          <span class="what">The artwork framed on a plain mat ground. Upload this as the product's main image. Uses the <em>first selected template's</em> moulding, so it shifts if you reorder templates in <code>room-templates.json</code> or change which ones <code>--only</code> selects.</span>
         </li>
         <li>
           <code>contact-sheet.jpg</code>
@@ -732,6 +732,21 @@ room templates ──┘                      ├── room-&lt;template-id&gt;
               One poster failing does not stop the batch. Failures are collected, reported
               at the end with the poster name and reason, and the process exits non-zero.
             </p>
+            <div class="note warn">
+              <span class="note-label">The output folder is not cleaned between runs</span>
+              <p>
+                Re-running against the same <code>--out</code> directory does not clear it
+                first. Delete a room shot from the contact sheet, run again without
+                <code>--only</code>, and the deleted file comes back. A <code>--only</code>
+                re-run is additive too — the earlier run's <code>room-*.jpg</code> files stay
+                on disk beside the new ones.
+              </p>
+              <p>
+                A poster that fails partway through keeps whatever it had already written. A
+                poster's folder missing <code>contact-sheet.jpg</code> is an interrupted run,
+                not a finished one where nothing survived review.
+              </p>
+            </div>
           </div>
         </li>
 
@@ -842,8 +857,9 @@ framed-main.jpg,room-living-room-warm.jpg|room-reading-nook.jpg</code></pre>
       <h3>frame-renders.json</h3>
       <p>
         Keyed by moulding slug, matching the catalogue's frame records. Ships with
-        <code>oak</code>, <code>black</code>, <code>white</code>, <code>gold</code> and
-        <code>frameless</code>.
+        <code>wood</code>, <code>black</code>, <code>white</code>, <code>gold</code>,
+        <code>silver</code> and <code>frameless</code>. <code>rolled</code> is excluded on
+        purpose: a rolled canvas ships in a tube and is never hung, so it has no room shot.
       </p>
       <div class="table-wrap">
         <table>
