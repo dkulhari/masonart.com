@@ -1,0 +1,927 @@
+<title>Chobii Vendor Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ink:        #14181a;
+    --ink-soft:   #5a6462;
+    --paper:      #f2f4f3;
+    --surface:    #ffffff;
+    --rule:       #d5dad8;
+    --rule-soft:  #e6eae8;
+    --accent:     #b4741e;
+    --accent-ink: #7d4f11;
+
+    --amber-fg: #b45309; --amber-bg: #fffbeb; --amber-br: #fde68a;
+    --blue-fg:  #1d4ed8; --blue-bg:  #eff6ff; --blue-br:  #bfdbfe;
+    --slate-fg: #334155; --slate-bg: #f1f5f9; --slate-br: #cbd5e1;
+    --green-fg: #15803d; --green-bg: #f0fdf4; --green-br: #bbf7d0;
+    --red-fg:   #b91c1c; --red-bg:   #fef2f2; --red-br:   #fecaca;
+    --indigo-fg:#4338ca; --indigo-bg:#eef2ff; --indigo-br:#c7d2fe;
+
+    --measure: 65ch;
+    --step--1: 0.8125rem;
+    --step-0:  1.0625rem;
+    --step-1:  1.25rem;
+    --step-2:  1.5rem;
+    --step-3:  2rem;
+    --step-4:  2.75rem;
+
+    --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    --body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:        #e4e8e6;
+      --ink-soft:   #97a3a0;
+      --paper:      #0e1112;
+      --surface:    #171b1c;
+      --rule:       #2b3234;
+      --rule-soft:  #212728;
+      --accent:     #d9a055;
+      --accent-ink: #e8bd85;
+
+      --amber-fg: #fbbf24; --amber-bg: #2a1f0c; --amber-br: #5c440f;
+      --blue-fg:  #93b4fd; --blue-bg:  #101c33; --blue-br:  #1e3a6b;
+      --slate-fg: #b7c2c8; --slate-bg: #1c2224; --slate-br: #3a4448;
+      --green-fg: #86e0a6; --green-bg: #0f2418; --green-br: #1f4a30;
+      --red-fg:   #fca5a5; --red-bg:   #2a1213; --red-br:   #5e2122;
+      --indigo-fg:#b0b6fb; --indigo-bg:#161a36; --indigo-br:#31376e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink:        #e4e8e6;
+    --ink-soft:   #97a3a0;
+    --paper:      #0e1112;
+    --surface:    #171b1c;
+    --rule:       #2b3234;
+    --rule-soft:  #212728;
+    --accent:     #d9a055;
+    --accent-ink: #e8bd85;
+
+    --amber-fg: #fbbf24; --amber-bg: #2a1f0c; --amber-br: #5c440f;
+    --blue-fg:  #93b4fd; --blue-bg:  #101c33; --blue-br:  #1e3a6b;
+    --slate-fg: #b7c2c8; --slate-bg: #1c2224; --slate-br: #3a4448;
+    --green-fg: #86e0a6; --green-bg: #0f2418; --green-br: #1f4a30;
+    --red-fg:   #fca5a5; --red-bg:   #2a1213; --red-br:   #5e2122;
+    --indigo-fg:#b0b6fb; --indigo-bg:#161a36; --indigo-br:#31376e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: var(--step-0);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 4rem) clamp(1.1rem, 4vw, 3rem) 6rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 1.75rem;
+    margin-bottom: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2.25rem, 7vw, var(--step-4));
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: var(--measure);
+    font-size: var(--step-1);
+    color: var(--ink-soft);
+  }
+
+  /* ---------- shell ---------- */
+
+  .shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+
+  @media (min-width: 62rem) {
+    .shell { grid-template-columns: 15rem 1fr; gap: 4rem; align-items: start; }
+    .contents { position: sticky; top: 2rem; }
+  }
+
+  .contents ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    border-left: 2px solid var(--rule);
+    padding-left: 1rem;
+  }
+
+  .contents a {
+    font-family: var(--display);
+    font-size: var(--step--1);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--ink-soft);
+    text-decoration: none;
+    display: block;
+  }
+
+  .contents a:hover, .contents a:focus-visible { color: var(--accent-ink); }
+
+  .contents-label {
+    font-family: var(--display);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 0 0 0.9rem;
+  }
+
+  /* ---------- sections ---------- */
+
+  .body-col { display: flex; flex-direction: column; gap: 3.5rem; min-width: 0; }
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; scroll-margin-top: 2rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: var(--step-3);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: var(--step-1);
+    line-height: 1.25;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  p { margin: 0; max-width: var(--measure); }
+
+  a { color: var(--accent-ink); }
+
+  strong { font-weight: 600; }
+
+  ul, ol.plain { margin: 0; padding-left: 1.2rem; max-width: var(--measure); display: flex; flex-direction: column; gap: 0.45rem; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+  }
+
+  /* ---------- the lifecycle ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .stage:first-child { border-top: 1px solid var(--rule-soft); }
+
+  @media (min-width: 44rem) {
+    .stage { grid-template-columns: 13.5rem 1fr; gap: 1.5rem; align-items: start; }
+  }
+
+  .stage-what { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .pill {
+    font-family: var(--display);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border-radius: 999px;
+    border: 1px solid;
+    padding: 0.2rem 0.7rem;
+    display: inline-block;
+    width: fit-content;
+  }
+
+  .pill.amber  { color: var(--amber-fg);  background: var(--amber-bg);  border-color: var(--amber-br); }
+  .pill.blue   { color: var(--blue-fg);   background: var(--blue-bg);   border-color: var(--blue-br); }
+  .pill.slate  { color: var(--slate-fg);  background: var(--slate-bg);  border-color: var(--slate-br); }
+  .pill.green  { color: var(--green-fg);  background: var(--green-bg);  border-color: var(--green-br); }
+  .pill.red    { color: var(--red-fg);    background: var(--red-bg);    border-color: var(--red-br); }
+  .pill.indigo { color: var(--indigo-fg); background: var(--indigo-bg); border-color: var(--indigo-br); }
+
+  .whose {
+    font-family: var(--display);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .whose.yours { color: var(--accent-ink); }
+
+  .stage-do { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .button-name {
+    font-family: var(--display);
+    font-weight: 600;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 4px;
+    padding: 0.16em 0.55em;
+    font-size: 0.88em;
+    white-space: nowrap;
+  }
+
+  /* ---------- panels ---------- */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 1.25rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .panel.warn { border-left: 4px solid var(--accent); }
+
+  .panel-title {
+    font-family: var(--display);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0;
+  }
+
+  /* ---------- tables ---------- */
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+
+  table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+
+  th, td { text-align: left; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+
+  thead th {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    background: var(--rule-soft);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+
+  td.mono { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-soft); white-space: nowrap; }
+
+  .req {
+    font-family: var(--display);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .req.yes { color: var(--red-fg); }
+  .req.no  { color: var(--ink-soft); }
+
+  /* ---------- refusals ---------- */
+
+  .refusals { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule-soft); }
+
+  .refusal {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  @media (min-width: 50rem) {
+    .refusal { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  }
+
+  .said {
+    font-style: italic;
+    color: var(--ink);
+    border-left: 3px solid var(--red-br);
+    padding-left: 0.85rem;
+    margin: 0;
+  }
+
+  .means { margin: 0; color: var(--ink-soft); }
+  .means strong { color: var(--ink); }
+
+  /* ---------- closing ---------- */
+
+  .colophon {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--ink);
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+    max-width: var(--measure);
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; font-size: 10.5pt; }
+    .contents { display: none; }
+    .shell { grid-template-columns: 1fr; }
+    section { break-inside: avoid-page; }
+    .stage, .refusal { break-inside: avoid; }
+    a { color: #000; text-decoration: none; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">chobii.art &middot; for the workshops who make the work</p>
+    <h1>The Vendor Handbook</h1>
+    <p class="standfirst">
+      Everything the portal asks of you, in the order it asks for it — what each
+      job status means, which photographs we need, how to send a parcel on, and
+      what to do when a button refuses.
+    </p>
+  </header>
+
+  <div class="shell">
+
+    <nav class="contents" aria-label="Contents">
+      <p class="contents-label">Contents</p>
+      <ol>
+        <li><a href="#screens">The three screens</a></li>
+        <li><a href="#life">The life of a job</a></li>
+        <li><a href="#photos">The photographs</a></li>
+        <li><a href="#parcels">Sending a parcel</a></li>
+        <li><a href="#inbound">Receiving a parcel</a></li>
+        <li><a href="#money">What you are paid</a></li>
+        <li><a href="#refused">When a button refuses</a></li>
+        <li><a href="#private">What you are not shown</a></li>
+      </ol>
+    </nav>
+
+    <main class="body-col">
+
+      <!-- ============================================================ -->
+      <section id="screens">
+        <h2>The three screens</h2>
+        <p>
+          The whole portal is three tabs. Everything you do lives on the first
+          one; the other two are there when you want to check a number.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Tab</th><th>What it holds</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>My jobs</strong></td>
+                <td>
+                  Your queue, plus two panels above it: <strong>Ready to send</strong>,
+                  which is the work waiting to be parcelled up, and
+                  <strong>Parcels</strong>, which is everything moving to or from
+                  your bench. Open any job for its items, artwork and photographs.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Rates</strong></td>
+                <td>
+                  Your rate card — what you are paid per piece, by stage and by
+                  size band. This is the figure a job is priced from at the moment
+                  we assign it to you.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Payments</strong></td>
+                <td>
+                  What is owed and what has been settled. A settled job is closed:
+                  it can no longer be edited, reassigned or put on a parcel.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Filter the queue by status and the address bar changes with it, so a
+          filtered queue is a link you can send to somebody or keep in a tab.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="life">
+        <h2>The life of a job</h2>
+        <p>
+          A job moves through these in order. The colour tells you whose move it
+          is at a glance: <strong>amber is yours</strong>. You will only ever see
+          buttons for moves that are actually legal from where the job is
+          standing — if a button is not there, that move is not available yet.
+        </p>
+
+        <div class="stages">
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill amber">Assigned to you</span>
+              <span class="whose yours">Your move</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                We have given you the work and priced it from your rate card.
+                Nothing starts until you say you have what you need — the artwork
+                for a print job, or the printed sheet for a frame job.
+              </p>
+              <p>
+                Press <span class="button-name">Mark received</span>. It asks
+                <em>&ldquo;Confirm you have everything you need to start?&rdquo;</em>
+                Only say yes if you genuinely do.
+              </p>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill blue">In production</span>
+              <span class="whose yours">Your move</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                The piece is on your bench. This is the only window in which you
+                can add, replace or withdraw photographs — once the job leaves
+                production the shot list is read-only.
+              </p>
+              <p>
+                When the work is finished and every required shot is uploaded,
+                press <span class="button-name">Send for approval</span>. The
+                button stays disabled until the shot list is complete, and the
+                screen names the shots still missing.
+              </p>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill slate">Sent for approval</span>
+              <span class="whose">With us</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                We are looking at your photographs. Nothing is asked of you here.
+                The job will move to <strong>Approved</strong> or
+                <strong>Changes needed</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill red">Changes needed</span>
+              <span class="whose yours">Your move</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                We found something. The job screen leads with exactly what has to
+                be put right — the defects we ticked, and any note the reviewer
+                wrote.
+              </p>
+              <p>
+                Redo the work, photograph it again, and send it for approval once
+                more. Every submission is kept: a rework that passes does not
+                erase the failure that caused it, and the old photographs stay on
+                file.
+              </p>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill green">Approved &mdash; ready to ship</span>
+              <span class="whose yours">Your move</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                The piece has passed. What happens next depends on whether you are
+                the workshop assembling the order.
+              </p>
+              <ul>
+                <li>
+                  <strong>If the goods have to travel</strong>, the job appears in
+                  <strong>Ready to send</strong>. Send it as a parcel — see
+                  below.
+                </li>
+                <li>
+                  <strong>If you are assembling the order</strong>, keep the piece.
+                  It waits on your bench for the rest to arrive, then goes out to
+                  the customer with a courier label we buy.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill indigo">Handed over</span>
+              <span class="whose">Finished</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                The piece has left your hands, either on a parcel to another
+                workshop or with the courier. This is the end of the line — a job
+                here cannot move again, and you are paid for it.
+              </p>
+            </div>
+          </div>
+
+          <div class="stage">
+            <div class="stage-what">
+              <span class="pill red">Cancelled</span>
+              <span class="whose">Finished</span>
+            </div>
+            <div class="stage-do">
+              <p>
+                The work was called off. If a price was agreed for work you had
+                already done, that figure stands and is what you see on the job.
+                Otherwise a cancelled job is not a bill.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="photos">
+        <h2>The photographs</h2>
+        <p>
+          The shot list is how a piece gets approved without anyone driving to
+          your workshop, and it is the evidence a colour or damage dispute turns
+          on later. Every required slot must hold a live photograph before
+          <span class="button-name">Send for approval</span> will do anything.
+        </p>
+
+        <h3>A print job asks for four</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Shot</th><th>Slot</th><th>Needed</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>The whole print, flat and front-on</td><td class="mono">print_full</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>The print beside the colour reference</td><td class="mono">print_colour_reference</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Raking light across the print surface</td><td class="mono">print_raking_light</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Any detail worth flagging</td><td class="mono">print_detail</td><td><span class="req no">Optional</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>A frame job asks for eight</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Shot</th><th>Slot</th><th>Needed</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>The framed piece, front-on</td><td class="mono">frame_front</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Raking light across the glazing</td><td class="mono">frame_raking_light</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Top-left corner</td><td class="mono">frame_corner_top_left</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Top-right corner</td><td class="mono">frame_corner_top_right</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Bottom-left corner</td><td class="mono">frame_corner_bottom_left</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Bottom-right corner</td><td class="mono">frame_corner_bottom_right</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>The back, showing the hanging fixture</td><td class="mono">frame_back</td><td><span class="req yes">Required</span></td></tr>
+              <tr><td>Any detail worth flagging</td><td class="mono">frame_detail</td><td><span class="req no">Optional</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel warn">
+          <p class="panel-title">Why raking light</p>
+          <p>
+            A lamp held almost flat across the surface throws every scuff, dent and
+            banding line into relief. Front-on light hides all three. It is the
+            single shot that settles most disputes, on the print and on the
+            glazing alike.
+          </p>
+        </div>
+
+        <h3>File rules</h3>
+        <ul>
+          <li><strong>JPEG, PNG or WebP.</strong> Nothing else is accepted.</li>
+          <li>
+            <strong>Not HEIC</strong> — which is what an iPhone shoots by default.
+            Turn the camera to &ldquo;Most Compatible&rdquo;, or export as JPEG
+            before uploading. A HEIC file is refused at the door rather than
+            stored as something nobody can open.
+          </li>
+          <li><strong>Up to 25&nbsp;MB per photograph.</strong> Do not downscale to fit — the detail is the point.</li>
+          <li><strong>Up to 40 photographs per job</strong>, counting replaced ones. Reshooting the whole list repeatedly will use it up.</li>
+        </ul>
+
+        <p>
+          Uploading into a slot that already holds a shot <strong>replaces</strong>
+          it. The earlier photograph is not deleted — it stays on file and we can
+          still see it, which is why nothing is lost by correcting a bad shot.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="parcels">
+        <h2>Sending a parcel</h2>
+        <p>
+          When approved work has to travel to the workshop assembling the order,
+          it appears under <strong>Ready to send</strong> on your jobs screen.
+        </p>
+
+        <div class="panel">
+          <p class="panel-title">We group it, you do not</p>
+          <p>
+            Each group is one parcel's worth of work, already worked out for you.
+            You cannot pick jobs across groups and you do not need to — a group is
+            exactly the set that belongs in one box. If a group holds two jobs,
+            both pieces go in together.
+          </p>
+        </div>
+
+        <h3>What to fill in</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Field</th><th>What we expect</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Carrier</strong></td>
+                <td>Who is carrying it — Delhivery, Blue Dart, whoever you booked. Up to 120 characters. Leave it blank if you have not booked yet.</td>
+              </tr>
+              <tr>
+                <td><strong>Docket reference</strong></td>
+                <td>The consignment or AWB number off the docket. Up to 120 characters. This is what we quote when we chase the carrier, so it is worth getting right.</td>
+              </tr>
+              <tr>
+                <td><strong>Pieces</strong></td>
+                <td>How many physical boxes or tubes. It starts at the number of jobs in the group — change it if you packed them differently. Between 1 and 999.</td>
+              </tr>
+              <tr>
+                <td><strong>Due by</strong></td>
+                <td>The date the <em>carrier</em> promised, off the docket. Not a promise about your own work.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Press <strong>Send this group</strong>. The jobs move to
+          <span class="pill indigo">Handed over</span>, the parcel appears in your
+          <strong>Parcels</strong> panel as outbound, and you are paid for that
+          work whatever happens to the box afterwards.
+        </p>
+
+        <div class="panel warn">
+          <p class="panel-title">You do not choose where it goes</p>
+          <p>
+            There is no destination field, and that is deliberate. We decide the
+            routing and we pay for the leg, so there is nothing for you to select
+            and no address for you to get wrong. Pack it, book it, record the
+            docket.
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="inbound">
+        <h2>Receiving a parcel</h2>
+        <p>
+          Anything on its way to you sits at the top of the <strong>Parcels</strong>
+          panel, marked <em>Coming to you</em>, with the docket and the carrier's
+          promised date.
+        </p>
+        <p>
+          When the box actually reaches your bench, press
+          <span class="button-name">Confirm arrival</span>. Do it on arrival, not
+          when you get round to opening it — a frame job cannot start until the
+          sheet it needs is confirmed as landed, and the sending workshop and we
+          are both waiting on that one press.
+        </p>
+
+        <ul>
+          <li>
+            <strong>&ldquo;Not sent yet&rdquo;</strong> means the parcel exists but
+            nobody has handed it to a courier. There is nothing to confirm; it will
+            gain a button once it is genuinely moving.
+          </li>
+          <li>
+            <strong>&ldquo;Written off as lost&rdquo;</strong> means the parcel is
+            not coming. Do not wait for it and do not chase the courier — we raise
+            a replacement job to cover the work, and nothing about the loss is
+            charged to you.
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="money">
+        <h2>What you are paid</h2>
+        <p>
+          Every job shows one figure under <strong>You are paid</strong>. That is
+          the number, and it does not change because of anything that happens to
+          the goods after they leave you.
+        </p>
+
+        <ul>
+          <li>
+            Normally it is your <strong>rate card</strong> price, worked out from
+            the stage and the biggest item's longest edge at the moment we assigned
+            the job.
+          </li>
+          <li>
+            If a price was <strong>negotiated</strong> for that job, you see the
+            agreed figure with the rate-card price shown beside it, so you can see
+            both numbers in a disagreement.
+          </li>
+          <li>
+            A <strong>lost parcel</strong> does not cost you the job. The work was
+            done; the box is our problem.
+          </li>
+          <li>
+            <strong>Unavailable</strong> means we could not read the figure, not
+            that it is zero. Tell us if you see it.
+          </li>
+        </ul>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="refused">
+        <h2>When a button refuses</h2>
+        <p>
+          The portal tries to grey out anything that would be refused, but a job
+          can move under you while your screen is open — someone here reassigns
+          it, or a second tab gets there first. These are the messages you may
+          see, and what each one actually means.
+        </p>
+
+        <div class="refusals">
+
+          <div class="refusal">
+            <p class="said">&ldquo;These jobs have already been sent on a parcel, and a job rides exactly one.&rdquo;</p>
+            <p class="means"><strong>Someone already sent it</strong> — often you, in another tab. Refresh the page. If a parcel genuinely went missing, we raise a replacement job rather than a second parcel for the same work.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;Nobody has been chosen to assemble this order yet, so there is nowhere to send it.&rdquo;</p>
+            <p class="means"><strong>Wait — this one is ours.</strong> We have not yet decided which workshop assembles the order. Nothing is wrong with your work. It will appear in Ready to send once we have routed it.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;You are assembling this order yourself, so there is no parcel to send.&rdquo;</p>
+            <p class="means"><strong>Keep the pieces.</strong> You are the workshop the goods are travelling to. Hold them until the rest of the order arrives, then despatch the order itself.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;These jobs are not all on the same order, so they cannot ride one parcel.&rdquo;</p>
+            <p class="means"><strong>Send one parcel per group.</strong> You should not be able to reach this from the screen — if you do, refresh and send each group on its own.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;One of these jobs was cancelled, so there is nothing left to send.&rdquo;</p>
+            <p class="means"><strong>The work was called off</strong> after the screen loaded. Refresh, and check your queue for what is current.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;One of these jobs has already been settled and can no longer be moved.&rdquo;</p>
+            <p class="means"><strong>It is paid and closed.</strong> Do not re-open a settled job — raise it with us instead and we will sort it out properly.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;This parcel has not been sent yet, so there is nothing to confirm.&rdquo;</p>
+            <p class="means"><strong>It has not left the other bench.</strong> The confirm button appears once it is actually on its way.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;This parcel was already confirmed.&rdquo;</p>
+            <p class="means"><strong>Someone at your end already pressed it.</strong> Nothing more to do.</p>
+          </div>
+
+          <div class="refusal">
+            <p class="said">&ldquo;Carrier is longer than 120 characters&hellip;&rdquo;</p>
+            <p class="means"><strong>Shorten that box.</strong> The message names which of the two fields is over — carrier or docket reference.</p>
+          </div>
+
+        </div>
+
+        <p>
+          Anything else, or the same refusal twice after a refresh: send us the job
+          number from the address bar and what you pressed. We can see both ends of
+          every parcel and can tell you what is actually blocking it.
+        </p>
+      </section>
+
+      <!-- ============================================================ -->
+      <section id="private">
+        <h2>What you are not shown</h2>
+        <p>
+          Some things are missing from this portal on purpose, and it is worth
+          knowing which, so you do not go looking for them.
+        </p>
+
+        <ul>
+          <li>
+            <strong>No customer.</strong> No name, address, phone or order number
+            reaches this portal. You will not find them by looking harder.
+          </li>
+          <li>
+            <strong>No other workshop.</strong> A parcel tells you the docket, the
+            carrier, the piece count and whether it is coming to you or going from
+            you — never who is at the other end. That protects you as much as them.
+          </li>
+          <li>
+            <strong>No retail prices.</strong> You see your rate, not what the
+            piece sold for.
+          </li>
+          <li>
+            <strong>The courier label is an exception</strong>, and a narrow one.
+            When you are the workshop shipping an order out, you can download the
+            label — it carries the customer's address because the courier prints
+            it. It arrives as a file to hand to the courier, is never displayed on
+            screen, and each download is recorded.
+          </li>
+        </ul>
+
+        <p>
+          If you need something chased with a carrier or another workshop, ask us.
+          We can see both ends; you are not expected to.
+        </p>
+      </section>
+
+      <p class="colophon">
+        Anything here that does not match what you see on screen is a mistake in
+        this handbook, not in your reading of it — tell us and we will fix it.
+        Keep this page bookmarked; it is updated as the portal changes.
+      </p>
+
+    </main>
+  </div>
+</div>

@@ -13,6 +13,7 @@ This guide covers everything you need to know to get started based on your role.
 | **Customer** | Regular shoppers browsing and buying art | [Customer Guide](./customer-guide.md) |
 | **Trade Member** | Interior designers & professionals with wholesale access | [Trade Guide](./trade-guide.md) |
 | **Administrator** | Staff managing products, orders, and the platform | [Admin Guide](./admin-guide.md) |
+| **Vendor** | Print shops and framers producing the work | [Vendor Handbook](./vendor-handbook.html) |
 
 ---
 
@@ -32,6 +33,15 @@ Professionals (interior designers, architects, staging companies) who get:
 - Extended payment terms
 - Priority production queue
 - Project management tools
+
+### Vendor
+Print and framing workshops who:
+- Work the job queue at `/vendor` and mark a job received when they can start
+- Photograph each piece against the shot list its stage asks for
+- Send approved work on to the workshop assembling the order, and confirm parcels that arrive
+- See their own rate card and payments — and nothing about the customer, the retail price, or the workshop at the other end of a parcel
+
+The Vendor Handbook is a single self-contained HTML page: open it in a browser, or print it and pin it above the bench.
 
 ### Admin / Super-Admin
 Platform administrators who can:
