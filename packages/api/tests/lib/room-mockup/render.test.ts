@@ -34,6 +34,29 @@ const roomFile = async (w: number, h: number): Promise<string> => {
   return path;
 };
 
+/**
+ * A room photograph stored at w x h but tagged EXIF orientation 6 ("rotate
+ * 90° CW to display correctly") — the shape a phone actually writes for a
+ * portrait shot. `sharp().metadata()` on this file reports w x h (the STORED
+ * dimensions); a viewer, and autoOrient(), show h x w (the DISPLAYED ones).
+ */
+const rotatedRoomFile = async (w: number, h: number): Promise<string> => {
+  const dir = mkdtempSync(join(tmpdir(), 'room-mockup-'));
+  const path = join(dir, 'room.jpg');
+  await sharp({ create: { width: w, height: h, channels: 3, background: { r: 230, g: 226, b: 218 } } })
+    .withMetadata({ orientation: 6 })
+    .jpeg()
+    .toFile(path);
+  return path;
+};
+
+/** Same idea as rotatedRoomFile, but as an in-memory artwork buffer. */
+const rotatedArt = (w: number, h: number) =>
+  sharp({ create: { width: w, height: h, channels: 3, background: { r: 10, g: 20, b: 200 } } })
+    .withMetadata({ orientation: 6 })
+    .jpeg()
+    .toBuffer();
+
 const TEMPLATE: RoomTemplate = {
   id: 'test-room',
   file: 'room.jpg',
@@ -148,5 +171,40 @@ describe('renderRoomMockup', () => {
     );
 
     expect((await sharp(out).metadata()).width).toBe(1000);
+  });
+});
+
+describe('EXIF orientation', () => {
+  // Both fixtures below are STORED at 800x400 (landscape pixels) but tagged
+  // orientation 6, the shape a phone writes for a portrait shot: a viewer —
+  // and a correct render — DISPLAYS them at 400x800 (portrait). A renderer
+  // that reads dimensions before rotating would produce a landscape output
+  // from a portrait photo, silently.
+
+  it('auto-orients the room photo before compositing, so a rotated phone photo comes out at its displayed dimensions, not its stored ones', async () => {
+    const room = await rotatedRoomFile(800, 400);
+
+    const out = await renderRoomMockup(await art(200, 300), room, TEMPLATE, OAK);
+    const meta = await sharp(out).metadata();
+
+    // Displayed (correct): 400x800. Stored (bug): 800x400 — exactly swapped,
+    // so this also fails loudly rather than passing by coincidence.
+    expect(meta.width).toBe(400);
+    expect(meta.height).toBe(800);
+  });
+
+  it('auto-orients the artwork before framing, so a rotated portrait photo is not framed as a landscape', async () => {
+    const source = await rotatedArt(800, 400);
+
+    const framed = await frameArtwork(source, OAK);
+    const meta = await sharp(framed).metadata();
+
+    // shortEdge is 400 either way (min(800,400) === min(400,800)), so this
+    // is not sensitive to the frame math — only to which axis the frame face
+    // was added to. face = round(400 * 0.05) = 20; bevel = round(20*0.12) = 2.
+    // Displayed (correct): 400x800 art -> 444x844 framed.
+    // Stored (bug): 800x400 art -> 844x444 framed — exactly swapped.
+    expect(meta.width).toBe(444);
+    expect(meta.height).toBe(844);
   });
 });

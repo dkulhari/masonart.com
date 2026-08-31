@@ -17,11 +17,20 @@ import type { FrameRender, RoomTemplate } from './templates';
  * Wrap artwork in a frame face, with a thin dark bevel hairline between the
  * two. The bevel is not decoration: without it the face reads as a flat colour
  * band pasted round the art rather than as a moulding with an inner edge.
+ *
+ * Auto-orients first: `sharp(x).metadata()` reports the INPUT's stored
+ * dimensions, EXIF tag and all, so a phone photo shot in portrait but stored
+ * with an orientation tag (landscape pixels + "rotate me") would size the
+ * frame face off the wrong short edge if read before rotation. Materialising
+ * the oriented buffer once, up front, means every metadata read and every
+ * extend() below sees the pixels as they will actually display.
  */
 export async function frameArtwork(art: Buffer, frame: FrameRender): Promise<Buffer> {
-  if (frame.widthRatio === 0) return art;
+  const oriented = await sharp(art).autoOrient().toBuffer();
 
-  const meta = await sharp(art).metadata();
+  if (frame.widthRatio === 0) return oriented;
+
+  const meta = await sharp(oriented).metadata();
   const shortEdge = Math.min(meta.width ?? 0, meta.height ?? 0);
 
   // Sized off the SHORT edge so a panoramic poster is not swallowed by a frame
@@ -31,7 +40,7 @@ export async function frameArtwork(art: Buffer, frame: FrameRender): Promise<Buf
 
   const [r, g, b] = frame.color;
 
-  const withBevel = await sharp(art)
+  const withBevel = await sharp(oriented)
     .extend({
       top: bevel,
       bottom: bevel,
@@ -113,7 +122,16 @@ export async function renderRoomMockup(
   const framed = await frameArtwork(art, frame);
   const fmeta = await sharp(framed).metadata();
 
-  const rmeta = await sharp(roomPath).metadata();
+  // Auto-orient the room photo the same way, and for the same reason: an
+  // operator measures the placement rectangle against the DISPLAYED image
+  // (a phone shoots portrait but stores it rotated with an EXIF tag), while
+  // a plain metadata() read reports the stored, unrotated dimensions. Doing
+  // this later in the chain would not help — sharp(roomPath).metadata() has
+  // already reported the wrong numbers by then — so the oriented buffer is
+  // materialised here and used for every dimension read and for the
+  // composite base below.
+  const roomBuf = await sharp(roomPath).autoOrient().toBuffer();
+  const rmeta = await sharp(roomBuf).metadata();
   const canvasW = rmeta.width ?? 0;
   const canvasH = rmeta.height ?? 0;
 
@@ -135,7 +153,7 @@ export async function renderRoomMockup(
 
   // Ambient first, contact over it, art on top: the wide faint layer must sit
   // UNDER the tight dark one or the contact edge is washed out.
-  return sharp(roomPath)
+  return sharp(roomBuf)
     .composite([
       { input: await shadowLayer(canvasW, canvasH, placed, ambient), blend: 'over' },
       { input: await shadowLayer(canvasW, canvasH, placed, contact), blend: 'over' },

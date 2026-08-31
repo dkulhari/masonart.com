@@ -25,7 +25,12 @@ const placementSchema = z
   });
 
 export const roomTemplateSchema = z.object({
-  id: z.string().min(1),
+  // The driver writes this straight into a filename (`room-${id}.jpg`), so a
+  // stray "/" (a plausible typo next to the hyphenated ids elsewhere, e.g.
+  // "living/room") would throw ENOENT partway through a poster, and a ".."
+  // segment would write outside the output folder entirely. Same slug
+  // convention as createProductSchema in routes/admin/products.ts.
+  id: z.string().regex(/^[a-z0-9-]+$/, 'must be lowercase alphanumeric with hyphens'),
   file: z.string().min(1),
   placement: placementSchema,
   light: z.enum(['left', 'right']),

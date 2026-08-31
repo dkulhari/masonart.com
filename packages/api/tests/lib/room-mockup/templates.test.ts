@@ -62,6 +62,32 @@ describe('loadTemplates', () => {
       .toThrow(/living-room-warm/);
   });
 
+  it('rejects a template id containing a slash, naming the offending id', () => {
+    // The driver writes `room-${id}.jpg`; a slash here (a plausible typo
+    // next to hyphenated ids like "living-room") would throw ENOENT
+    // partway through a poster instead of failing at load time.
+    expect(() => loadTemplates([template({ id: 'living/room' })], FRAMES, allExist))
+      .toThrow(/living\/room/);
+  });
+
+  it('rejects a template id containing a ".." segment', () => {
+    // Unchecked, this would let a template write its room-<id>.jpg outside
+    // the intended output folder entirely.
+    expect(() => loadTemplates([template({ id: '../escape' })], FRAMES, allExist))
+      .toThrow(/\.\.\/escape/);
+  });
+
+  it('rejects a template id with uppercase letters', () => {
+    expect(() => loadTemplates([template({ id: 'Living-Room' })], FRAMES, allExist))
+      .toThrow(/Living-Room/);
+  });
+
+  it('accepts a well-formed hyphenated id', () => {
+    const { templates } = loadTemplates([template({ id: 'living-room-warm' })], FRAMES, allExist);
+
+    expect(templates[0].id).toBe('living-room-warm');
+  });
+
   it('rejects a frame slug with no render spec, naming both the template and the slug', () => {
     expect(() => loadTemplates([template({ frame: 'walnut' })], FRAMES, allExist))
       .toThrow(/living-room-warm.*walnut|walnut.*living-room-warm/);

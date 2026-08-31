@@ -26,6 +26,39 @@ import { buildContactSheet, renderFramedMain, type SheetEntry } from '../lib/roo
 
 const POSTER_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
+/**
+ * Find posters whose output slug (basename with its extension stripped)
+ * collides with another poster's — e.g. `sunset.jpg` and `sunset.png` both
+ * map to `out/sunset/`, because POSTER_EXT accepts more than one extension
+ * per basename. Whichever sorts last in the render loop would silently
+ * overwrite the first poster's entire output folder (room-*.jpg,
+ * framed-main.jpg, contact-sheet.jpg) with no error, leaving an operator to
+ * upload one poster's mockups believing they belong to the other.
+ *
+ * Pure and filesystem-free — takes the already-listed filenames — so the
+ * driver can check every poster up front, before anything is rendered, and
+ * a test can exercise it without touching disk.
+ */
+export function findSlugCollisions(posters: string[]): Map<string, string[]> {
+  const bySlug = new Map<string, string[]>();
+
+  for (const poster of posters) {
+    const slug = basename(poster, extname(poster));
+    const group = bySlug.get(slug);
+    if (group) {
+      group.push(poster);
+    } else {
+      bySlug.set(slug, [poster]);
+    }
+  }
+
+  const collisions = new Map<string, string[]>();
+  for (const [slug, files] of bySlug) {
+    if (files.length > 1) collisions.set(slug, files);
+  }
+  return collisions;
+}
+
 // Read at runtime with JSON.parse rather than a static `import ... from
 // './x.json'`: this package builds as a `composite` TS project, and a
 // composite project's wildcard `include` glob does not extend to `.json`
@@ -39,8 +72,12 @@ const dataDir = dirname(fileURLToPath(import.meta.url));
 // as SEED_MEDIA_DIR in seed-images.ts (#450): a cwd-relative default meant
 // `bun run mockups:rooms` from the repo root and from packages/api resolved
 // `--templates` to two different directories, and the second one silently
-// found nothing to render. Four levels holds for both layouts — src/database/
-// under development and dist/database/ after `tsc`.
+// found nothing to render. Four levels holds for src/database/, which is the
+// only layout this ever runs from: `mockups:rooms` runs the source file
+// directly, and `build` is a plain `tsc` that never copies `.json` — a
+// dist/database/ run would fail on the readFileSync of room-templates.json
+// below before this arithmetic even comes into play. This tool is
+// source-only; a dist build is not a supported way to run it.
 const REPO_ROOT = join(dataDir, '../../../..');
 
 async function main(): Promise<void> {
@@ -94,6 +131,17 @@ async function main(): Promise<void> {
 
   if (posters.length === 0) {
     throw new Error(`No poster images found in ${opts.posters}`);
+  }
+
+  // Checked before anything is rendered — see findSlugCollisions — so a
+  // sunset.jpg + sunset.png pair fails loudly by name instead of one
+  // silently overwriting the other's output folder partway through the run.
+  const collisions = findSlugCollisions(posters);
+  if (collisions.size > 0) {
+    const detail = [...collisions.entries()]
+      .map(([slug, files]) => `"${slug}" (${files.join(', ')})`)
+      .join('; ');
+    throw new Error(`Poster filenames collide on the same output folder — rename one of each: ${detail}`);
   }
 
   console.log(
@@ -157,11 +205,19 @@ async function main(): Promise<void> {
   console.log(`\nDone. Review ${opts.out}/<slug>/contact-sheet.jpg and delete what you do not want.`);
 }
 
-// Print just the message, not a Bun stack trace with source excerpts — the
-// runbook's "When it refuses" table documents clean one-liners, and this
-// follows the same shape as backfill-art-box.ts's terminal `.catch()`. Every
-// throw site's message is unchanged; only how it reaches the terminal is.
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+// Guarded the same way as init-super-admin.ts: without this, importing this
+// module (e.g. from a test that wants findSlugCollisions) would run the CLI
+// for real — parsing process.argv, throwing on the missing --posters, and
+// process.exit()ing the whole test run. Only runs when this file is the
+// thing actually executed.
+if (import.meta.main) {
+  // Print just the message, not a Bun stack trace with source excerpts — the
+  // runbook's "When it refuses" table documents clean one-liners, and this
+  // follows the same shape as backfill-art-box.ts's terminal `.catch()`.
+  // Every throw site's message is unchanged; only how it reaches the
+  // terminal is.
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

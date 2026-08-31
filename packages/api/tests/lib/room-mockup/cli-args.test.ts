@@ -79,6 +79,18 @@ describe('parseArgs', () => {
   it('rejects an unknown flag rather than ignoring a typo', () => {
     expect(() => parseArgs(argv('--posters', './art', '--postrs', 'x'))).toThrow(/--postrs/);
   });
+
+  it('rejects a repeated --only rather than silently keeping only the last value', () => {
+    expect(() =>
+      parseArgs(argv('--posters', './art', '--only', 'living-room', '--only', 'nook'))
+    ).toThrow(/--only/);
+  });
+
+  it('rejects a repeated --posters rather than silently keeping only the last value', () => {
+    expect(() =>
+      parseArgs(argv('--posters', './a', '--posters', './b'))
+    ).toThrow(/--posters/);
+  });
 });
 
 describe('selectTemplates', () => {

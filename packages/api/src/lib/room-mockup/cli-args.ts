@@ -61,6 +61,14 @@ export function parseArgs(argv: string[]): RunOptions {
       throw new Error(`Flag ${flag} needs a value.`);
     }
 
+    // A repeated value flag silently overwrote the earlier one (last write
+    // wins), so `--only living-room --only nook` rendered only nook and
+    // `--posters ./a --posters ./b` read ./b — no different from a typo'd
+    // flag, which this module already refuses rather than shrugging off.
+    if (values.has(flag)) {
+      throw new Error(`Flag ${flag} was passed more than once.`);
+    }
+
     values.set(flag, value);
     i++;
   }
