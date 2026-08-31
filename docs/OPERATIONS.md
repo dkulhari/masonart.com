@@ -117,6 +117,49 @@ failed"). The business action still succeeded — by design, an audit failure ne
 back a refund — so the row is missing, not the money. Check the API logs for
 `audit write failed` and the database for connection saturation.
 
+## 3c. Object-store CORS, and why QC photographs fail silently without it
+
+**Check before a vendor does:**
+
+```bash
+node scripts/check-bucket-cors.mjs https://chobii.art
+```
+
+Run it against the **production** bucket. A pass in dev proves nothing — MinIO
+echoes back any Origin it is sent, so the script reports INCONCLUSIVE there, by
+design.
+
+**What breaks.** The vendor portal displays QC photographs by fetching the bytes
+and rendering them from a local `blob:` URL, never by putting a presigned URL in
+an `<img src>`. That is required, not stylistic: R2 of the customer-data rule
+forbids a signed URL being parked in the portal's DOM, and the vendor test suite
+bans `X-Amz-Signature` from that screen's markup.
+
+So the browser makes a cross-origin GET, and the bucket must allow it.
+
+**Why it hides.** The presigned PUT already needs CORS, so *uploading* works and
+looks healthy. The GET is the new dependency. If the bucket allows only PUT,
+every photo slot renders "could not be shown" while nothing else appears wrong.
+The failure is graceful — it never falls back to a link carrying the signature —
+which is exactly why nobody notices.
+
+It is not cosmetic. Photo QC is what gates the shipping label, so a vendor who
+cannot display their own photographs cannot prove they did the work, and the
+order cannot progress.
+
+**What no test will tell you.** Every vendor suite mocks the store; 149 tests
+pass against a mock. The first real signal would be a vendor reporting that
+photographs do not display, and nobody would suspect CORS, because uploading
+worked.
+
+**Required policy:** `GET` and `PUT`, for the production app origin and whatever
+origin staging runs on, plus the preflight the browser sends.
+
+Prefer configuration checked in, or at minimum a documented dashboard step here.
+An unrecorded manual step is a defect in its own right — that is the lesson of
+the audit-log trigger (#663), where a missing raw-SQL object survived because
+nothing recorded that it had to exist.
+
 ## 4. Do-not rules
 
 - **Payment state belongs to webhooks.** Never hand-edit order/payment status in the DB — redeliver the webhook from the Razorpay dashboard; idempotency makes duplicates safe.
