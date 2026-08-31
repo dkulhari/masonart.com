@@ -12,7 +12,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "../database";
 import { orders } from "../database/schema/orders";
@@ -49,6 +49,61 @@ const guestLookupSchema = z.object({
 const tracking = new Hono<{ Variables: TrackingVariables }>();
 
 /**
+ * The shipment a customer is actually looking at.
+ *
+ * ONE helper, because `/lookup` and `/token/:token` each carried their own copy
+ * of this read and therefore the same defect. A third handler copying a fourth
+ * version of it is how `order-dispatch-tracking` started.
+ *
+ * `voided_at IS NULL` is the point. Without it the newest row wins, and once a
+ * label has been voided and re-bought the newest row can be the DEAD one — the
+ * customer is then shown an AWB the courier will not honour. The ordering
+ * survives as a tiebreak, not as the choice; `order_shipments_live_label_idx`
+ * is what makes at most one row live on a migrated database.
+ */
+async function liveShipmentFor(orderId: string) {
+  const shipment = await db.query.orderShipments.findFirst({
+    where: and(
+      eq(orderShipments.orderId, orderId),
+      isNull(orderShipments.voidedAt)
+    ),
+    orderBy: (shipments, { desc }) => [desc(shipments.createdAt), desc(shipments.id)],
+  });
+
+  return shipment ?? null;
+}
+
+/**
+ * The public tracking block, or null.
+ *
+ * Null STAYS. It was never the bug — the bug was that nothing wrote the table
+ * this reads. Falling back to `orders.shipping_details` would put the second
+ * source of truth back that this whole phase exists to remove.
+ *
+ * The field list is an ALLOW-LIST, not a spread. `order_shipments` now carries
+ * what we paid, the parcel's weight, the aggregator's ids and the label token,
+ * and none of that belongs to the customer. Spreading the row would leak the
+ * next dispatch column somebody adds, silently.
+ */
+function trackingPayload(shipment: Awaited<ReturnType<typeof liveShipmentFor>>) {
+  if (!shipment) return null;
+
+  return {
+    // What we bought through, and who actually carries it. The customer
+    // recognises the second one; `carrier` is the aggregator.
+    carrier: shipment.carrier,
+    courierName: shipment.courierName,
+    awbNumber: shipment.awbNumber,
+    trackingNumber: shipment.trackingNumber,
+    trackingUrl: shipment.trackingUrl,
+    status: shipment.status,
+    shippedAt: shipment.shippedAt,
+    estimatedDeliveryAt: shipment.estimatedDeliveryAt,
+    deliveredAt: shipment.deliveredAt,
+  };
+}
+
+/**
  * GET /api/tracking/lookup
  * Look up an order by order number and email/phone (guest checkout support)
  *
@@ -78,7 +133,6 @@ tracking.get(
           guestPhone: true,
           userId: true,
           shippingAddress: true,
-          shippingDetails: true,
           itemCount: true,
           createdAt: true,
           shippedAt: true,
@@ -118,11 +172,8 @@ tracking.get(
         );
       }
 
-      // Get shipment tracking info if available
-      const shipment = await db.query.orderShipments.findFirst({
-        where: eq(orderShipments.orderId, order.id),
-        orderBy: (shipments, { desc }) => [desc(shipments.createdAt)],
-      });
+      // The LIVE shipment — see liveShipmentFor. Never the newest.
+      const shipment = await liveShipmentFor(order.id);
 
       // Return tracking info
       return c.json({
@@ -134,15 +185,7 @@ tracking.get(
           state: order.shippingAddress?.state,
           postalCode: order.shippingAddress?.postalCode,
         },
-        tracking: shipment ? {
-          carrier: shipment.carrier,
-          trackingNumber: shipment.trackingNumber,
-          trackingUrl: shipment.trackingUrl,
-          status: shipment.status,
-          shippedAt: shipment.shippedAt,
-          estimatedDeliveryAt: shipment.estimatedDeliveryAt,
-          deliveredAt: shipment.deliveredAt,
-        } : null,
+        tracking: trackingPayload(shipment),
         timeline: {
           orderedAt: order.createdAt,
           shippedAt: order.shippedAt,
@@ -220,7 +263,6 @@ tracking.get(
           status: true,
           trackingTokenExpiresAt: true,
           shippingAddress: true,
-          shippingDetails: true,
           itemCount: true,
           createdAt: true,
           shippedAt: true,
@@ -243,11 +285,8 @@ tracking.get(
         );
       }
 
-      // Get shipment tracking info if available
-      const shipment = await db.query.orderShipments.findFirst({
-        where: eq(orderShipments.orderId, order.id),
-        orderBy: (shipments, { desc }) => [desc(shipments.createdAt)],
-      });
+      // The LIVE shipment — see liveShipmentFor. Never the newest.
+      const shipment = await liveShipmentFor(order.id);
 
       // Return tracking info (same format as lookup endpoint)
       return c.json({
@@ -259,15 +298,7 @@ tracking.get(
           state: order.shippingAddress?.state,
           postalCode: order.shippingAddress?.postalCode,
         },
-        tracking: shipment ? {
-          carrier: shipment.carrier,
-          trackingNumber: shipment.trackingNumber,
-          trackingUrl: shipment.trackingUrl,
-          status: shipment.status,
-          shippedAt: shipment.shippedAt,
-          estimatedDeliveryAt: shipment.estimatedDeliveryAt,
-          deliveredAt: shipment.deliveredAt,
-        } : null,
+        tracking: trackingPayload(shipment),
         timeline: {
           orderedAt: order.createdAt,
           shippedAt: order.shippedAt,
