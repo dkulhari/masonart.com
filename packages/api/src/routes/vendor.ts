@@ -139,7 +139,6 @@ import {
   getVendorPayableTotal,
   getVendorJobArtwork,
   getVendorJobLabelKey,
-  LabelSeamNotReady,
   listVendorJobPhotos,
   assertVendorMayUploadQcPhoto,
   recordVendorQcPhoto,
@@ -536,14 +535,17 @@ vendorApp.get(
  * about JSON *keys* can never reach, since the object key rides in the path of
  * the signed URL as a value.
  *
- * ## The seam under all of this, and the 503
+ * ## A miss is an ordinary 404
  *
- * `order_shipments.label_object_token` does not exist yet — it belongs to
- * `order-dispatch-tracking` — so in every environment today this route's read
- * raises, and the catch answers **503 with a fixed body**. Not a 404, which
- * would make a missing seam indistinguishable from "no label bought yet", and
- * not the old 500, which echoed the driver's sentence and so published our
- * schema from the one route that must give the least away.
+ * `order_shipments.label_object_token` exists now, so this route works. Until
+ * `order-dispatch-tracking` landed that column the read raised `42703` in every
+ * environment and a catch answered a fixed 503 — that whole path is gone, along
+ * with the `LabelSeamNotReady` type it depended on.
+ *
+ * What survives is the 404 above, which still covers all of: no such job, not
+ * your job, you are not the consolidator, and no label bought yet. None of
+ * those is worth distinguishing to the caller, and 403 would confirm the order
+ * exists and name somebody else's parcel.
  *
  * ## The audit row
  *
@@ -596,38 +598,13 @@ vendorApp.get("/jobs/:id/label", zValidator("param", jobParamSchema), async (c) 
       ).toISOString(),
     });
   } catch (error) {
-    // The SEAM, answered deliberately. `order_shipments.label_object_token`
-    // belongs to `order-dispatch-tracking` and has not landed, so this route
-    // cannot work yet in any environment. Three answers were possible and two
-    // are wrong: a 404 would dress a missing seam up as "no label bought yet"
-    // and hide it for as long as nobody checked, and the 500 this used to give
-    // quoted the driver's own sentence back — our schema, narrated to a
-    // supplier, from the one route that carries a customer's address.
-    //
-    // So: 503, a FIXED body naming no column, table or driver, and a message the
-    // consolidator can act on — the label is not available here yet, ask the
-    // office. `LabelSeamNotReady` is a type rather than a parsed message, so it
-    // cannot be raised by anything except the seam, and every other failure
-    // still falls through to the generic 500 below.
-    //
-    // `tests/lib/vendor-label-seam.test.ts` goes RED the day the column lands.
-    // Delete this branch then, and the catch in `getVendorJobLabelKey` with it.
-    if (error instanceof LabelSeamNotReady) {
-      logger.error(
-        { err: error },
-        "vendor portal: label requested before the dispatch-tracking seam landed"
-      );
-      return c.json(
-        {
-          error:
-            "Carrier labels are not available in the portal yet. Nothing is " +
-            "wrong with this order — ask the office for the label.",
-          code: "LABEL_NOT_AVAILABLE",
-        },
-        503
-      );
-    }
-
+    // `failed()` and nothing else. There used to be a branch above this that
+    // turned a missing `order_shipments.label_object_token` into a fixed 503,
+    // because the column did not exist and every request raised `42703`. It
+    // exists now, so every failure this route can produce is a real one — and
+    // `failed()` already refuses to echo the driver, which is the property that
+    // branch was really protecting on the one route carrying a customer's
+    // address.
     return c.json(failed("sign label URL", error), 500);
   }
 });

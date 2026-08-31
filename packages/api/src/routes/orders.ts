@@ -18,6 +18,7 @@ import { z } from "zod";
 import { eq, and, desc, sql, inArray, notInArray, isNotNull } from "drizzle-orm";
 
 import { db } from "../database";
+import { liveShipmentForOrder, trackingPayloadForOrder } from "./tracking";
 import {
   orders,
   orderItems,
@@ -917,7 +918,17 @@ ordersApp.get("/:id", async (c) => {
       paymentStatus: order.paymentStatus,
       orderType: order.orderType,
       shippingAddress: order.shippingAddress,
-      shippingDetails: order.shippingDetails,
+      /**
+       * Through the SAME allow-list `/api/tracking/*` uses, not a second
+       * hand-written projection.
+       *
+       * `order_shipments` carries what we paid, the parcel's weight and
+       * dimensions, the aggregator's ids and the label token. One definition of
+       * "what a customer may see about a parcel" means adding a dispatch column
+       * cannot widen this surface without widening the tracking page too — and
+       * a second list is how one of those eventually leaks.
+       */
+      shipment: trackingPayloadForOrder(await liveShipmentForOrder(order.id)),
       shippingMethod: order.shippingMethod,
       shippingCost: order.shippingCost,
       subtotal: order.subtotal,

@@ -28,17 +28,20 @@ import {
   gte,
   lte,
   inArray,
+  isNull,
 } from "drizzle-orm";
 
 import { db } from "../../database";
+import { liveShipmentForOrder } from "../tracking";
 import { recordAudit } from "../../lib/audit";
 import { isOrderNumber } from "../../lib/order-number";
 import {
   orders,
   type PaymentStatus,
-  type OrderShippingDetails,
   type OrderPaymentDetails,
 } from "../../database/schema/orders";
+import { orderShipments } from "../../database/schema/shipping";
+import { generateTrackingUrl } from "../shipments";
 import { users } from "../../database/schema/users";
 import {
   requireAuth,
@@ -186,13 +189,27 @@ const updateStatusSchema = z.object({
 /**
  * Schema for updating shipping details
  */
+/**
+ * Caps match the COLUMNS these now land in, not the jsonb they used to.
+ *
+ * `awb_number` and `external_shipment_id` are `varchar(64)` and `tracking_url`
+ * is `varchar(500)` (schema/shipping.ts). A value that fits the old jsonb but
+ * not the column raises Postgres `22001`, which the catch-all below turns into
+ * a generic 500 — a validation mistake reported as a server fault.
+ *
+ * `.min(1)` matters as much as the maximums. `z.string()` accepts `""`, which
+ * would be STORED as an empty string rather than NULL — and
+ * `ORDER_HAS_LABEL` asks `coalesce(token, awb, tracking) is not null`, so an
+ * empty tracking number would count as a label and satisfy the `dispatched`
+ * guard for an order carrying nothing.
+ */
 const updateShippingSchema = z.object({
-  carrier: z.string().max(100).optional(),
-  trackingNumber: z.string().max(100).optional(),
-  trackingUrl: z.string().url().optional(),
-  awbNumber: z.string().max(100).optional(),
-  shipmentId: z.string().max(100).optional(),
-  estimatedDelivery: z.string().optional(), // ISO date
+  carrier: z.string().min(1).max(100).optional(),
+  trackingNumber: z.string().min(1).max(100).optional(),
+  trackingUrl: z.string().url().max(500).optional(),
+  awbNumber: z.string().min(1).max(64).optional(),
+  shipmentId: z.string().min(1).max(64).optional(),
+  estimatedDelivery: z.string().min(1).optional(), // ISO date
 });
 
 /**
@@ -553,7 +570,19 @@ adminOrdersApp.get("/:id", async (c) => {
         phone: order.guestPhone,
       },
       shippingAddress: order.shippingAddress,
-      shippingDetails: order.shippingDetails,
+      /**
+       * The whole row, deliberately — this is the ADMIN screen.
+       *
+       * `cost_paise` is what we paid a carrier, and since shipping is baked
+       * into the item price the customer is charged nothing for it. That makes
+       * it the only number margin can be computed from, and this is where it
+       * belongs. The customer-facing projection is the narrow one in
+       * `routes/tracking.ts`.
+       *
+       * Replaces `order.shippingDetails`, which #707 stopped writing — the
+       * panel would otherwise render empty on every order shipped from now on.
+       */
+      shipment: await liveShipmentForOrder(order.id),
       shippingMethod: order.shippingMethod,
       shippingCost: order.shippingCost,
       subtotal: order.subtotal,
@@ -971,7 +1000,7 @@ adminOrdersApp.patch(
       const existing = await db
         .select({
           id: orders.id,
-          shippingDetails: orders.shippingDetails,
+          orderNumber: orders.orderNumber,
         })
         .from(orders)
         .where(whereCondition)
@@ -986,51 +1015,134 @@ adminOrdersApp.patch(
         return c.json({ error: "Order not found" }, 404);
       }
 
-      // Merge shipping details
-      const currentShippingDetails =
-        (existingOrder.shippingDetails as OrderShippingDetails) || {};
-      const newShippingDetails: OrderShippingDetails = {
-        ...currentShippingDetails,
-      };
+      /**
+       * Written to `order_shipments`, NOT to `orders.shipping_details`.
+       *
+       * This handler used to merge into that jsonb column while
+       * `GET /api/tracking/*` read `order_shipments`, and the only writer of
+       * `order_shipments` had no UI. So an admin typed a tracking number here,
+       * the save succeeded, and the customer's tracking page stayed empty
+       * forever — and the whole `order-tracking-notifications` feature was
+       * starved by the same gap.
+       *
+       * The jsonb column is deliberately NOT written and NOT cleared. It is the
+       * backfill's source (#708), and a pass that starts writing elsewhere AND
+       * destroys the old store leaves nothing to re-run against.
+       *
+       * One transaction: the shipment write and the row that says who made it
+       * have to become true together. A tracking number a customer can read,
+       * with no row naming who typed it, is the shape of an unanswerable
+       * support call.
+       */
+      const result = await db.transaction(async (tx) => {
+        // The LIVE shipment, by the same predicate `lib/vendor-scope.ts` uses:
+        // not the newest, because a voided label and its replacement both hang
+        // off the order and only one is the one a courier will honour.
+        const [liveShipment] = await tx
+          .select({
+            id: orderShipments.id,
+            carrier: orderShipments.carrier,
+            trackingNumber: orderShipments.trackingNumber,
+            // Read so the write below can MERGE. Omitting them here is what
+            // made a partial save null them — see the `values` comment.
+            awbNumber: orderShipments.awbNumber,
+            externalShipmentId: orderShipments.externalShipmentId,
+            estimatedDeliveryAt: orderShipments.estimatedDeliveryAt,
+            status: orderShipments.status,
+          })
+          .from(orderShipments)
+          .where(
+            and(
+              eq(orderShipments.orderId, existingOrder.id),
+              isNull(orderShipments.voidedAt)
+            )
+          )
+          .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
+          .limit(1);
 
-      if (input.carrier !== undefined)
-        newShippingDetails.carrier = input.carrier;
-      if (input.trackingNumber !== undefined)
-        newShippingDetails.trackingNumber = input.trackingNumber;
-      if (input.trackingUrl !== undefined)
-        newShippingDetails.trackingUrl = input.trackingUrl;
-      if (input.awbNumber !== undefined)
-        newShippingDetails.awbNumber = input.awbNumber;
-      if (input.shipmentId !== undefined)
-        newShippingDetails.shipmentId = input.shipmentId;
-      if (input.estimatedDelivery !== undefined)
-        newShippingDetails.estimatedDelivery = input.estimatedDelivery;
+        // `carrier` is NOT NULL. An admin who typed a tracking number and no
+        // carrier has made a mistake worth telling them about — defaulting it
+        // puts a placeholder on the page the CUSTOMER reads.
+        if (!liveShipment && !input.carrier) {
+          return {
+            error: "A carrier is required to open a shipment for this order",
+            status: 400 as const,
+          };
+        }
 
-      // If tracking number is being added and shippedAt is not set, set it now
-      const updateData: Record<string, unknown> = {
-        shippingDetails: newShippingDetails,
-        updatedAt: new Date(),
-      };
+        const carrier = input.carrier ?? liveShipment!.carrier;
+        const trackingNumber =
+          input.trackingNumber ?? liveShipment?.trackingNumber ?? null;
+        const trackingUrl =
+          input.trackingUrl ??
+          (trackingNumber ? generateTrackingUrl(carrier, trackingNumber) : null);
 
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
+        /**
+         * A MERGE, not a replace. Every field falls back to the live row.
+         *
+         * The jsonb handler this replaced only assigned a key when
+         * `input.<field> !== undefined`, and losing that is a silent data-loss
+         * bug rather than a cosmetic one: the admin modal has no AWB field at
+         * all, so correcting a typo'd tracking number would drop an AWB written
+         * by `POST /orders/:orderId/ship`, by the 0028 backfill, or by the
+         * production-pipeline flow. `ORDER_HAS_LABEL` and `despatchEvidence`
+         * read `awb_number`, so that can flip the `dispatched` guard back to
+         * unsatisfied and strand a consolidator.
+         */
+        const values = {
+          carrier,
+          trackingNumber,
+          trackingUrl,
+          awbNumber: input.awbNumber ?? liveShipment?.awbNumber ?? null,
+          externalShipmentId: input.shipmentId ?? liveShipment?.externalShipmentId ?? null,
+          estimatedDeliveryAt: input.estimatedDelivery
+            ? new Date(input.estimatedDelivery)
+            : (liveShipment?.estimatedDeliveryAt ?? null),
+        };
 
-      const updatedOrder = updatedOrders[0];
-      if (!updatedOrder) {
-        return c.json({ error: "Failed to update shipping details" }, 500);
+        const [shipment] = liveShipment
+          ? await tx
+              .update(orderShipments)
+              .set({ ...values, updatedAt: new Date() })
+              .where(eq(orderShipments.id, liveShipment.id))
+              .returning()
+          : await tx
+              .insert(orderShipments)
+              .values({ ...values, orderId: existingOrder.id, status: "pending" })
+              .returning();
+
+        // `tx`, not `db`: this row asserts something the transaction must make
+        // true, so it shares the transaction's failures rather than leaving a
+        // tracking number nobody is accountable for. See lib/audit.ts.
+        await recordAudit(
+          c,
+          {
+            action: "shipment.tracking_updated",
+            entityType: "order_shipment",
+            entityId: shipment?.id ?? liveShipment?.id ?? null,
+            summary: `Tracking set on order ${existingOrder.orderNumber}`,
+            before: liveShipment
+              ? {
+                  carrier: liveShipment.carrier,
+                  trackingNumber: liveShipment.trackingNumber,
+                }
+              : null,
+            after: { carrier, trackingNumber },
+            metadata: { orderId: existingOrder.id },
+          },
+          tx
+        );
+
+        return { shipment };
+      });
+
+      if ("error" in result) {
+        return c.json({ error: result.error }, result.status);
       }
 
       return c.json({
         message: "Shipping details updated successfully",
-        order: {
-          id: updatedOrder.id,
-          orderNumber: updatedOrder.orderNumber,
-          shippingDetails: updatedOrder.shippingDetails,
-        },
+        shipment: result.shipment,
       });
     } catch (error) {
       return c.json({ error: "Failed to update shipping details" }, 500);

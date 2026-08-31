@@ -121,7 +121,7 @@ describe('Email Templates', () => {
 
     it('should return EmailTemplate structure for shipped', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       expect(template).toHaveProperty('subject');
       expect(template).toHaveProperty('html');
@@ -130,7 +130,7 @@ describe('Email Templates', () => {
 
     it('should return EmailTemplate structure for out for delivery', () => {
       const order = createMockOrder();
-      const template = getOutForDeliveryTemplate(order);
+      const template = getOutForDeliveryTemplate(order, createMockShipment() as never);
 
       expect(template).toHaveProperty('subject');
       expect(template).toHaveProperty('html');
@@ -239,10 +239,28 @@ describe('Email Templates', () => {
   // Shipped Template Tests
   // ==========================================================================
 
+  /**
+   * The LIVE shipment, which is where tracking data comes from since #710.
+   *
+   * These values mirror what `createMockOrder().shippingDetails` used to
+   * carry, so the assertions below are unchanged — only the SOURCE moved.
+   * `order.shipping_details` is no longer written (#707), so a template that
+   * still read it would render an empty tracking box on every real email.
+   */
+  const createMockShipment = (overrides: Record<string, unknown> = {}) => ({
+    carrier: 'shiprocket',
+    courierName: 'blue_dart',
+    awbNumber: 'BD123456789',
+    trackingNumber: 'BD123456789',
+    trackingUrl: 'https://bluedart.com/track/BD123456789',
+    estimatedDeliveryAt: '2024-02-15T00:00:00.000Z',
+    ...overrides,
+  });
+
   describe('getShippedTemplate', () => {
     it('should include order number in subject', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       expect(template.subject).toContain(order.orderNumber);
       expect(template.subject.toLowerCase()).toContain('shipped');
@@ -250,46 +268,42 @@ describe('Email Templates', () => {
 
     it('should include tracking information in HTML', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       expect(template.html).toContain('BD123456789');
     });
 
     it('should include carrier information', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       expect(template.html).toContain('blue_dart');
     });
 
     it('should include tracking URL', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       expect(template.html).toContain('bluedart.com/track/BD123456789');
     });
 
     it('should handle order without tracking URL', () => {
-      const order = createMockOrder({
-        shippingDetails: {
-          ...createMockOrder().shippingDetails!,
-          trackingUrl: undefined,
-        },
-      });
-      const template = getShippedTemplate(order);
+      const order = createMockOrder();
+      const template = getShippedTemplate(
+        order,
+        createMockShipment({ trackingUrl: null }) as never
+      );
 
       // Should use default tracking URL
       expect(template.html).toContain(`chobii.art/track/${order.orderNumber}`);
     });
 
     it('should handle order without tracking number', () => {
-      const order = createMockOrder({
-        shippingDetails: {
-          ...createMockOrder().shippingDetails!,
-          trackingNumber: undefined,
-        },
-      });
-      const template = getShippedTemplate(order);
+      const order = createMockOrder();
+      const template = getShippedTemplate(
+        order,
+        createMockShipment({ trackingNumber: null, awbNumber: null }) as never
+      );
 
       // Should still render successfully
       expect(template.subject).toContain('Shipped');
@@ -297,7 +311,7 @@ describe('Email Templates', () => {
 
     it('should include estimated delivery when available', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       // Should contain formatted date
       expect(template.html).toContain('Estimated Delivery');
@@ -305,7 +319,7 @@ describe('Email Templates', () => {
 
     it('should have plain text with tracking info', () => {
       const order = createMockOrder();
-      const template = getShippedTemplate(order);
+      const template = getShippedTemplate(order, createMockShipment() as never);
 
       expect(template.text).toContain('BD123456789');
       expect(template.text).toContain(order.orderNumber);
@@ -319,7 +333,7 @@ describe('Email Templates', () => {
   describe('getOutForDeliveryTemplate', () => {
     it('should include order number in subject', () => {
       const order = createMockOrder();
-      const template = getOutForDeliveryTemplate(order);
+      const template = getOutForDeliveryTemplate(order, createMockShipment() as never);
 
       expect(template.subject).toContain(order.orderNumber);
       expect(template.subject.toLowerCase()).toContain('delivery');
@@ -327,14 +341,14 @@ describe('Email Templates', () => {
 
     it('should include urgent delivery message', () => {
       const order = createMockOrder();
-      const template = getOutForDeliveryTemplate(order);
+      const template = getOutForDeliveryTemplate(order, createMockShipment() as never);
 
       expect(template.html.toLowerCase()).toContain('today');
     });
 
     it('should include shipping address', () => {
       const order = createMockOrder();
-      const template = getOutForDeliveryTemplate(order);
+      const template = getOutForDeliveryTemplate(order, createMockShipment() as never);
 
       expect(template.html).toContain('123 Main Street');
       expect(template.html).toContain('Mumbai');
@@ -342,14 +356,14 @@ describe('Email Templates', () => {
 
     it('should include track delivery button', () => {
       const order = createMockOrder();
-      const template = getOutForDeliveryTemplate(order);
+      const template = getOutForDeliveryTemplate(order, createMockShipment() as never);
 
       expect(template.html).toContain('Track');
     });
 
     it('should have plain text version', () => {
       const order = createMockOrder();
-      const template = getOutForDeliveryTemplate(order);
+      const template = getOutForDeliveryTemplate(order, createMockShipment() as never);
 
       expect(template.text).toContain(order.orderNumber);
       expect(template.text.toLowerCase()).toContain('today');
@@ -460,17 +474,19 @@ describe('Email Templates', () => {
 
       // Should not throw
       expect(() => getOrderConfirmationTemplate(order)).not.toThrow();
-      expect(() => getShippedTemplate(order)).not.toThrow();
-      expect(() => getOutForDeliveryTemplate(order)).not.toThrow();
+      expect(() => getShippedTemplate(order, null)).not.toThrow();
+      expect(() => getOutForDeliveryTemplate(order, null)).not.toThrow();
       expect(() => getDeliveredTemplate(order)).not.toThrow();
     });
 
-    it('should handle null shipping details', () => {
-      const order = createMockOrder({ shippingDetails: null });
+    it('should handle an order with no shipment row yet', () => {
+      // A real state: the email can go out before a shipment exists. The
+      // fallback is correct HERE, and was the bug when it was reached because
+      // the code read a jsonb column nothing writes.
+      const order = createMockOrder();
 
-      expect(() => getShippedTemplate(order)).not.toThrow();
-      const template = getShippedTemplate(order);
-      expect(template.html).toContain('our carrier partner');
+      expect(() => getShippedTemplate(order, null)).not.toThrow();
+      expect(getShippedTemplate(order, null).html).toContain('our carrier partner');
     });
 
     it('should handle very large order totals', () => {

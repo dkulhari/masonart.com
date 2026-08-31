@@ -1,28 +1,28 @@
 /**
- * The carrier label's SEAM, and the two bounds around it.
+ * The carrier label: it works, it hides nothing, and it is bounded.
  *
- * `lib/vendor-scope.ts` reads `order_shipments.label_object_token` as a raw SQL
- * fragment. **That column does not exist** — not in `schema/shipping.ts`, not in
- * any of the migrations — because it belongs to `order-dispatch-tracking`, and
- * inventing it here would put this feature's name on another sub-project's
- * table. That part is deliberate and stays.
+ * This file used to be about a SEAM. `lib/vendor-scope.ts` read
+ * `order_shipments.label_object_token` as a raw SQL fragment against a column
+ * that did not exist, because the column belonged to `order-dispatch-tracking`
+ * and inventing it here would have put one feature's name on another's table.
+ * Every request raised `42703`, a catch turned that into a typed
+ * `LabelSeamNotReady`, and the route answered a fixed 503 — in production too.
  *
- * What this file exists for is everything around it:
+ * #703 landed the column and #704 deleted all of that. A tripwire test here
+ * fired on exactly the commit that added it and named what to unwire; it has
+ * done its job and is gone. What the file holds now:
  *
- * 1. **The seam is DETECTABLE.** Nothing in the repository noticed either
- *    state — the column being absent, or the column arriving. The first test
- *    below goes RED the day `label_object_token` lands and says, in its failure
- *    message, exactly what to wire up. Until then it holds the other half:
- *    while the column is missing, the deliberate failure path must still be
- *    there. The two cannot drift apart.
+ * 1. **The route WORKS.** It signs the live label and answers 200, and the key
+ *    it signs is `fulfilment/labels/<token>.pdf` — identity-free by
+ *    construction, because the key rides in the PATH of the signed URL where no
+ *    assertion about JSON keys can reach it. A miss is an ordinary 404.
  *
- * 2. **The failure is SAFE.** The read raises `42703` today, and that used to
- *    travel to `routes/vendor.ts`'s catch-all and come back as
- *    `500 Failed to sign label URL: column "order_shipments"."label_object_token"
- *    does not exist` — our schema, narrated to a supplier, from the ONE route
- *    that exists to carry a customer's name, address and phone. It is now a
- *    typed throw, answered with a fixed 503 that names no column, table or
- *    driver.
+ * 2. **Nothing is swallowed, and nothing is echoed.** With the catch gone,
+ *    every failure the read produces is real and must travel — a catch that
+ *    stayed would report an outage as "not available yet". The other half is
+ *    unchanged and still matters: `failed()` must not append the driver's
+ *    sentence, on the ONE route that exists to carry a customer's name, address
+ *    and phone.
  *
  * 3. **The label has a STATUS BOUND.** Three conditions used to live in the
  *    WHERE and the job's status was not one of them, so a vendor whose job had
@@ -40,7 +40,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { buildRouteApp } from '../helpers/route-app'
@@ -85,7 +85,6 @@ import { vendorApp } from '../../src/routes/vendor'
 import { readJson } from '../helpers/json'
 import {
   LABEL_ACCESS_STATUSES,
-  LabelSeamNotReady,
   getVendorJobLabelKey,
 } from '../../src/lib/vendor-scope'
 import { PRODUCTION_TRANSITIONS } from '../../src/lib/production-transitions'
@@ -105,25 +104,25 @@ const labelPath = (jobId = JOB_ID) => `/api/vendor/jobs/${jobId}/label`
 
 const buildApp = () => buildRouteApp('/api/vendor', vendorApp)
 
+/** For the source assertions in section 4, which read the real files. */
 const API_SRC = resolve(__dirname, '../../src')
 
 /**
- * The error the APPLICATION actually catches for a column that does not exist.
+ * The error the APPLICATION actually sees for a column that does not exist.
  *
  * Not the one Postgres raises — that one never reaches `vendor-scope.ts`.
  * Drizzle wraps it in a `DrizzleQueryError` whose `message` is
  * `Failed query: <sql>\nparams: <args>` and NOTHING else, and hangs the
  * `postgres.js` error, carrying `code` and Postgres's own sentence, on `cause`.
  *
- * This used to fabricate a bare `Error` with the code and the sentence on the
- * same object, which is a shape the driver does not produce — so the seam's
- * detector passed here while returning `false` against every real request, and
- * the 503 these tests assert was unreachable in every environment. The suite
- * guarding the bug could not fail on it. #694 found the difference by driving
- * the route end to end against a real database.
- *
- * So: the wrapped shape, deliberately split across the two links, which is what
- * makes the detector's `cause` walk load-bearing rather than decorative.
+ * The real shape is kept even though nothing inspects it any more. There used
+ * to be a detector walking this `cause` chain to recognise the missing seam,
+ * and it was written against a fabricated bare `Error` carrying the code and
+ * the sentence on one object — a shape the driver never produces — so it passed
+ * here while returning `false` against every real request (#694). The detector
+ * is gone with the seam; the lesson that a fixture must match what the driver
+ * emits is not, and these tests assert that no part of either link reaches a
+ * response body.
  */
 function undefinedColumn(column: string) {
   const driverError = new Error(
@@ -196,98 +195,81 @@ afterEach(() => {
 })
 
 // ============================================================================
-// 1. The tripwire
+// 1. The route WORKS
 // ============================================================================
 
-describe('the label seam is detectable in BOTH directions', () => {
-  const schemaDir = resolve(API_SRC, 'database/schema')
-  const migrationsDir = resolve(API_SRC, 'database/migrations')
+describe('the label route works now that the column exists', () => {
+  it('signs the live label and answers 200', async () => {
+    // This is the whole point of #703/#704. Until `label_object_token` landed,
+    // every request to this route answered 503 — in production too.
+    queueRows({ 'select:production_jobs': [[{ token: LABEL_TOKEN }]] })
 
-  const read = (dir: string, filter: (f: string) => boolean) =>
-    readdirSync(dir)
-      .filter(filter)
-      .map((file) => ({ file, text: readFileSync(resolve(dir, file), 'utf8') }))
+    const res = await buildApp().request(labelPath())
+    const body = await readJson(res)
 
-  it('goes RED the day order_shipments.label_object_token lands', () => {
-    // The seam is a raw SQL fragment against a column that does not exist. The
-    // day `order-dispatch-tracking` adds it, `GET /jobs/:id/label` stops raising
-    // and starts WORKING — through a catch that converts its every failure into
-    // "not available yet" and a route that answers 503 before it ever signs.
-    // Nothing else in this repository would notice that, in either direction:
-    // the tests around it queue their own rows and never touch the schema.
-    const schema = read(schemaDir, (f) => f.endsWith('.ts'))
-    const migrations = read(migrationsDir, (f) => f.endsWith('.sql'))
-
-    const landed = [...schema, ...migrations]
-      .filter(({ text }) => text.includes('label_object_token'))
-      .map(({ file }) => file)
-
-    expect(
-      landed,
-      [
-        'order_shipments.label_object_token has LANDED. The label route is still',
-        'wired for its absence and now fails safely instead of working:',
-        '',
-        '  1. lib/vendor-scope.ts — replace the LABEL_OBJECT_TOKEN sql fragment',
-        '     with orderShipments.labelObjectToken, and delete the catch in',
-        '     getVendorJobLabelKey that turns 42703 into LabelSeamNotReady.',
-        '  2. routes/vendor.ts — delete the LabelSeamNotReady branch that answers',
-        '     503 on GET /jobs/:id/label.',
-        '  3. Delete this test, and check the rest of this file still passes.',
-        '',
-        'Found in: ',
-      ].join('\n') + landed.join(', ')
-    ).toEqual([])
-
-    // Not vacuous: the scan reads real files with real content in them.
-    expect(schema.length, 'the schema scan found no files').toBeGreaterThan(5)
-    expect(migrations.length, 'the migration scan found no files').toBeGreaterThan(20)
-    expect(schema.some(({ file }) => file === 'shipping.ts')).toBe(true)
-    expect(schema.find(({ file }) => file === 'shipping.ts')!.text).toContain('order_shipments')
+    expect(res.status).toBe(200)
+    expect(body.jobId).toBe(JOB_ID)
+    expect(body.url).toBe(SIGNED_URL)
+    expect(body.expiresInSeconds).toBeGreaterThan(0)
   })
 
-  it('and while it has NOT landed, the deliberate failure path is still there', () => {
-    // The other half of the same fact. A seam whose catch was deleted while the
-    // column was still missing puts the raw database message back in the body of
-    // the one route that carries customer PII, and the test above would stay
-    // green through it.
-    const scopeSrc = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
-    const routeSrc = readFileSync(resolve(API_SRC, 'routes/vendor.ts'), 'utf8')
+  it('signs the key built from the token, never a path naming the order', async () => {
+    queueRows({ 'select:production_jobs': [[{ token: LABEL_TOKEN }]] })
 
-    expect(scopeSrc, 'the seam no longer raises a typed error').toContain(
-      'throw new LabelSeamNotReady()'
-    )
-    expect(routeSrc, 'the route no longer answers the seam deliberately').toContain(
-      'error instanceof LabelSeamNotReady'
-    )
-    expect(routeSrc).toContain('LABEL_NOT_AVAILABLE')
+    await buildApp().request(labelPath())
+
+    // The key rides in the PATH of the signed URL, which is the one place an
+    // assertion about JSON keys can never reach. An order id there would be a
+    // stable person-linked handle.
+    expect(mockPresign).toHaveBeenCalledWith(LABEL_KEY, expect.any(Number))
+    expect(LABEL_KEY).toMatch(/^fulfilment\/labels\/[A-Za-z0-9_-]+\.pdf$/)
+  })
+
+  it('records the disclosure only after the URL exists', async () => {
+    queueRows({ 'select:production_jobs': [[{ token: LABEL_TOKEN }]] })
+
+    await buildApp().request(labelPath())
+
+    // The audit row says a customer document crossed to a vendor. Written on
+    // SUCCESS, so no row ever claims a disclosure a throw then unmade.
+    expect(auditSpy).toHaveBeenCalled()
+  })
+
+  it('answers 404 — never 503 — when no label row matches', async () => {
+    // A miss still covers all of: no such job, not your job, you are not the
+    // consolidator, no label bought yet. None is worth distinguishing, and 403
+    // would confirm the order exists and name somebody else's parcel.
+    queueRows({ 'select:production_jobs': [[]] });
+
+    const res = await buildApp().request(labelPath())
+
+    expect(res.status).toBe(404)
+  })
+
+  it('signs nothing when no label row matches', async () => {
+    queueRows({ 'select:production_jobs': [[]] })
+
+    await buildApp().request(labelPath())
+
+    // Authorisation is checked BEFORE signing, not after. A signed URL that is
+    // generated and then withheld has still been generated, and lives in
+    // whatever log, trace or crash dump saw it.
+    expect(mockPresign, 'a label was signed for a request that had no row').not.toHaveBeenCalled()
+    expect(auditSpy).not.toHaveBeenCalled()
   })
 })
 
 // ============================================================================
-// 2. The failure is safe
+// 2. A real failure is a real failure
 // ============================================================================
 
-describe('the missing seam fails clearly, and says nothing about the schema', () => {
-  it('turns Postgres 42703 on THAT column into a typed refusal', async () => {
-    rejectNthSelect(1, undefinedColumn('label_object_token'))
-
-    await expect(getVendorJobLabelKey(VENDOR_ID, JOB_ID)).rejects.toBeInstanceOf(
-      LabelSeamNotReady
-    )
-  })
-
-  it('rethrows a 42703 naming a DIFFERENT column — the catch is not a swallow', async () => {
-    // A genuine typo in some other column of this select must not be reported
-    // for months as "the label feature is not wired up yet".
-    rejectNthSelect(1, undefinedColumn('tracking_numbr'))
-
-    await expect(getVendorJobLabelKey(VENDOR_ID, JOB_ID)).rejects.not.toBeInstanceOf(
-      LabelSeamNotReady
-    )
-  })
-
-  it('rethrows a failure that is nothing to do with columns at all', async () => {
+describe('the read no longer swallows anything', () => {
+  it('lets a genuine database failure travel', async () => {
+    // There used to be a catch here converting Postgres `42703` on
+    // `label_object_token` into a typed `LabelSeamNotReady`, because the column
+    // did not exist and the route could not work in any environment. It exists
+    // now, so every failure this read produces is real and must propagate —
+    // a catch that stayed would report an outage as "not available yet".
     rejectNthSelect(1, new Error('connection terminated unexpectedly'))
 
     await expect(getVendorJobLabelKey(VENDOR_ID, JOB_ID)).rejects.toThrow(
@@ -295,46 +277,20 @@ describe('the missing seam fails clearly, and says nothing about the schema', ()
     )
   })
 
-  it('answers 503 with a fixed body that quotes no column, table or driver', async () => {
-    // Call 1 is requireVendor's `vendor_users` read; call 2 is the label read.
-    rejectNthSelect(2, undefinedColumn('label_object_token'))
+  it('lets a missing-column failure travel too, rather than dressing it up', async () => {
+    // The case the deleted catch used to intercept. A `42703` now means a
+    // genuine defect — a typo, or a migration that did not run — and reporting
+    // it as an ordinary empty state is how that hides for months.
+    rejectNthSelect(1, undefinedColumn('label_object_token'))
 
-    const res = await buildApp().request(labelPath())
-    const body = await readJson(res)
-
-    expect(res.status).toBe(503)
-    expect(body.code).toBe('LABEL_NOT_AVAILABLE')
-    expect(Object.keys(body).sort()).toEqual(['code', 'error'])
-
-    const serialised = JSON.stringify(body)
-    for (const internal of [
-      'label_object_token',
-      'order_shipments',
-      'production_jobs',
-      'column',
-      '42703',
-      'select',
-    ]) {
-      expect(serialised.toLowerCase(), `the 503 body leaked "${internal}"`).not.toContain(
-        internal
-      )
-    }
+    await expect(getVendorJobLabelKey(VENDOR_ID, JOB_ID)).rejects.toThrow()
   })
 
-  it('signs nothing and claims no disclosure when the seam is missing', async () => {
-    rejectNthSelect(2, undefinedColumn('label_object_token'))
-
-    await buildApp().request(labelPath())
-
-    // The presigner is never reached, so no signature exists in any log — and
-    // no `label_issued` row claims a customer document left the building.
-    expect(mockPresign, 'a label was signed for a route that cannot work').not.toHaveBeenCalled()
-    expect(auditSpy).not.toHaveBeenCalled()
-  })
-
-  it('does NOT echo the driver on the generic 500 either', async () => {
-    // D5. `failed()` used to append `error.message` verbatim; on this route that
-    // is whatever the database or the S3 client happened to say.
+  it('does NOT echo the driver on the generic 500', async () => {
+    // D5, and now the ONLY guard on this route's error body. `failed()` used to
+    // append `error.message` verbatim; on this route that is whatever the
+    // database or the S3 client happened to say, on the one route that exists
+    // to carry a customer's name, address and phone.
     queueRows({ 'select:production_jobs': [[{ token: LABEL_TOKEN }]] })
     mockPresign.mockRejectedValueOnce(
       new Error('R2 refused: bucket poster-app-prod key fulfilment/labels/secret.pdf')
@@ -347,6 +303,23 @@ describe('the missing seam fails clearly, and says nothing about the schema', ()
     expect(body).toEqual({ error: 'Failed to sign label URL' })
     expect(JSON.stringify(body)).not.toContain('poster-app-prod')
     expect(JSON.stringify(body)).not.toContain(LABEL_KEY)
+  })
+
+  it('names no column, table or driver in any body it produces', async () => {
+    rejectNthSelect(2, undefinedColumn('label_object_token'))
+
+    const res = await buildApp().request(labelPath())
+    const serialised = JSON.stringify(await readJson(res))
+
+    for (const internal of [
+      'label_object_token',
+      'order_shipments',
+      'production_jobs',
+      '42703',
+      'select',
+    ]) {
+      expect(serialised.toLowerCase(), `the body leaked "${internal}"`).not.toContain(internal)
+    }
   })
 })
 
@@ -424,5 +397,76 @@ describe('the label is bound to the statuses where it is legitimately needed', (
     for (const status of ['cancelled', 'received', 'dispatched', 'draft']) {
       expect(bound, `${status} is inside the label window`).not.toContain(status)
     }
+  })
+})
+
+// ============================================================================
+// 4. WHICH shipment — the live one, not the newest
+// ============================================================================
+
+/**
+ * An order carries more than one `order_shipments` row once a label has been
+ * voided and re-bought, and only one of them names a PDF the courier will
+ * still honour.
+ *
+ * This used to be answered by `ORDER BY created_at DESC, id DESC LIMIT 1` —
+ * newest-labelled — because the table had no way to say which label was dead.
+ * `voided_at` landed in #703, so the choice can be made by the fact rather than
+ * by a proxy for it. The failure the proxy allows is not theoretical: void a
+ * label and buy its replacement inside the same clock tick and `created_at`
+ * ties, so the winner is decided by `id`, which is random — a vendor who
+ * reloads the page gets a different PDF, and one of them is dead.
+ *
+ * Asserted as a QUERY. The recording db is blind to a WHERE, so a fixture that
+ * queued two rows and checked which came back would be testing the mock. The
+ * behavioural half — that Postgres itself refuses two live labelled shipments
+ * on one order — is `tests/database/order-shipments-live-label.test.ts`.
+ */
+describe('the LIVE label is chosen by the void marker, not by recency', () => {
+  it('puts voided_at IS NULL in the WHERE, beside the other four conditions', async () => {
+    queueRows({ 'select:production_jobs': [[{ token: LABEL_TOKEN }]] })
+
+    await getVendorJobLabelKey(VENDOR_ID, JOB_ID)
+
+    const reads = queries.filter((q) => q.op === 'select')
+    const where = render(reads[0]?.where).sql
+
+    expect(where, 'the void marker is not consulted at all').toContain('voided_at')
+    expect(where.toLowerCase().replace(/\s+/g, ' ')).toMatch(/voided_at"? is null/)
+  })
+
+  it('keeps the ordering as a TIEBREAK, so the answer is stable as well as correct', () => {
+    // The predicate makes it CORRECT; the ordering keeps it DETERMINISTIC even
+    // on a database built with `db:push`, where the partial unique index may be
+    // absent. Dropping the ORDER BY because "the index guarantees one row"
+    // trades a free guard for a bug that only appears where the index is not.
+    const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+
+    expect(src).toContain('orderShipments.createdAt')
+    expect(src).toContain('orderShipments.id')
+  })
+
+  it('agrees with the partial unique index the database enforces', () => {
+    // A predicate that disagreed with `order_shipments_live_label_idx` would be
+    // a defect neither could show alone: the query would either return rows the
+    // index thinks cannot coexist, or refuse rows it happily stores.
+    const schema = readFileSync(resolve(API_SRC, 'database/schema/shipping.ts'), 'utf8')
+
+    expect(schema).toContain('order_shipments_live_label_idx')
+    expect(schema).toMatch(/voidedAt.*IS NULL|IS NULL.*voidedAt/s)
+    expect(schema).toMatch(/labelObjectToken.*IS NOT NULL|IS NOT NULL.*labelObjectToken/s)
+  })
+
+  it('no longer defers the fix to a later feature', () => {
+    // The doc block carried a SEAM note naming order-dispatch-tracking as the
+    // owner of exactly this change. This feature IS that owner, and this ticket
+    // is that change — a note left standing would send the next reader looking
+    // for work that is already done.
+    const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+
+    expect(
+      src,
+      'the SEAM note still defers a fix that has landed'
+    ).not.toContain('SEAM, owned by `order-dispatch-tracking`')
   })
 })

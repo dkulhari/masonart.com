@@ -58,9 +58,17 @@ import { join, resolve } from 'path';
 
 const MIGRATIONS_DIR = resolve(__dirname, '../../src/database/migrations');
 
-/** `ALTER TYPE "public"."x" ADD VALUE 'v'`, with or without BEFORE/AFTER. */
+/**
+ * `ALTER TYPE "public"."x" ADD VALUE 'v'`, INCLUDING any BEFORE/AFTER anchor.
+ *
+ * The anchor is part of the match on purpose. It is a catalog lookup — the
+ * value it names must already exist in that type — so it can never be an
+ * unsafe use, and leaving it in the residue made the scan report it as one the
+ * moment some unrelated type added a value with the same NAME. See the
+ * anchor test below for the whole story.
+ */
 const ADD_VALUE =
-  /ALTER\s+TYPE\s+[^\s]+\s+ADD\s+VALUE\s+(?:IF\s+NOT\s+EXISTS\s+)?'([^']+)'/gi;
+  /ALTER\s+TYPE\s+[^\s]+\s+ADD\s+VALUE\s+(?:IF\s+NOT\s+EXISTS\s+)?'([^']+)'(?:\s+(?:BEFORE|AFTER)\s+'[^']+')?/gi;
 
 /** `CREATE TYPE … AS ENUM(…)` — a new type; its own values are always safe. */
 const CREATE_ENUM = /CREATE\s+TYPE\s+[^\s]+\s+AS\s+ENUM\s*\([^)]*\)/gi;
@@ -137,6 +145,50 @@ describe('migration enum literals (#673, #580)', () => {
     for (const value of ['qc_submitted', 'dispatched', 'fulfilment']) {
       const occurrences = [...source.matchAll(ADD_VALUE)].filter((m) => m[1] === value);
       expect(occurrences).toHaveLength(1);
+    }
+  });
+
+  /**
+   * A `BEFORE`/`AFTER` anchor is a catalog lookup, not a use.
+   *
+   * `ALTER TYPE t ADD VALUE 'x' BEFORE 'y'` requires `y` to ALREADY exist in
+   * `t` — that is what makes it a legal anchor. Postgres resolves it against
+   * the catalog and never coerces a literal to the enum, so
+   * `check_safe_enum_use` is not reached and there is nothing here to be
+   * unsafe.
+   *
+   * The scan used to see it anyway. `ADD_VALUE` matched only as far as the
+   * added value, leaving ` BEFORE 'y'` in the residue, so the moment ANY
+   * migration added a value that happened to share a NAME with some other
+   * type's anchor, the pair was reported. That is a collision on the value
+   * STRING across two unrelated enums — `addedEnumValues()` is keyed by name
+   * alone — and Postgres blacklists a (type, value) pair, not a word.
+   *
+   * It stayed green for a year by luck: no added value shared a name with an
+   * anchor. `order-dispatch-tracking` adding `'cancelled'` to `shipment_status`
+   * collided with `0023`'s `BEFORE 'cancelled'` on `production_job_status` and
+   * produced a violation that was pure false positive — 0023's own header says
+   * naming `cancelled` there "is a catalog lookup, not a use of anything new".
+   */
+  it('does not read a BEFORE/AFTER anchor as a use of the value it names', () => {
+    const added = addedEnumValues();
+
+    // Not vacuous: there really is an anchor naming a value some migration
+    // adds, which is the case that used to be misreported.
+    const anchors = [...readAllMigrations().matchAll(/(?:BEFORE|AFTER)\s+'([^']+)'/gi)].map(
+      (m) => m[1]!
+    );
+    expect(anchors.length).toBeGreaterThan(0);
+    expect(anchors.some((anchor) => added.has(anchor))).toBe(true);
+
+    // And an ADD VALUE statement leaves nothing behind once stripped, so an
+    // anchor can never reach the literal scan in the first place.
+    for (const statement of statements()) {
+      const scanned = statement.sql.replace(ADD_VALUE, '').replace(CREATE_ENUM, '');
+      expect(
+        scanned,
+        `${statement.migration}:~${statement.line} leaves an anchor in the scanned residue`
+      ).not.toMatch(/(?:BEFORE|AFTER)\s+'/i);
     }
   });
 

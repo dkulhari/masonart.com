@@ -508,6 +508,28 @@ async function markThroughPortal(page: Page, jobId: string, to: string): Promise
   await confirmButton.click()
 
   await expect(page.getByTestId('vendor-job-action-error')).toHaveCount(0)
+
+  // The line above asserts an ABSENCE, which is true the instant the click
+  // returns and says nothing about whether the move landed. Nor does the button
+  // disappearing — the portal drops it optimistically. Callers that followed
+  // with a `page.goto` got away with both; the one that follows with a direct
+  // API call read the old status and failed three steps later, naming a
+  // transition guard rather than this helper.
+  //
+  // So ask the server. `page.request` carries this vendor's cookies, and the
+  // vendor route is the one it is allowed to read — `jobStatus` above uses the
+  // admin route, which a vendor context cannot call.
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get(`${API_URL}/api/vendor/jobs/${jobId}`)
+        if (!res.ok()) return `HTTP ${res.status()}`
+        const { job } = (await res.json()) as { job: { status: string } }
+        return job.status
+      },
+      { message: `the portal move to '${to}' never reached the server` }
+    )
+    .toBe(to)
 }
 
 // ============================================================================
@@ -838,34 +860,38 @@ test.describe('production pipeline: two-vendor consolidation', () => {
     // Vendor A is `qc_passed` and is NOT the consolidator, which is the one
     // moment `LABEL_ACCESS_STATUSES` even lets the question be asked.
     //
-    // The documented answer is 404 with the presigner never called. It is not
-    // the answer today and cannot be: `order_shipments.label_object_token` does
-    // not exist, and it is named in the SELECT list, so Postgres raises 42703
-    // during parse analysis — before a WHERE predicate is evaluated. A
-    // non-consolidator and the consolidator get the identical 503. Asserting a
-    // 404 here would assert a fixture this file had built for itself.
+    // The documented answer is 404 with the presigner never called, and as of
+    // #703/#704 it is also the real one: `order_shipments.label_object_token`
+    // exists, so the SELECT parses, the predicate is evaluated, and the route
+    // refuses on its merits instead of on a 42703 the seam laundered into 503.
+    // This assertion was pinned at 503 while that was the only reachable answer;
+    // it is now the documented one. 404 and never 403 — a 403 would confirm the
+    // order exists and name somebody else's parcel.
     //
-    // What IS assertable, and is: the refusal is our fixed sentence with its
-    // documented code, naming no column, table or driver — from the one route
-    // that exists to carry a customer's name and address.
+    // The refusal carries no `code`: `vendor.ts:569` answers a bare sentence,
+    // and the point below is that the sentence names no column, table or driver
+    // — from the one route that exists to carry a customer's name and address.
     const api = await vendorApi(VENDOR_A_AUTH)
     const context = await browser.newContext({ storageState: VENDOR_A_AUTH })
     const page = await context.newPage()
 
     try {
       const body = await expectRefusal(api, 'get', `/api/vendor/jobs/${jobAId}/label`, {
-        status: 503,
-        code: 'LABEL_NOT_AVAILABLE',
+        status: 404,
       })
       const message = body.error as string
       expect(message).not.toMatch(/label_object_token|order_shipments|column|42703|relation/i)
 
-      // And on the screen, in our words rather than the response's.
+      // And on the screen, in our words rather than the response's. A 404 takes
+      // the `labelError.status === 404` branch in `vendor/jobs/$id.tsx`, which
+      // is the one that tells a vendor holding a finished piece to speak up —
+      // not the `LABEL_NOT_AVAILABLE` seam copy, which no longer has a status
+      // that reaches it now the seam is gone.
       await page.goto(`/vendor/jobs/${jobAId}`, { waitUntil: 'networkidle' })
       await expect(page.getByTestId('vendor-job-label-card')).toBeVisible()
       await page.getByTestId('vendor-job-label').click()
-      await expect(page.getByTestId('vendor-job-label-unavailable')).toBeVisible()
-      await expect(page.getByTestId('vendor-job-label-error')).toHaveCount(0)
+      await expect(page.getByTestId('vendor-job-label-error')).toBeVisible()
+      await expect(page.getByTestId('vendor-job-label-unavailable')).toHaveCount(0)
       // R2: never inline, and never a signed URL in the DOM.
       await expect(page.locator('iframe, embed, object')).toHaveCount(0)
       await expect(page.locator('body')).not.toContainText('X-Amz-Signature')
@@ -915,6 +941,10 @@ test.describe('production pipeline: two-vendor consolidation', () => {
       )
       const mine = outbound.items.find((item) => item.id === transferId)
       expect(mine).toBeDefined()
+      // An exact list, not a subset: the guard is that nothing NEW leaks either.
+      // `isLost` is admitted deliberately — it is a fact about this parcel, which
+      // is A's own, and it names no vendor and no order. Anything carrying an
+      // identity belongs on the other side of this assertion.
       expect(Object.keys(mine as object).sort()).toEqual(
         [
           'carrier',
@@ -922,6 +952,7 @@ test.describe('production pipeline: two-vendor consolidation', () => {
           'dispatchedAt',
           'expectedBy',
           'id',
+          'isLost',
           'pieceCount',
           'receivedAt',
           'reference',
@@ -1127,12 +1158,18 @@ test.describe('production pipeline: two-vendor consolidation', () => {
     page,
     browser,
   }) => {
-    // Manual dispatch is today's reality — the Shiprocket client is
-    // `order-dispatch-tracking`'s, explicitly out of scope for this feature
-    // (§12). Recording the AWB is the real, pre-existing admin route an office
-    // uses, and it is what `ORDER_HAS_LABEL` reads. Nothing is stubbed: the
-    // guard that refused in the previous test is satisfied by a genuine write
-    // through a genuine route.
+    // Manual dispatch is still today's reality — the Shiprocket client remains
+    // out of scope here (§12) and is `order-dispatch-tracking`'s pass 2.
+    //
+    // What HAS changed underneath this call: the route below no longer writes
+    // `orders.shipping_details`. It upserts the live `order_shipments` row
+    // (#707), and `ORDER_HAS_LABEL` now reads that table with a
+    // `voided_at IS NULL` predicate (#711). So this is still a genuine write
+    // through a genuine route satisfying a genuine guard — the guard just asks
+    // a different table, and a voided label would no longer satisfy it.
+    //
+    // Nothing is stubbed: the guard that refused in the previous test is
+    // satisfied by real data crossing two features' code.
     await apiJson(page.request, 'patch', `/api/admin/orders/${orderId}/shipping`, {
       carrier: 'Blue Dart',
       awbNumber: `E2E-AWB-${RUN}`,

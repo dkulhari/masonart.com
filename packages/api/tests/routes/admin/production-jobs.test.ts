@@ -1659,7 +1659,12 @@ describe('PATCH /api/admin/production/:jobId', () => {
       // The consolidator handing the goods to the courier: no inter-vendor
       // parcel, and `evaluateLabelReadiness` reads exactly this case.
       'select:production_transfer_jobs': [[]],
-      'select:orders': [[{ shippingDetails: { carrier: 'Delhivery', awbNumber: 'AWB-1' } }]],
+      // The label lives on `order_shipments` now, not on the order's jsonb —
+      // #707 stopped writing that column, so a fixture shaped like it would
+      // pass here while the real guard answered false for every order.
+      'select:order_shipments': [
+        [{ id: 'ship-1', labelObjectToken: null, awbNumber: 'AWB-1', trackingNumber: null }],
+      ],
       'update:production_jobs': [[jobRow({ status: 'dispatched', vendorId: VENDOR_ID })]],
     })
 
@@ -1675,7 +1680,8 @@ describe('PATCH /api/admin/production/:jobId', () => {
     queueRows({
       'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
       'select:production_transfer_jobs': [[]],
-      'select:orders': [[{ shippingDetails: null }]],
+      // No live labelled shipment: nothing has moved the goods.
+      'select:order_shipments': [[]],
     })
 
     const res = await buildApp().request(
@@ -1710,7 +1716,9 @@ describe('PATCH /api/admin/production/:jobId', () => {
     queueRows({
       'select:production_jobs': [[jobRow({ status: 'qc_passed', vendorId: VENDOR_ID })]],
       'select:production_transfer_jobs': [[]],
-      'select:orders': [[{ shippingDetails: {} }]],
+      // And no label either, so the lost parcel is the only thing that could
+      // have satisfied the guard.
+      'select:order_shipments': [[]],
     })
 
     const res = await buildApp().request(

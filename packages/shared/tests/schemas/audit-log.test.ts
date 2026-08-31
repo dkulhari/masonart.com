@@ -135,14 +135,36 @@ describe('production pipeline actions', () => {
   })
 
   /**
-   * #671 will fail the build on an action nothing emits. Declaring anything for
-   * a later phase to fill in breaks the build the day that guard lands, so the
-   * registry must hold nothing for order-dispatch-tracking yet.
+   * The courier leg, declared in the same phase as its emitters (#706).
+   *
+   * This test used to assert the opposite — that the registry held NOTHING
+   * starting with `shipment.` — because #671 fails the build on an action
+   * nothing emits, and `order-dispatch-tracking` had no emitters yet. It has
+   * them now, so the rule has not changed, only which side of it we are on.
+   *
+   * The other half of the rule cannot be checked here: this package does not
+   * know what emits anything. `packages/api/tests/lib/audit-actions-emitted.test.ts`
+   * holds that scan, in the package where the emitters live and where the
+   * dependency points the right way.
    */
-  it('declares nothing for a later phase to emit', () => {
-    for (const action of AUDIT_ACTIONS) {
-      expect(action.startsWith('shipment.')).toBe(false)
-    }
+  it('declares the courier-leg actions', () => {
+    expect(AUDIT_ACTIONS).toContain('shipment.created')
+    expect(AUDIT_ACTIONS).toContain('shipment.tracking_updated')
+  })
+
+  it('declares only the shipment actions that have emitters today', () => {
+    // `shipment.label_issued` and `shipment.voided` belong to the Shiprocket
+    // pass and must arrive WITH their emitters, not ahead of them.
+    const shipmentActions = AUDIT_ACTIONS.filter((a) => a.startsWith('shipment.'))
+    expect([...shipmentActions].sort()).toEqual(['shipment.created', 'shipment.tracking_updated'])
+  })
+
+  it('files a parcel moving under fulfilment, not money', () => {
+    // What we PAID a carrier is a money event, and that action arrives in the
+    // Shiprocket pass with the code that writes the cost. A parcel changing
+    // hands is not.
+    expect(AUDIT_ACTION_CATEGORY['shipment.created']).toBe('fulfilment')
+    expect(AUDIT_ACTION_CATEGORY['shipment.tracking_updated']).toBe('fulfilment')
   })
 })
 

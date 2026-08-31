@@ -42,6 +42,10 @@ vi.mock('../../src/database', () => ({
     query: {
       carts: { findFirst: (...args: unknown[]) => cartFindFirstMock(...args) },
       orders: { findFirst: (...args: unknown[]) => orderFindFirstMock(...args) },
+      // Order detail resolves the live shipment for its `shipment` field
+      // (#712). These fixtures are about promotion figures, so "no shipment"
+      // is the right answer — but the read has to exist or the handler 500s.
+      orderShipments: { findFirst: async () => undefined },
     },
   },
 }));
