@@ -588,6 +588,105 @@ describe('a cancelled job shows no phantom amount (#695)', () => {
     )
     expect(screen.getByTestId('vendor-job-amount')).toHaveTextContent('₹250.00')
   })
+
+  /**
+   * The override and the rate card are different numbers and a vendor arguing
+   * a payment needs both. `agreed` became `vendorJobPayableAmount(job)` while
+   * `final` stayed `amountActual`, so `final !== agreed` was unreachable for
+   * every input and the rate-card figure vanished from the portal — on the one
+   * screen where the dispute is had.
+   */
+  it('shows the rate card beside an override that replaced it', () => {
+    render(
+      <VendorJobDetailBody
+        data={{
+          ...detail,
+          job: {
+            ...detail.job,
+            status: 'received',
+            amountExpected: '250.00',
+            amountActual: '400.00',
+          },
+        }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+
+    const amount = screen.getByTestId('vendor-job-amount')
+    expect(amount).toHaveTextContent('₹400.00')
+    expect(amount).toHaveTextContent('₹250.00')
+  })
+
+  it('says nothing about a rate card that was not overridden', () => {
+    render(
+      <VendorJobDetailBody
+        data={{
+          ...detail,
+          job: {
+            ...detail.job,
+            status: 'received',
+            amountExpected: '250.00',
+            amountActual: null,
+          },
+        }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+
+    const amount = screen.getByTestId('vendor-job-amount')
+    expect(amount).toHaveTextContent('₹250.00')
+    expect(amount.textContent).not.toMatch(/rate card/i)
+  })
+
+  it('says nothing about a rate card an override merely restated', () => {
+    render(
+      <VendorJobDetailBody
+        data={{
+          ...detail,
+          job: {
+            ...detail.job,
+            status: 'received',
+            amountExpected: '250.00',
+            amountActual: '250.00',
+          },
+        }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+
+    expect(screen.getByTestId('vendor-job-amount').textContent).not.toMatch(/rate card/i)
+  })
+
+  it('keeps the rate card off a cancelled job, where it is not a bill', () => {
+    // #695: on a cancelled job the rate-card expectation is not owed. Printing
+    // it beside a kill fee reads as a number the vendor is going to be paid.
+    render(
+      <VendorJobDetailBody
+        data={{
+          ...detail,
+          job: {
+            ...detail.job,
+            status: 'cancelled',
+            amountExpected: '900.00',
+            amountActual: '250.00',
+          },
+        }}
+        isLoading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    )
+
+    const amount = screen.getByTestId('vendor-job-amount')
+    expect(amount).toHaveTextContent('₹250.00')
+    expect(amount).not.toHaveTextContent('900')
+  })
 })
 
 describe('the job detail — the three states and the two writes', () => {
@@ -980,6 +1079,54 @@ describe('the QC shot list', () => {
     // An empty shot list after a failed read would say the vendor photographed
     // nothing, which is a different and worse claim than "we could not look".
     expect(screen.getByTestId(`vendor-qc-shot-${QC_SHOT_LIST.print[0].slot}`)).toBeInTheDocument()
+  })
+
+  /**
+   * "Not yet photographed — the approval cannot start without it" is a claim
+   * about what the vendor HAS, and only a read can make it. Before the read
+   * lands, and after one that failed, every required tile went destructive-red
+   * saying exactly that — underneath the panel's own box explaining that we
+   * could not look. The obvious response, reshooting the lot, burns superseded
+   * rows against MAX_QC_PHOTOS_PER_JOB.
+   */
+  it.each([
+    ['the photos have not loaded yet', { isLoading: true }],
+    ['the read failed', { error: 'Failed to load the photographs' }],
+  ])('claims nothing about what is missing while %s', (_case, over) => {
+    render(<VendorQcShotList stage="print" qc={panel(over)} canUpload />)
+
+    expect(screen.queryByText(/the approval cannot start without it/)).toBeNull()
+    expect(screen.queryByTestId('vendor-qc-missing')).toBeNull()
+    // The slots are still named; it is the verdict on them that waits.
+    expect(
+      screen.getByTestId(`vendor-qc-shot-${QC_SHOT_LIST.print[0].slot}`)
+    ).toBeInTheDocument()
+  })
+
+  it('says which required shots are missing once the read has landed', () => {
+    render(<VendorQcShotList stage="print" qc={panel({ data: photoSet('print') })} canUpload />)
+
+    expect(screen.getByTestId('vendor-qc-missing')).toBeInTheDocument()
+    expect(screen.getAllByText(/the approval cannot start without it/).length).toBe(
+      requiredQcSlots('print').length
+    )
+  })
+
+  it('keeps the landed answer on screen while a refresh is in flight', () => {
+    // `loadPhotos` only replaces `data` on success, so a refresh has the last
+    // good read the whole time. Blanking the verdict on every upload would
+    // flash the tiles grey for no reason.
+    render(
+      <VendorQcShotList
+        stage="print"
+        qc={panel({ data: photoSet('print'), isLoading: true })}
+        canUpload
+      />
+    )
+
+    expect(screen.getAllByText(/the approval cannot start without it/).length).toBe(
+      requiredQcSlots('print').length
+    )
   })
 
   it('retry is wired on the photo panel', () => {

@@ -925,7 +925,25 @@ export interface VendorQcShotListProps {
  */
 export function VendorQcShotList({ stage, qc, canUpload }: VendorQcShotListProps) {
   const entries = mergeQcShots(stage, qc.data?.shots)
-  const missing = new Set(missingRequiredQcSlots(stage, entries))
+
+  /**
+   * Which required slots are EMPTY — a claim about what the vendor has, which
+   * only a read can make.
+   *
+   * Empty until `data` lands, and `data` is null exactly when we have not read
+   * or the read failed (`loadPhotos` replaces it only on success, so a refresh
+   * keeps the last good answer). Derived from the read rather than gated at
+   * each render site: the summary line was gated and the tiles were not, so a
+   * 500 painted all seven required tiles destructive-red saying "Not yet
+   * photographed — the approval cannot start without it", directly beneath the
+   * panel's own box explaining that we could not look. Reshooting the lot is
+   * the obvious response, and it burns superseded rows against the job's photo
+   * cap.
+   */
+  const missing =
+    qc.data === null
+      ? new Set<string>()
+      : new Set(missingRequiredQcSlots(stage, entries))
   const superseded = qc.supersededSlots ?? {}
   const slotErrors = qc.slotErrors ?? {}
 
@@ -985,7 +1003,7 @@ export function VendorQcShotList({ stage, qc, canUpload }: VendorQcShotListProps
         </p>
       )}
 
-      {!qc.error && !qc.isLoading && missing.size > 0 && (
+      {missing.size > 0 && (
         <p data-testid="vendor-qc-missing" className="text-xs text-muted-foreground">
           {missing.size} required shot(s) still to take. We cannot start the
           approval until each one is here.
@@ -1731,8 +1749,25 @@ export function VendorJobDetailBody({
   // `vendorJobPayableAmount` rather than `job.amountExpected` directly: on a
   // cancelled job the rate-card expectation is not a bill, and this screen and
   // the list have to say the same thing about the same row (#695).
-  const agreed = formatVendorAmount(vendorJobPayableAmount(job))
-  const final = formatVendorAmount(job.amountActual)
+  const payable = formatVendorAmount(vendorJobPayableAmount(job))
+
+  /**
+   * The rate card, shown only where an override REPLACED it.
+   *
+   * These are two different numbers and a vendor arguing a payment needs both.
+   * The comparison used to be `amountActual` against `amountActual ?? expected`
+   * — true for no input at all — so the rate-card figure had silently gone from
+   * the portal. Suppressed on a cancelled job, where #695 says the expectation
+   * is not owed: printing it beside a kill fee reads as a second number the
+   * vendor is going to be paid.
+   */
+  const overriddenRateCard =
+    job.status !== 'cancelled' &&
+    job.amountActual !== null &&
+    job.amountExpected !== null &&
+    job.amountActual !== job.amountExpected
+      ? formatVendorAmount(job.amountExpected)
+      : null
 
   const qcPanel: VendorQcPanelState = qc ?? {
     data: null,
@@ -1846,9 +1881,11 @@ export function VendorJobDetailBody({
           <div className="text-xs font-medium text-muted-foreground">You are paid</div>
           <div className="mt-1 tabular-nums" data-testid="vendor-job-amount">
             {/* Never a fallback zero: an unreadable amount says so. */}
-            {final ?? agreed ?? <span className="text-destructive">Unavailable</span>}
-            {final && agreed && final !== agreed && (
-              <span className="ml-2 text-xs text-muted-foreground">agreed {agreed}</span>
+            {payable ?? <span className="text-destructive">Unavailable</span>}
+            {overriddenRateCard && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                rate card {overriddenRateCard}
+              </span>
             )}
           </div>
         </div>
