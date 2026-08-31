@@ -60,11 +60,23 @@ interface TrackableOrder {
  */
 async function findTrackableOrder(request: APIRequestContext): Promise<TrackableOrder | null> {
   const res = await request.get('/api/admin/orders?pageSize=25&sortBy=createdAt&sortOrder=desc');
-  if (!res.ok()) return null;
 
-  const body = (await res.json()) as { orders?: Array<Record<string, any>> };
+  // A failed listing is a broken run, not an empty environment. Returning null
+  // here would turn an expired admin session into a skip, and a skip reads as a
+  // pass — the exact vacuous green this spec exists to refuse.
+  if (!res.ok()) {
+    throw new Error(
+      `admin order listing failed: ${res.status()} ${res.statusText()}. ` +
+        'The chromium-admin storage state is missing or expired.'
+    );
+  }
 
-  for (const order of body.orders ?? []) {
+  // The endpoint pages its results as `items`. Reading `orders` yields undefined
+  // for every environment, which made both tests skip and the file pass without
+  // ever running — the first version of this spec did exactly that.
+  const body = (await res.json()) as { items?: Array<Record<string, any>> };
+
+  for (const order of body.items ?? []) {
     const email = order.customer?.email ?? order.guestEmail ?? order.user?.email;
     if (!email || !order.id || !order.orderNumber) continue;
 
