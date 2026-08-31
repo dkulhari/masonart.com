@@ -43,12 +43,12 @@ description: |-
 feature: image-cdn-storage
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T03:54:47.106Z'
-last_updated: '2026-08-31T03:54:47.106Z'
-time_spent_minutes: 0
+last_updated: '2026-08-31T04:46:08.662Z'
+time_spent_minutes: 7
 labels:
   - api
   - images
@@ -56,8 +56,103 @@ labels:
   - admin
   - upload
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T04:30:31.513Z'
+    text: |-
+      ## Possible interaction with #545's orientation guard — worth checking during the fix
+
+      #545 ("Product orientation column contradicts the artwork for 6 of 14 collection representatives") was closed on 2026-08-13. It listed three suspects for why the column disagreed with the pixels — seed data, an import, or a derivation that never ran. **EXIF orientation is a fourth that nobody listed.**
+
+      It was resolved by adding a rule plus a guard rather than by finding a systemic root cause:
+
+      - `packages/shared/src/constants/orientation.ts` — the orientation rule
+      - `packages/api/src/routes/admin/products.ts` — a guard that refuses a declared orientation contradicting the measured art box, with `orientationOverride` as the escape hatch
+      - two corrected seed values, each with its measurement
+      - `packages/api/src/database/backfill-art-box.ts` — audits the column against that second opinion
+
+      That guard is the interaction worth checking, and it is more concerning than the root-cause question.
+
+      ### The dependency chain
+
+      ```
+      upload -> buildProductMedia() -> measureArtBox()  [no autoOrient]
+             -> artBox -> orientation guard -> accept / 400
+      ```
+
+      `measureArtBox` reads the pixels. This ticket is that it reads them in the **stored** orientation. So for any image carrying an orientation tag, the art box is measured on a rotated rectangle — and the guard's verdict is computed from it.
+
+      The consequence is not just a wrong column. It is that the guard added specifically to catch this class of drift **can produce the wrong verdict on exactly the inputs it was built to police**: a portrait photograph stored landscape measures landscape, so a correct `portrait` declaration gets refused with a 400, and a wrong `landscape` one is accepted. `backfill-art-box.ts` audits against the same measurement, so it would agree with the wrong answer rather than catch it.
+
+      An admin hitting the refusal has one obvious move — set `orientationOverride` — which silently writes the value the guard was protecting against.
+
+      ### Not a claim, a thing to verify
+
+      I have not confirmed that any real catalogue image is affected, and #545's own symptom looks adequately explained by `measureArtBox` not peeling a wall off until #594 (see the comment at `packages/api/src/database/seed.ts:172`). The seeded catalogue is also unlikely to carry orientation tags, since it came from stock and reference sources rather than phones.
+
+      Two concrete things to do while fixing this ticket:
+
+      1. **Add a guard test with an EXIF-tagged fixture.** `packages/api/tests/routes/admin/product-orientation-guard.test.ts` has 11 cases; none of them use a tagged image. That is the gap that would let this recur.
+      2. **Re-run `backfill-art-box.ts` after the fix** and diff the results. Any product whose `artBox` changes was measured wrong, and its `orientation` column should be re-derived rather than trusted.
+
+      If orientation values drift again after this ticket lands, this chain is the first place to look.
+  - author: system
+    timestamp: '2026-08-31T04:39:04.535Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T04:46:03.580Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `9481d8f2` — fix(api): mat and crop the photo the admin saw, not the one on disk
+
+      **Files Changed**:
+      - `packages/api/src/lib/image-processing.ts` — new private `autoOriented()`; called at the entry of `processImage`, `convertToWebP`, `getImageMetadata`, `matToSquare`, `measureArtBox` and `cropToSquare`
+      - `packages/api/tests/lib/image-processing-orientation.test.ts` — new, 9 cases
+      - `packages/api/tests/lib/product-media.test.ts` — one case added at the `buildProductMedia` seam
+
+      **Summary**:
+
+      `autoOriented()` materialises the displayed rectangle before anything measures it. Materialised rather than chained, which is the subtlety the ticket named: `sharp(x).metadata()` reports the input's stored dimensions, so an `.autoOrient()` further along the same pipeline does not correct a read taken earlier.
+
+      An untagged source — `orientation` absent or 1 — is returned untouched rather than re-encoded, so the catalogue path costs one metadata read and no lossy round-trip. A source sharp cannot read is also returned untouched; every caller already has its own fallback and an unreadable asset must never fail an upload.
+
+      `processImage` now generates the whole variant ladder from the oriented buffer, not just the original.
+
+      **On the two things the #545 comment asked for**
+
+      1. *Tagged fixture against the guard.* Placed at `buildProductMedia`, not in `product-orientation-guard.test.ts`. That suite feeds the route an `artBox` in the request payload, so a tagged image never reaches the code under test there — it would have proved nothing. `buildProductMedia` is where `measureArtBox` actually runs and where the guard's input is produced, so that is where the gap was. Confirmed non-vacuous: reverted `image-processing.ts` to HEAD and the new case failed, restored and it passed.
+
+      2. *Re-ran `backfill-art-box.ts`.* Read-only, `--dry-run --force`, so every stored box was re-measured with the fix rather than skipped:
+
+      ```
+      [dry run] products touched 41/41 | images scanned 163, measured 41, skipped 122, failed 0
+      Every orientation agrees with its artwork.
+      ```
+
+      Nothing was written. **No catalogue image is affected** — consistent with the comment's own expectation that the seeded catalogue came from stock and reference sources rather than phones. No `orientation` column needs re-deriving.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/lib`
+      - Result: PASS (29 files, 803 tests, 0 failing)
+      - Pre-fix evidence: the same new suite ran 8 failed / 1 passed — the one pass being the fixture's own sanity check that it really carries `orientation: 6`
+      - Build: `bun run typecheck` PASS (turbo, 3 packages, includes `tsconfig.test.json`) — ran as the pre-commit gate
+  - author: system
+    timestamp: '2026-08-31T04:46:06.736Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T04:39:04.291Z'
+    agent: claude-code
+    summary: 'Added autoOriented() and wired it into all six public functions in image-processing.ts. New 9-case orientation suite (RED 8/9 before, GREEN 9/9 after) plus a tagged-fixture case at the buildProductMedia seam. tests/lib 803/803, typecheck clean. Backfill dry-run --force: no catalogue image affected. Committed 9481d8f2.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T04:46:08.622Z'
+    duration: '00:07:04'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -69,7 +164,7 @@ implementation_steps:
     file: packages/api/tests/lib/image-processing-orientation.test.ts
     command: cd packages/api && bunx vitest run tests/lib/image-processing-orientation.test.ts
     expected_result: FAIL - each function processes the stored orientation
-    status: pending
+    status: done
     code: |-
       // Build the fixture with sharp(...).withMetadata({ orientation: 6 }).
       // Assert on DIMENSIONS and artBox values only — image diffing is banned in this project.
@@ -77,21 +172,39 @@ implementation_steps:
     action: verify-fail
     description: Confirm the tests reproduce the defect
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Materialise an auto-oriented buffer at the entry of each public function in image-processing.ts, before any metadata() read
     file: packages/api/src/lib/image-processing.ts
-    status: pending
+    status: done
   - id: 4
     action: verify-pass
     description: Confirm the new tests pass and every existing image-processing test still passes
     command: cd packages/api && bunx vitest run tests/lib
     expected_result: PASS - no regression
-    status: pending
+    status: done
   - id: 5
     action: commit
     description: Commit the fix
     command: 'git add packages/api/src/lib/image-processing.ts packages/api/tests/lib && git commit -m "fix(api): honour EXIF orientation on upload instead of stripping it"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 5
+started: '2026-08-31T04:39:04.291Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:07:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run tests/lib
+  test_output: 'Test Files 29 passed (29) | Tests 803 passed (803). New suite tests/lib/image-processing-orientation.test.ts: 9/9. Pre-fix run of the same suite: 8 failed, 1 passed.'
+  build_passed: true
+  build_command: bun run typecheck (turbo, 3 packages incl. tsconfig.test.json)
+  verified_at: '2026-08-31T04:45:49.960Z'
+completed: '2026-08-31T04:46:06.736Z'

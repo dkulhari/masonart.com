@@ -407,8 +407,13 @@ adminVendorPayablesApp.post(
           entityId: id,
           outcome: "failure",
           summary: `Settlement refused: ${error.message}`,
-          after: {
-            vendorId: id,
+          // The attempt, not a state: no money moved, so there is no `after` to
+          // report. An `after.amount` on a payment that never happened reads as
+          // a settled figure to anything scanning the trail for what was paid.
+          metadata: {
+            // NOT `vendorId`: `recordAudit` reserves that key for the shop a
+            // VENDOR request was written for, and an admin acts for nobody.
+            payeeVendorId: id,
             amount,
             reference: reference ?? null,
             jobIds,

@@ -309,8 +309,16 @@ const adminVendorInviteRoute = adminVendorInviteApp.post(
           entityId: id,
           outcome: "failure",
           summary: `Refused: ${email} could not be linked to ${vendor.name ?? id}`,
-          after: { email, userId: newUserId, created: false },
-          metadata: { orphanRemoved, reason },
+          // The attempt, not a state: nothing was linked, so there is no
+          // `after` to report. `created: false` in an `after` reads as a
+          // recorded outcome of a write that never landed.
+          metadata: {
+            email,
+            userId: newUserId,
+            created: false,
+            orphanRemoved,
+            reason,
+          },
         });
 
         if (isUniqueViolation(error)) {

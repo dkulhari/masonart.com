@@ -732,7 +732,20 @@ describe('POST /api/admin/vendors/:id/settlements', () => {
         outcome: 'failure',
       })
       expect(String(entry().summary)).toMatch(/settled/i)
-      expect(entry().after).toMatchObject({ vendorId: VENDOR_ID, amount: '1956.25' })
+
+      // The attempt lives in `metadata`, and the row carries NO `after`: no
+      // money moved, and an `after.amount` on a payment that never happened
+      // reads as a settled figure to anything scanning the trail for what we
+      // paid. `payeeVendorId`, not `vendorId` — that key is reserved by
+      // `recordAudit` for the shop a VENDOR-PORTAL request was written for.
+      expect(entry().metadata).toMatchObject({
+        payeeVendorId: VENDOR_ID,
+        amount: '1956.25',
+        reference: 'NEFT-2026-08-17-001',
+      })
+      expect(entry().metadata.jobIds).toEqual([JOB_A, JOB_SETTLED])
+      expect(entry().after ?? null).toBeNull()
+      expect(entry().before ?? null).toBeNull()
     })
 
     it('writes the refusal OUTSIDE the transaction, or the rollback erases the evidence', async () => {

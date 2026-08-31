@@ -498,7 +498,12 @@ adminVendorRatesApp.post(
           effectiveFrom: startsAt,
           effectiveTo: candidate.effectiveTo,
         },
-        metadata: { vendorId: id, supersededRateId: incumbent?.id ?? null },
+        metadata: {
+          // NOT `vendorId`: `recordAudit` reserves that key for the shop a
+          // VENDOR request was written for, and an admin acts for nobody.
+          ratedVendorId: id,
+          supersededRateId: incumbent?.id ?? null,
+        },
       });
 
       return c.json(
@@ -614,7 +619,11 @@ adminVendorRatesApp.patch(
         summary: `Edited the ${candidate.kind} rate band (${Object.keys(delta.after ?? {}).join(", ") || "no change"})`,
         before: delta.before,
         after: delta.after,
-        metadata: { vendorId: id },
+        metadata: {
+          // NOT `vendorId`: `recordAudit` reserves that key for the shop a
+          // VENDOR request was written for, and an admin acts for nobody.
+          ratedVendorId: id,
+        },
       });
 
       return c.json({ message: "Rate updated", rate });
@@ -684,7 +693,11 @@ adminVendorRatesApp.post(
           `(₹${target.amount}) with effect from ${endsAt.toISOString()}`,
         before: { effectiveTo: target.effectiveTo },
         after: { effectiveTo: endsAt },
-        metadata: { vendorId: id },
+        metadata: {
+          // NOT `vendorId`: `recordAudit` reserves that key for the shop a
+          // VENDOR request was written for, and an admin acts for nobody.
+          ratedVendorId: id,
+        },
       });
 
       return c.json({ message: "Rate closed", rate });

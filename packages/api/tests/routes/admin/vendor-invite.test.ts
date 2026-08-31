@@ -549,11 +549,24 @@ describe('the privilege trail', () => {
     expect(created?.after ?? null).toBeNull()
     expect(created?.metadata).toMatchObject({ orphanRemoved: true })
 
-    expect(auditFor('vendor.invited')).toMatchObject({
+    const refused = auditFor('vendor.invited')
+    expect(refused).toMatchObject({
       entityType: 'vendor',
       entityId: VENDOR_ID,
       outcome: 'failure',
     })
+
+    // The attempt lives in `metadata`, and the refusal carries NO `after`:
+    // nobody was linked, and `created: false` sitting in an `after` reads as a
+    // recorded outcome of a write that never landed.
+    expect(refused?.metadata).toMatchObject({
+      email: 'shop@printworks.test',
+      userId: NEW_USER_ID,
+      created: false,
+      orphanRemoved: true,
+    })
+    expect(refused?.after ?? null).toBeNull()
+    expect(refused?.before ?? null).toBeNull()
   })
 
   it('says in the row when the cleanup failed and the account is still out there', async () => {

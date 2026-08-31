@@ -210,6 +210,14 @@ describe('POST /api/admin/vendors/:id/rates', () => {
     // opened, and only together do they explain what we now pay.
     expect(auditArgs().before).toMatchObject({ amount: '450.00' });
     expect(auditArgs().after).toMatchObject({ amount: '600.00' });
+
+    // `ratedVendorId`, NOT `vendorId`: `recordAudit` reserves `metadata.vendorId`
+    // for the shop a VENDOR-PORTAL request was written for and merges it AFTER
+    // the caller's metadata. On an admin request there is nothing to merge, so a
+    // caller-supplied `vendorId` would survive and make this admin rate edit
+    // indistinguishable from a vendor-portal write.
+    expect(auditArgs().metadata).toMatchObject({ ratedVendorId: VENDOR_ID });
+    expect(auditArgs().metadata).not.toHaveProperty('vendorId');
   });
 
   it('records the band with no before when nothing priced it before', async () => {
@@ -267,6 +275,8 @@ describe('PATCH /api/admin/vendors/:id/rates/:rateId', () => {
     });
     expect(auditArgs().before).toEqual({ amount: '450.00' });
     expect(auditArgs().after).toEqual({ amount: '525.00' });
+    expect(auditArgs().metadata).toMatchObject({ ratedVendorId: VENDOR_ID });
+    expect(auditArgs().metadata).not.toHaveProperty('vendorId');
   });
 });
 
@@ -292,6 +302,8 @@ describe('POST /api/admin/vendors/:id/rates/:rateId/close', () => {
     // ISO string on the way into jsonb, and that is `lib/audit`'s test.
     expect(auditArgs().before).toEqual({ effectiveTo: null });
     expect(auditArgs().after).toEqual({ effectiveTo: endsAt });
+    expect(auditArgs().metadata).toMatchObject({ ratedVendorId: VENDOR_ID });
+    expect(auditArgs().metadata).not.toHaveProperty('vendorId');
   });
 });
 
@@ -522,5 +534,51 @@ describe('POST /api/admin/ai-moderation/bulk-approve', () => {
     });
     expect(auditArgs().before).toEqual({ moderationStatus: 'pending_review' });
     expect(auditArgs().after).toEqual({ moderationStatus: 'approved' });
+  });
+});
+
+describe('POST /api/admin/ai-moderation/bulk-reject', () => {
+  it('records one row per generation that actually moved, with the reason and category', async () => {
+    queue(
+      selectMock,
+      [
+        { id: GENERATION_ID, moderationStatus: 'pending_review' },
+        { id: GENERATION_ID_2, moderationStatus: 'flagged' },
+      ],
+      [
+        { id: GENERATION_ID, moderationStatus: 'rejected' },
+        // Failed inside the bulk loop and did not move, so it must not get a
+        // row saying it was rejected.
+        { id: GENERATION_ID_2, moderationStatus: 'flagged' },
+      ]
+    );
+    bulkReject.mockResolvedValue({ rejected: 1, failed: 1 });
+
+    const res = await send('/api/admin/ai-moderation/bulk-reject', 'POST', {
+      generationIds: [GENERATION_ID, GENERATION_ID_2],
+      reason: 'Nudity',
+      category: 'nsfw',
+    });
+
+    expect(res.status).toBe(200);
+    expect(auditCalls()).toHaveLength(1);
+    expect(auditArgs()).toMatchObject({
+      action: 'ai_generation.moderated',
+      entityType: 'ai_generation',
+      entityId: GENERATION_ID,
+    });
+    expect(auditArgs().before).toEqual({ moderationStatus: 'pending_review' });
+    expect(auditArgs().after).toEqual({ moderationStatus: 'rejected' });
+
+    // A rejection is the appealable half of moderation, and the two things an
+    // appeal argues with are why it was rejected and under which category. A
+    // bulk row without them says only that fifty generations were refused.
+    expect(auditArgs().metadata).toMatchObject({
+      decision: 'rejected',
+      bulk: true,
+      requested: 2,
+      reason: 'Nudity',
+      category: 'nsfw',
+    });
   });
 });
