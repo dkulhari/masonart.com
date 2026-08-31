@@ -1,0 +1,88 @@
+/**
+ * CLI contract for generate-room-mockups.
+ *
+ * Split out from the driver so it can be tested without a filesystem. Unknown
+ * flags are an error rather than a shrug: a typo in --templates would
+ * otherwise silently render against the default directory.
+ */
+
+import type { RoomTemplate } from './templates';
+
+export interface RunOptions {
+  posters: string;
+  templates: string;
+  out: string;
+  only: string[] | null;
+  frame: string | null;
+  dryRun: boolean;
+}
+
+const VALUE_FLAGS = ['--posters', '--templates', '--out', '--only', '--frame'] as const;
+const BOOL_FLAGS = ['--dry-run'] as const;
+
+export function parseArgs(argv: string[]): RunOptions {
+  const args = argv.slice(2);
+  const values = new Map<string, string>();
+  let dryRun = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const flag = args[i];
+    // args[i] is `string | undefined` under noUncheckedIndexedAccess, but the
+    // loop bound guarantees it is defined here — narrow so the checks below
+    // (Array#includes, Map#set) can take a plain string.
+    if (flag === undefined) continue;
+
+    if ((BOOL_FLAGS as readonly string[]).includes(flag)) {
+      dryRun = true;
+      continue;
+    }
+
+    if (!(VALUE_FLAGS as readonly string[]).includes(flag)) {
+      throw new Error(`Unknown flag: ${flag}`);
+    }
+
+    const value = args[i + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(`Flag ${flag} needs a value.`);
+    }
+
+    values.set(flag, value);
+    i++;
+  }
+
+  const posters = values.get('--posters');
+  if (!posters) {
+    throw new Error('--posters <dir> is required.');
+  }
+
+  const only = values.get('--only');
+
+  return {
+    posters,
+    templates: values.get('--templates') ?? '.cache/room-templates',
+    out: values.get('--out') ?? './out',
+    only: only ? only.split(',').map((s) => s.trim()).filter(Boolean) : null,
+    frame: values.get('--frame') ?? null,
+    dryRun,
+  };
+}
+
+/**
+ * Narrow the template set to the requested ids, preserving template file order
+ * so the contact sheet's numbering is stable across runs.
+ */
+export function selectTemplates(
+  all: RoomTemplate[],
+  only: string[] | null
+): RoomTemplate[] {
+  if (!only) return all;
+
+  const known = new Set(all.map((t) => t.id));
+  const missing = only.filter((id) => !known.has(id));
+  if (missing.length > 0) {
+    throw new Error(`No template with id: ${missing.join(', ')}`);
+  }
+
+  const wanted = new Set(only);
+  return all.filter((t) => wanted.has(t.id));
+}
