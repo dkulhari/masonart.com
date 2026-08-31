@@ -61,7 +61,7 @@ const tracking = new Hono<{ Variables: TrackingVariables }>();
  * survives as a tiebreak, not as the choice; `order_shipments_live_label_idx`
  * is what makes at most one row live on a migrated database.
  */
-async function liveShipmentFor(orderId: string) {
+export async function liveShipmentForOrder(orderId: string) {
   const shipment = await db.query.orderShipments.findFirst({
     where: and(
       eq(orderShipments.orderId, orderId),
@@ -85,7 +85,9 @@ async function liveShipmentFor(orderId: string) {
  * and none of that belongs to the customer. Spreading the row would leak the
  * next dispatch column somebody adds, silently.
  */
-function trackingPayload(shipment: Awaited<ReturnType<typeof liveShipmentFor>>) {
+export function trackingPayloadForOrder(
+  shipment: Awaited<ReturnType<typeof liveShipmentForOrder>>
+) {
   if (!shipment) return null;
 
   return {
@@ -172,8 +174,8 @@ tracking.get(
         );
       }
 
-      // The LIVE shipment — see liveShipmentFor. Never the newest.
-      const shipment = await liveShipmentFor(order.id);
+      // The LIVE shipment — see liveShipmentForOrder. Never the newest.
+      const shipment = await liveShipmentForOrder(order.id);
 
       // Return tracking info
       return c.json({
@@ -185,7 +187,7 @@ tracking.get(
           state: order.shippingAddress?.state,
           postalCode: order.shippingAddress?.postalCode,
         },
-        tracking: trackingPayload(shipment),
+        tracking: trackingPayloadForOrder(shipment),
         timeline: {
           orderedAt: order.createdAt,
           shippedAt: order.shippedAt,
@@ -285,8 +287,8 @@ tracking.get(
         );
       }
 
-      // The LIVE shipment — see liveShipmentFor. Never the newest.
-      const shipment = await liveShipmentFor(order.id);
+      // The LIVE shipment — see liveShipmentForOrder. Never the newest.
+      const shipment = await liveShipmentForOrder(order.id);
 
       // Return tracking info (same format as lookup endpoint)
       return c.json({
@@ -298,7 +300,7 @@ tracking.get(
           state: order.shippingAddress?.state,
           postalCode: order.shippingAddress?.postalCode,
         },
-        tracking: trackingPayload(shipment),
+        tracking: trackingPayloadForOrder(shipment),
         timeline: {
           orderedAt: order.createdAt,
           shippedAt: order.shippedAt,

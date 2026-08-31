@@ -92,6 +92,35 @@ export interface ShippingAddress {
   countryCode?: string
 }
 
+/**
+ * The live `order_shipments` row, as `GET /api/admin/orders/:id` returns it.
+ *
+ * Replaces the old `ShippingDetails` jsonb shape: #707 stopped writing
+ * `orders.shipping_details`, so a panel still reading it renders empty on every
+ * order shipped from now on.
+ *
+ * `carrier` is the aggregator we bought through and `courierName` is who
+ * actually carries the parcel — the screen shows the courier, because that is
+ * the name on the delivery. `costPaise` is what WE paid; shipping is baked into
+ * the item price so the customer is charged nothing for it, which makes this
+ * the only number margin can be read from. Admin-only by construction: the
+ * customer projection is the narrow allow-list in `routes/tracking.ts`.
+ */
+export interface Shipment {
+  id: string
+  carrier?: string | null
+  courierName?: string | null
+  awbNumber?: string | null
+  trackingNumber?: string | null
+  trackingUrl?: string | null
+  status?: string | null
+  shippedAt?: string | null
+  estimatedDeliveryAt?: string | null
+  deliveredAt?: string | null
+  costPaise?: number | null
+}
+
+/** What the shipping form sends to `PATCH /admin/orders/:id/shipping`. */
 export interface ShippingDetails {
   carrier?: string
   trackingNumber?: string
@@ -138,7 +167,7 @@ export interface FullOrder {
   orderType: 'regular' | 'ai_generated' | 'trade'
   customer?: OrderCustomer | null
   shippingAddress?: ShippingAddress | null
-  shippingDetails?: ShippingDetails | null
+  shipment?: Shipment | null
   shippingMethod?: string | null
   shippingCost: string
   subtotal: string
@@ -901,26 +930,30 @@ export function OrderDetail({
             </div>
           )}
 
-          {/* Shipping Details */}
-          {order.shippingDetails && (
-            <div className="rounded-xl border border-border bg-card p-4">
-              <SectionHeader icon={Truck} title="Shipping Details" />
+          {/* Shipment */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <SectionHeader icon={Truck} title="Shipment" />
+            {order.shipment ? (
               <div className="mt-3 space-y-2 text-sm">
-                {order.shippingDetails.carrier && (
+                {(order.shipment.courierName || order.shipment.carrier) && (
                   <p>
                     <span className="text-muted-foreground">Carrier:</span>{' '}
-                    <span className="text-foreground">{order.shippingDetails.carrier}</span>
+                    <span className="text-foreground">
+                      {/* The courier is the name on the parcel; `carrier` is
+                          the aggregator we bought through. */}
+                      {order.shipment.courierName || order.shipment.carrier}
+                    </span>
                   </p>
                 )}
-                {order.shippingDetails.trackingNumber && (
+                {(order.shipment.awbNumber || order.shipment.trackingNumber) && (
                   <p>
                     <span className="text-muted-foreground">Tracking:</span>{' '}
                     <span className="font-mono text-foreground">
-                      {order.shippingDetails.trackingNumber}
+                      {order.shipment.awbNumber || order.shipment.trackingNumber}
                     </span>
-                    {order.shippingDetails.trackingUrl && (
+                    {order.shipment.trackingUrl && (
                       <a
-                        href={order.shippingDetails.trackingUrl}
+                        href={order.shipment.trackingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ml-2 inline-flex items-center text-brand-500 hover:underline"
@@ -930,17 +963,32 @@ export function OrderDetail({
                     )}
                   </p>
                 )}
-                {order.shippingDetails.estimatedDelivery && (
+                {order.shipment.estimatedDeliveryAt && (
                   <p>
                     <span className="text-muted-foreground">Est. Delivery:</span>{' '}
                     <span className="text-foreground">
-                      {new Date(order.shippingDetails.estimatedDelivery).toLocaleDateString('en-IN')}
+                      {new Date(order.shipment.estimatedDeliveryAt).toLocaleDateString('en-IN')}
+                    </span>
+                  </p>
+                )}
+                {typeof order.shipment.costPaise === 'number' && (
+                  <p>
+                    <span className="text-muted-foreground">We paid:</span>{' '}
+                    <span className="text-foreground">
+                      ₹{(order.shipment.costPaise / 100).toFixed(2)}
                     </span>
                   </p>
                 )}
               </div>
-            </div>
-          )}
+            ) : (
+              /* An explicit empty state, not a hidden panel. Rendering nothing
+                 is how a broken projection stays invisible — which is exactly
+                 how orders.shipping_details went unread for months. */
+              <p className="mt-3 text-sm text-muted-foreground">
+                No shipment yet. Add a carrier and tracking number below.
+              </p>
+            )}
+          </div>
 
           {/* Payment Summary */}
           <div className="rounded-xl border border-border bg-card p-4">
@@ -1050,7 +1098,19 @@ export function OrderDetail({
 
       {showShippingModal && (
         <ShippingUpdateModal
-          currentDetails={order.shippingDetails}
+          // Seeded from the shipment the API actually wrote, so the value the
+          // form starts with and the value the save returns are one object.
+          currentDetails={
+            order.shipment
+              ? {
+                  carrier: order.shipment.courierName ?? order.shipment.carrier ?? undefined,
+                  trackingNumber: order.shipment.trackingNumber ?? undefined,
+                  trackingUrl: order.shipment.trackingUrl ?? undefined,
+                  awbNumber: order.shipment.awbNumber ?? undefined,
+                  estimatedDelivery: order.shipment.estimatedDeliveryAt ?? undefined,
+                }
+              : null
+          }
           onUpdate={handleShippingUpdate}
           onClose={() => setShowShippingModal(false)}
           isUpdating={isUpdating}

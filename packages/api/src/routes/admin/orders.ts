@@ -32,6 +32,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "../../database";
+import { liveShipmentForOrder } from "../tracking";
 import { recordAudit } from "../../lib/audit";
 import { isOrderNumber } from "../../lib/order-number";
 import {
@@ -555,7 +556,19 @@ adminOrdersApp.get("/:id", async (c) => {
         phone: order.guestPhone,
       },
       shippingAddress: order.shippingAddress,
-      shippingDetails: order.shippingDetails,
+      /**
+       * The whole row, deliberately — this is the ADMIN screen.
+       *
+       * `cost_paise` is what we paid a carrier, and since shipping is baked
+       * into the item price the customer is charged nothing for it. That makes
+       * it the only number margin can be computed from, and this is where it
+       * belongs. The customer-facing projection is the narrow one in
+       * `routes/tracking.ts`.
+       *
+       * Replaces `order.shippingDetails`, which #707 stopped writing — the
+       * panel would otherwise render empty on every order shipped from now on.
+       */
+      shipment: await liveShipmentForOrder(order.id),
       shippingMethod: order.shippingMethod,
       shippingCost: order.shippingCost,
       subtotal: order.subtotal,
