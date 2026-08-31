@@ -1,0 +1,97 @@
+ticket_number: 716
+title: 'Bug: uploaded phone photos are matted and squared in their stored orientation, not the one the admin saw'
+description: |-
+  ## Task
+
+  `packages/api/src/lib/image-processing.ts` never calls `.autoOrient()` (nor `.rotate()`), so every image entering the upload pipeline is processed in its **stored** orientation, ignoring its EXIF orientation tag.
+
+  A photograph taken on a phone in portrait is very often stored landscape with `orientation: 6`, meaning "rotate 90° to display". Every viewer the admin uses — Finder, Preview, the browser's file picker, the form's own preview — honours that tag. Sharp does not, unless asked.
+
+  ## Verified
+
+  Reproduced directly against this repo's installed sharp (libvips 8.17.3):
+
+  ```
+  input     : 800x400  orientation 6      (displays as 400x800)
+  no-fix    : 800x400  orientation undefined   <- tag stripped, pixels NOT rotated
+  autoOrient: 400x800  orientation undefined   <- correct
+  ```
+
+  Note the tag is not merely ignored — it is **stripped** from the output, so the rotation becomes unrecoverable downstream. Confirmed by grep: no `autoOrient` or `.rotate(` anywhere in `packages/api/src/lib/image-processing.ts`.
+
+  ## What this does to a real upload
+
+  Every function in that file measures or transforms using the stored dimensions:
+
+  - `matToSquare()` (`:243`) mats the artwork sideways.
+  - `measureArtBox()` (`:338`) measures a rotated art box, so `artBox` is written wrong and the storefront card re-frames against it.
+  - `cropToSquare()` (`:473`) applies the admin's chosen crop window to an image in a different orientation than the one they cropped, so the window lands somewhere else entirely.
+  - `processImage()` (`:75`) generates the whole WebP variant ladder from the wrong orientation.
+  - `orientation` on the product row is derived from a measurement of the wrong rectangle, so a portrait poster can be filed landscape.
+
+  The admin sees a correct thumbnail while picking the file, then a sideways product image afterwards, with no error anywhere.
+
+  ## Suggested fix
+
+  Call `.autoOrient()` once at the entry of each public function in `image-processing.ts`, before any `metadata()` read. The subtlety worth writing a test around: `sharp(x).metadata()` reports the **input's** stored dimensions, so calling `.autoOrient()` later in a chain does not retroactively correct an earlier `metadata()` read. The oriented image has to be materialised before it is measured.
+
+  ## Context
+
+  Found while building the room mockup generator (#701), which had the same gap in its own new code and fixed it there. This ticket is the pre-existing instance in the live upload path, which affects customer-facing catalogue images today.
+
+  Worth checking during the fix whether any already-uploaded product images are affected — a stored `artBox` that disagrees with its artwork is the visible symptom.
+feature: image-cdn-storage
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T03:54:47.106Z'
+last_updated: '2026-08-31T03:54:47.106Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - images
+  - sharp
+  - admin
+  - upload
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: an image tagged orientation 6 passed through matToSquare, cropToSquare, measureArtBox and processImage must be handled in its displayed orientation, not its stored one'
+    file: packages/api/tests/lib/image-processing-orientation.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-orientation.test.ts
+    expected_result: FAIL - each function processes the stored orientation
+    status: pending
+    code: |-
+      // Build the fixture with sharp(...).withMetadata({ orientation: 6 }).
+      // Assert on DIMENSIONS and artBox values only — image diffing is banned in this project.
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests reproduce the defect
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Materialise an auto-oriented buffer at the entry of each public function in image-processing.ts, before any metadata() read
+    file: packages/api/src/lib/image-processing.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the new tests pass and every existing image-processing test still passes
+    command: cd packages/api && bunx vitest run tests/lib
+    expected_result: PASS - no regression
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/api/src/lib/image-processing.ts packages/api/tests/lib && git commit -m "fix(api): honour EXIF orientation on upload instead of stripping it"'
+    status: pending
+current_step: 1

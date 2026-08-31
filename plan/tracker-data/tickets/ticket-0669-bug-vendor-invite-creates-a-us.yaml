@@ -1,0 +1,126 @@
+ticket_number: 669
+title: Bug - vendor invite creates a user and grants a role with no privilege audit row
+description: |-
+  ## Task
+
+  `vendor.invited` and `vendor.user_created` are in `AUDIT_ACTIONS` under category `privilege`, alongside `user.role_changed` which #643 wired. Neither string appears in `packages/api/src`. `routes/admin/vendor-invite.ts:98` creates a user row and grants that account vendor access, and the only trace is a floor row filed under `config` — so the privilege filter, one of the two launch-gate categories, does not show the single route in the codebase that mints a new privileged account.
+
+  The route already has a compensating delete at line 240 (`db.delete(users)` when the invite fails downstream), which means a created-then-deleted account can currently leave no evidence in either direction.
+
+  ## Context
+
+  `user.status_changed` is also declared and never emitted, but that one is not a wiring bug: `users.status` is readable and filterable in `routes/admin/customers.ts` (line 106, 156, 247) and there is no write endpoint for it — `adminCustomersApp` exposes only two GETs and the role-change PUT at line 356. It belongs on the waiver list in the coverage guard ticket, not here. Add the emitter in the same commit as the future suspend/reactivate endpoint.
+
+  Snapshot the invited email into the row. `actor_email` is the person who sent the invite; the invitee's address is the subject of the action and belongs in `after`.
+
+  Existing suite to extend: `packages/api/tests/routes/admin/vendor-invite.test.ts`. Assertion shape: `packages/api/tests/routes/admin/privilege-audit.test.ts`.
+feature: admin-audit-log
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T11:27:28.143Z'
+last_updated: '2026-08-30T11:27:28.143Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - audit
+  - privilege
+  - bug
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the invite emits both privilege actions, and that a rolled-back invite still leaves evidence
+    file: packages/api/tests/routes/admin/privilege-audit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/privilege-audit.test.ts
+    expected_result: FAIL - vendor-invite emits neither action
+    status: pending
+    code: |-
+      it('records the account it minted and the vendor it was granted', async () => {
+        // ...invite fixtures...
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'vendor.user_created',
+            entityType: 'user',
+            after: expect.objectContaining({ email: 'printer@example.com', role: 'vendor' }),
+          })
+        )
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'vendor.invited',
+            entityType: 'vendor',
+            entityId: VENDOR_ID,
+          })
+        )
+      })
+
+      it('leaves a failure row when the invite is compensated away', async () => {
+        // force the downstream failure that triggers db.delete(users) at line 240
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'vendor.invited', outcome: 'failure' })
+        )
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the new cases fail while the rest of the privilege suite still passes
+    command: cd packages/api && bunx vitest run tests/routes/admin/privilege-audit.test.ts
+    expected_result: FAIL - only the new cases
+    status: pending
+  - id: 3
+    action: implement
+    description: Emit both actions, including on the compensating-delete path
+    file: packages/api/src/routes/admin/vendor-invite.ts
+    status: pending
+    code: |-
+      import { recordAudit } from '../../lib/audit'
+
+      await recordAudit(c, {
+        action: 'vendor.user_created',
+        entityType: 'user',
+        entityId: newUserId,
+        after: { email, role: 'vendor', vendorId },
+        summary: `Created vendor account ${email} for vendor ${vendorId}`,
+      })
+
+      await recordAudit(c, {
+        action: 'vendor.invited',
+        entityType: 'vendor',
+        entityId: vendorId,
+        after: { email, userId: newUserId },
+        summary: `Invited ${email} to vendor ${vendorId}`,
+      })
+
+      // On the compensating path beside `db.delete(users)`: the account is gone but
+      // the attempt is not nothing, and a created-then-deleted privileged account
+      // with no trail is the exact hole this feature exists to close.
+      await recordAudit(c, {
+        action: 'vendor.invited',
+        entityType: 'vendor',
+        entityId: vendorId,
+        outcome: 'failure',
+        after: { email, userId: newUserId, rolledBack: true },
+        summary: `Invite of ${email} rolled back; account ${newUserId} deleted`,
+      })
+  - id: 4
+    action: verify-pass
+    description: Privilege suite and the vendor-invite route suite both green
+    command: cd packages/api && bunx vitest run tests/routes/admin/privilege-audit.test.ts tests/routes/admin/vendor-invite.test.ts
+    expected_result: PASS - no regression
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the privilege wiring
+    command: 'git add packages/api/src/routes/admin/vendor-invite.ts packages/api/tests/routes/admin/privilege-audit.test.ts && git commit -m "fix(api): audit vendor invites, including the compensated rollback path"'
+    status: pending
+current_step: 1

@@ -20,20 +20,90 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.413Z'
-last_updated: '2026-08-30T12:02:20.413Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T15:18:38.950Z'
+time_spent_minutes: 8
 labels:
   - api
   - admin
   - qc
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T15:10:12.484Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T15:11:19.551Z'
+    text: |-
+      **Implementation steps** (derived — this ticket carries no `implementation_steps`):
+
+      1. [write-test] Extend `packages/api/tests/routes/admin/production-jobs.test.ts` — rewrite the `POST /:jobId/reviews` describe for the transactional verdict: guard, move, defects-on-fail, review_id stamping, one audit row, refusal writes nothing but keeps the failure row.
+      2. [verify-fail] `bun run vitest run tests/routes/admin/production-jobs.test.ts` — expect RED.
+      3. [implement] Rewrite `POST /:jobId/reviews` in `packages/api/src/routes/admin/production-jobs.ts` as one transaction following #680's shape (FOR UPDATE, predicate repeated in the UPDATE WHERE, row-count mismatch → rollback, settled job frozen, `assertTransition`, `recordAudit(..., tx)` for the verdict and no `tx` for the refusal).
+      4. [verify-pass] Same command — expect GREEN.
+      5. [write-test] Tests for the new `GET /:jobId/photos` — shot list per stage, presigned DOWNLOAD urls for live photos only, missing required slots named, object key never returned, 404 never reaches the presigner, role gating.
+      6. [verify-fail] Expect RED.
+      7. [implement] Add `GET /:jobId/photos` using `getPresignedDownloadUrl` from `lib/storage` (NOT `lib/vendor-scope`) and `qcShotsForStage`/`requiredQcSlots` from `@chobii/shared`.
+      8. [verify-pass] Expect GREEN, then `bun run typecheck` in packages/api (src + tests).
+      9. [commit] Stage only the two files by explicit path.
+
+      **Design decision to flag** — "guard that the job is `qc_submitted`" is implemented **as `assertTransition`, not as a hardcoded status literal**. The matrix already encodes exactly that guard (`qc_submitted → qc_passed`, `qc_submitted → qc_failed`) *plus* the one deliberate exception the design carves out: `qc_passed → qc_failed`, "a second review may still fail a job before it leaves", documented in `production-transitions.ts` as reachable **only** through this route. A hardcoded `from !== 'qc_submitted'` refusal would make that edge dead code and would re-decide in the router what #680 established the matrix decides. Every other from-status is refused, and a `pass` is refused from anything but `qc_submitted`.
+  - author: mcp-client
+    timestamp: '2026-08-30T15:18:31.908Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a4b9154a` — feat(api): make the QC verdict move the job, and judge the photos it saw
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/production-jobs.ts` — `POST /:jobId/reviews` rewritten as one transaction; new `GET /:jobId/photos`; `createReviewSchema` now requires a non-empty `defects` on a fail; header docblock updated (route list, decision 4 rewritten, new decision 7 on keys vs signed URLs).
+      - `packages/api/tests/routes/admin/production-jobs.test.ts` — the QC section rewritten (23 new/rewritten cases) plus a presigner mock and `/photos` in the role-gating table.
+
+      **Summary**:
+      The verdict and the status move are now one fact in one transaction: FOR UPDATE read, settled-job freeze, `assertTransition`, insert the review, guarded UPDATE with the from-status repeated in the WHERE, stamp `review_id` onto every live photo, one audit row. `pass → qc_passed`, `fail → qc_failed`. A refused transition writes nothing — not the review either — so `production_job_reviews` stays append-only with nothing to be sorry about, and the `production_job.transition_refused` row is written OUTSIDE the rolled-back transaction while the `qc_approved`/`qc_rejected` row shares it. Exactly one audit row per verdict; no `transitioned` row beside it.
+
+      `GET /:jobId/photos` returns the whole `QC_SHOT_LIST` for the job's stage with a presigned DOWNLOAD url per live photo (`lib/storage`, **not** `lib/vendor-scope`), `missingRequiredSlots`, and never the object key. Nothing is signed until after the 404. A live photo in a slot outside the stage's list is surfaced with `onShotList: false` rather than dropped.
+
+      **Design decision** (flagged in the earlier comment): the "job is `qc_submitted`" guard is `assertTransition`, not a hardcoded literal. The matrix already encodes it, and hardcoding it would make `qc_passed → qc_failed` — the supervisor overturn, documented in `production-transitions.ts` as reachable only through this route — dead code. A `pass` is refused from anything but `qc_submitted`; a `fail` is additionally allowed from `qc_passed`, which is the edge that exists.
+
+      **Out of scope, noted for whoever picks it up**: `packages/web/app/routes/admin/production/$id.tsx` posts to this route. If its QC form can submit a `fail` with no defects it will now get a 400 — a web-side ticket, not this one.
+
+      **Verification**:
+      - Command: `bun run vitest run tests/routes/admin/production-jobs.test.ts` (cwd `packages/api`)
+      - Result: PASS (102 tests, 102 passing, 0 failing) — RED first at 23 failed / 79 passed before the implementation landed.
+      - Also PASS: `bun run vitest run tests/routes/route-shadowing.test.ts tests/lib/production-transitions.test.ts tests/lib/production-seam.test.ts tests/schema/production-jobs.test.ts` — 72 tests, 72 passing (the new `/:jobId/photos` is not shadowed by `/:jobId`).
+      - Gate: `bun run typecheck` (repo-wide, incl. `packages/api` tests via tsconfig.test.json) — 4 tasks successful, 0 errors. Pre-commit hook ran it and accepted the commit.
+  - author: system
+    timestamp: '2026-08-30T15:18:38.950Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T15:10:37.819Z'
+    agent: claude-code
+    summary: 'Landed #681 in commit a4b9154a. POST /:jobId/reviews is now one transaction (FOR UPDATE, settled-job freeze, assertTransition, review insert, guarded UPDATE with the from-status repeated, review_id stamped onto every live photo, one qc_approved/qc_rejected audit row sharing tx, refusal row written outside it). defects is now required on a fail. Added GET /:jobId/photos with presigned download urls from lib/storage. 102/102 tests in tests/routes/admin/production-jobs.test.ts, repo typecheck clean.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T15:18:36.945Z'
+    duration: '00:07:59'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T15:10:12.484Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:08:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:08:00'
+      tokens: 0
+completed: '2026-08-30T15:18:38.950Z'

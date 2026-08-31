@@ -1,0 +1,218 @@
+ticket_number: 667
+title: Tier 1 - audit production job assignment, status transitions and amount overrides
+description: |-
+  ## Task
+
+  `routes/admin/production-jobs.ts` contains zero `recordAudit` calls, and `AUDIT_ACTIONS` declares no `production_job.*` action at all. Every mutation on the production queue lands only the middleware floor row from `index.ts:226` — action `admin.request`, category `config`, summary `PATCH /api/admin/production/<id> → 200`, metadata limited to status/params/query. No `entityType`, no `entityId`, no `before`/`after`, because a middleware cannot know what changed.
+
+  So the audit log can prove somebody hit a job's endpoint and got a 200. It cannot say which stage the job moved from or to, which vendor it was assigned to, or what `amountActual` was overridden to — and that last one is money we pay a supplier.
+
+  This is the same tier as #641 (returns), #642 (orders) and #643 (privilege and tender): money paths that cannot be backfilled.
+
+  ## Context
+
+  Routes to cover in `packages/api/src/routes/admin/production-jobs.ts`:
+
+  - `POST /` (line 279) — job + items created in one transaction
+  - `POST /:jobId/assign` (line 397) — prices against the live rate card, writes `vendorId`, `amountExpected`, `assignedAt`, `status: 'assigned'`. This is the moment vendor cost is committed, so it is a `money` row.
+  - `PATCH /:jobId` (line 514) — `amountActual` override, dates, `status`. The header states there is deliberately no transition guard, so the audit row is the only record of an illegal or surprising jump.
+  - `POST /:jobId/reviews` (line 554) — QC verdict
+
+  **Implementation hazard:** PATCH currently issues the `UPDATE ... RETURNING` first and never reads the prior row, so `before` is not available at the call site. It needs a `SELECT` ahead of the update, then `diffRecords(before, after)` from `lib/audit` — the same shape `routes/admin/frames.ts:233` already uses.
+
+  `production_job_reviews` is already INSERT-only with a `reviewerId`, so its own history survives. The audit row duplicates the actor fact deliberately — the schema header for `admin_audit_log` says one place must answer "who did what", always.
+
+  Category: all `production_job.*` under `money`. The route header justifies `requireAdmin` on exactly that ground — "these rows carry what we pay a supplier".
+
+  Follow the test shape in `packages/api/tests/routes/admin/catalogue-audit.test.ts` (hoisted db mock, `recordAudit` spied via `vi.mock` over `../../../src/lib/audit`).
+feature: admin-audit-log
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T11:27:28.015Z'
+last_updated: '2026-08-31T01:42:38.643Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - audit
+  - production
+  - money
+acceptance_criteria: []
+comments:
+  - author: user
+    timestamp: '2026-08-31T01:42:32.328Z'
+    text: |-
+      #667 — Close as superseded-in-part. Do not implement.
+
+      Everything it asks for shipped in #679/#680:
+
+      - All four actions emit from routes/admin/production-jobs.ts — verified.
+      - Its hazard note is already fixed. It flags that PATCH updates before reading so before doesn't exist; #680 made the handler SELECT first (also needed for from in assertTransition), and diffRecords(job, updated, [...]) is live at :1158.
+
+      Implementing it as written would actively regress the code. It specifies *"all production_job.* under money"*; what shipped is money for the 4 that move rupees, fulfilmentfor the other 10 — andfulfilmentis a real enum value added by migration0023`. Someone working this ticket rewrites that map and undoes the reasoning behind an applied migration.
+
+      I found no residual scope.
+  - author: system
+    timestamp: '2026-08-31T01:42:38.643Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert each production mutation emits its precise action with a narrow before/after
+    file: packages/api/tests/routes/admin/production-audit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/production-audit.test.ts
+    expected_result: FAIL - recordAudit is never called from production-jobs.ts
+    status: pending
+    code: |-
+      it('records the stage transition, not just that somebody called PATCH', async () => {
+        queue(selectMock, [{ id: JOB_ID, status: 'assigned', amountActual: null }])
+        updateMock.mockImplementation(() => thenable([{ id: JOB_ID, status: 'printing', amountActual: null }]))
+
+        const res = await app().request(`/api/admin/production/${JOB_ID}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'printing' }),
+        })
+
+        expect(res.status).toBe(200)
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'production_job.status_changed',
+            entityType: 'production_job',
+            entityId: JOB_ID,
+            before: { status: 'assigned' },
+            after: { status: 'printing' },
+          })
+        )
+      })
+
+      it('records the vendor and the committed cost on assignment', async () => {
+        // ...assign fixtures...
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'production_job.assigned',
+            entityType: 'production_job',
+            after: expect.objectContaining({ vendorId: VENDOR_ID, amountExpected: expect.anything() }),
+          })
+        )
+      })
+
+      it('records a refused assignment as evidence', async () => {
+        // unpriced item -> 422, nothing written to the job, one failure row
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'production_job.assigned', outcome: 'failure' })
+        )
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails for the stated reason and not a fixture mistake
+    command: cd packages/api && bunx vitest run tests/routes/admin/production-audit.test.ts
+    expected_result: FAIL - recordAudit received 0 calls
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the production_job actions to the closed registry and map them to money
+    file: packages/shared/src/schemas/audit-log.ts
+    status: pending
+    code: |-
+      // In AUDIT_ACTIONS, under "Money — orders":
+        'production_job.created',
+        'production_job.assigned',
+        'production_job.status_changed',
+        'production_job.amount_overridden',
+        'production_job.review_recorded',
+
+      // In AUDIT_ACTION_CATEGORY:
+        'production_job.created': 'money',
+        'production_job.assigned': 'money',
+        'production_job.status_changed': 'money',
+        'production_job.amount_overridden': 'money',
+        'production_job.review_recorded': 'money',
+  - id: 4
+    action: implement
+    description: Read the prior row before PATCH updates it, then record the delta on every production mutation
+    file: packages/api/src/routes/admin/production-jobs.ts
+    status: pending
+    code: |-
+      import { recordAudit, diffRecords } from '../../lib/audit'
+
+      // PATCH /:jobId — the update currently runs first, so there is no `before` to
+      // diff against. Read it, then update.
+      const [existing] = await db
+        .select()
+        .from(productionJobs)
+        .where(eq(productionJobs.id, jobId))
+        .limit(1)
+
+      if (!existing) {
+        await recordAudit(c, {
+          action: 'production_job.status_changed',
+          entityType: 'production_job',
+          entityId: jobId,
+          outcome: 'failure',
+          summary: `Refused: production job ${jobId} not found`,
+        })
+        return c.json({ error: 'Production job not found' }, 404)
+      }
+
+      const [job] = await db
+        .update(productionJobs)
+        .set({ ...body, updatedAt: new Date() })
+        .where(eq(productionJobs.id, jobId))
+        .returning()
+
+      const { before, after } = diffRecords(existing, job)
+
+      // An amountActual override is a different question from a stage move, and a
+      // money filter must find it without also returning every print/frame step.
+      await recordAudit(c, {
+        action: body.amountActual !== undefined
+          ? 'production_job.amount_overridden'
+          : 'production_job.status_changed',
+        entityType: 'production_job',
+        entityId: jobId,
+        before,
+        after,
+        summary: body.amountActual !== undefined
+          ? `Job ${jobId} payable overridden to ${body.amountActual}`
+          : `Job ${jobId} ${existing.status} → ${job.status}`,
+      })
+
+      // POST /:jobId/assign — after the update, and on the 422 refusal path too:
+      await recordAudit(c, {
+        action: 'production_job.assigned',
+        entityType: 'production_job',
+        entityId: jobId,
+        before: { vendorId: job.vendorId, status: job.status, amountExpected: job.amountExpected },
+        after: { vendorId, status: 'assigned', amountExpected },
+        summary: `Job ${jobId} assigned to ${vendor.name} at ${amountExpected}`,
+      })
+  - id: 5
+    action: verify-pass
+    description: Confirm the new suite passes and the existing production-jobs suite is unbroken
+    command: cd packages/api && bunx vitest run tests/routes/admin/production-audit.test.ts tests/routes/admin/production-jobs.test.ts
+    expected_result: PASS - no regression in production-jobs.test.ts
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Typecheck source and tests — AUDIT_ACTIONS is a closed tuple, a typo fails here
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS - 0 errors
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the production audit tier
+    command: 'git add packages/shared/src/schemas/audit-log.ts packages/api/src/routes/admin/production-jobs.ts packages/api/tests/routes/admin/production-audit.test.ts && git commit -m "feat(api): audit production job assignment, stage changes and cost overrides"'
+    status: pending
+current_step: 1
+completed: '2026-08-31T01:42:38.643Z'

@@ -1,0 +1,171 @@
+ticket_number: 671
+title: Guard - fail the build when AUDIT_ACTIONS declares an action nothing emits
+description: |-
+  ## Task
+
+  Ten of the forty-one actions in `AUDIT_ACTIONS` are emitted by no code at all. Nothing caught that, because the registry's type safety runs one way: a call site with a typo fails typecheck, but a declared action with no call site is invisible. The registry is meant to be the guard rail and it currently describes a trail wider than the one that exists — the viewer's action filter offers `vendor.payable_settled`, and the empty result reads as "never happened" rather than "never recorded".
+
+  Add a test that scans `packages/api/src` for every member of `AUDIT_ACTIONS` and fails on any that no source file emits, with an explicit waiver list for actions declared ahead of their route.
+
+  ## Context
+
+  This is the same class of guard as `packages/api/src/database/raw-sql-objects.ts` from #663: a manifest plus a test that fails when reality drifts from it. Follow that precedent — the failure message must name the dead action and say what to do, not just assert a count.
+
+  Known waivers at the time of writing, both declared with no write route in the codebase:
+
+  - `wallet.adjusted` — `/api/admin/wallet-config` sets config; there is no admin balance-adjustment endpoint.
+  - `user.status_changed` — `users.status` is filterable in `admin/customers.ts` but `adminCustomersApp` exposes only two GETs and the role-change PUT at line 356.
+
+  Each waiver carries a one-line reason in the file. A waiver with no reason is how the list becomes a graveyard.
+
+  The scan is a grep over source text, not a runtime check — an action emitted only on an error branch still counts as wired, and requiring runtime coverage would make the guard hostage to fixture completeness. Depends on the other four tickets landing first, or the guard fails on arrival.
+feature: admin-audit-log
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T11:27:28.255Z'
+last_updated: '2026-08-31T01:46:53.243Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - audit
+  - test
+  - guard
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T01:46:53.243Z'
+    text: |-
+      Note from the production-pipeline run (feature complete, PR #3).
+
+      **production-pipeline no longer blocks this ticket. Verified at head: all 14 of its actions have emitters.**
+
+      | action | emitter |
+      |---|---|
+      | `production_job.created`, `.assigned`, `.reassigned`, `.amount_overridden`, `.qc_approved`, `.qc_rejected`, `order.consolidator_set` | `routes/admin/production-jobs.ts` |
+      | `production_job.transitioned`, `.transition_refused` | `routes/admin/production-jobs.ts` + `routes/vendor.ts` |
+      | `production_job.photos_submitted`, `production_transfer.received` | `routes/vendor.ts` + `lib/vendor-scope.ts` |
+      | `production_job.label_issued`, `production_transfer.dispatched` | `routes/vendor.ts` |
+      | `production_transfer.declared_lost` | `routes/admin/transfers.ts` |
+
+      **This ticket would have caught a real window.** #679 declared all 14 ahead of their emitters — deliberately, as the one place the "declare in the same phase as the emitter" rule was broken, because the emitters were three phases away. Nothing enforced that except a note in a prompt. Phases 3 and 4 closed it, but if they had not, or had landed in a different order, the registry would have advertised 14 actions nothing wrote and no test would have said so.
+
+      **Remaining blockers are exactly #668, #669, #670 and the waiver list** — twelve dead actions, mapping onto those with nothing left over. Your dependency ordering is right. Suggested sequence: #669 → #668 (payables half only) → #670 → this.
+
+      **One limit worth writing into the ticket, so the guard is not mistaken for more than it is.**
+
+      A static scan proves an action *appears* at a call site. It does not prove the call site is reachable. This run produced two cases where that distinction was the whole defect:
+
+      - **`guardFor`** in `lib/production-transitions.ts` was exported, documented as "the checklist for #680/#681/#684", and **called from nowhere for three phases**. Three guarded edges passed through `PATCH` unchecked, one of which (`qc_passed → dispatched`) wedged an order permanently with no repair path. A presence scan would have seen the export and said nothing.
+      - **#693's `labelIssued` chain** passed a guard value "upward only" (`true`, never `false`), and `nextVendorActions` blocks only on an explicit `false` — so it rendered identically to passing nothing. Two branches were unreachable in production and the only test touching them fed a value the app never produced.
+
+      Both were found by adversarial review and mutation testing, not by static presence. So the honest claim for this guard is "every declared action is written somewhere", not "every declared action is emitted". Worth stating in the ticket, because the second reading is the one people will take from a green build.
+
+      Related: the reverse direction is already safe — a typo at a call site fails typecheck against `AuditAction`. This guard closes the other direction. The third direction — declared, present, unreachable — stays open, and mutation testing is currently the only thing that finds it.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Scan source for every declared action and fail on the unemitted ones
+    file: packages/api/tests/lib/audit-action-coverage.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/audit-action-coverage.test.ts
+    expected_result: FAIL until the wiring tickets land - names each dead action
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import { readdirSync, readFileSync, statSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { AUDIT_ACTIONS } from '@chobii/shared'
+
+      /**
+       * Declared ahead of the route that will emit them. A waiver needs a reason:
+       * without one the list becomes a graveyard and the guard stops guarding.
+       */
+      const WAIVED: Record<string, string> = {
+        'wallet.adjusted':
+          'No admin balance-adjustment endpoint exists; wallet-config sets config only.',
+        'user.status_changed':
+          'users.status is filterable in admin/customers.ts but has no write route.',
+      }
+
+      function sourceFiles(dir: string): string[] {
+        return readdirSync(dir).flatMap((entry) => {
+          const path = join(dir, entry)
+          if (statSync(path).isDirectory()) return sourceFiles(path)
+          return path.endsWith('.ts') ? [path] : []
+        })
+      }
+
+      describe('every declared audit action has an emitter', () => {
+        const corpus = sourceFiles(join(import.meta.dirname, '../../src'))
+          .map((path) => readFileSync(path, 'utf8'))
+          .join('\n')
+
+        it('leaves no action declared that nothing emits', () => {
+          const dead = AUDIT_ACTIONS.filter(
+            (action) =>
+              !WAIVED[action] &&
+              !corpus.includes(`'${action}'`) &&
+              !corpus.includes(`"${action}"`)
+          )
+
+          expect(
+            dead,
+            `These actions are in AUDIT_ACTIONS but no source file emits them, so the ` +
+              `viewer offers a filter that returns nothing forever. Wire a recordAudit ` +
+              `call, or add a waiver with a reason in WAIVED above:\n  ${dead.join('\n  ')}`
+          ).toEqual([])
+        })
+
+        it('keeps the waiver list honest — a waived action that got wired must leave', () => {
+          const stale = Object.keys(WAIVED).filter(
+            (action) => corpus.includes(`'${action}'`) || corpus.includes(`"${action}"`)
+          )
+          expect(stale, `Now emitted; drop from WAIVED: ${stale.join(', ')}`).toEqual([])
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the guard names the dead actions rather than failing opaquely
+    command: cd packages/api && bunx vitest run tests/lib/audit-action-coverage.test.ts
+    expected_result: FAIL - message lists each unwired action by name
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: With the four wiring tickets landed, the guard passes with only the two reasoned waivers
+    command: cd packages/api && bunx vitest run tests/lib/audit-action-coverage.test.ts
+    expected_result: PASS - 2 waivers, 0 dead actions
+    status: pending
+  - id: 4
+    action: implement
+    description: Note the guard in the registry header so the next action added knows the rule
+    file: packages/shared/src/schemas/audit-log.ts
+    status: pending
+    code: |-
+      /**
+       * ...existing AUDIT_ACTIONS header...
+       *
+       * The tuple is checked both ways. A call site with a typo fails typecheck; an
+       * action declared here that no source file emits fails
+       * `packages/api/tests/lib/audit-action-coverage.test.ts`. Ten of these were
+       * dead before that guard existed, and the viewer offered every one of them as
+       * a filter that could only ever return nothing.
+       */
+  - id: 5
+    action: verify-pass
+    description: Full api suite and typecheck
+    command: cd packages/api && bun run test && bun run typecheck
+    expected_result: PASS - no regression, 0 type errors
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the coverage guard
+    command: 'git add packages/api/tests/lib/audit-action-coverage.test.ts packages/shared/src/schemas/audit-log.ts && git commit -m "test(api): fail when AUDIT_ACTIONS declares an action nothing emits"'
+    status: pending
+current_step: 1

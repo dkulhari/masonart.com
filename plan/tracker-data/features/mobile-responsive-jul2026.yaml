@@ -13,13 +13,20 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 2
+  total_duration: "00:08:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:07:00"
+      tokens: 0
+    antigravity:
+      sessions: 1
+      duration: "00:01:00"
+      tokens: 0
 tickets:
-  todo:
-    "361": "DECISION: order numbers still use the masonart MA- prefix after the rebrand"
+  todo: {}
   in_progress: {}
   done:
     "348": "BUG: Mobile nav drawer is transparent — page content bleeds through, menu illegible"
@@ -35,6 +42,7 @@ tickets:
     "358": "BUG: Track page placeholder shows stale 'MA-2024-001234' masonart order prefix"
     "359": "TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests"
     "360": "Product grid card sizing: residual height variance + home/listing ratio mismatch"
+    "361": "DECISION: order numbers still use the masonart MA- prefix after the rebrand"
     "595": "Layout: Prevent horizontal page overflow and right-edge clipping on narrowed viewports"
     "596": "Mobile top bar layout parity: [menu][search] left, centred wordmark, [wishlist][cart] right, 56px"
     "597": Mobile chrome scroll rule is inverted — top bar and tab bar both behave opposite to mesonart
@@ -42,7 +50,8 @@ tickets:
     "599": "Mobile drawer inventory: All Art, the 12 styles and the remaining pages, at mesonart's 24px scale"
     "600": "Mobile drawer footer: pinned account/login row and social icons"
 total_tickets: 20
-completion_percentage: 95
-is_completed: false
-last_activity: "2026-08-13T21:34:03.610Z"
+completion_percentage: 100
+is_completed: true
+last_activity: "2026-08-30T07:18:15.178Z"
 started: "2026-08-13T21:34:03.610Z"
+completed: "2026-08-30T07:15:19.541Z"

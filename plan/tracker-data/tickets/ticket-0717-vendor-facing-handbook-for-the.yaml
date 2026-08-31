@@ -1,0 +1,79 @@
+ticket_number: 717
+title: Vendor-facing handbook for the production portal
+description: |-
+  ## Task
+
+  Write the document a workshop reads before they touch the vendor portal for the first time, and keep a copy in the repo so it can be revised with the code it describes.
+
+  The production pipeline shipped its whole vendor surface — queue, QC shot lists, inter-vendor parcels, the despatch screen — with no vendor-facing documentation at all. Every refusal the API can answer with is written for a vendor to read, but nothing told them what the statuses mean, which photographs are required before "Send for approval" does anything, or that three of the refusals are instructions to do nothing rather than errors.
+
+  ## Scope
+
+  - A single self-contained HTML page, written from the code rather than from memory: status labels from `VENDOR_JOB_STATUS_LABELS`, button names and confirmation questions from `VENDOR_ACTION_COPY`, both shot lists slot-for-slot from `QC_SHOT_LIST`, file rules from `QC_PHOTO_CONTENT_TYPES` / `QC_PHOTO_MAX_BYTES` / `MAX_QC_PHOTOS_PER_JOB`, and the transfer fields from `createTransferSchema`.
+  - Published as a shareable artifact, and committed to `docs/user-guide/` so it is revised alongside the portal.
+  - Status chips reuse the portal's own palette, so the chips in the handbook are the chips on the vendor's screen.
+
+  ## Known gaps, deliberately left
+
+  - **Payments is thin.** The settlement cadence is not in the code, so the page says what a settled job means and stops there rather than inventing a policy.
+  - **No contact route.** Nothing in the code names how a vendor reaches support, so the page says "ask us" rather than inventing an address or an SLA.
+  - **HEIC advice unverified.** The "Most Compatible" camera setting is real iPhone guidance but has not been checked against a current iOS version.
+
+  These are why this ticket is worth reopening rather than deleting: the page is correct as far as the code goes, and incomplete exactly where the code was silent.
+feature: production-pipeline
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T04:16:21.763Z'
+last_updated: '2026-08-31T04:17:11.608Z'
+time_spent_minutes: 0
+labels:
+  - docs
+  - vendor-portal
+  - production-pipeline
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T04:17:08.871Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `75e12961` - docs(vendor): the handbook a workshop reads before touching the portal
+
+      **Artifact**: https://claude.ai/code/artifact/5c7dd4e4-afc2-4c8e-a532-75786a270b74
+      Private until shared from the page's share menu. Republishing the same file path from this conversation updates that URL in place; from any other conversation, pass the URL as `url` or a second artifact is created instead.
+
+      **Files Changed**:
+      - `docs/user-guide/vendor-handbook.html` — the page, byte-identical to what was published
+      - `docs/user-guide/README.md` — Vendor added to the role table and the role overview; it was the one role the index did not list
+
+      **Summary**:
+      A single self-contained HTML page — no external assets beyond Google Fonts — in eight sections: the three tabs, the job lifecycle, the shot lists, sending a parcel, receiving one, what you are paid, what to do when a button refuses, and what the portal withholds on purpose.
+
+      Written from the code rather than from memory. Every label is verbatim: `VENDOR_JOB_STATUS_LABELS`, `VENDOR_ACTION_COPY` (including the confirmation questions), `QC_SHOT_LIST` slot-for-slot for both stages, `QC_PHOTO_CONTENT_TYPES` / `QC_PHOTO_MAX_BYTES` / `MAX_QC_PHOTOS_PER_JOB`, and `createTransferSchema`'s field bounds. The status chips use the portal's own palette, so a chip in the handbook matches the chip on the vendor's screen.
+
+      The two sections that do real work: nine actual refusal messages mapped to a plain remedy — three of which ("nobody has been chosen to assemble this order", "you are assembling this order yourself", "written off as lost") read as errors but are instructions to do nothing — and a section stating the isolation rules plainly so nobody hunts for a withheld field.
+
+      Design: cool workshop-paper neutrals, Archivo / Source Serif 4 / IBM Plex Mono, full light and dark token sets including the unstamped `prefers-color-scheme` case, tables scrolling inside their own containers, and a print stylesheet that drops the contents rail and avoids breaking a lifecycle stage across pages.
+
+      **Verification**:
+      - Published and rendered at the URL above
+      - `diff` confirms the committed copy is byte-identical to the published file
+      - No test suite applies — this is a static document with no imports into the app
+
+      **Left open on purpose** (the reason to reopen rather than delete this ticket):
+      1. **Payments is thin** — the settlement cadence is not in the code, so the page explains what a settled job means and stops rather than inventing a policy.
+      2. **No contact route** — nothing in the code names how a vendor reaches support, so the page says "ask us".
+      3. **HEIC advice unverified** against a current iOS version.
+      4. The README's Customer / Trade / Admin guides it sits beside are still dead links — those documents do not exist.
+  - author: system
+    timestamp: '2026-08-31T04:17:11.608Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-31T04:17:11.608Z'

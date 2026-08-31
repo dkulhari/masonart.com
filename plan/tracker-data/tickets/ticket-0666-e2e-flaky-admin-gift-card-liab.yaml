@@ -1,0 +1,44 @@
+ticket_number: 666
+title: E2E flaky - admin gift card liability test reads a global total other tests are changing
+description: |-
+  ## Finding
+
+  Seen once in 9 full-file rounds of `tests/e2e/gift-cards.spec.ts` while verifying #661 (load average 10-16, the private :3010/:4321 server pair).
+
+  ```
+  tests/e2e/gift-cards.spec.ts:397 › admin gift cards › the outstanding liability rises by what was just issued
+    Error: expect(received).toBeCloseTo(expected, precision)
+    Expected: 1000
+    Received: 1500
+  ```
+
+  The test reads the admin outstanding-liability figure, issues a ₹1,000 card, reads it again, and asserts the delta is exactly 1000. That figure is **global**. Every other test in the file seeds its own gift card through `seedGiftCard`, and Playwright runs them in parallel workers, so any card issued between the two reads lands in the delta. A ₹500 card issued by a neighbour makes it 1500.
+
+  Unrelated to #661's cause — that one was a dirty shared cart — and it was not introduced by that fix. It is a pre-existing race that the fix's timing shift happened to expose.
+
+  ## Steps
+
+  - Reproduce by running the file with several workers under load, repeated
+  - Make the assertion independent of the global figure: either scope the read to the card just issued, or serialise the admin tests against seeding (`test.describe.configure({ mode: 'serial' })` is not enough on its own — other files seed too)
+  - Prefer asserting the issued card appears in the admin list with its amount over asserting a global delta
+  - Re-run repeatedly under load; a single green run proves nothing here
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T10:01:52.569Z'
+last_updated: '2026-08-30T10:01:52.569Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+  - gift-cards
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

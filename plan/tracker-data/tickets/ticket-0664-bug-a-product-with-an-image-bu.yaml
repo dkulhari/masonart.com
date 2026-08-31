@@ -27,20 +27,127 @@ description: |-
 feature: admin-panel
 type: bug
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T04:38:56.300Z'
-last_updated: '2026-08-30T04:38:56.300Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T07:06:15.660Z'
+time_spent_minutes: 8
 labels:
   - frontend
   - ui
   - bug
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T06:50:46.222Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T06:54:20.322Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `970de4e7` - fix(web): stop missing alt text from silently blocking the product save
+
+      **Decision**: took the second option from the ticket — soft warning, not a hard block. The API accepts an empty `altText` and older rows carry one, so making it a validated requirement would still refuse the save, just legibly: an admin editing a title would be forced to write alt text for images they never touched. Reporting it keeps Save working.
+
+      **Files Changed**:
+      - `packages/web/app/lib/product-images.ts` - new `isAltTextMissing()` predicate (undefined / empty / whitespace-only all count as missing)
+      - `packages/web/app/components/admin/ProductForm.tsx` - dropped `required` from the saved-image and staged-upload alt text inputs; added an `AltTextWarning` amber note rendered per row when alt text is missing
+      - `packages/web/tests/components/admin/ProductForm.alt-text.test.tsx` - new, 5 tests
+      - `packages/web/tests/components/admin/ProductForm.images.test.tsx` - replaced the now-wrong `marks the alt text input required` assertion from #368, with a comment pointing at the new file
+      - `packages/web/tests/lib/product-images.test.ts` - 2 tests for the predicate
+
+      **Summary**:
+      The `Alt text` input was marked `required` on every image row. An image with an empty `altText` failed native constraint validation, so the browser refused the submit before React saw it — no request, no banner, and `validateForm()` never ran. Inside the collapsible Images section Chrome could not focus the control to show its bubble, so it gave up silently and only logged "An invalid form control ... is not focusable".
+
+      Alt text is now reported rather than enforced. Both alt text inputs lost `required`; a row without alt text shows a non-blocking amber warning ("No alt text — hurts SEO and screen readers").
+
+      **No native `required` remains anywhere in `ProductForm.tsx`** — verified by grep, the only hits left are the `validateForm()` message strings for title/sku/slug/basePrice. Every requirement now routes through `validateForm()`, which reports next to the field. The invariant holds: Save either works or says why.
+
+      **Verification**:
+      - RED first: the new `submits a product whose image has no alt text` test failed with `expected "vi.fn()" to be called 1 times, but got 0 times` — jsdom enforces `required` too, so the test reproduced the exact defect before the fix.
+      - Command: `npx vitest run tests/components/admin/ProductForm.images.test.tsx tests/components/admin/ProductForm.alt-text.test.tsx tests/components/admin/product-popularity.test.tsx tests/lib/product-images.test.ts tests/lib/product-images.crop.test.ts` (in `packages/web`)
+      - Result: PASS (5 files, 38 tests, 0 failing)
+      - Build: `turbo run typecheck` PASS via the pre-commit gate (4 tasks successful)
+
+      **Not done**: no browser check of the rendered warning, and the E2E fixtures from #652 still set `altText` so they exercise the happy path only. The unit tests cover the regression.
+  - author: system
+    timestamp: '2026-08-30T06:54:22.733Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T07:06:10.955Z'
+    text: |-
+      🌐 **Browser verification** (follow-up to `970de4e7`)
+
+      Checked against a local server pair (API :3010, web :4321) on the seeded dev DB, logged in as `admin@chobii.art`, editing "Synthetic Nature" (`6de2a31d-bb93-4025-a8e4-1c8106ec1e3c`, 4 images).
+
+      **No `required` left in the rendered form**
+      ```
+      {"altInputs":4,"anyRequired":false,"requiredAnywhereInForm":[],"formValid":true}
+      ```
+      `document.querySelectorAll('form [required]')` returns an empty list, so the browser has nothing to refuse. That is the defect gone at the source.
+
+      **Warning is per-row and reactive**
+      Cleared the main image's alt text to a single space. Exactly one `[data-testid="alt-text-warning"]` appeared, on that row only, reading "No alt text — hurts SEO and screen readers"; the three rows that still had alt text stayed clean. Typing a value back cleared the warning immediately (`warningsAfterTyping: 0`). `form.checkValidity()` stayed `true` throughout.
+
+      **The save actually goes through**
+      With the blank-alt row mounted and the form in the state that used to block, clicked Save Changes. It persisted:
+      ```
+      updatedAt: 2026-08-30T07:04:45.401Z
+        main         | altText= ' '
+        room-mockup  | altText= 'Synthetic Nature framed on a wall'  (x3)
+      ```
+      Previously this click was a no-op. Restored the original alt text through the UI and saved again (`updatedAt: 2026-08-30T07:05:38.515Z`, `altText= 'Synthetic Nature artwork'`), so the dev DB is back as it was.
+
+      **Correction to the ticket's diagnosis**
+      The ticket attributes the silence to a required control inside a *collapsed* section. `FormSection` renders `{isOpen && <div>{children}</div>}`, so collapsing unmounts the rows outright — confirmed live: `altInputsStillMounted: 0` after collapsing Images. A collapsed section therefore could not have been the blocker; the block came from the section in its default-open state, where the empty required input is mounted. This does not change the fix (the input was the blocker either way, and the unit test reproduced it with `onSubmit` called 0 times), but the "not focusable" console line likely came from a different render state than the one described.
+
+      **Not covered**: console capture started after the save, so the absence of the "An invalid form control ... is not focusable" line is not evidenced from the log — it is implied by there being no `required` attribute at all.
+work_sessions:
+  - start: '2026-08-30T06:50:48.947Z'
+    agent: claude-code
+    summary: 'Fixed the silent save no-op: dropped `required` from both alt text inputs, added isAltTextMissing() + a non-blocking AltTextWarning row note. RED-first via a submit test that reproduced the block (onSubmit called 0 times). 38 tests pass across 5 files, typecheck green. Committed 970de4e7. Ticket done.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T06:54:26.583Z'
+    duration: '00:03:37'
+  - start: '2026-08-30T07:02:08.376Z'
+    agent: claude-code
+    summary: Browser verification on :4321/:3010 dev pair. Confirmed zero `required` attributes in the rendered form, the per-row warning appears/clears correctly, and Save persists with a blank altText (updatedAt moved). Restored the dev DB value. Found the ticket's collapsed-section diagnosis is wrong (FormSection unmounts children) — noted on the ticket; fix unaffected. No code changes.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T07:06:15.658Z'
+    duration: '00:04:07'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T06:50:46.222Z'
+work_session_summary:
+  total_sessions: 2
+  total_duration: '00:08:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 2
+      duration: '00:08:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/components/admin/ProductForm.images.test.tsx tests/components/admin/ProductForm.alt-text.test.tsx tests/components/admin/product-popularity.test.tsx tests/lib/product-images.test.ts tests/lib/product-images.crop.test.ts (in packages/web)
+  test_output: Test Files 5 passed (5); Tests 38 passed (38)
+  build_passed: true
+  build_command: turbo run typecheck (pre-commit gate)
+  verified_at: '2026-08-30T06:54:05.823Z'
+completed: '2026-08-30T06:54:22.733Z'

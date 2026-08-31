@@ -21,18 +21,110 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.335Z'
-last_updated: '2026-08-30T12:02:20.335Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T14:14:28.531Z'
+time_spent_minutes: 9
 labels:
   - audit
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T14:05:19.256Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T14:05:35.187Z'
+    text: |-
+      **Implementation steps** (derived — this ticket carries no `implementation_steps`):
+
+      1. `[write-test]` `packages/shared/tests/schemas/audit-log.test.ts` — the 14 new production actions are registered, each maps to exactly one category, the four money ones are `money` and the ten fulfilment ones are `fulfilment`, and `production_job.cancelled` is deliberately absent. Expected: FAIL.
+      2. `[verify-fail]` `npx vitest run tests/schemas/audit-log.test.ts` (cwd `packages/shared`). Expected: FAIL.
+      3. `[implement]` `packages/shared/src/schemas/audit-log.ts` — add the actions to `AUDIT_ACTIONS` and their categories to `AUDIT_ACTION_CATEGORY`.
+      4. `[verify-pass]` same command. Expected: PASS.
+      5. `[write-test]` `packages/api/tests/lib/audit-record.test.ts` — a context carrying `vendorId` produces `metadata.vendorId`; a caller-supplied `metadata.vendorId` cannot override the context one; an admin context (no vendorId) writes no `vendorId` key; the plain structural stub still satisfies the signature; a DB failure is still swallowed. Expected: FAIL.
+      6. `[verify-fail]` `npx vitest run tests/lib/audit-record.test.ts` (cwd `packages/api`). Expected: FAIL.
+      7. `[implement]` `packages/api/src/lib/audit.ts` — read `c.get('vendorId')` inside `recordAudit` and merge it **after** the caller's metadata; write the share/never-share transaction rule into the doc comment.
+      8. `[verify-pass]` both test files. Expected: PASS.
+      9. `[verify]` typecheck both packages.
+      10. `[commit]` stage only the four files by explicit path.
+  - author: system
+    timestamp: '2026-08-30T14:14:05.565Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T14:14:28.531Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3e9564d8` — feat(audit): register the production actions and make recordAudit carry vendorId
+
+      **Files Changed**:
+      - `packages/shared/src/schemas/audit-log.ts` — 14 actions added to `AUDIT_ACTIONS` and `AUDIT_ACTION_CATEGORY`; the "declared in the same phase as its emitter" rule written into the `AUDIT_ACTIONS` doc comment.
+      - `packages/shared/tests/schemas/audit-log.test.ts` — 6 new tests (18 → 24).
+      - `packages/api/src/lib/audit.ts` — `recordAudit` reads `c.get('vendorId')`; transaction rule documented.
+      - `packages/api/tests/lib/audit-record.test.ts` — 6 new tests (11 → 17).
+
+      **Summary**
+
+      *Actions.* money (commits or changes what we owe a supplier): `production_job.assigned`, `.reassigned`, `.amount_overridden`, `production_transfer.declared_lost`. fulfilment: `production_job.created`, `.transitioned`, `.transition_refused`, `.photos_submitted`, `.qc_approved`, `.qc_rejected`, `.label_issued`, `production_transfer.dispatched`, `.received`, `order.consolidator_set`. This reconciles #667, which filed all `production_job.*` under `money` — **#667 is superseded in part**: the split is by what the row is *about*, not by table.
+
+      No `production_job.cancelled`: a cancellation is a transition, which keeps "one row per transition" true. A test asserts its absence, with the `order.cancelled` contrast (`routes/admin/orders.ts:66-74`) written into the comment — an order cancellation is itself the money decision; a job cancellation is a state move whose money consequence is a separate `amount_overridden`.
+
+      *vendorId.* Read inside `recordAudit`, not at the call sites — the same reason the category is derived and ip/user-agent/request-id/method/path are captured: a caller cannot get a context fact wrong if a caller never supplies it. `requireVendor` (`middleware/vendor.ts:58`) has set `c.set("vendorId", …)` since it was written and nothing had ever read it. Merged **after** `entry.metadata`, so a caller cannot overwrite it; **absent entirely** when the context has none, so "has a vendorId" keeps meaning "was written for a vendor" rather than degrading to a null on every admin row. The `vendor.request` floor row gets it for free — `middleware/audit.ts:80` writes through `recordAudit`.
+
+      All four hard constraints held and are covered by tests: `AuditContext` stays structural (a test calls `recordAudit` with a plain `{get,set,req}` object, no Hono, no cast); `recordAudit` still swallows a DB failure and still claims `audited` **before** the insert (asserted in the same failing-insert test); the category stays derived.
+
+      *Transaction rule.* Verified first: all 40 `recordAudit` call sites in `packages/api/src` omit `tx` (balanced-paren arg count over every call — the only 3-arg hit was the definition itself). Documented in the doc comment: share the transaction when the row would be a **lie** if the business write rolled back; **never** share it for a refusal, because a refusal row records that a transaction was rolled back and writing it inside that transaction erases the very evidence it exists to preserve. Ends with the rule of thumb — `tx` when the row asserts something the transaction must make true, no `tx` when the row asserts something *about* the transaction.
+
+      **Sequencing — on the record**
+
+      These 14 actions **have no emitter today**. `routes/admin/production-jobs.ts` (#680, #681) and `routes/vendor.ts` (#684) emit them in Phase 3; no emitters were wired here. #671 (feature `admin-audit-log`, still `todo`) adds a build guard that fails on any declared action nothing emits. That guard is **not implemented yet**, so this is safe now — but **#671 must not land before #680/#681/#684**, or it will fail the build on these declarations. A test in `audit-log.test.ts` guards the other half of the rule: nothing is declared for order-dispatch-tracking to fill in later.
+
+      **Verification**:
+      - Command: `npx vitest run tests/lib/audit-record.test.ts` (cwd `packages/api`)
+      - Result: PASS (17 tests, 17 passing — was 11)
+      - Command: `npx vitest run tests/schemas/audit-log.test.ts` (cwd `packages/shared`)
+      - Result: PASS (24 tests, 24 passing — was 18)
+      - Command: `turbo run typecheck` (pre-commit gate, includes `packages/api` `tsconfig.test.json`)
+      - Result: PASS — `Tasks: 4 successful, 4 total`
+      - Also re-run green: `packages/api/tests/middleware/audit.test.ts` (11 passing), since the floor row's metadata changed.
+
+      RED was confirmed before each implementation: 3 failing shared tests (`undefined` category for every new action), then 4 failing api tests (`metadata.vendorId` absent, caller's value winning).
+
+      Two earlier gate runs were refused by typecheck errors in a sibling agent's in-flight `lib/vendor-scope.ts` / `tests/routes/vendor/artwork.test.ts`; I waited for those to land rather than touching them or using `--no-verify`. Only my four files were staged, by explicit path.
+work_sessions:
+  - start: '2026-08-30T14:05:26.265Z'
+    agent: claude-code
+    summary: 'Registered the 14 production actions (4 money, 10 fulfilment) in AUDIT_ACTIONS/AUDIT_ACTION_CATEGORY, made recordAudit read c.get(''vendorId'') itself and merge it after the caller''s metadata, and wrote the share/never-share transaction rule into the doc comment. TDD throughout: 3 shared tests red then green, 4 api tests red then green. Commit 3e9564d8; 41 tests passing across the two files; workspace typecheck gate green.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T14:14:01.840Z'
+    duration: '00:08:35'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T14:05:19.256Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:09:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:09:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/lib/audit-record.test.ts (packages/api) + npx vitest run tests/schemas/audit-log.test.ts (packages/shared)
+  test_output: 17 passed (api, was 11) and 24 passed (shared, was 18) — 41 total, 12 new
+  build_passed: true
+  build_command: turbo run typecheck (pre-commit gate) — 4 successful, 4 total
+  verified_at: '2026-08-30T14:13:59.826Z'
+completed: '2026-08-30T14:14:05.565Z'

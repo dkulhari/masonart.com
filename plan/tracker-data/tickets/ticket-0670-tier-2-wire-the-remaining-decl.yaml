@@ -1,0 +1,219 @@
+ticket_number: 670
+title: Tier 2 - wire the remaining declared-but-dead catalogue, config and content actions
+description: |-
+  ## Task
+
+  Seven more actions are declared in `AUDIT_ACTIONS` and emitted by nothing, and every one of them has a live route. #644 wired part of each file and the rest was never finished — `collections.ts` emits `collection.deleted` but not `collection.updated`, `promotions.ts` emits enabled/disabled/deleted but not `created`, `products.ts` emits the three product actions but neither variant action.
+
+  Dead action, and the route that should emit it:
+
+  - `collection.updated` — `admin/collections.ts:110`, `:175`, `:335` (PUT, PUT, PATCH)
+  - `promotion.created` — `admin/promotions.ts:258` (POST)
+  - `product_variant.updated`, `product_variant.deleted` — `admin/products.ts:1068` (DELETE) plus the variant write path
+  - `vendor_rate.updated` — `admin/vendor-rates.ts:356`, `:475`, `:565`. Category `config`, but this is the rate card that prices every production job, so an unlogged edit changes what a supplier is owed.
+  - `review.deleted`, `review_media.deleted` — `admin/reviews.ts:538`, `:595`. Both hard-delete rows; the deleted content is unrecoverable, so the audit row is the only surviving description of what was removed.
+  - `ai_generation.moderated` — `admin/ai-moderation.ts:310`, `:369`, `:395`
+
+  `admin/vendors.ts` mutates on nine routes (`:380` through `:656`) and has no declared action at all. Either add `vendor.created` / `vendor.updated` / `vendor.archived` to the registry, or record in the ticket that the floor row is judged sufficient for the vendor record itself — one of those, not silence.
+
+  ## Context
+
+  Same pattern throughout: `recordAudit` after the write succeeds, `diffRecords(before, after)` where a prior row is in hand, narrow before/after. `routes/admin/frames.ts:233` is the reference call site.
+
+  For `review.deleted` the delta is inverted from the usual shape — put the removed row's identifying fields in `before` and leave `after` null. A deletion whose audit row says only "deleted" cannot answer whether the right review was removed.
+
+  `ai_generation.moderated` overlaps with the `ai_generation_reviews` table, which carries its own actor column. Duplicate it anyway; the `admin_audit_log` header states that duplication is deliberate so one table answers "who did what", always.
+
+  Extend `packages/api/tests/routes/admin/catalogue-audit.test.ts` rather than starting a new file for the catalogue half; content and config actions can share a new `content-config-audit.test.ts`.
+feature: admin-audit-log
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T11:27:28.198Z'
+last_updated: '2026-08-31T01:46:36.628Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - audit
+  - catalogue
+  - config
+  - content
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T01:46:36.628Z'
+    text: |-
+      Note from the production-pipeline run (feature complete, PR #3).
+
+      **Recommendation: settle the waiver list as its own commit first, then wire the rest.** The "declare or waive explicitly" framing is right; splitting the decision from six route edits makes the decision reviewable on its own.
+
+      **Verified at head — the twelve actions still declared with no emitter anywhere in `packages/api/src`:**
+
+      `order.shipment_marked_delivered`, `wallet.adjusted`, `vendor.payable_settled`, `user.status_changed`, `vendor.invited`, `vendor.user_created`, `product_variant.updated`, `product_variant.deleted`, `vendor_rate.updated`, `review.deleted`, `review_media.deleted`, `ai_generation.moderated`.
+
+      That set maps onto #668 (2), #669 (2), this ticket (6), and the waiver list (2), with nothing unaccounted for.
+
+      **One waiver decided by evidence — and my first read of it was wrong, so the reasoning matters more than the conclusion.**
+
+      `wallet.adjusted` cannot be wired today, but not because nothing writes wallet transactions — `services/wallet.ts` writes them in five places. The actual reason: **`adjustWalletBalance` is defined at `services/wallet.ts:652` and called from nowhere.** There is no admin wallet route mounted at all — `index.ts` mounts `/api/wallet` (customer top-up: `/topup`, `/topup/verify`) and `/api/admin/wallet-config` (config only, and `wallet_config.updated` IS wired). The admin adjustment surface the action names does not exist yet.
+
+      So waive it **with that reason recorded**, and the waiver expires the day an admin adjust route lands. A bare "waived" entry would read as "we decided not to audit balance adjustments", which is the opposite of true.
+
+      Worth noting this is the third "exported, never called" case this run turned up. `guardFor` in `lib/production-transitions.ts` sat exported with zero call sites for three phases while three guarded edges went unchecked — a CRITICAL. #693's `labelIssued` chain passed a value that rendered identically to passing nothing. A declared-but-dead *action* is the same shape one layer up, which is what makes #671 worth doing.
+
+      **Everything else in this ticket's scope has a mutating route to emit from** — `products.ts` (7), `reviews.ts` (5), `ai-moderation.ts` (3), `vendor-rates.ts` (3). None of them is blocked; they are wiring work.
+
+      **`user.status_changed`** is the other waiver candidate and I did not verify it. `customers.ts` has 1 mutating route and `user.role_changed` is already wired there, so check whether a status-change path actually exists before waiving it — it may be wiring work rather than a waiver.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Add a case per dead action asserting the precise row, extending the existing catalogue suite
+    file: packages/api/tests/routes/admin/catalogue-audit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/catalogue-audit.test.ts
+    expected_result: FAIL - the new cases only
+    status: pending
+    code: |-
+      it('records a collection edit, not only a collection deletion', async () => {
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'collection.updated',
+            entityType: 'collection',
+            before: { name: 'Monsoon' },
+            after: { name: 'Monsoon 2026' },
+          })
+        )
+      })
+
+      it('records promotion creation, so a discount has an author', async () => {
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'promotion.created', entityType: 'promotion' })
+        )
+      })
+
+      it('describes the variant it deleted, since the row is gone', async () => {
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'product_variant.deleted',
+            before: expect.objectContaining({ sku: 'CA-A3-BLK' }),
+            after: null,
+          })
+        )
+      })
+  - id: 2
+    action: write-test
+    description: Cover the config and content actions in a second suite
+    file: packages/api/tests/routes/admin/content-config-audit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/content-config-audit.test.ts
+    expected_result: FAIL - vendor-rates, reviews and ai-moderation emit nothing
+    status: pending
+    code: |-
+      it('records a rate card edit — this is what a supplier gets paid', async () => {
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'vendor_rate.updated', entityType: 'vendor_rate' })
+        )
+      })
+
+      it('describes the review it hard-deleted', async () => {
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            action: 'review.deleted',
+            before: expect.objectContaining({ productId: expect.any(String), rating: 1 }),
+            after: null,
+          })
+        )
+      })
+
+      it('records the moderation verdict alongside ai_generation_reviews', async () => {
+        expect(recordAudit).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: 'ai_generation.moderated' })
+        )
+      })
+  - id: 3
+    action: verify-fail
+    description: Confirm both suites fail on the new cases
+    command: cd packages/api && bunx vitest run tests/routes/admin/catalogue-audit.test.ts tests/routes/admin/content-config-audit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 4
+    action: implement
+    description: Wire the four catalogue actions
+    file: packages/api/src/routes/admin/collections.ts
+    status: pending
+    code: |-
+      // collections.ts (PUT :110, PUT :175, PATCH :335), promotions.ts (POST :258),
+      // products.ts (variant write + DELETE :1068). Same shape at every site:
+      const { before, after } = diffRecords(existing, updated)
+      await recordAudit(c, {
+        action: 'collection.updated',
+        entityType: 'collection',
+        entityId: id,
+        before,
+        after,
+        summary: `Collection ${updated.slug} updated`,
+      })
+
+      // For the deletes, the row is unrecoverable — describe it in `before`:
+      await recordAudit(c, {
+        action: 'product_variant.deleted',
+        entityType: 'product_variant',
+        entityId: variantId,
+        before: { productId, sku: variant.sku, size: variant.size, price: variant.price },
+        after: null,
+        summary: `Variant ${variant.sku} deleted from product ${productId}`,
+      })
+  - id: 5
+    action: implement
+    description: Wire vendor_rate.updated, the two review deletions and ai_generation.moderated
+    file: packages/api/src/routes/admin/vendor-rates.ts
+    status: pending
+    code: |-
+      // vendor-rates.ts :356, :475, :565 — a rate change is effective-dated, so put
+      // the effective window in the row or the trail cannot answer "what were we
+      // paying on the 14th".
+      await recordAudit(c, {
+        action: 'vendor_rate.updated',
+        entityType: 'vendor_rate',
+        entityId: rate.id,
+        before,
+        after,
+        summary: `Rate for vendor ${vendorId} ${rate.stage} ${rate.minEdge}-${rate.maxEdge}in effective ${rate.effectiveFrom}`,
+      })
+
+      // reviews.ts :538 and :595, ai-moderation.ts :310/:369/:395 follow the same
+      // pattern with review.deleted / review_media.deleted / ai_generation.moderated.
+  - id: 6
+    action: implement
+    description: 'Decide vendors.ts: declare vendor.created/updated/archived, or record that the floor row is sufficient'
+    file: packages/shared/src/schemas/audit-log.ts
+    status: pending
+    code: |-
+      // Nine mutating routes in admin/vendors.ts (:380-:656) with no declared action.
+      // Either add them to AUDIT_ACTIONS under 'config':
+      //   'vendor.created', 'vendor.updated', 'vendor.archived',
+      // or leave them on the floor and add them to the waiver list in the coverage
+      // guard. Silence is the one option this ticket rules out.
+  - id: 7
+    action: verify-pass
+    description: Both audit suites green, and every touched route suite unbroken
+    command: cd packages/api && bunx vitest run tests/routes/admin/
+    expected_result: PASS - no regression across the admin route suites
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the tier 2 completion
+    command: 'git add packages/shared/src/schemas/audit-log.ts packages/api/src/routes/admin packages/api/tests/routes/admin && git commit -m "feat(api): emit the catalogue, config and content audit actions the registry already declares"'
+    status: pending
+current_step: 1

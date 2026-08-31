@@ -17,19 +17,99 @@ description: |-
 feature: production-pipeline
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.443Z'
-last_updated: '2026-08-30T12:02:20.443Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T15:34:28.246Z'
+time_spent_minutes: 10
 labels:
   - api
   - admin
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T15:24:01.589Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T15:24:13.851Z'
+    text: |-
+      **Implementation steps (derived, TDD order)**
+
+      Everything lands in `packages/api/src/routes/admin/production-jobs.ts` + `tests/routes/admin/production-jobs.test.ts`, plus one mount line in `src/index.ts`.
+
+      1. [write-test] `orderId` filter on GET /api/admin/production: only that order's jobs, condition renders `order_id`, and the column carries `production_jobs_order_id_idx`. Expect FAIL.
+      2. [implement] one field on `listQuerySchema`, one `eq(productionJobs.orderId, orderId)` condition. Expect PASS.
+      3. [write-test] POST /api/admin/orders/:orderId/consolidator — the three proposal rules (sole vendor / frame vendor / most items), decided_by NULL vs actor, 409 after the first transfer dispatched, 404s, CONCURRENT_MODIFICATION rollback, audit inside tx for a set and OUTSIDE for a refusal. Expect FAIL.
+      4. [implement] second Hono app `adminOrderProductionApp` in the same file, mounted at `/api/admin/orders`. Uses `loadOrderProductionSnapshot` + `proposeConsolidator` + `consolidatorOverrideAllowed` from `lib/production-readiness.ts` — no rule is re-derived here. FOR UPDATE on the order row (the serialiser) and on the existing `order_consolidation` row; the predicate repeated in the UPDATE's WHERE; row-count mismatch rolls back.
+      5. [write-test] GET /api/admin/orders/:orderId/production-readiness returns the blocker LIST with codes, not a bare boolean. Expect FAIL.
+      6. [implement] one `getOrderLabelReadiness(orderId)` call, nothing re-derived.
+      7. [verify] `npx vitest run tests/routes/admin/production-jobs.test.ts` from packages/api + `pnpm --filter @chobii/api typecheck`.
+      8. [commit] stage only the three files by explicit path.
+
+      Per-route `requireAuth, requireAdmin` on the two new routes rather than `use('*')`: a `use('*')` in a router mounted at `/api/admin/orders` also matches `adminOrdersApp`'s own routes and would run the session lookup twice for the whole admin orders tree.
+  - author: mcp-client
+    timestamp: '2026-08-30T15:34:20.216Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `04dc6d82` — feat(api): let an order say who consolidates it, and why it cannot ship
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/production-jobs.ts` — the `orderId` filter on the queue, plus a second router (`adminOrderProductionApp`) holding `POST /api/admin/orders/:orderId/consolidator` and `GET /api/admin/orders/:orderId/production-readiness`
+      - `packages/api/src/index.ts` — mounts that router on `/api/admin/orders`, beside `adminOrdersApp`
+      - `packages/api/tests/routes/admin/production-jobs.test.ts` — 34 new tests
+
+      **Summary**:
+      - **`orderId` filter**: one field on `listQuerySchema`, one `eq()`, on both the page query and the COUNT (or `total` would describe a different set than `items`). `OrderProductionPanel.tsx` was NOT touched — it already sends `orderId`; #690 removes its scan.
+      - **Consolidator**: the system proposes, an admin confirms. `decided_by IS NULL` is written only for `sole_vendor`; `frame_vendor` and `most_items` come back 422 `CONFIRMATION_REQUIRED` carrying the proposal, so an arbitrary choice can never reach the table claiming there was nothing to decide. Override refused 409 `TRANSFER_DISPATCHED` once the first transfer dispatched; confirming the SAME vendor after dispatch is still allowed (nothing is re-routed), and a FIRST decision is never an override or an order with goods in transit and no row would be permanently unlabelable. Re-confirming what already stands writes nothing and audits nothing.
+      - **Readiness**: one `getOrderLabelReadiness(orderId)` call, returning `blockers` + `blockerCodes`. Nothing re-derived; the seam scan in `tests/lib/production-seam.test.ts` still passes because `isOrderReadyToLabel` is untouched. A missing order answers 200 with `order_not_found` rather than 404.
+      - **Rules live in the lib**: `proposeConsolidator`, `consolidatorOverrideAllowed` and `loadOrderProductionSnapshot` are called, never re-implemented — the proposal is computed from exactly the rows the label gate later reads.
+      - **Concurrency**: the ORDER row is read `FOR UPDATE` (the serialiser), the existing decision is read under the same lock, the predicate is repeated in the UPDATE's `WHERE`, and a row-count mismatch rolls back with `CONCURRENT_MODIFICATION`. `order_consolidation.order_id` is the primary key, so the database is what ultimately leaves one row.
+      - **Audit**: `order.consolidator_set` shares the transaction on a write and is written OUTSIDE it on a refusal; `metadata.decision` is `system_default` or `admin_confirmed`, with `basis` (`sole_vendor` / `confirmed_proposal` / `admin_override`). Uses `consolidatorVendorId`, not `vendorId`, which `recordAudit` reserves.
+      - Gated per PATH, not `use('*')`: this router shares its mount with `routes/admin/orders.ts`, and a `*` middleware would run the session lookup twice for that whole tree.
+
+      **Verification**:
+      - Command: `cd packages/api && npx vitest run tests/routes/admin/production-jobs.test.ts`
+      - Result: PASS (136 tests, 136 passing, 0 failing — 34 new)
+      - Also PASS: `npx vitest run tests/lib/production-seam.test.ts tests/lib/production-readiness.test.ts` (67 passing — the single-consumer scan is untouched)
+      - Build: `bun run typecheck` — 4/4 tasks successful (api src + api tests + shared + web); the pre-commit gate passed on the commit itself
+      - Mutation-checked, not just run: forcing `decidedBy = user.id` and disabling the override guard turned 5 of the new tests red, so they discriminate rather than merely execute
+  - author: system
+    timestamp: '2026-08-30T15:34:28.246Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T15:24:02.575Z'
+    agent: claude-code
+    summary: 'Shipped #682 in commit 04dc6d82: the orderId filter on GET /api/admin/production, POST /api/admin/orders/:orderId/consolidator (system proposes / admin confirms, decided_by NULL vs actor, 409 once a transfer dispatched, FOR UPDATE + repeated predicate + row-count rollback), and GET /api/admin/orders/:orderId/production-readiness returning the blocker list. 136 tests passing in tests/routes/admin/production-jobs.test.ts (34 new), full turbo typecheck green.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T15:34:25.580Z'
+    duration: '00:10:23'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T15:24:01.589Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:10:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:10:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/routes/admin/production-jobs.test.ts
+  test_output: 'Test Files 1 passed (1) | Tests 136 passed (136) — 34 of them new for #682'
+  build_passed: true
+  build_command: 'bun run typecheck (turbo: @chobii/api tsc --noEmit && tsc -p tsconfig.test.json --noEmit, @chobii/shared, @chobii/web)'
+  verified_at: '2026-08-30T15:34:02.031Z'
+completed: '2026-08-30T15:34:28.246Z'

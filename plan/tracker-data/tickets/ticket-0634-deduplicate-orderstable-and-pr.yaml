@@ -76,20 +76,117 @@ description: |-
 feature: code-deduplication
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-17T05:12:37.577Z'
-last_updated: '2026-08-17T05:12:37.577Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T06:28:37.152Z'
+time_spent_minutes: 11
 labels:
   - refactor
   - dry
   - frontend
   - admin
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T05:43:43.475Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T06:17:01.105Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits**:
+      - `12b1cf62` — test(web): pin the shared behaviour of the admin tables before extracting it
+      - `ec160434` — refactor(web): extract StatusBadge, SortableHeader and RowActionsMenu from the admin tables
+      - `bbe812c6` — refactor(web): extract the AdminDataTable shell from the admin tables
+
+      **Files Changed**:
+      - `packages/web/tests/components/admin/admin-tables-shared.test.tsx` — new, 28 characterization tests over both tables
+      - `packages/web/app/components/admin/StatusBadge.tsx` — new, region 1
+      - `packages/web/app/components/admin/SortableHeader.tsx` — new, region 2
+      - `packages/web/app/components/admin/RowActionsMenu.tsx` — new, region 3
+      - `packages/web/app/components/admin/AdminDataTable.tsx` — new, regions 4 and 5 (`AdminDataTable` + `AdminTableSkeleton`)
+      - `packages/web/app/components/admin/OrdersTable.tsx` — 716 → 556 lines
+      - `packages/web/app/components/admin/ProductsTable.tsx` — 736 → 586 lines
+
+      **Summary**:
+      All five clone regions are now single shared components. The test came first, on its own commit, so the refactor diff is reviewable against it.
+
+      Three differences between the two tables became props rather than being flattened away:
+      - `StatusBadge` keeps `styles`/`labels` with each caller. Order status, payment status and product status are three different vocabularies; one map exhaustive over all three would be worse than the duplication. `labels` is optional — product statuses render the raw value through `capitalize`, as before.
+      - `AdminDataTable` takes `isFiltered` rather than the empty-state copy. An empty table means two different things — nothing exists, or nothing matched — and only the second is worth advising about. Passing the boolean keeps the sentence in one place.
+      - `AdminDataTable` takes `rowClassName` for the tint on a selected product row. OrdersTable has no row selection and passes nothing.
+
+      `RowActionsMenu` gives its children a `close` callback so an item can dismiss the menu after running. ProductsTable's "View in Store" link deliberately does not, and still does not.
+
+      Palette classes moved verbatim; nothing was retokenised.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/admin/ tests/styles/`
+      - Result: PASS — 15 files, 159 tests, identical to the pre-refactor baseline recorded at step 2
+      - Command: `bun run typecheck`
+      - Result: PASS — 0 errors, 4/4 turbo tasks
+      - Command: `npx jscpd@5.0.12 packages --format typescript,tsx,javascript,jsx --ignore '...' --min-lines 15`
+      - Result: total duplication **2.62%**, down from the 2.93% baseline. Grepping the clone list for OrdersTable/ProductsTable/AdminDataTable/RowActionsMenu/StatusBadge returns nothing — all five pairs are gone.
+
+      **Browser verification** (step 11, on localhost:3001 as admin):
+      - `/admin/orders` — badges render in their own palettes (Confirmed blue, Paid green, Pending amber), Package and DollarSign cell icons intact, pagination footer reads "Showing 1 to 10 of 20 orders".
+      - Sort ladder: clicking `Total` sorted ascending, swapped the double chevron for the up chevron, and re-ordered the rows.
+      - Row menu: opened with View Details / Update Status / separator / Cancel Order (amber) / Initiate Refund (red); the click-away backdrop closed it.
+      - The `aria-label="Order actions for MA-2026-000042"`, `aria-haspopup` and `aria-expanded` from #625 survive the extraction — confirmed in the accessibility tree.
+      - `/admin/products` — thumbnails, Active/Featured badges, sortable headers, pagination all correct. Row menu opens with View Details / Edit Product / View in Store / separator / Archive (amber) / Delete (red).
+      - Row selection tints the row and raises the "1 selected · Archive · Delete" bulk bar.
+      - Empty state: searching a non-matching string renders the ImageIcon, "No products found" and the "Try adjusting your search or filter" hint, with the pagination footer hidden.
+      - No console errors.
+
+      **Follow-up, deliberately not fixed here**: ProductsTable's row-menu trigger still has no accessible name — the accessibility tree shows it as a bare `button`. #625 named that defect and fixed only the orders side. `label` is optional on `RowActionsMenu` for exactly that reason. Adding it would change the products DOM, which is outside a behaviour-preserving refactor; worth its own ticket.
+  - author: system
+    timestamp: '2026-08-30T06:17:03.177Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-30T06:28:37.152Z'
+    text: |-
+      **Follow-up landed** — commit `4dd38195`, `fix(web): name the products row-menu trigger for screen readers`.
+
+      The previous comment left this as "worth its own ticket". On review that was over-cautious: the #634 constraint was behaviour-preserving in the sense of not changing how the admin screens look or act, and adding an accessible name to an icon-only button changes neither. `RowActionsMenu` already took a `label` prop, so it was one line.
+
+      `ProductsTable`'s trigger is now `aria-label={\`Product actions for ${product.title}\`}`, and it picks up `aria-haspopup`/`aria-expanded` from the shared shell the same way the orders trigger does.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/admin/ tests/styles/`
+      - Result: PASS — 15 files, **160 tests** (159 baseline + one new assertion pinning the products trigger's name and open state)
+      - Typecheck: PASS via the pre-commit gate, 0 errors
+
+      `label` stays optional on `RowActionsMenu` so the component does not force a name on a future caller that genuinely has no row identity to put in one, but both current callers now pass it.
+
+      All four commits for this ticket are pushed to `origin/main` (`ce922da1`).
+work_sessions:
+  - start: '2026-08-30T05:44:04.154Z'
+    agent: claude-code
+    summary: 'Extracted all five clone regions. Commits 12b1cf62 (28-test characterization suite), ec160434 (StatusBadge, SortableHeader, RowActionsMenu), bbe812c6 (AdminDataTable + AdminTableSkeleton). 159/159 admin+styles tests pass, unchanged from baseline; typecheck 0 errors; jscpd 2.93% -> 2.62% with no OrdersTable/ProductsTable pair left. Step 11 (browser check of /admin/orders and /admin/products) still open: both routes are behind an admin login and I do not enter passwords.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T05:52:31.334Z'
+    duration: '00:08:27'
+  - start: '2026-08-30T06:14:06.075Z'
+    agent: claude-code
+    summary: 'Step 11 browser verification done on localhost:3001 as admin. Both /admin/orders and /admin/products render and behave as before: badge palettes, sort ladder with all three chevrons, row menus with click-away, product row selection tint and bulk bar, filtered empty state, pagination. #625 aria attributes on the orders trigger survive the extraction. No console errors. Ticket closed.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T06:17:06.934Z'
+    duration: '00:03:00'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -101,7 +198,7 @@ implementation_steps:
     file: packages/web/tests/components/admin/admin-tables-shared.test.tsx
     command: cd packages/web && bunx vitest run tests/components/admin/admin-tables-shared.test.tsx
     expected_result: PASS - this test describes CURRENT behaviour, so it must pass before the refactor and after it. If it fails now, the assertion is wrong, not the component.
-    status: pending
+    status: done
     code: |
       /**
        * What OrdersTable and ProductsTable must keep doing while their shared parts
@@ -144,18 +241,18 @@ implementation_steps:
     description: Confirm the characterization test and the existing admin specs are green BEFORE refactoring
     command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
     expected_result: PASS - record the counts; this is the contract for every later step
-    status: pending
+    status: done
   - id: 3
     action: commit
     description: Commit the characterization test on its own, so the refactor diff is reviewable against it
     command: 'git add packages/web/tests/components/admin/admin-tables-shared.test.tsx && git commit -m "test(web): pin the shared behaviour of the admin tables before extracting it"'
-    status: pending
+    status: done
   - id: 4
     action: implement
     description: Extract StatusBadge (region 1), moving the palette classes as-is
     file: packages/web/app/components/admin/StatusBadge.tsx
     expected_result: OrderStatusBadge and PaymentStatusBadge both become thin wrappers over one component; no class string changes
-    status: pending
+    status: done
     code: |-
       import { cn } from '~/lib/utils'
 
@@ -193,51 +290,69 @@ implementation_steps:
     description: Confirm the badge extraction changed nothing, including the token guard
     command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
     expected_result: PASS - same counts as step 2
-    status: pending
+    status: done
   - id: 6
     action: implement
     description: Extract SortableHeader (region 2) and RowActionsMenu (region 3)
     file: packages/web/app/components/admin/SortableHeader.tsx
     expected_result: Both tables use one generic header button and one menu shell; the click-away backdrop behaviour is preserved exactly
-    status: pending
+    status: done
   - id: 7
     action: verify-pass
     description: Confirm the header and menu extractions changed nothing
     command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
     expected_result: PASS - same counts as step 2
-    status: pending
+    status: done
   - id: 8
     action: commit
     description: Commit the badge, header and menu extractions
     command: 'git add packages/web/app/components/admin && git commit -m "refactor(web): extract StatusBadge, SortableHeader and RowActionsMenu from the admin tables"'
-    status: pending
+    status: done
   - id: 9
     action: implement
     description: Extract AdminDataTable (region 4) and fold the skeleton widths block (region 5) into it
     file: packages/web/app/components/admin/AdminDataTable.tsx
     expected_result: thead, loading skeleton, empty state and tbody are one component; the empty-state icon and copy come in as props
-    status: pending
+    status: done
   - id: 10
     action: verify-pass
     description: 'Full check: admin specs, style guards and typecheck'
     command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/ && cd ../.. && bun run typecheck
     expected_result: PASS - counts match step 2 exactly, typecheck 0 errors
-    status: pending
+    status: done
   - id: 11
     action: verify-pass
     description: Look at both screens in a browser - the tests cannot see a layout regression
     command: 'cd packages/api && DATABASE_URL=''postgresql://poster_app:dev_password@localhost:5440/poster_app_dev'' bun run dev  # then web, then visit /admin/orders and /admin/products'
     expected_result: Manual verification - both tables sort, paginate, open row menus and render empty and loading states exactly as before
-    status: pending
+    status: done
   - id: 12
     action: verify-pass
     description: Re-run the duplication scan and confirm the five pairs are gone
     command: npx jscpd@5.0.12 packages --format typescript,tsx,javascript,jsx --ignore '**/node_modules/**,**/migrations/**,**/dist/**,**/build/**,**/.turbo/**,**/*.d.ts' --min-lines 15
     expected_result: Total duplication below 2.93%; no OrdersTable/ProductsTable pair over 15 lines remains
-    status: pending
+    status: done
   - id: 13
     action: commit
     description: Commit the table shell extraction
     command: 'git add packages/web/app/components/admin && git commit -m "refactor(web): extract AdminDataTable shell from the admin tables"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 11
+started: '2026-08-30T05:43:43.475Z'
+work_session_summary:
+  total_sessions: 2
+  total_duration: '00:11:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 2
+      duration: '00:11:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run tests/components/admin/ tests/styles/
+  test_output: '15 test files, 159 tests passed — identical to the pre-refactor baseline recorded at step 2. Includes the 28-test characterization suite added by this ticket. jscpd (min-lines 15, #630 scoping): total duplication 2.62%, down from 2.93%; no OrdersTable/ProductsTable clone pair remains.'
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-30T05:52:26.681Z'
+completed: '2026-08-30T06:17:03.177Z'

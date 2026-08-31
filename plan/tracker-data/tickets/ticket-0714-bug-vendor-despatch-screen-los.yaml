@@ -1,0 +1,155 @@
+ticket_number: 714
+title: 'Bug: vendor despatch screen loses draft dockets and resurrects already-sent buckets under concurrent use'
+description: |-
+  ## Task
+
+  Four state-correctness defects in `packages/web/app/routes/vendor/index.tsx`, all introduced by `5652a799 feat(web): give the vendor portal the screen that sends a parcel`. Each was verified against the file at 1577 lines; line numbers below are current as of that commit.
+
+  Filed by a different session that was working on an unrelated branch — not fixed here, because the file belongs to live work elsewhere.
+
+  ### 1. `loadCandidates` has no stale-response guard (`:1359`)
+
+  `useLatestOnly` exists at `packages/web/app/lib/latest-request.ts` and is already used by `routes/admin/production/index.tsx`, `$id.tsx` and `OrderProductionPanel.tsx`. This screen does not use it. Verified: no occurrence of `useLatestOnly` anywhere in `vendor/index.tsx`.
+
+  Repro: despatch bucket A (its post-write `loadCandidates` starts), immediately despatch bucket B. B's response returns without A or B; the slower A response then lands and overwrites it with a list that still contains B. B reappears as sendable, and "Send this group" returns 409 `JOB_ALREADY_ON_TRANSFER` for work already despatched. Double-clicking "Try again" has the same shape.
+
+  ### 2. Every refetch unmounts in-progress dockets (`:1360`, render at `:1090`)
+
+  `loadCandidates` calls `setCandidatesLoading(true)` unconditionally, and the panel renders `DespatchSkeleton` whenever `isLoading` is true. So a refetch destroys typed input in every *other* bucket.
+
+  Repro: type carrier "Delhivery", reference "DL-9911" and a due date into bucket B, then send bucket A. A's success triggers `loadCandidates()`, the skeleton replaces the list, B unmounts and remounts with empty fields and `pieces` reset. This contradicts the commit's own stated guarantee that two buckets being filled at once do not share fields.
+
+  Fix: keep the previous `data` on screen during a refetch and show the skeleton only when `data === null`, or track initial load separately from refetch.
+
+  ### 3. `busyGroupId` is a single scalar (`:1299`)
+
+  `const [busyGroupId, setBusyGroupId] = useState<string | null>(null)`, consumed at `:1108` as `busy={busyGroupId === key}`. `despatch` sets it on entry and clears it to `null` in `finally`.
+
+  Repro: submit bucket A (busy=A, A disabled). Before A resolves, submit B — B's button is not disabled — so `busyGroupId` becomes B and **A re-enables while A's POST is still open**. When A resolves, `finally` sets `null`, re-enabling B while B's POST is still open. Either click re-fires `POST /api/vendor/transfers`. The unique index on `production_transfer_jobs.job_id` prevents a duplicate parcel, but the vendor sees a spurious "already been sent on a parcel" 409 for a send they never completed.
+
+  Fix: a `Set` or record of busy keys instead of a scalar.
+
+  ### 4. `pieces` never re-syncs when a bucket gains a job (`:932`)
+
+  `const [pieces, setPieces] = useState(String(group.jobs.length))` runs once. The React key is `despatchGroupKey(group)` (`:828`, `:929`), the first job's id, which is stable when a job is *added*.
+
+  Repro: a bucket shows 2 jobs and Pieces auto-fills 2. A third job for the same order passes QC; `loadCandidates` returns 3 jobs under the same first-job id, so the component is reused and Pieces still reads 2. **The vendor sends a docket claiming 2 pieces for a 3-job parcel.**
+
+  Mirror case: if the new job sorts first under the server's `order by stage, id`, the key changes instead and the whole draft is silently discarded — same root cause as defect 2.
+
+  ## Context
+
+  Defects 1 and 2 compound: a queued stale read is more likely precisely when the operator is clicking repeatedly, which is also when they have the most unsaved input to lose.
+
+  All four were confirmed by reading the file directly, not inferred.
+feature: production-pipeline
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T03:43:09.071Z'
+last_updated: '2026-08-31T03:55:47.874Z'
+time_spent_minutes: 4
+labels:
+  - web
+  - vendor-portal
+  - concurrency
+  - production-pipeline
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T03:51:19.628Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-31T03:55:41.265Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2905bfa7` - fix(vendor): stop the despatch screen losing dockets and resurrecting sent buckets
+
+      **Files Changed**:
+      - `packages/web/app/routes/vendor/index.tsx` — extracted `useVendorDespatch`; skeleton gate; busy Set; piece-count re-sync
+      - `packages/web/tests/routes/vendor/vendor-screens.test.tsx` — 7 new tests
+
+      **Summary**:
+      All four defects fixed as filed. The two races (1 and 3) were not reachable through the presentational panel, so the loader became an exported hook, `useVendorDespatch`, and both are now tested directly with deferred promises.
+
+      1. `loadCandidates` now runs under `useLatestOnly` (`packages/web/app/lib/latest-request.ts`), the guard already used by the three admin production screens. A stale candidates response no longer overwrites a newer one.
+      2. The skeleton renders only when `data === null`, so a refetch keeps every other bucket mounted and its typed docket intact.
+      3. `busyGroupId: string | null` became `busyGroupIds: ReadonlySet<string>` on both the hook and `VendorDespatchPanelState`. Keys are added and removed, never assigned, so one send settling cannot unlock another that is still open.
+      4. `pieces` follows `group.jobs.length` via an effect keyed on the count — so a bucket that gains a job updates its default, while a count the vendor typed survives a re-read of the same bucket.
+
+      **Note on scope**: extracting the loader also moved `setError(null)` to the START of a read rather than on success. That is half of #715 defect 1 and lands here as a consequence of the extraction, not as a claimed fix — #715 will add the test that pins it.
+
+      **Verification**:
+      - Command: `npx vitest run tests/routes/vendor/` (in `packages/web`)
+      - Result: PASS (3 files, 293 tests, 293 passing, 0 failing)
+      - All 7 new tests were confirmed failing before the fix (step 2)
+      - Build: `npm run typecheck` PASS
+  - author: system
+    timestamp: '2026-08-31T03:55:43.804Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-31T03:51:22.645Z'
+    agent: claude-code
+    summary: Fixed all four defects in 2905bfa7. Extracted useVendorDespatch so the two races were testable; stale-response guard via useLatestOnly, busy Set, skeleton gated on data === null, piece count follows the job count. 7 new tests, red before green. 293/293 vendor tests pass, typecheck clean.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T03:55:47.854Z'
+    duration: '00:04:25'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: a slow candidates response arriving after a newer one must not overwrite it; a refetch must not clear another bucket''s carrier/reference/date; two concurrent despatches must each stay disabled until their own request settles; a bucket gaining a job must update its pieces default'
+    file: packages/web/app/routes/vendor/__tests__/despatch.test.tsx
+    expected_result: FAIL - all four reproduce the defects
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm all four fail before any fix
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Wrap loadCandidates in useLatestOnly; render the skeleton only when data === null; replace busyGroupId with a Set of busy keys; re-sync the pieces default when group.jobs.length changes
+    file: packages/web/app/routes/vendor/index.tsx
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Confirm all four pass, and that the existing vendor portal tests still pass
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/web/app/routes/vendor && git commit -m "fix(web): stop the vendor despatch screen losing drafts and resurrecting sent buckets"'
+    status: done
+current_step: 5
+started: '2026-08-31T03:51:19.628Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/routes/vendor/ (in packages/web)
+  test_output: 3 files, 293 tests, 293 passing, 0 failing. 7 new tests covered the four defects and each failed before the fix.
+  build_passed: true
+  build_command: npm run typecheck
+  verified_at: '2026-08-31T03:55:08.340Z'
+completed: '2026-08-31T03:55:43.804Z'

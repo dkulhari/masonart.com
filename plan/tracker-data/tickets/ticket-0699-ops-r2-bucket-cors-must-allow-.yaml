@@ -1,0 +1,67 @@
+ticket_number: 699
+title: Ops - R2 bucket CORS must allow GET from the app origin, or every QC photo fails to display
+description: |-
+  ## Task
+  Verify and configure the R2 bucket's CORS policy to allow `GET` from the app origin, not only `PUT`. Add a check that catches the gap before a vendor does.
+
+  ## Context
+  Found by #692 during implementation. There is **no bucket-CORS configuration anywhere in this repo**, so nothing verifies this and no test can.
+
+  #692 renders QC photographs by fetching the bytes from R2 and displaying them from a local `blob:` URL, rather than putting the presigned URL in an `<img src>`. That is deliberate and required: `packages/web/tests/routes/vendor/no-customer-data.test.tsx` bans `X-Amz-Signature` from the vendor screen's `innerHTML`, and R2 of the customer-data rule forbids a signed URL being parked in the portal's DOM.
+
+  The consequence is a runtime dependency that unit tests cannot see:
+
+  - The presigned **PUT** already needs CORS for upload to work at all, so upload will appear fine.
+  - The **GET** is new. If the bucket allows only PUT, every photo slot renders "could not be shown" while the upload path looks healthy.
+
+  The failure is graceful — it never falls back to a link carrying the signature — but it silently breaks the QC review loop, and photo QC is what gates the shipping label. A vendor would be unable to prove they did the work.
+
+  ## Why this cannot be caught by the existing suites
+
+  Every vendor test mocks the network. 149 tests pass against a mocked R2. The first real signal would be a vendor reporting that photographs do not display, after which nobody would suspect CORS because uploading worked.
+
+  Design constraints:
+  - Allowed origins must cover the production app origin and whatever origin the staging/dev app runs on — `chobii.art` plus the local dev port.
+  - `GET` and `PUT` both, plus whatever preflight the browser sends for a `fetch` with credentials.
+  - Prefer configuration checked into the repo (or a documented `wrangler`/dashboard step in `docs/deployment.md`) over an undocumented dashboard click — the audit-log trigger incident (#663) is the precedent for why an unrecorded manual step is a defect in itself.
+  - Add an ops check: a smoke test or runbook step that fetches one object from the app origin and fails loudly, rather than relying on a vendor to notice.
+  - `docs/OPERATIONS.md` is where the audit trail runbook lives; this belongs beside it.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T19:40:03.395Z'
+last_updated: '2026-08-31T01:01:17.686Z'
+time_spent_minutes: 0
+labels:
+  - ops
+  - storage
+  - deployment
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-31T01:01:17.686Z'
+    text: |-
+      Made detectable, not fixed — the bucket policy lives outside this repo.
+
+      Shipped in commit `46fbac61`:
+      - `scripts/check-bucket-cors.mjs` — sends the preflight a browser would send and reports whether a cross-origin GET is allowed.
+      - `docs/OPERATIONS.md` §3c — the runbook entry, beside the audit-trail one.
+
+      **The check is honest about its own limits, which matters here.** Dev MinIO echoes back whatever `Origin` it is sent, so it is effectively a wildcard and the script passes for `https://not-an-allowed-origin.example`. Rather than let that read as assurance, the script detects the echo and reports INCONCLUSIVE, saying a pass in dev proves nothing about R2. It only has teeth pointed at the production bucket.
+
+      Verified locally: dev MinIO returns `allow-origin: http://localhost:4321`, `allow-methods: GET` — so the local environment is fine and was never the risk.
+
+      **Still outstanding, and needs someone with dashboard or wrangler access:**
+      1. Run `node scripts/check-bucket-cors.mjs https://chobii.art` against production R2.
+      2. If it fails, set the policy: `GET` and `PUT`, for the production origin and whatever origin staging uses, plus the preflight.
+      3. Preferably check the config in rather than leaving it a dashboard click. The audit-log trigger (#663) is the precedent — a required object survived unmade because nothing recorded that it had to exist.
+
+      Leaving this ticket **todo** deliberately. The detection landed; the configuration has not, and closing it would misrepresent that.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

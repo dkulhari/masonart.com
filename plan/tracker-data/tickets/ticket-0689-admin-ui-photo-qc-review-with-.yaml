@@ -16,20 +16,95 @@ description: |-
 feature: production-pipeline
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.711Z'
-last_updated: '2026-08-30T12:02:20.711Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T18:43:19.721Z'
+time_spent_minutes: 14
 labels:
   - web
   - admin
   - qc
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T18:28:49.479Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T18:43:11.863Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `1f829294` — feat(web): drive the QC screen's actions from the matrix, not from a list
+
+      **Files Changed**
+      - `packages/shared/src/schemas/production-transitions.ts` (new) — the transition TABLE, plus `nextStatuses`/`guardFor`/`TERMINAL_STATUSES`, and two derivations only the UIs need: `VERDICT_ONLY_STATUSES` and `patchableNextStatuses`.
+      - `packages/shared/src/index.ts`, `packages/shared/src/schemas/index.ts` — barrels.
+      - `packages/shared/tests/schemas/production-transitions.test.ts` (new) — 10 tests on the UI-side derivations, expected values written out rather than recomputed.
+      - `packages/api/src/lib/production-transitions.ts` — imports the shared table instead of restating it. Every function, the 409 and the `TransitionMatrix` totality assertion against the pgEnum stay exactly where they were.
+      - `packages/api/tests/lib/production-transitions.test.ts` — one added assertion: the shared status list still deep-equals `productionJobStatusEnum.enumValues`.
+      - `packages/web/app/routes/admin/production/$id.tsx` — `TransitionPanel`, `TransitionRefusal`, `QcShotList`, defect chips on `QcReviewForm`, overturn marker on `QcReviewHistory`, `fetchPhotos`, page wiring.
+      - `packages/web/tests/routes/admin/production-detail.test.tsx` — 34 → 63 tests.
+
+      **Why the matrix moved**
+
+      Hard constraint 1 ("render actions FROM the matrix, never from a hardcoded list") is not satisfiable with the table where it was: `packages/web` cannot import `packages/api/src/lib/production-transitions.ts` — not a dependency, and it value-imports the drizzle schema. The only two options were a second copy of the table in web (the exact drift design §4 forbids) or one copy both packages read. The table is now in `@chobii/shared`; the API imports it and keeps asserting it against the live pgEnum, so there is still exactly one matrix and it is still checked against the enum at compile time and in the anti-drift test. The added enum-equality assertion covers the one thing a type cannot: `PRODUCTION_JOB_STATUSES` is what shared's `nextStatuses` iterates, so a status missing from it would be an action the admin screen silently never offers while the API kept allowing the move.
+
+      **What the screen does now**
+      - The `<select>` over all 7 statuses is gone. `TransitionPanel` renders `patchableNextStatuses(status, 'admin')`; `dispatched`/`cancelled` get a sentence; `sent` gets a different sentence (retired, not terminal).
+      - `qc_passed`/`qc_failed` never appear as buttons and are named in a sentence pointing at the verdict form.
+      - An edge whose guard PATCH cannot evaluate (`priced-from-rate-card`) is shown, disabled, with where it IS taken beside it — keyed off the guard on the edge, not off a copy of the API's route table.
+      - A 409 renders `from`, `to`, `allowed` inline, and `route` on `GUARD_NOT_EVALUABLE_HERE`.
+      - `QcShotList` over `QC_SHOT_LIST` + `GET /:jobId/photos`, with skeleton / empty / error and a retry. A required slot with no photo is named; a photo outside the shot list is flagged, not dropped.
+      - `review_id` is presented as the FIRST verdict that judged a shot, and once a job has >1 verdict the panel says so — the API stamps only where the column is NULL, so a later verdict leaves no mark on these rows and its judged set is on its own audit row. Not papered over.
+      - Fail with no defect: submit disabled, inline message, `onSubmit` not called. No native `confirm()`/`alert()` anywhere.
+      - Overturn: both rows render, and the fail-after-pass carries an "Overturns the approval above" marker.
+
+      **Verification**
+      - `packages/web`: `npx vitest run tests/routes/admin/production-detail.test.tsx` → **63 passed** (34 before)
+      - `packages/api`: `npx vitest run tests/lib/production-transitions.test.ts` → **48 passed** (47 before)
+      - `packages/shared`: `npx vitest run tests/schemas/production-transitions.test.ts` → **10 passed**
+      - `tsc --noEmit`: shared clean, web clean, api clean for both `tsconfig.json` and `tsconfig.test.json`
+
+      **Follow-up for Phase 7 (not touched here)**
+
+      `tests/e2e/admin-vendor-lifecycle.spec.ts` drives the deleted `admin-production-status` select at lines ~361, ~437, ~454. It was already dead before this ticket — it asserts `toHaveValue('sent')` (retired, and `assigned → sent` has no edge) and `selectOption('qc_passed')` (which PATCH no longer parses), both killed by Phase 3. It now also has no element to find. Belongs to the Phase 7 E2E rewrite.
+  - author: system
+    timestamp: '2026-08-30T18:43:19.721Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T18:28:50.212Z'
+    agent: claude-code
+    summary: Moved the transition matrix into @chobii/shared so web renders actions from the one table the API asserts against the pgEnum; rebuilt /admin/production/$id's status control as TransitionPanel over patchableNextStatuses, added TransitionRefusal (409 from/to/allowed + GUARD_NOT_EVALUABLE_HERE route), QcShotList over QC_SHOT_LIST + GET /:jobId/photos, defect chips with a fail that cannot submit without one, and an overturn marker in the history. web 63 passed, api 48 passed, shared 10 passed, all typechecks clean. Commit 1f829294.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T18:43:17.647Z'
+    duration: '00:14:27'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T18:28:49.479Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:14:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:14:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/routes/admin/production-detail.test.tsx (packages/web); npx vitest run tests/lib/production-transitions.test.ts (packages/api); npx vitest run tests/schemas/production-transitions.test.ts (packages/shared)
+  test_output: web 63 passed (was 34), api 48 passed (was 47), shared 10 passed (new file)
+  build_passed: true
+  build_command: tsc --noEmit in packages/shared, packages/web, packages/api (tsconfig.json and tsconfig.test.json)
+  verified_at: '2026-08-30T18:42:49.499Z'
+completed: '2026-08-30T18:43:19.721Z'

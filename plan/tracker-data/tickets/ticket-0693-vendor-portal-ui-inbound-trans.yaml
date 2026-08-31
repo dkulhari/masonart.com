@@ -16,19 +16,83 @@ description: |-
 feature: production-pipeline
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T12:02:20.884Z'
-last_updated: '2026-08-30T12:02:20.884Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T20:01:36.459Z'
+time_spent_minutes: 16
 labels:
   - web
   - vendor-portal
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T19:45:06.377Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T20:01:36.388Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `cbb83119` — feat(web): hand the vendor portal its parcels and the carrier label
+
+      **Files Changed**:
+      - `packages/web/app/routes/vendor/index.tsx` — the parcel strip, its fetchers, `unreceivedInboundTransfers`, and `InlineConfirm` (moved here from the job screen)
+      - `packages/web/app/routes/vendor/jobs/$id.tsx` — `VendorLabelHandoverCard`, the "waiting on an inbound parcel" note, the guard wiring; re-exports `InlineConfirm`
+      - `packages/web/tests/routes/vendor/vendor-screens.test.tsx` — +39 behavioural tests
+      - `packages/web/tests/routes/vendor/no-customer-data.test.tsx` — +14 tests, including a source-level embed scan
+
+      **Summary**
+
+      *The label.* A BUTTON. `GET /api/vendor/jobs/:id/label` is called in the click handler, the bytes are fetched from the signature and saved through a local `blob:` URL — #692's `QcPhotoImage` technique applied to a download. No `iframe`/`embed`/`object`, and the signature never reaches an attribute, state, or a "here is the link instead" fallback. The card renders where `nextVendorActions` reports the matrix gating that edge on `open-transfer-or-order-label`, matching the API's own `LABEL_ACCESS_STATUSES` derivation rather than hardcoding `qc_passed`.
+
+      The **503 `LABEL_NOT_AVAILABLE`** seam renders in the card's OWN words, not the body's, so a driver sentence in a future body cannot narrate our schema to a supplier. 404 says there is no label without putting back the distinction the API withholds. Both were mutation-tested against a hostile body carrying `order_shipments.label_object_token`.
+
+      The guard is supplied UPWARD only — `true` once a label has actually been issued, never `false`. The edge is satisfied by an open transfer OR a label and the screen can see neither: probing the label route signs and writes a `production_job.label_issued` row, and `GET /transfers` withholds the order a parcel belongs to. Absent means unknown, which the matrix leaves live.
+
+      *The parcels.* Seven fields plus `direction` — no vendor name, no vendor id, no order, no cost. The strip lives on `/vendor` because a parcel is a fact about the vendor: in the consolidation case the receiving vendor has no job for the piece at all. A frame job whose vendor has an un-received inbound parcel says it is waiting on one, and says the VENDOR is waiting rather than naming this job's parcel, because `order_id` is withheld under R1 and `GET /transfers/:id` scopes `jobIds` to the caller's own jobs.
+
+      **Verification**
+      - Command: `bunx vitest run tests/routes/vendor/{no-customer-data,vendor-screens,layout-guard}.test.tsx` (from `packages/web`)
+      - Result: PASS — 215 tests, 215 passing, 0 failing (26 + 176 + 13). The two suites this ticket touches went 149 → 202: **53 new tests**.
+      - Command: `bun run typecheck` → 4/4 successful.
+
+      **Mutation testing: 33 run.**
+
+      First pass had **one survivor, and it was a real hole**: an `<iframe>` planted behind a prop nobody passes passed every rendered-DOM assertion in the suite, because no test enters that branch. R2's rule is not "no embed appears in the states we check" — it is that the portal has no inline viewer at all. Closed with a source-level scan of all five files in the tree (same shape as the existing native-dialog scan), plus a teeth check on the pattern. That mutation is now red along with the other 32.
+
+      The 33 cover: an inline PDF viewer; a fallback link on byte-fetch failure; fetching the label at render; echoing the API's 503 and 404 bodies; `onIssued` never firing; the signed URL going into an `href`; the card rendering on every status; the card keyed on any move rather than the label guard; the body ignoring `guards`; a constant direction badge; arrival confirmation offered on outbound and on already-arrived parcels; the empty state winning over the error; a bare piece count; a blank docket; a digit in the error block; a shared row error; the waiting note ignoring stage, counting arrived parcels, treating an unread list as waiting, and naming the parcel; a leaked vendor name and order id in the strip; `<embed>`/`<object>` in unrendered branches; the wrong parcel id on confirm; a dropped session cookie; a back-dated `receivedAt` body; an invented refusal message; and a forced direction filter.
+
+      **Out of scope, deliberately**: `POST /api/vendor/transfers` (outbound despatch) has no control on this screen. The ticket is "inbound transfers and the label handover card", and that endpoint moves the jobs to `dispatched` itself, so it is a different affordance ("despatch to the next workshop") rather than part of either surface here.
+  - author: system
+    timestamp: '2026-08-30T20:01:36.459Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T19:45:08.002Z'
+    agent: claude-code
+    summary: 'Shipped the parcel strip on /vendor and the label handover card on the job screen. Label is a button, fetched at click, bytes handed to the OS via a blob: URL; never an iframe/embed/object and no signature in the DOM. Card placement derived from nextVendorActions, not hardcoded. 503 LABEL_NOT_AVAILABLE rendered in our own words so the seam cannot narrate our schema. 53 new tests (215 passing across the three vendor suites), typecheck clean, 33 mutations run — one real survivor found (an iframe in an unrendered branch) and closed with a source-level embed scan. Commit cbb83119.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T20:01:11.104Z'
+    duration: '00:16:03'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T19:45:06.377Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:16:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:16:00'
+      tokens: 0
+completed: '2026-08-30T20:01:36.459Z'

@@ -15,12 +15,12 @@ description: |-
 feature: qa-e2e-testing
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-20T12:19:54.457Z'
-last_updated: '2026-08-30T05:36:40.061Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T10:02:27.068Z'
+time_spent_minutes: 41
 labels:
   - testing
   - e2e
@@ -71,8 +71,91 @@ comments:
         bunx playwright test tests/e2e/gift-cards.spec.ts --project=chromium
       ```
       with `cd packages/api && DATABASE_URL=…5440… bunx vitest run tests/routes` running alongside to load the box. Alone it passes every time.
-work_sessions: []
+  - author: system
+    timestamp: '2026-08-30T09:21:13.516Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T10:02:16.274Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3402b848` - test(e2e): start the gift card checkout tests from an empty cart
+
+      **Files Changed**:
+      - `tests/e2e/gift-cards.spec.ts` — `checkoutWithAnItem` now deletes the cart before seeding, and asserts the cart holds exactly one line instead of more than zero
+
+      **Root Cause**: a dirty shared cart, not a client-side stall
+
+      The instrumentation the previous comment asked for answered the question on the second try. In a stalled run the page console printed:
+
+      ```
+      [#661] handlePayment catch: Error: Payment gateway not configured
+      ```
+
+      So the success path never ran, and `navigate()` was never reached — both of the previous session's suspects were wrong.
+
+      `POST /api/orders/:id/payment/initiate` returned **503**. The order it was refusing:
+
+      | line | qty | line total |
+      |---|---|---|
+      | Synthetic Nature (poster) | 2 | 3398.00 |
+      | Gift card — ₹2,500 | 1 | 2500.00 |
+
+      total **5898.00**, against **1699.00** on every passing run.
+
+      These tests share one signed-in customer, so they share one server-side cart, and it outlives the browser context Playwright throws away between tests. A gift card line left by "buying a gift card alongside a poster" was still there. Gift card tender is capped to exclude gift card lines (#579), so the card could not cover an order containing one; the remainder was genuine, the server wanted a gateway, dev has none, and the 503 rolled the debit back. The client's catch called `syncCartWithServer()`, the cart was already emptied by order creation, and the page swapped to the empty-cart panel — on `/checkout`, with nothing wrong in the trace.
+
+      Which is also why it looked like a load problem. It is a cross-test ordering problem; load only changed how often the tests interleaved.
+
+      **Location**: `tests/e2e/gift-cards.spec.ts:102` (`checkoutWithAnItem`), cap at `packages/api/src/routes/orders.ts:1120`
+
+      **Fix**: `DELETE /api/cart` through the page's own origin before seeding, then poll for exactly one line. A leftover now fails loudly at the seeding step instead of quietly changing what the order costs.
+
+      **Verification**:
+      - Command: `SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4321 E2E_API_URL=http://localhost:3010 bunx playwright test tests/e2e/gift-cards.spec.ts --project=chromium --retries=0`, 5 rounds, with `DATABASE_URL=…5440… bunx vitest run tests/routes` looping alongside, load average 10-16
+      - Result: PASS — 13 passed in each of 5 rounds, `TOTAL_FAILED_ROUNDS=0`
+      - Before: the same harness failed **2 of 4** rounds on this test, both with the 503 above
+      - Also green: 4 further rounds run with the instrumentation still in place
+      - Typecheck: `turbo run typecheck` clean (pre-commit gate); 0 errors attributable to the spec under `tests/tsconfig.json`
+
+      **Filed from this work**:
+      - **#665** (high) — the real customer-facing defect underneath: checkout shows ₹0 due when the cart holds a gift card line, because the tender cap exists only on the server, and the resulting 503 presents as an empty cart.
+      - **#666** — a separate, pre-existing flake seen once in 9 rounds: the admin liability test asserts a delta on a *global* figure while parallel workers issue cards.
+  - author: system
+    timestamp: '2026-08-30T10:02:18.837Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T09:21:15.142Z'
+    agent: claude-code
+    summary: 'Instrumented the checkout success path and looped the full gift-cards spec under load. Console showed the stall was a 503 "Payment gateway not configured", not a client stall: the shared customer cart carried a leftover gift card line, and gift card tender is capped to exclude those (#579), so the card could not cover the order. Fixed by clearing the cart before seeding and asserting exactly one line. Commit 3402b848; 5 clean rounds green under load vs 2 of 4 failing before. Filed #665 (real client/server tender-cap mismatch) and #666 (separate liability-test race).'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T10:02:27.064Z'
+    duration: '00:41:11'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-30T09:21:13.516Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:41:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:41:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4321 E2E_API_URL=http://localhost:3010 bunx playwright test tests/e2e/gift-cards.spec.ts --project=chromium --retries=0 (x5 rounds, with `vitest run tests/routes` looping alongside, load avg 10-16)
+  test_output: 5 rounds, 13 passed each, TOTAL_FAILED_ROUNDS=0. Before the fix the same harness failed 2 of 4 rounds on this test.
+  build_passed: true
+  build_command: turbo run typecheck (pre-commit gate)
+  verified_at: '2026-08-30T10:01:58.330Z'
+completed: '2026-08-30T10:02:18.837Z'

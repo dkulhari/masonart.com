@@ -72,19 +72,87 @@ description: |-
 feature: qa-testing
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-30T04:04:32.642Z'
-last_updated: '2026-08-30T04:04:32.642Z'
-time_spent_minutes: 0
+last_updated: '2026-08-30T06:56:01.489Z'
+time_spent_minutes: 43
 labels:
   - testing
   - types
   - tech-debt
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T06:13:10.567Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T06:55:33.007Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits**: `ce922da1` — typecheck the tests/ tree and clear the mechanical error classes; `33a8eaed` — take tests/ to zero type errors and put them behind the gate
+
+      **Files Changed**:
+      - `packages/api/tsconfig.test.json` — new; the tests-only config
+      - `packages/api/tests/helpers/json.ts` — new; typed `readJson<T>()`
+      - `packages/api/package.json` — `typecheck` now runs both configs
+      - 95 test files across `packages/api/tests/`
+
+      **Burn-down** (each measured, not estimated):
+
+      | After | Errors |
+      |---|---|
+      | before | 1244 |
+      | `noUncheckedIndexedAccess: false` for tests | 882 |
+      | `readJson()` migration (523 call sites) | 274 |
+      | delete 71 unused declarations | 203 |
+      | hand triage | **0** |
+
+      The predicted 882 was hit exactly. `readJson()` beat the predicted 382 because the nested `(await app.request(…)).json()` form and five local `return res.json()` helpers were migrated too — 523 sites, not 413.
+
+      **Named `readJson`, not `json`**: 136 call sites already declare `const json = await res.json()`. `const json = await json(res)` is a temporal-dead-zone reference to the binding being declared — it would typecheck and throw at runtime.
+
+      **The #633 trap fired, in reverse.** `tests/database/orders.test.ts` declares `testVariantId` in two describe blocks. Deleting the dead one's assignments broke the live one, and the typechecker caught it (TS2454). The `productVariants` insert kept its side effect and lost only the dead binding it fed.
+
+      **Defects found by reading the residual**:
+      - `country` where `OrderShippingAddress` requires `countryCode` — four files, not just the one this ticket named
+      - `email-templates.test.ts` declared `shippingDetails` dates as `Date`; production declares ISO strings. It also set `paymentMethod`/`paymentId` at the top level (the row nests them under `paymentDetails`) and `billingAddress` (the column is `billingAddressId`)
+      - 19 inserts across four database suites omitted `id`. `user.id`/`session.id` are `text PRIMARY KEY NOT NULL` with no default — every one would have failed on a NOT NULL violation. **Type-verified only**: those suites are among the 5 skipped without a test database, so this is not runtime-proven
+      - `collection-resolver.test.ts` guarded with `merged && merged.styles`. `IMPOSSIBLE` is a symbol and symbols are truthy, so the guard never guarded
+      - `middleware/wallet.test.ts` passed provider `'fal'` and model `'flux-pro'`; neither is accepted
+      - `users.test.ts` chained `.where()` twice on one select
+      - six mocks declared fewer parameters than the function they stand in for
+      - `order-reviews.test.ts` had one test missing the `if (!app) return` guard the rest of the file has
+      - six files declared an `isDatabaseAvailable` skip-guard that nothing ever read
+
+      Two casts are upstream: postgres.js types `TransactionSql` as `Omit<Sql, …>`, and `Omit` drops the call signature.
+
+      **Verification**:
+      - Command: `npx tsc -p tsconfig.test.json --noEmit`
+      - Result: **0 errors**, down from 1244
+      - Self-tested at zero: appending an undefined identifier still reports `TS2304`, so the zero means the config is looking, not blind
+      - Command: `npx vitest run` (full packages/api suite)
+      - Result: PASS — 189 files passed | 5 skipped (194); 5029 tests passed | 187 skipped (5216); **0 failed**
+      - Test declaration count unchanged at 4533 vs `bbe812c6`
+      - Gate proof: appending `${counterThatWasDeleted}` to a staged test file — the #633 failure mode — makes `.githooks/pre-commit` exit 1 with `TS2304: Cannot find name` and "commit refused". Before this ticket the same edit was a `FULL TURBO` cache hit.
+  - author: system
+    timestamp: '2026-08-30T06:55:36.604Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T06:13:12.030Z'
+    agent: claude-code
+    summary: 'Ticket complete. Added packages/api/tsconfig.test.json + readJson() helper, migrated 523 json call sites, deleted 71 unused declarations, hand-triaged the residual to 0 errors (from 1244), wired the config into the typecheck script, and proved the pre-commit gate now refuses a test file with an undefined identifier. Full api suite green: 189 files, 5029 tests, 0 failures, test count unchanged. Commits ce922da1 and 33a8eaed.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T06:56:01.482Z'
+    duration: '00:42:49'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -94,7 +162,7 @@ implementation_steps:
     action: implement
     description: Add packages/api/tsconfig.test.json — separate from tsconfig.json, which cannot include tests because rootDir is ./src
     file: packages/api/tsconfig.test.json
-    status: pending
+    status: done
     code: |-
       {
         "extends": "../../tsconfig.json",
@@ -120,12 +188,12 @@ implementation_steps:
     description: Self-test the config, then record the baseline. A config reporting zero errors is indistinguishable from one that is not looking — prove it looks before trusting it.
     command: cd packages/api && printf '\nconst __probe = __definitelyNotDefined;\n' >> tests/helpers/live-db.ts && npx tsc -p tsconfig.test.json 2>&1 | grep -c __definitelyNotDefined && git checkout -- tests/helpers/live-db.ts && npx tsc -p tsconfig.test.json 2>&1 | grep -c 'error TS'
     expected_result: Probe count 1 (config genuinely checks), then 882 errors. If the probe count is 0, the config is inert — fix it before going further.
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add a typed json<T>() test helper and move the 413 res.json() call sites onto it — the single biggest category, 500 errors
     file: packages/api/tests/helpers/http.ts
-    status: pending
+    status: done
     code: |-
       /**
        * `Response.json()` is typed `unknown`, so every `body.field` read in a
@@ -142,43 +210,61 @@ implementation_steps:
     description: Confirm the json() migration dropped the count and changed no behaviour
     command: cd packages/api && npx tsc -p tsconfig.test.json 2>&1 | grep -c 'error TS' && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests/routes --no-file-parallelism
     expected_result: ~382 errors. Route suites pass with the same test count as before the change — record that count first.
-    status: pending
+    status: done
   - id: 5
     action: implement
     description: 'Delete the 71 unused declarations TS6133 reports. Check each is genuinely dead before removing — in #633 six ''unused'' counters were still used by orderNumber.'
     command: cd packages/api && npx tsc -p tsconfig.test.json 2>&1 | grep 'error TS6133'
-    status: pending
+    status: done
   - id: 6
     action: verify-pass
     description: Confirm the deletions and that nothing they fed has broken
     command: cd packages/api && npx tsc -p tsconfig.test.json 2>&1 | grep -c 'error TS' && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests --no-file-parallelism
     expected_result: ~311 errors, full api suite green
-    status: pending
+    status: done
   - id: 7
     action: implement
     description: Triage the residual ~311 by hand. These are the ones worth reading — they include real test/production drift, e.g. email-templates.test.ts:58 setting `country` where OrderShippingAddress requires `countryCode`. Fix the test to match production, not the type to match the test.
-    status: pending
+    status: done
   - id: 8
     action: verify-pass
     description: Zero errors, and the whole api suite still green with an unchanged test count
     command: cd packages/api && npx tsc -p tsconfig.test.json && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run tests --no-file-parallelism
     expected_result: 0 errors; test count identical to the run recorded in step 4
-    status: pending
+    status: done
   - id: 9
     action: implement
     description: Wire the test config into the typecheck script so the gate actually runs it
     file: packages/api/package.json
-    status: pending
+    status: done
     code: '"typecheck": "tsc --noEmit && tsc -p tsconfig.test.json"'
   - id: 10
     action: verify-pass
     description: 'Prove the gate now catches what it missed in #633 — a test file referencing an undefined identifier must fail the pre-commit hook'
     command: cd packages/api && printf '\nconst __probe = __definitelyNotDefined;\n' >> tests/helpers/live-db.ts && (cd ../.. && turbo run typecheck); git checkout -- tests/helpers/live-db.ts
     expected_result: turbo run typecheck FAILS on the probe. Before this ticket it passed clean. Restore the file afterwards.
-    status: pending
+    status: done
   - id: 11
     action: commit
     description: Commit, noting the deliberate strictness split between src and tests
     command: 'git add packages/api/tsconfig.test.json packages/api/package.json packages/api/tests && git commit -m "test(api): typecheck the test tree"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 11
+started: '2026-08-30T06:13:10.567Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:43:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:43:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run (full packages/api suite) + npx tsc -p tsconfig.test.json --noEmit
+  test_output: 'tsc: 0 errors (was 1244). Suite: 189 files passed | 5 skipped (194); 5029 tests passed | 187 skipped (5216); 0 failed. Test declaration count unchanged at 4533 vs bbe812c6.'
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-30T06:55:15.249Z'
+completed: '2026-08-30T06:55:36.604Z'

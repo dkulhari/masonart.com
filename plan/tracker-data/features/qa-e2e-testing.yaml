@@ -1,7 +1,7 @@
 name: qa-e2e-testing
 title: Qa E2e Testing
 priority: medium
-created: "2026-08-13T21:32:56.927Z"
+created: '2026-08-13T21:32:56.927Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -13,25 +13,30 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 1
+  total_duration: '00:41:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:41:00'
+      tokens: 0
 tickets:
   todo:
-    "661": E2E flaky - paying entirely with a gift card fails then passes on retry
+    '666': E2E flaky - admin gift card liability test reads a global total other tests are changing
   in_progress: {}
   done:
-    "184": "Bug: admin-approvals status transition tests timeout with networkidle"
-    "185": "Bug: admin-reviews bulk actions beforeEach times out waiting for stats card"
-    "186": "Bug: Replace networkidle with domcontentloaded in all admin E2E tests"
-    "651": E2E stale - admin-frames expects size buttons, the poster page now uses a select
-    "652": E2E stale - admin-products still expects native confirm() and an old edit flow
-    "653": E2E stale - admin-orders expects the Export button that was deliberately removed
-    "654": E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
-    "660": E2E failing - a staged order does not reach the storefront intact
-total_tickets: 9
-completion_percentage: 89
+    '184': 'Bug: admin-approvals status transition tests timeout with networkidle'
+    '185': 'Bug: admin-reviews bulk actions beforeEach times out waiting for stats card'
+    '186': 'Bug: Replace networkidle with domcontentloaded in all admin E2E tests'
+    '651': E2E stale - admin-frames expects size buttons, the poster page now uses a select
+    '652': E2E stale - admin-products still expects native confirm() and an old edit flow
+    '653': E2E stale - admin-orders expects the Export button that was deliberately removed
+    '654': E2E data-dependent - admin-dashboard empty-order-state tests cannot pass on a seeded database
+    '660': E2E failing - a staged order does not reach the storefront intact
+    '661': E2E flaky - paying entirely with a gift card fails then passes on retry
+total_tickets: 10
+completion_percentage: 90
 is_completed: false
-last_activity: "2026-08-30T04:39:24.853Z"
-started: "2026-08-30T03:23:50.136Z"
+last_activity: '2026-08-30T10:02:27.109Z'
+started: '2026-08-30T03:23:50.136Z'

@@ -1,0 +1,125 @@
+ticket_number: 698
+title: Admin API - expose the consolidator decision, so the panel stops reading it from the audit log
+description: |-
+  ## Task
+  Add a read that returns `order_consolidation` including `decided_by`, so `OrderProductionPanel` can show whether the consolidator was a system default or an admin decision without inferring it from an audit row.
+
+  ## Context
+  Found by #690 during implementation. Feature: production-pipeline.
+
+  #682 writes `order_consolidation.decided_by` and audits `order.consolidator_set` with `metadata.decision` of `system_default` or `admin_confirmed` — but **no route ever returns the column**. `GET /api/admin/orders/:orderId/production-readiness` returns `consolidatorVendorId` alone.
+
+  So #690's panel reads provenance off the newest successful `order.consolidator_set` audit row, and renders **unknown** when that read fails rather than assuming a default. That is the correct fallback given what exists, but it is the wrong source.
+
+  ## Why this matters beyond tidiness
+
+  The distinction is load-bearing by design. The system PROPOSES a consolidator and an admin CONFIRMS it; `decided_by = NULL` means "nobody chose this, the rules did". Rule 3 in particular — most order items, ties by earliest `assigned_at` — is explicitly only a proposal, because the real criterion (who is nearest the customer, which leg is cheapest) is not modelled. Making an arbitrary choice a *confirmed* one is what keeps it visible and auditable instead of silently arbitrary.
+
+  Reading that through the audit log has two problems:
+  - **The audit log has 400-day retention** (`queues/audit-retention.ts`). `order_consolidation.decided_by` does not expire. After the sweep runs, the panel would show `unknown` for a fact the database still holds.
+  - It couples a UI display to an audit query, which is a filtered, paginated, admin-and-super-admin-only endpoint. A content-manager cannot read the audit log at all.
+
+  Design constraints:
+  - Return the row, not a derived boolean — `vendorId`, `decidedBy`, `decidedAt`. The panel decides how to render it.
+  - Absence is meaningful: no row means not yet decided, which is different from a system default.
+  - Once this lands, replace the audit-log indirection in `OrderProductionPanel.tsx` and delete the fallback. The comment there names this ticket as the thing to replace it with.
+  - Do not widen it into a general consolidation history endpoint — the audit log is the history.
+feature: production-pipeline
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T18:41:19.785Z'
+last_updated: '2026-08-31T01:09:33.868Z'
+time_spent_minutes: 8
+labels:
+  - api
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-31T01:01:18.066Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-31T01:09:15.689Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-31T01:09:33.868Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d12162e0` - feat(api): return the order_consolidation row, so the panel stops reading the audit log
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/production-jobs.ts` — new `GET /api/admin/orders/:orderId/consolidator`, placed between the POST and the readiness GET (the FOR-UPDATE source scan slices `[post .. first get]`, so ordering is load-bearing). Gated by the `use("/:orderId/consolidator", requireAuth, requireAdmin)` that already covered the write.
+      - `packages/api/tests/routes/admin/production-jobs.test.ts` — 8 new tests + the read added to the order-scoped role-gating matrix.
+      - `packages/web/app/routes/admin/production/OrderProductionPanel.tsx` — reads the new route; `fetchConsolidatorProvenance`, `provenanceFromAuditEntries` and `ConsolidatorAuditEntry` deleted.
+      - `packages/web/tests/routes/admin/order-production-panel.test.tsx` — rewritten against the new source.
+
+      **Summary**
+
+      The route returns the ROW, not a verdict:
+
+      ```json
+      { "orderId": "…", "consolidation": { "orderId", "vendorId", "decidedBy", "decidedByEmail", "decidedAt" } }
+      ```
+
+      - **Absence is meaningful.** No row is `consolidation: null` with a 200, not a 404 and not a default-shaped row. "Nobody has decided" and "the rules chose" stay two facts.
+      - **`decidedByEmail` is the `decided_by` FK resolved**, exactly as the POST resolves `vendor_id` to a name — not an extra fact. It is nullable for two reasons that `decidedBy` tells apart: the system decided, or the account was deleted (`ON DELETE set null` nulls `decided_by` with it, per the schema note). The durable answer to "who" is still the audit log, which snapshots the email at write time.
+      - **Not widened into history.** One order, one current row. `basis` (`sole_vendor` / `confirmed_proposal` / `admin_override`) is deliberately absent — it is history, and history stays the audit log's job. The panel never rendered it.
+
+      Panel side: `provenanceFromConsolidation(row)` maps `decidedBy === null → system_default`, otherwise `admin_confirmed`. The email never decides. #690's three states survive the source change and are still distinct — read FAILED, read RUNNING, order has NO row — with their test ids intact and their wording moved off "the audit trail".
+
+      **Verification**
+      - Command: `npx vitest run tests/routes/admin/production-jobs.test.ts` (packages/api)
+      - Result: PASS (169 tests, 169 passing)
+      - Command: `npx vitest run tests/routes/admin/order-production-panel.test.tsx` (packages/web)
+      - Result: PASS (66 tests, 66 passing)
+      - `npm run typecheck` clean in both packages. `packages/web` excludes `tests/` from typecheck, so the test file was typechecked separately via a throwaway tsconfig: no new errors (the 12 reported are pre-existing `noUncheckedIndexedAccess` hits on `JOBS[0]` spreads, none in the new code).
+
+      **Non-vacuity — 10 mutations, each applied, run, and reverted**
+
+      API (each turned the suite red):
+      1. `decidedBy` dropped from the `.select({…})` projection
+      2. `.limit(1)` removed
+      3. `where` on `vendor_id` instead of `order_id`
+      4. absence answered as a default-shaped row
+      5. absence answered 404
+
+      Web (each turned the suite red):
+      6. `decidedByEmail` deciding instead of `decidedBy`
+      7. no row read as a system default
+      8. the `provenanceError` branch collapsed into the no-row branch
+      9. `fetchOrderConsolidation` pointed back at `/api/admin/audit-log`
+      10. a `!response.ok` swallowed as `null` instead of thrown
+
+      **Mutation 3 initially SURVIVED.** `expect(render(read?.where).params).toContain(ORDER_ID)` passes when the same uuid is matched against the wrong column — the parameters render identically. The assertion now pins the rendered SQL column (`"order_consolidation"."order_id"`) as well as the value, and the mutation turns red.
+work_sessions:
+  - start: '2026-08-31T01:01:18.930Z'
+    agent: claude-code
+    summary: Added GET /api/admin/orders/:orderId/consolidator returning the order_consolidation row (vendorId, decidedBy, decidedByEmail, decidedAt) or an explicit null; replaced the audit-log provenance indirection in OrderProductionPanel with it and deleted fetchConsolidatorProvenance/provenanceFromAuditEntries/ConsolidatorAuditEntry. TDD red→green both sides. 169 API + 66 web tests passing, 10 mutations verified red (one initially survived and the assertion was strengthened). Commit d12162e0.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-31T01:09:13.342Z'
+    duration: '00:07:54'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-31T01:01:18.066Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:08:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:08:00'
+      tokens: 0
+completed: '2026-08-31T01:09:15.689Z'

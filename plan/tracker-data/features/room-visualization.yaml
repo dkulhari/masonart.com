@@ -1,7 +1,7 @@
 name: room-visualization
 title: Room Visualization
 priority: low
-created: '2026-01-28T07:46:30.704Z'
+created: "2026-01-28T07:46:30.704Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -29,13 +29,14 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "701": "Room mockup generator: composite a poster into blank-wall room templates with frame shadows"
   in_progress: {}
   done: {}
-total_tickets: 0
+total_tickets: 1
 completion_percentage: 0
 is_completed: false
