@@ -204,6 +204,13 @@
       "when": 1788150858605,
       "tag": "0028_backfill_order_shipments",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788174382196,
+      "tag": "0029_vendor_shiprocket_pickup",
+      "breakpoints": true
     }
   ]
 }

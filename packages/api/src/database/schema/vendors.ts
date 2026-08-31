@@ -40,6 +40,19 @@ export const vendors = pgTable(
     state: text('state'),
     postalCode: text('postal_code'),
     country: text('country').default('IN'),
+    /**
+     * The nickname of a pickup address as registered in Shiprocket's own
+     * dashboard — pasted by an admin, never derived from the address columns
+     * above. A vendor can have a complete address here while Shiprocket has no
+     * pickup location for it, or has one filed under a name nobody would
+     * guess, so deriving would produce a value that is well-formed and wrong
+     * and would fail at dispatch rather than at the screen where it was set.
+     *
+     * Nullable because most vendors will never have one. NOT NULL with a
+     * placeholder would make "unset" and "set to something meaningless"
+     * indistinguishable, and only one of those should stop a dispatch.
+     */
+    shiprocketPickupLocation: text('shiprocket_pickup_location'),
     notes: text('notes'),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
