@@ -420,6 +420,32 @@ adminOrderShipmentsApp.post(
           .where(eq(orders.id, orderId));
       }
 
+      // Opening a shipment is what starts a customer being told their parcel is
+      // moving, and `order_shipments` is the store the tracking page reads. The
+      // floor `admin.request` row records that a POST happened; it does not
+      // record which carrier was chosen for whose order, which is the fact a
+      // support call or a carrier dispute actually turns on.
+      //
+      // AFTER the insert, and with no `tx`: the write above has already
+      // committed on its own, so a row written before it could claim a shipment
+      // that a later throw then unmade.
+      await recordAudit(c, {
+        action: "shipment.created",
+        entityType: "order_shipment",
+        // Optional throughout: `.returning()` is typed `T | undefined`, and a
+        // row that came back empty is a broken response anyway. Recording the
+        // attempt with a null id beats letting the audit write throw over a
+        // request whose database work has already committed.
+        entityId: newShipment?.id ?? null,
+        summary: `Shipment opened for order ${order.orderNumber} with ${data.carrier}`,
+        after: {
+          carrier: data.carrier,
+          trackingNumber: newShipment?.trackingNumber ?? null,
+          status: newShipment?.status ?? null,
+        },
+        metadata: { orderId },
+      });
+
       return c.json(
         {
           message: "Shipment created successfully",
@@ -551,6 +577,34 @@ adminShipmentsApp.patch(
             .where(eq(orders.id, existing.orderId));
         }
       }
+
+      // A tracking number is the one field on this row a CUSTOMER reads, on a
+      // page that has no other source of truth. When it turns out to be wrong —
+      // pasted from the wrong order, or overwritten during a re-book — the
+      // question is who last changed it and what it said before, and the floor
+      // `admin.request` row answers neither.
+      //
+      // `before` is the row as read at the top of this handler, so the diff is
+      // against what was actually replaced rather than against a re-read that
+      // could have moved underneath.
+      await recordAudit(c, {
+        action: "shipment.tracking_updated",
+        entityType: "order_shipment",
+        entityId: shipmentId,
+        summary: `Shipment ${shipmentId} updated`,
+        before: {
+          carrier: existing.carrier,
+          status: existing.status,
+        },
+        after: {
+          // Optional for the same reason as `shipment.created` above:
+          // `.returning()` is typed `T | undefined`.
+          carrier: updatedShipment?.carrier ?? null,
+          trackingNumber: updatedShipment?.trackingNumber ?? null,
+          status: updatedShipment?.status ?? null,
+        },
+        metadata: { orderId: existing.orderId },
+      });
 
       return c.json({
         message: "Shipment updated successfully",
