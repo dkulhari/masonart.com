@@ -72,6 +72,7 @@ import {
   STATUS_STYLES,
   StatusPill,
   isAssignable,
+  VendorIdFilter,
   assignRefusal,
   ASSIGN_REFUSAL_MESSAGES,
   assignJobsToVendor,
@@ -549,6 +550,93 @@ describe('isAssignable', () => {
    */
   it('refuses a job carrying a negotiated amount', () => {
     expect(isAssignable(jobWith({ status: 'assigned', amountActual: '350.00' }))).toBe(false)
+  })
+})
+
+describe('VendorIdFilter', () => {
+  /**
+   * The box was uncontrolled — `defaultValue`, no `key` — so the URL could move
+   * underneath it and it would go on showing the old text. Press "Clear
+   * filters" and the queue reloaded unfiltered while the box still held the id
+   * and the Clear button vanished; focus and blur it and `onBlur` re-applied
+   * the filter the admin had just cleared.
+   */
+  it('follows the filter when it is cleared from outside', () => {
+    const onApply = vi.fn()
+    const { rerender } = render(<VendorIdFilter vendorId={VENDOR_ID} onApply={onApply} />)
+
+    expect(screen.getByTestId('admin-production-filter-vendor')).toHaveValue(VENDOR_ID)
+
+    rerender(<VendorIdFilter vendorId={undefined} onApply={onApply} />)
+
+    const box = screen.getByTestId('admin-production-filter-vendor')
+    expect(box).toHaveValue('')
+
+    fireEvent.blur(box)
+    expect(onApply).not.toHaveBeenCalled()
+  })
+
+  it('applies what was typed, once, on blur', () => {
+    const onApply = vi.fn()
+    render(<VendorIdFilter vendorId={undefined} onApply={onApply} />)
+
+    const box = screen.getByTestId('admin-production-filter-vendor')
+    fireEvent.change(box, { target: { value: `  ${VENDOR_ID}  ` } })
+    fireEvent.blur(box)
+
+    expect(onApply).toHaveBeenCalledTimes(1)
+    expect(onApply).toHaveBeenCalledWith(VENDOR_ID)
+  })
+
+  it('keeps what is being typed until it is applied', () => {
+    const onApply = vi.fn()
+    render(<VendorIdFilter vendorId={undefined} onApply={onApply} />)
+
+    const box = screen.getByTestId('admin-production-filter-vendor')
+    fireEvent.change(box, { target: { value: 'half-a-vend' } })
+
+    expect(box).toHaveValue('half-a-vend')
+    expect(onApply).not.toHaveBeenCalled()
+  })
+
+  it('asks for nothing when the box has not changed', () => {
+    const onApply = vi.fn()
+    render(<VendorIdFilter vendorId={VENDOR_ID} onApply={onApply} />)
+
+    fireEvent.blur(screen.getByTestId('admin-production-filter-vendor'))
+    expect(onApply).not.toHaveBeenCalled()
+  })
+
+  it('asks for the filter to be dropped when the box is emptied', () => {
+    const onApply = vi.fn()
+    render(<VendorIdFilter vendorId={VENDOR_ID} onApply={onApply} />)
+
+    const box = screen.getByTestId('admin-production-filter-vendor')
+    fireEvent.change(box, { target: { value: '   ' } })
+    fireEvent.blur(box)
+
+    expect(onApply).toHaveBeenCalledWith(undefined)
+  })
+
+  /**
+   * The schema `.catch(undefined)`s an unparseable id, so `search.vendorId`
+   * never comes back as what was typed. Following the filter means the box
+   * empties — which is the truth: nothing was filtered.
+   */
+  it('empties when the router rejected what was typed', () => {
+    const onApply = vi.fn()
+    const { rerender } = render(<VendorIdFilter vendorId={undefined} onApply={onApply} />)
+
+    const box = screen.getByTestId('admin-production-filter-vendor')
+    fireEvent.change(box, { target: { value: 'not-a-uuid' } })
+    fireEvent.blur(box)
+    expect(onApply).toHaveBeenCalledWith('not-a-uuid')
+
+    rerender(<VendorIdFilter vendorId={undefined} onApply={onApply} />)
+
+    expect(screen.getByTestId('admin-production-filter-vendor')).toHaveValue('')
+    fireEvent.blur(screen.getByTestId('admin-production-filter-vendor'))
+    expect(onApply).toHaveBeenCalledTimes(1)
   })
 })
 

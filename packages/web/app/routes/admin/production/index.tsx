@@ -457,6 +457,60 @@ export function isAssignable(job: AssignCandidate): boolean {
   return assignRefusal(job) === null
 }
 
+/**
+ * The vendor-id filter box, controlled by the URL it writes to.
+ *
+ * It was uncontrolled — `defaultValue`, no `key` — so the filter could move
+ * underneath it and it would go on showing the old text. Pressing "Clear
+ * filters" reloaded the queue unfiltered while the box still held the id and
+ * the Clear button disappeared; focusing and blurring it then re-applied the
+ * filter the admin had just cleared. The same applies to a value the search
+ * schema `.catch(undefined)`s: `vendorId` never comes back as what was typed,
+ * so the box empties, which is the truth — nothing was filtered.
+ *
+ * A local draft rather than writing to the URL on every keystroke: half a uuid
+ * is not a filter, and a navigation per character is not a search box.
+ */
+export function VendorIdFilter({
+  vendorId,
+  onApply,
+}: {
+  vendorId: string | null | undefined
+  onApply: (vendorId: string | undefined) => void
+}) {
+  const applied = vendorId ?? ''
+  const [draft, setDraft] = useState(applied)
+  const [attempts, setAttempts] = useState(0)
+
+  // Keyed on the attempt as well as the value: a rejected id leaves `vendorId`
+  // exactly as it was, so watching it alone would leave the box showing text
+  // that filters nothing — and re-applying it on every blur after that. The box
+  // shows what is actually filtering, after every attempt to change it.
+  useEffect(() => {
+    setDraft(applied)
+  }, [applied, attempts])
+
+  return (
+    <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+      Vendor ID
+      <input
+        type="text"
+        data-testid="admin-production-filter-vendor"
+        placeholder="Paste a vendor id"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const value = draft.trim()
+          if (value === applied) return
+          setAttempts((n) => n + 1)
+          onApply(value || undefined)
+        }}
+        className="h-9 w-72 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
+      />
+    </label>
+  )
+}
+
 /** "24x36" as the API spells it, "24×36" as a person reads it. */
 function prettySize(size: string | null): string | null {
   if (!size) return null
@@ -1277,21 +1331,10 @@ function AdminProductionQueuePage() {
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Vendor ID
-          <input
-            type="text"
-            data-testid="admin-production-filter-vendor"
-            placeholder="Paste a vendor id"
-            defaultValue={search.vendorId ?? ''}
-            onBlur={(e) => {
-              const value = e.target.value.trim()
-              if (value === (search.vendorId ?? '')) return
-              updateSearch({ vendorId: value || undefined })
-            }}
-            className="h-9 w-72 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
-          />
-        </label>
+        <VendorIdFilter
+          vendorId={search.vendorId}
+          onApply={(vendorId) => updateSearch({ vendorId })}
+        />
 
         {(search.stage || search.status || search.vendorId) && (
           <Button
