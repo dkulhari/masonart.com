@@ -16,6 +16,7 @@ import { join } from "path";
 
 const startGiftCardDeliverySchedulerMock = vi.fn();
 const startDeadlineCheckerMock = vi.fn();
+const startQcPhotoRetentionWorkerMock = vi.fn();
 
 vi.mock("../src/services/gift-card-delivery", () => ({
   startGiftCardDeliveryScheduler: (...args: unknown[]) =>
@@ -25,6 +26,14 @@ vi.mock("../src/services/gift-card-delivery", () => ({
 vi.mock("../src/services/approval-deadline", () => ({
   startDeadlineChecker: (...args: unknown[]) =>
     startDeadlineCheckerMock(...args),
+}));
+
+// Mocked for the same reason as the two above, and for one more: the real
+// starter sweeps immediately, which would reach a live database and a live
+// bucket from a suite that is only asking whether startup calls it.
+vi.mock("../src/queues/qc-photo-retention", () => ({
+  startQcPhotoRetentionWorker: (...args: unknown[]) =>
+    startQcPhotoRetentionWorkerMock(...args),
 }));
 
 let startBackgroundWorkers: typeof import("../src/background").startBackgroundWorkers;
@@ -37,6 +46,7 @@ beforeEach(async () => {
     setTimeout(() => {}, 1_000_000) as unknown as NodeJS.Timeout,
   );
   startDeadlineCheckerMock.mockReturnValue({ stop: vi.fn() });
+  startQcPhotoRetentionWorkerMock.mockReturnValue({ stop: vi.fn() });
 
   ({ startBackgroundWorkers } = await import("../src/background"));
 });
@@ -64,6 +74,26 @@ describe("startBackgroundWorkers", () => {
     expect(startDeadlineCheckerMock).toHaveBeenCalledTimes(1);
 
     workers.stop();
+  });
+
+  it("starts the QC photo retention sweep", () => {
+    // #697. Unstarted, QC photographs accumulate in R2 forever and the rows
+    // that name them get cascaded away by unrelated job deletions.
+    const workers = startBackgroundWorkers();
+
+    expect(startQcPhotoRetentionWorkerMock).toHaveBeenCalledTimes(1);
+
+    workers.stop();
+  });
+
+  it("stops the QC photo retention sweep too", () => {
+    const qcStop = vi.fn();
+    startQcPhotoRetentionWorkerMock.mockReturnValue({ stop: qcStop });
+
+    const workers = startBackgroundWorkers();
+    workers.stop();
+
+    expect(qcStop).toHaveBeenCalledTimes(1);
   });
 
   it("stops everything it started", () => {
@@ -101,6 +131,7 @@ describe("startBackgroundWorkers", () => {
 
     expect(startGiftCardDeliverySchedulerMock).not.toHaveBeenCalled();
     expect(startDeadlineCheckerMock).not.toHaveBeenCalled();
+    expect(startQcPhotoRetentionWorkerMock).not.toHaveBeenCalled();
 
     workers.stop();
   });

@@ -1336,10 +1336,9 @@ export async function updateVendorJob(
  * the index.
  *
  * The R2 objects outlive the rows on purpose. A cascade would drop rows and
- * leave the objects orphaned forever, so the 400-day retention sweep has to
- * call `deleteByPrefix('production-qc/<jobId>/')` and only THEN delete rows.
- * That sweep is not in this module and not yet written — see #685's completion
- * note.
+ * leave the objects orphaned forever, so the 400-day retention sweep calls
+ * `deleteByPrefix('production-qc/<jobId>/')` and only THEN deletes rows. That
+ * sweep is not in this module: it is `queues/qc-photo-retention.ts` (#697).
  */
 
 /** One live photograph as this module answers it: a KEY, never a URL. */

@@ -1224,3 +1224,58 @@ describe('StoragePaths.productionQcPhoto', () => {
     }
   });
 });
+
+/**
+ * The prefix the 400-day retention sweep deletes under (#697).
+ *
+ * It has to cover EXACTLY the keys `productionQcPhoto` writes and nothing
+ * else. Too narrow and objects survive their rows, permanently orphaned
+ * because the sweep drops the only handle on them; too wide and it reaches
+ * into another job's evidence.
+ */
+describe('StoragePaths.productionQcJobPrefix', () => {
+  it('covers every slot of the job it names', () => {
+    const prefix = StoragePaths.productionQcJobPrefix('job-1');
+
+    for (const slot of QC_SHOT_SLOTS) {
+      expect(StoragePaths.productionQcPhoto('job-1', slot, 'a.jpg').startsWith(prefix)).toBe(
+        true
+      );
+    }
+  });
+
+  it('covers no other job', () => {
+    const prefix = StoragePaths.productionQcJobPrefix('job-a');
+
+    expect(
+      StoragePaths.productionQcPhoto('job-b', 'print_full', 'a.jpg').startsWith(prefix)
+    ).toBe(false);
+  });
+
+  it('ends in a slash, so it cannot swallow a job whose id is a prefix of another', () => {
+    // Without it, `production-qc/job-1` also matches `job-12`'s objects, and
+    // that job's photographs are gone 400 days early with its rows intact.
+    const prefix = StoragePaths.productionQcJobPrefix('job-1');
+
+    expect(prefix.endsWith('/')).toBe(true);
+    expect(
+      StoragePaths.productionQcPhoto('job-12', 'print_full', 'a.jpg').startsWith(prefix)
+    ).toBe(false);
+  });
+
+  it('sanitises the job id the same way the key builder does', () => {
+    // Both sides must agree or the sweep deletes under a prefix nothing was
+    // ever written to, and reports success.
+    expect(StoragePaths.productionQcJobPrefix('../admin')).toBe(
+      `production-qc/${StoragePaths.productionQcPhoto('../admin', 'print_full', 'a.jpg').split('/')[1]}/`
+    );
+  });
+
+  it('never widens to the whole production-qc namespace', () => {
+    // A job id that sanitised to empty must fall back to a segment, not
+    // collapse the prefix to `production-qc/` and delete every job's photos.
+    for (const jobId of ['...', '.', '-', '/']) {
+      expect(StoragePaths.productionQcJobPrefix(jobId)).not.toBe('production-qc/');
+    }
+  });
+});

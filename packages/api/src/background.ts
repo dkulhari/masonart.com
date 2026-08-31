@@ -32,6 +32,7 @@
 import { startGiftCardDeliveryScheduler } from "./services/gift-card-delivery";
 import { startDeadlineChecker } from "./services/approval-deadline";
 import { startAuditRetentionWorker } from "./queues/audit-retention";
+import { startQcPhotoRetentionWorker } from "./queues/qc-photo-retention";
 import { logger } from "./lib/logger";
 
 export interface BackgroundWorkers {
@@ -48,7 +49,7 @@ export interface BackgroundWorkers {
 export function startBackgroundWorkers(): BackgroundWorkers {
   if (process.env.DISABLE_BACKGROUND_WORKERS === "true") {
     logger.info(
-      "Background workers disabled by DISABLE_BACKGROUND_WORKERS — gift card delivery, approval deadlines and audit retention will not run in this process",
+      "Background workers disabled by DISABLE_BACKGROUND_WORKERS — gift card delivery, approval deadlines, audit retention and QC photo retention will not run in this process",
     );
     return { stop: () => {} };
   }
@@ -65,8 +66,15 @@ export function startBackgroundWorkers(): BackgroundWorkers {
   // and the delete is bounded by age rather than by count.
   const auditRetention = startAuditRetentionWorker();
 
+  // Retention on the QC photographs, on the same 400-day window as the audit
+  // log above so a verdict and its evidence expire together. Safe in every
+  // instance for the same age-bounded reason, plus one of its own: the sweep
+  // deletes the R2 objects BEFORE the rows that name them, so a loser of the
+  // race finds an already-empty prefix and deletes rows that are already gone.
+  const qcPhotoRetention = startQcPhotoRetentionWorker();
+
   logger.info(
-    "Background workers started: gift card delivery, approval deadlines, audit retention",
+    "Background workers started: gift card delivery, approval deadlines, audit retention, QC photo retention",
   );
 
   let stopped = false;
@@ -81,6 +89,7 @@ export function startBackgroundWorkers(): BackgroundWorkers {
       clearInterval(giftCardDelivery);
       deadlineChecker.stop();
       auditRetention.stop();
+      qcPhotoRetention.stop();
       logger.info("Background workers stopped");
     },
   };

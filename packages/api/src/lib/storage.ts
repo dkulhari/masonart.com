@@ -119,6 +119,19 @@ export const StoragePaths = {
     const safeFilename = sanitizeKeySegment(filename, 'file');
     return `production-qc/${safeJobId}/${safeSlot}/${safeFilename}`;
   },
+
+  /**
+   * The prefix covering every QC photograph of one job, across every slot.
+   *
+   * Exists so the 400-day retention sweep (#697) deletes under exactly the
+   * same segment `productionQcPhoto` wrote under. Reimplementing the prefix
+   * at the call site would pass its own tests and then silently miss objects
+   * the moment `sanitizeKeySegment` changed on one side only — and a missed
+   * object is permanent, because the sweep drops the row that named it.
+   */
+  productionQcJobPrefix(jobId: string): string {
+    return `production-qc/${sanitizeKeySegment(jobId, 'unknown')}/`;
+  },
 } as const;
 
 /**

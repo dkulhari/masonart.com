@@ -264,7 +264,8 @@ export const productionJobPhotos = pgTable(
     /**
      * cascade, unlike productionJobs.orderId: a photograph of a job is not a
      * financial record and means nothing without the job. It does leave the R2
-     * objects orphaned, which is why the 400-day retention sweep calls
+     * objects orphaned, which is why the 400-day retention sweep in
+     * `queues/qc-photo-retention.ts` (#697) calls
      * `deleteByPrefix('production-qc/<jobId>/')` BEFORE deleting rows — a
      * cascade cannot reach into object storage.
      */
