@@ -1285,6 +1285,28 @@ export function QcReviewForm({
   const [defects, setDefects] = useState('')
   const [notes, setNotes] = useState('')
 
+  /**
+   * The job moving is what says the last submission landed, so it is what
+   * empties the form.
+   *
+   * A verdict IS a transition — the review row and the move are written in one
+   * transaction — so there is no successful submit that leaves `status` alone,
+   * and no failed one that changes it. `onSubmit` cannot be asked instead: the
+   * parent swallows the failure into `error` and resolves either way.
+   *
+   * Without this, only `verdict` followed the job. Recording a pass with defect
+   * chips ticked — legal, the legend says "optional on a pass" — left them
+   * ticked in a form that had silently become the overturn, with submit
+   * enabled: one press posted `qc_passed -> qc_failed` carrying the previous
+   * verdict's defects and notes.
+   */
+  useEffect(() => {
+    setPreferred(null)
+    setChips([])
+    setDefects('')
+    setNotes('')
+  }, [status])
+
   const verdicts = availableVerdicts(status)
 
   /**

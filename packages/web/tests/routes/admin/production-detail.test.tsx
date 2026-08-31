@@ -1194,6 +1194,104 @@ const OVERTURN: ProductionJobReview[] = [
   },
 ]
 
+describe('QcReviewForm — what a recorded verdict leaves behind', () => {
+  /**
+   * A verdict IS a transition, so the job moves under this form: a pass turns
+   * `qc_submitted` into `qc_passed`, where the only edge left is the overturn.
+   * `verdict` is derived every render and follows that move; the chips, the
+   * free text and the notes were not, and stayed exactly as they were.
+   *
+   * Ticking defect chips on a pass is legal — the legend says "optional on a
+   * pass" — so the form silently re-rendered as **Fail**, with those chips
+   * still active and submit enabled. One press posted a `qc_passed →
+   * qc_failed` overturn carrying the previous verdict's defects and notes.
+   */
+  it('clears the defects and notes once the job has moved', () => {
+    const onSubmit = vi.fn(async () => {})
+    const { rerender } = render(
+      <QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+
+    fireEvent.click(screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`))
+    fireEvent.change(screen.getByTestId('admin-production-review-defects'), {
+      target: { value: 'a scuff along the top edge' },
+    })
+    fireEvent.change(screen.getByTestId('admin-production-review-notes'), {
+      target: { value: 'passed anyway, cosmetic' },
+    })
+    fireEvent.submit(screen.getByTestId('admin-production-review-form'))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+
+    // The pass landed: the job is `qc_passed`, where the overturn is the only
+    // verdict left, so the select now reads Fail without anyone choosing it.
+    rerender(
+      <QcReviewForm status="qc_passed" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+
+    expect(screen.getByTestId('admin-production-review-verdict')).toHaveValue('fail')
+    expect(
+      screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`)
+    ).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('admin-production-review-defects')).toHaveValue('')
+    expect(screen.getByTestId('admin-production-review-notes')).toHaveValue('')
+    // An overturn is a fail, and a fail with no defect cannot be submitted — so
+    // the one press that used to post the previous verdict's defects now posts
+    // nothing at all.
+    expect(screen.getByTestId('admin-production-review-submit')).toBeDisabled()
+  })
+
+  /** A rework that comes back for inspection starts from a clean form too. */
+  it('clears the form when a failed job is resubmitted for inspection', () => {
+    const onSubmit = vi.fn(async () => {})
+    const { rerender } = render(
+      <QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+
+    fireEvent.change(screen.getByTestId('admin-production-review-verdict'), {
+      target: { value: 'fail' },
+    })
+    fireEvent.click(screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`))
+    fireEvent.submit(screen.getByTestId('admin-production-review-form'))
+
+    rerender(
+      <QcReviewForm status="qc_failed" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+    rerender(
+      <QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+
+    expect(
+      screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`)
+    ).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('admin-production-review-verdict')).toHaveValue('pass')
+  })
+
+  /** Typing is not a move. Nothing is cleared while the job sits still. */
+  it('keeps what the reviewer typed while the job has not moved', () => {
+    const onSubmit = vi.fn(async () => {})
+    const { rerender } = render(
+      <QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error={null} />
+    )
+
+    fireEvent.click(screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`))
+    fireEvent.change(screen.getByTestId('admin-production-review-notes'), {
+      target: { value: 'still writing this' },
+    })
+
+    rerender(
+      <QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={true} error={null} />
+    )
+    rerender(
+      <QcReviewForm status="qc_submitted" onSubmit={onSubmit} isSubmitting={false} error="Failed to record the inspection" />
+    )
+
+    expect(
+      screen.getByTestId(`admin-production-review-chip-${QC_DEFECT_CHIPS[0]}`)
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('admin-production-review-notes')).toHaveValue('still writing this')
+  })
+})
+
 describe('QcReviewHistory — an overturn', () => {
   it('renders both verdicts, the approval first', () => {
     render(<QcReviewHistory reviews={OVERTURN} isLoading={false} error={null} />)
