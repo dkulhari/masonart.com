@@ -825,6 +825,15 @@ export interface VendorTransferCandidatesResponse {
   groups: VendorTransferCandidateGroup[]
 }
 
+/**
+ * What `createTransferSchema` accepts for `carrier` and `reference`.
+ *
+ * The API's own bound, named here rather than guessed: the schema is
+ * `.strict()`, so an over-length value comes back as a bare
+ * "Invalid request body" with nothing saying which of the two was wrong.
+ */
+export const VENDOR_TRANSFER_TEXT_MAX = 120
+
 /** What one bucket is called on screen: its first job. Stable, and not new. */
 export function despatchGroupKey(group: VendorTransferCandidateGroup): string {
   return group.jobs[0]?.id ?? ''
@@ -1068,9 +1077,27 @@ function DespatchGroup({
   // parcel of no pieces is not a parcel.
   const piecesValid = Number.isInteger(pieceCount) && pieceCount >= 1 && pieceCount <= 999
 
+  /**
+   * Which text field is too long, BY NAME.
+   *
+   * `maxLength` below stops typing, and neither a paste in some browsers nor a
+   * scripted change is typing — so the check exists as well. Naming the field
+   * is the whole point: the API's answer is `.strict()`'s bare
+   * "Invalid request body", which tells the vendor nothing about which of the
+   * two boxes to shorten.
+   */
+  const overLongField =
+    carrier.trim().length > VENDOR_TRANSFER_TEXT_MAX
+      ? 'Carrier'
+      : reference.trim().length > VENDOR_TRANSFER_TEXT_MAX
+        ? 'Docket reference'
+        : null
+
+  const canSubmit = piecesValid && overLongField === null && !busy
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
-    if (!piecesValid || busy) return
+    if (!canSubmit) return
 
     void onDespatch({
       jobIds: group.jobs.map((job) => job.id),
@@ -1110,6 +1137,7 @@ function DespatchGroup({
             data-testid={`vendor-despatch-carrier-${key}`}
             value={carrier}
             onChange={(e) => setCarrier(e.target.value)}
+            maxLength={VENDOR_TRANSFER_TEXT_MAX}
             placeholder="Delhivery"
             className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
           />
@@ -1122,6 +1150,7 @@ function DespatchGroup({
             data-testid={`vendor-despatch-reference-${key}`}
             value={reference}
             onChange={(e) => setReference(e.target.value)}
+            maxLength={VENDOR_TRANSFER_TEXT_MAX}
             placeholder="DL-9911"
             className="h-9 rounded-lg border border-border bg-background px-2 text-sm text-foreground"
           />
@@ -1161,10 +1190,17 @@ function DespatchGroup({
         </p>
       )}
 
+      {overLongField && (
+        <p data-testid={`vendor-despatch-too-long-${key}`} className="text-xs text-destructive">
+          {overLongField} is longer than {VENDOR_TRANSFER_TEXT_MAX} characters, which is
+          the most we can record. Shorten it.
+        </p>
+      )}
+
       <Button
         type="submit"
         data-testid={`vendor-despatch-submit-${key}`}
-        disabled={!piecesValid || busy}
+        disabled={!canSubmit}
       >
         {busy ? 'Sending…' : 'Send this group'}
       </Button>

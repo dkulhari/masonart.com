@@ -2551,6 +2551,81 @@ describe('VendorDespatchPanel', () => {
     expect(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`)).toHaveValue(7)
   })
 
+  /**
+   * #715 defect 1. The panel checks `error` before anything else, and the
+   * error was only cleared on SUCCESS — so clicking "Try again" changed
+   * nothing on screen: banner still there, button still enabled. The operator
+   * clicks again, and again, each firing another unguarded read.
+   */
+  it('replaces the failed read with a loading state the moment a retry starts', () => {
+    const { rerender } = render(
+      <VendorDespatchPanel
+        despatch={despatchPanel({ data: null, error: 'Failed to load what you can send' })}
+      />
+    )
+
+    expect(screen.getByTestId('vendor-despatch-error')).toBeInTheDocument()
+    expect(screen.getByTestId('vendor-despatch-retry')).toBeInTheDocument()
+
+    // What the hook does the instant `reload()` is called.
+    rerender(<VendorDespatchPanel despatch={despatchPanel({ data: null, isLoading: true })} />)
+
+    expect(screen.queryByTestId('vendor-despatch-error')).toBeNull()
+    // And with the banner goes the button, so a second click cannot queue a
+    // second read.
+    expect(screen.queryByTestId('vendor-despatch-retry')).toBeNull()
+    expect(screen.getByTestId('vendor-despatch-skeleton')).toBeInTheDocument()
+  })
+
+  /**
+   * #715 defect 2. `createTransferSchema` caps carrier and reference at 120 and
+   * is `.strict()`, so an over-length value came back as a bare
+   * "Invalid request body" with nothing saying which field was wrong — the
+   * exact outcome `promisedInstant` was written to prevent for the date.
+   */
+  it('caps the carrier and the docket reference at the length the API accepts', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_B] })} />)
+
+    expect(screen.getByTestId(`vendor-despatch-carrier-${KEY_B}`)).toHaveAttribute(
+      'maxLength',
+      '120'
+    )
+    expect(screen.getByTestId(`vendor-despatch-reference-${KEY_B}`)).toHaveAttribute(
+      'maxLength',
+      '120'
+    )
+  })
+
+  it.each([
+    ['carrier', `vendor-despatch-carrier-${KEY_B}`, /carrier/i],
+    ['reference', `vendor-despatch-reference-${KEY_B}`, /docket reference/i],
+  ])('refuses an over-length %s, and says which field', (_name, testId, message) => {
+    const onDespatch = vi.fn()
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_B], onDespatch })} />)
+
+    // `maxLength` stops typing, not a paste in jsdom — and not a scripted
+    // change either, which is why the local check exists as well.
+    fireEvent.change(screen.getByTestId(testId), { target: { value: 'x'.repeat(121) } })
+
+    expect(screen.getByTestId(`vendor-despatch-too-long-${KEY_B}`).textContent).toMatch(message)
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).toBeDisabled()
+
+    fireEvent.submit(screen.getByTestId(`vendor-despatch-form-${KEY_B}`))
+    expect(onDespatch).not.toHaveBeenCalled()
+  })
+
+  it('accepts a carrier of exactly the length the API accepts', () => {
+    const onDespatch = vi.fn()
+    render(<VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_B], onDespatch })} />)
+
+    fireEvent.change(screen.getByTestId(`vendor-despatch-carrier-${KEY_B}`), {
+      target: { value: 'x'.repeat(120) },
+    })
+
+    expect(screen.queryByTestId(`vendor-despatch-too-long-${KEY_B}`)).toBeNull()
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).not.toBeDisabled()
+  })
+
   it('names no counterparty, because it is told none', () => {
     render(<VendorDespatchPanel despatch={despatchPanel()} />)
 
@@ -2622,6 +2697,40 @@ describe('useVendorDespatch', () => {
     })
 
     expect(result.current.data?.map((g) => g.jobs[0]?.id)).toEqual(['fresh'])
+  })
+
+  /**
+   * #715 defect 1, at the source. The error has to go when the read STARTS;
+   * clearing it on success means a failing retry leaves the banner up and the
+   * button live, and the operator keeps clicking.
+   */
+  it('clears a failed read the moment a retry starts, not when it succeeds', async () => {
+    const pending = defer()
+    let call = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        call += 1
+        if (call === 1) return Promise.reject(new Error('network is down'))
+        return pending.promise
+      })
+    )
+
+    const { result } = renderHook(() => useVendorDespatch())
+    await waitFor(() => expect(result.current.error).toBe('network is down'))
+
+    act(() => {
+      result.current.reload()
+    })
+
+    // Still in flight — and the banner is already gone.
+    expect(result.current.error).toBeNull()
+    expect(result.current.isLoading).toBe(true)
+
+    await act(async () => {
+      pending.resolve(ok({ groups: [] }))
+      await pending.promise
+    })
   })
 
   /**
