@@ -72,6 +72,7 @@ import {
   productionJobPhotos,
   productionJobReviews,
   vendorSettlements,
+  type ProductionJobStage,
 } from '../database/schema/production-jobs'
 import { orderItems, orders } from '../database/schema/orders'
 import {
@@ -2020,6 +2021,91 @@ export async function getVendorTransfer(
 }
 
 /** What the vendor supplies. Every other column is ours, or derived. */
+/** One job a vendor may put on a parcel, and the three things they are told. */
+export interface VendorTransferCandidateJob {
+  id: string
+  stage: ProductionJobStage
+  dueAt: Date | null
+}
+
+/**
+ * The jobs that can ride ONE parcel together.
+ *
+ * The bucket has no identity of its own: it IS its jobs. A synthetic group key
+ * would be a stable handle on an order that a vendor could hold, correlate
+ * across sessions and replay, which is the whole thing `order_id`'s absence
+ * from every vendor projection exists to prevent.
+ */
+export interface VendorTransferCandidateGroup {
+  jobs: VendorTransferCandidateJob[]
+}
+
+/**
+ * What this vendor could despatch right now, grouped the way the POST demands.
+ *
+ * `createVendorTransfer` refuses `JOBS_SPAN_ORDERS`, and `listVendorJobs` omits
+ * `order_id` on purpose — so the portal cannot tell which of a vendor's jobs
+ * belong together and a multi-select over the job list is trial and error
+ * against a 422. The grouping is therefore ours to do, and this read does it by
+ * `order_id` WITHOUT SELECTING IT: the aggregate leaves the database, the value
+ * it grouped by does not. Same shape as the routing read inside
+ * `createVendorTransfer`, for the same reason.
+ *
+ * Every filter here is one of that function's refusals, asked before the vendor
+ * packs a box rather than after:
+ *
+ * - `qc_passed` — the only status with a vendor edge to `dispatched`
+ *   (`ILLEGAL_TRANSITION`). `cancelled` is excluded by the same clause.
+ * - `settlement_id IS NULL` — a settled job is frozen (`JOB_SETTLED`).
+ * - no `production_transfer_jobs` row — a job rides exactly one parcel, ever
+ *   (`JOB_ALREADY_ON_TRANSFER`).
+ * - an `order_consolidation` row exists (`NO_CONSOLIDATOR`) naming somebody
+ *   else (`CONSOLIDATOR_IS_SELF`).
+ *
+ * So a group this read offers is a group the POST accepts, and the only
+ * refusals the screen can still meet are the ones a race produces.
+ *
+ * Oldest bucket first: the work that has been waiting longest is the parcel to
+ * pack next, which is not the newest-first order the job list uses.
+ */
+export async function listVendorTransferCandidates(
+  vendorId: string | null | undefined
+): Promise<VendorTransferCandidateGroup[]> {
+  assertVendorId(vendorId)
+
+  const groups = await db
+    .select({
+      // The ONLY selected expression. `order_id` is grouped by and never read
+      // out; `json_agg` is what lets one row carry a whole bucket without the
+      // key that made it.
+      jobs: sql<VendorTransferCandidateJob[]>`json_agg(json_build_object(
+        'id', ${productionJobs.id},
+        'stage', ${productionJobs.stage},
+        'dueAt', ${productionJobs.dueAt}
+      ) order by ${productionJobs.stage}, ${productionJobs.id})`,
+    })
+    .from(productionJobs)
+    // INNER: no consolidation row means nowhere to send it, which is a refusal
+    // rather than a bucket.
+    .innerJoin(orderConsolidation, eq(orderConsolidation.orderId, productionJobs.orderId))
+    .leftJoin(productionTransferJobs, eq(productionTransferJobs.jobId, productionJobs.id))
+    .where(
+      and(
+        eq(productionJobs.vendorId, vendorId),
+        eq(productionJobs.status, 'qc_passed'),
+        isNull(productionJobs.settlementId),
+        isNull(productionTransferJobs.jobId),
+        // Not `eq(...)` negated: the consolidator being this vendor means the
+        // goods are already on the bench that assembles them.
+        sql`${orderConsolidation.vendorId} <> ${vendorId}`
+      )
+    )
+    .groupBy(productionJobs.orderId)
+    .orderBy(sql`min(${productionJobs.createdAt}) asc`)
+
+  return groups.map((group) => ({ jobs: group.jobs ?? [] }))
+}
+
 export interface VendorTransferInput {
   jobIds: string[]
   carrier: string | null

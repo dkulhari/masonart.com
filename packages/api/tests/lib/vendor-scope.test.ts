@@ -47,6 +47,10 @@ describe('vendor-scope module contract', () => {
     'getVendorTransfer',
     'createVendorTransfer',
     'markVendorTransferReceived',
+    // What could go on a parcel, grouped per order. It groups BY `order_id`, so
+    // an unscoped call would group another vendor's work into buckets and hand
+    // back stable handles on it — the leak this whole boundary is drawn against.
+    'listVendorTransferCandidates',
   ] as const
 
   /**

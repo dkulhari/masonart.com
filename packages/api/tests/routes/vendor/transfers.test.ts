@@ -434,6 +434,134 @@ describe('GET /transfers', () => {
 // GET /api/vendor/transfers/:id
 // ============================================================================
 
+// ============================================================================
+// GET /api/vendor/transfers/candidates — what may go on a parcel, grouped
+// ============================================================================
+
+/**
+ * The read the despatch screen is built on, and the reason it can exist.
+ *
+ * `POST /transfers` refuses `JOBS_SPAN_ORDERS`, but `listVendorJobs` omits
+ * `order_id` on purpose — so the portal cannot tell which of a vendor's jobs
+ * belong together, and a multi-select built on the job list is trial and error
+ * against a 422. The grouping is therefore the SERVER'S: it groups by
+ * `order_id` and returns the buckets without ever selecting the value it
+ * grouped by, exactly as `createVendorTransfer` reaches the consolidator.
+ *
+ * The bucket has no identity of its own. It IS its job ids, so there is no new
+ * handle on an order for a vendor to hold, correlate or replay.
+ */
+describe('GET /transfers/candidates', () => {
+  const candidateRow = (jobs: Array<Record<string, unknown>>) => ({ jobs })
+
+  const seedCandidates = (...groups: Array<Array<Record<string, unknown>>>) =>
+    queueRows({ 'select:production_jobs': [groups.map(candidateRow)] })
+
+  const job = (over: Record<string, unknown> = {}) => ({
+    id: JOB_A,
+    stage: 'print',
+    dueAt: null,
+    ...over,
+  })
+
+  /**
+   * Hono matches in registration order, so `/transfers/:id` registered first
+   * would swallow this path and answer 400 on a uuid check against the word
+   * "candidates" — a route that exists and is unreachable.
+   */
+  it('is not swallowed by the :id route', async () => {
+    seedCandidates([job()])
+
+    const res = await buildApp().request('/api/vendor/transfers/candidates')
+
+    expect(res.status).toBe(200)
+    expect(ops('select', productionTransfers)).toHaveLength(0)
+  })
+
+  it('groups the caller`s own dispatchable jobs, one bucket per order', async () => {
+    seedCandidates([job(), job({ id: JOB_B, stage: 'frame' })], [job({ id: FOREIGN_JOB })])
+
+    const res = await buildApp().request('/api/vendor/transfers/candidates')
+    const body = await readJson<{ groups: Array<{ jobs: Array<{ id: string }> }> }>(res)
+
+    expect(body.groups).toHaveLength(2)
+    expect(body.groups[0]?.jobs.map((j) => j.id)).toEqual([JOB_A, JOB_B])
+    expect(body.groups[1]?.jobs.map((j) => j.id)).toEqual([FOREIGN_JOB])
+  })
+
+  it('scopes the read to the caller, and to nobody else', async () => {
+    seedCandidates([job()])
+
+    await buildApp().request('/api/vendor/transfers/candidates')
+
+    const read = ops('select', productionJobs)[0]!
+    const { sql, params: bound } = render(read.where)
+    expect(sql).toContain('vendor_id')
+    expect(bound).toContain(VENDOR_ID)
+    expect(bound).not.toContain(OTHER_VENDOR_ID)
+  })
+
+  /**
+   * Every refusal `createVendorTransfer` can answer with, asked BEFORE the
+   * vendor packs a box rather than after. A group this read offers is a group
+   * the POST accepts.
+   */
+  it('offers only jobs that have passed QC and are free to travel', async () => {
+    seedCandidates([job()])
+
+    await buildApp().request('/api/vendor/transfers/candidates')
+
+    const read = ops('select', productionJobs)[0]!
+    const { sql, params: bound } = render(read.where)
+
+    // ILLEGAL_TRANSITION: only `qc_passed` carries a vendor edge to dispatched.
+    expect(bound).toContain('qc_passed')
+    // JOB_SETTLED: a settled job is frozen.
+    expect(sql).toContain('settlement_id')
+    // JOB_ALREADY_ON_TRANSFER: a job rides exactly one parcel, ever.
+    expect(sql).toContain('job_id')
+    // NO_CONSOLIDATOR and CONSOLIDATOR_IS_SELF: there has to be somewhere to
+    // send it, and it must not be this bench.
+    expect(sql).toContain('vendor_id')
+  })
+
+  it('tells the vendor three fields per job and no more', async () => {
+    seedCandidates([job({ dueAt: PAST })])
+
+    const res = await buildApp().request('/api/vendor/transfers/candidates')
+    const body = await readJson<{ groups: Array<{ jobs: Array<Record<string, unknown>> }> }>(res)
+
+    expect(Object.keys(body.groups[0]!.jobs[0]!).sort()).toEqual(['dueAt', 'id', 'stage'])
+  })
+
+  /**
+   * THE property. The grouping is by `order_id` and the projection must not
+   * contain it — asserted on what was asked of the database, because the rows
+   * come from a fixture this file wrote.
+   */
+  it('groups by the order without ever selecting it', async () => {
+    seedCandidates([job()])
+
+    const res = await buildApp().request('/api/vendor/transfers/candidates')
+    const body = await readJson(res)
+
+    expect(columnsOf(ops('select', productionJobs)[0], 'the candidates read')).toEqual(['jobs'])
+    expect(JSON.stringify(body)).not.toContain(ORDER_ID)
+    expect(JSON.stringify(body)).not.toContain(OTHER_VENDOR_ID)
+    expect(forbiddenIn(body)).toEqual([])
+  })
+
+  it('says there is nothing to send rather than failing', async () => {
+    seedCandidates()
+
+    const res = await buildApp().request('/api/vendor/transfers/candidates')
+    const body = await readJson<{ groups: unknown[] }>(res)
+
+    expect(res.status).toBe(200)
+    expect(body.groups).toEqual([])
+  })
+})
+
 describe('GET /transfers/:id', () => {
   it("answers 404 for another vendor's transfer, even with a correct id", async () => {
     // The scoped read binds the caller on both sides, so the row is NOT FOUND

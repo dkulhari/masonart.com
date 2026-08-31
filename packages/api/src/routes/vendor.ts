@@ -144,6 +144,7 @@ import {
   assertVendorMayUploadQcPhoto,
   recordVendorQcPhoto,
   retractVendorQcPhoto,
+  listVendorTransferCandidates,
   listVendorTransfers,
   getVendorTransfer,
   createVendorTransfer,
@@ -1258,6 +1259,34 @@ vendorApp.get(
     }
   }
 );
+
+// ============================================================================
+// GET /api/vendor/transfers/candidates
+// ============================================================================
+
+/**
+ * What this vendor could put on a parcel right now, grouped per order.
+ *
+ * Registered BEFORE `/transfers/:id`, and that order is load-bearing: Hono
+ * matches in registration order, so the `:id` route would swallow this path and
+ * answer 400 on a uuid check against the word "candidates" — a route that
+ * exists and is unreachable.
+ *
+ * The despatch screen exists because of this read. `POST /transfers` refuses
+ * `JOBS_SPAN_ORDERS`, and no vendor-facing projection carries `order_id`, so
+ * the portal cannot work out which jobs belong together; the grouping is ours,
+ * and `lib/vendor-scope.ts` does it without the value it grouped by ever
+ * leaving the database.
+ */
+vendorApp.get("/transfers/candidates", async (c) => {
+  const vendorId = c.get("vendorId");
+
+  try {
+    return c.json({ groups: await listVendorTransferCandidates(vendorId) });
+  } catch (error) {
+    return c.json(failed("list what can be despatched", error), 500);
+  }
+});
 
 // ============================================================================
 // GET /api/vendor/transfers/:id

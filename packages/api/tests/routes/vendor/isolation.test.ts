@@ -637,6 +637,15 @@ const ROUTE_TABLE: RouteCase[] = [
     okStatus: 200,
   },
   {
+    // No `theirs`: there is no id in the path to aim at somebody else's row.
+    // The read is a list scoped at `production_jobs.vendor_id`, judged by the
+    // same table gate every other list here is judged by.
+    pattern: '/transfers/candidates',
+    method: 'GET',
+    mine: () => ['/api/vendor/transfers/candidates', undefined],
+    okStatus: 200,
+  },
+  {
     pattern: '/transfers/:id',
     method: 'GET',
     mine: () => [`/api/vendor/transfers/${B_TRANSFER_ID}`, undefined],
