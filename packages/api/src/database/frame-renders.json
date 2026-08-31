@@ -1,0 +1,7 @@
+{
+  "oak": { "widthRatio": 0.032, "color": [178, 141, 94], "depthRatio": 0.024 },
+  "black": { "widthRatio": 0.028, "color": [26, 26, 28], "depthRatio": 0.022 },
+  "white": { "widthRatio": 0.028, "color": [242, 240, 236], "depthRatio": 0.022 },
+  "gold": { "widthRatio": 0.03, "color": [186, 152, 84], "depthRatio": 0.024 },
+  "frameless": { "widthRatio": 0, "color": [0, 0, 0], "depthRatio": 0.03 }
+}
