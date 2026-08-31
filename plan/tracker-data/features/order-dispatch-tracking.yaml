@@ -150,7 +150,10 @@ work_session_summary:
       duration: "00:55:00"
       tokens: 0
 tickets:
-  todo: {}
+  todo:
+    "721": "Carrier Config - Database Schema: vendors.shiprocket_pickup_location"
+    "722": Carrier Config - SHIPROCKET_* env and a not-configured refusal that names itself
+    "723": Carrier Config - Admin sets a vendor's Shiprocket pickup nickname
   in_progress: {}
   done:
     "702": Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
@@ -165,9 +168,9 @@ tickets:
     "711": One Tracking Store - The two production label guards read order_shipments
     "712": One Tracking Store - Admin and customer order detail render the shipment
     "713": E2E - An admin-entered tracking number reaches the customer tracking page
-total_tickets: 12
-completion_percentage: 100
-is_completed: true
+total_tickets: 15
+completion_percentage: 80
+is_completed: false
 plan:
   phases:
     - name: "Phase 1: Database Schema"

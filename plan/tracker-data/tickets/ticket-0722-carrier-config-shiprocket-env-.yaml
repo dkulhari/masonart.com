@@ -1,0 +1,53 @@
+ticket_number: 722
+title: Carrier Config - SHIPROCKET_* env and a not-configured refusal that names itself
+description: |-
+  ## Task
+
+  Declare the Shiprocket configuration and make its absence an explicit, quotable refusal rather than a crash at dispatch time.
+
+  This is the whole of what pass 2 can deliver without live credentials, and it is worth delivering first: it converts "we have no keys yet" from a landmine into a documented state.
+
+  ## Scope
+
+  - `SHIPROCKET_*` in `.env.example` with a comment saying where each value comes from in Shiprocket's dashboard.
+  - `packages/api/src/services/shiprocket.ts` — config read plus `isConfigured()`, and a `ShiprocketError`-style refusal for every entry point. Follow `packages/api/src/lib/razorpay.ts:243` and its siblings: a fixed sentence, thrown from each public function, not a null return that a caller can ignore.
+  - No API calls. No client. Auth, AWB assignment and label fetch are phase 6, and they are gated on credentials that do not exist yet.
+
+  ## The seam constraint — read before choosing a filename
+
+  `PRODUCTION_LIB_FORBIDDEN_IMPORT = 'shiprocket'` at `packages/api/src/lib/production-readiness.ts:910`, and `tests/lib/production-seam.test.ts` scans for it: **no `lib/production-*` module may import anything named `shiprocket`.** That guard is deliberate and this ticket must not weaken it. Put the module under `services/`, and if a production-* lib turns out to need a fact from it, the fact crosses as a parameter, never as an import.
+
+  ## Refusal wording
+
+  The message reaches an admin who can act. Name the missing configuration and where it is set. Do not name env var values, and do not let a key, token or secret reach a log line or a response body — the same rule the label route follows at `packages/api/src/routes/vendor.ts:559`.
+
+  ## Done when
+
+  - `isConfigured()` is false on a tree with no `SHIPROCKET_*` set, and every exported entry point throws the fixed sentence.
+  - A test asserts the refusal names no secret and no env var value.
+  - `tests/lib/production-seam.test.ts` still passes — verify it actually ran, do not infer it from a green total.
+
+  ## Gotchas
+
+  - `packages/api` tests ARE typechecked (#662); `packages/web` tests are not (#720).
+  - Never run prettier in this repo — no config, and its defaults rewrite files away from the repo's style.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T10:24:24.916Z'
+last_updated: '2026-08-31T10:24:24.916Z'
+time_spent_minutes: 0
+labels:
+  - config
+  - shiprocket
+  - pass-2
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

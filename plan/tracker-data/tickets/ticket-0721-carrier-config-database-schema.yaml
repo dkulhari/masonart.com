@@ -1,0 +1,47 @@
+ticket_number: 721
+title: 'Carrier Config - Database Schema: vendors.shiprocket_pickup_location'
+description: |-
+  ## Task
+
+  Add `vendors.shiprocket_pickup_location` — the nickname of a pickup address as registered in Shiprocket's own dashboard.
+
+  `packages/api/src/database/schema/vendors.ts:31` (the table already carries `addressLine1`, `city`, `state`, `postalCode`, `country`). Next migration number is **0029** — 0028 is taken by the dispatch backfill.
+
+  ## The decision this encodes
+
+  An admin pastes the nickname that already exists in Shiprocket. We do **not** auto-register a vendor's address with Shiprocket, and we do not derive the nickname from the address columns we hold.
+
+  Recorded in the feature plan (phase 5) and worth restating because the alternative looks tempting: a vendor row here can have a complete address while Shiprocket has no pickup location for it, or has one under a name nobody would guess. Deriving would produce a value that is well-formed and wrong, and the failure would surface as a rejected pickup at dispatch time — long after the admin who could fix it has moved on.
+
+  ## Shape
+
+  - `text('shiprocket_pickup_location')`, nullable. Nullable is correct and not laziness: most vendors will not have one until somebody sets it, and a NOT NULL with a placeholder default would make "unset" indistinguishable from "set to something meaningless".
+  - Trim on write, and treat `''` as unset. `#670` is the precedent for why: an empty string satisfying `is not null` is what let an empty tracking number count as a label.
+
+  ## Out of scope
+
+  The admin field that sets it (its own ticket) and anything that reads it (phase 6+). This ticket is the column and its constraints.
+
+  ## Done when
+
+  Migration applies to the dev DB on port **5440**, a schema test asserts the column exists and is nullable, and the round trip preserves a pasted nickname verbatim including inner spaces.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T10:24:09.394Z'
+last_updated: '2026-08-31T10:24:09.394Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - shiprocket
+  - pass-2
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

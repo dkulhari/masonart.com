@@ -1,0 +1,49 @@
+ticket_number: 723
+title: Carrier Config - Admin sets a vendor's Shiprocket pickup nickname
+description: |-
+  ## Task
+
+  Give an admin a way to set `vendors.shiprocket_pickup_location`. Without this the column from its own ticket is unreachable and the decision it encodes — that a human pastes the nickname Shiprocket already knows — is not actually implemented.
+
+  ## Scope
+
+  - `packages/web/app/routes/admin/vendors/VendorForm.tsx` — one field, beside the address block.
+  - The admin vendor update route on the API, plus its Zod schema.
+  - Help text saying this is the pickup location's nickname **as registered in Shiprocket's dashboard**, not our address. An admin who types the vendor's street here has produced a value that will be accepted and will fail at dispatch.
+
+  ## Constraints
+
+  - Trim on write, store `null` for empty — matches the column ticket, and #670 is the precedent for why `''` must not read as set.
+  - Cap the length in Zod at whatever the column allows, and check the two agree. The dispatch review found a 100-char zod cap over a `varchar(64)`; do not repeat it.
+  - Audit the change. A vendor's pickup location decides where a courier collects, so an edit belongs in the log with before and after. Check `AUDIT_ACTIONS` for an existing vendor-update action before declaring a new one — **#671 fails the build on any declared action nothing emits.**
+
+  ## Done when
+
+  An admin sets a nickname, reloads, and sees it; clearing it stores null; the audit row carries both sides of the edit. Verify by rendering, and grep the e2e specs for any vendor fixture shape this changes — `tests/e2e/` is typechecked by nothing (#720), so a renamed shape is caught by no tool.
+
+  ## Gotcha
+
+  Run E2E against your own server pair. `VITE_API_URL` must point at your API — the browser auth client uses an absolute URL and ignores `VITE_API_PROXY_TARGET`, so without it sign-in goes to whatever is on :3000 and every admin spec fails for reasons unrelated to your change. See #713's closing comment for the full recipe.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T10:24:39.434Z'
+last_updated: '2026-08-31T10:24:39.434Z'
+time_spent_minutes: 0
+labels:
+  - admin
+  - shiprocket
+  - pass-2
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 721
+    feature: order-dispatch-tracking
+    description: 'Carrier Config - Database Schema: vendors.shiprocket_pickup_location'
+blocks: []
+attachments: []
