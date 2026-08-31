@@ -32,6 +32,7 @@ import {
   type AuthVariables,
 } from "../../middleware/auth";
 import { generateTrackingUrl } from "../shipments";
+import { recordAudit } from "../../lib/audit";
 
 // ============================================================================
 // Constants
@@ -619,6 +620,25 @@ adminShipmentsApp.post("/:id/mark-delivered", async (c) => {
         updatedAt: now,
       })
       .where(eq(orders.id, existing.orderId));
+
+    // Delivery is what starts the return window, so a disputed return date
+    // turns on who marked it delivered and when. The floor `admin.request` row
+    // records that a POST happened but not which status the shipment moved
+    // from — and without that, a delivery back-dated over a shipment still
+    // sitting at `pending` is indistinguishable from a normal one.
+    //
+    // No transaction to share: the two updates above have already committed on
+    // their own, so this is written independently and an audit failure must not
+    // fail a request whose work is done.
+    await recordAudit(c, {
+      action: "order.shipment_marked_delivered",
+      entityType: "order_shipment",
+      entityId: shipmentId,
+      summary: `Shipment marked delivered (was ${existing.status})`,
+      before: { status: existing.status },
+      after: { status: "delivered", deliveredAt: now },
+      metadata: { orderId: existing.orderId },
+    });
 
     return c.json({
       message: "Shipment marked as delivered",

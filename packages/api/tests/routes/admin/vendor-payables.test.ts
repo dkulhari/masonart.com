@@ -233,7 +233,11 @@ vi.mock('../../../src/database', () => ({
     // A real transaction rolls back on throw. The mock cannot un-record, which
     // is fine: the tests that reject a settlement assert nothing was recorded
     // in the first place, which is the stronger property (422 before any write).
-    transaction: async (cb: (tx: unknown) => Promise<unknown>) => cb(handle('tx')),
+    transaction: async (cb: (tx: unknown) => Promise<unknown>) => {
+      const tx = handle('tx')
+      txBox.last = tx
+      return cb(tx)
+    },
   },
 }))
 
@@ -242,6 +246,29 @@ const mockGetSession = vi.fn()
 vi.mock('../../../src/auth', () => ({
   auth: { api: { getSession: (...args: unknown[]) => mockGetSession(...args) } },
 }))
+
+/**
+ * `recordAudit` is mocked rather than left to write for real, so the existing
+ * transaction-trace assertions keep meaning what they meant: a real audit
+ * INSERT on the shared handle would show up as a fourth `tx` query in every
+ * settlement test and turn "one transaction, three statements" into noise.
+ * What the row must CONTAIN is asserted from the call arguments instead.
+ */
+const recordAudit = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+vi.mock('../../../src/lib/audit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/audit')>()),
+  recordAudit: (...args: unknown[]) => recordAudit(...args),
+}))
+
+/**
+ * The handle `db.transaction` last handed the route.
+ *
+ * Captured so the audit assertion can prove the settlement row shares THAT
+ * transaction, rather than merely that something truthy was passed as the
+ * third argument. The distinction is the whole point: a row written on a
+ * different handle survives the rollback of the payment it describes.
+ */
+const txBox = vi.hoisted(() => ({ last: null as unknown }))
 
 import { adminVendorPayablesApp } from '../../../src/routes/admin/vendor-payables'
 import { getVendorPayableTotal } from '../../../src/lib/vendor-scope'
@@ -410,6 +437,9 @@ beforeEach(() => {
   seedJobs = JOBS.map((j) => ({ ...j }))
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('admin'))
+  recordAudit.mockClear()
+  recordAudit.mockResolvedValue(undefined)
+  txBox.last = null
 })
 
 // ============================================================================
@@ -618,6 +648,118 @@ describe('POST /api/admin/vendors/:id/settlements', () => {
     )
     expect(res.status).toBe(404)
     expect(queries.some((q) => q.op === 'insert')).toBe(false)
+  })
+
+  // ==========================================================================
+  // The money-tier audit row (#668)
+  // ==========================================================================
+
+  /**
+   * `vendor.payable_settled` is declared in the shared `AUDIT_ACTIONS` registry
+   * and filed under the `money` category, but nothing emitted it — so the audit
+   * viewer's `money` filter, the launch gate this feature was built around,
+   * missed supplier payments entirely. An empty filter reads as "this never
+   * happened" rather than "this was never recorded", which is the worst way for
+   * an audit trail to be wrong.
+   */
+  describe('the money-tier audit row', () => {
+    const settleOk = () =>
+      queueRows({
+        'select:vendors': [[{ id: VENDOR_ID }]],
+        'select:production_jobs': [unsettledFor(VENDOR_ID)],
+        'insert:vendor_settlements': [
+          [{ id: SETTLEMENT_ID, vendorId: VENDOR_ID, amount: '1956.25' }],
+        ],
+        'update:production_jobs': [[{ id: JOB_A }, { id: JOB_B }]],
+      })
+
+    const settle = (body: unknown = validBody) =>
+      buildApp().request(`/api/admin/vendors/${VENDOR_ID}/settlements`, json(body))
+
+    /** The entry argument of the Nth `recordAudit` call. */
+    const entry = (n = 0) => recordAudit.mock.calls[n]?.[1] as Record<string, any>
+    /** The transaction argument — `undefined` means "written independently". */
+    const sharedTx = (n = 0) => recordAudit.mock.calls[n]?.[2]
+
+    it('records a settlement under vendor.payable_settled, with the amount and the job ids', async () => {
+      settleOk()
+
+      const res = await settle()
+      expect(res.status).toBe(201)
+
+      expect(recordAudit).toHaveBeenCalledTimes(1)
+      expect(entry()).toMatchObject({
+        action: 'vendor.payable_settled',
+        entityType: 'vendor_settlement',
+        entityId: SETTLEMENT_ID,
+      })
+
+      // A settlement with no amount in the trail answers none of the questions
+      // a settlement dispute asks, and no job ids answers "paid for what".
+      expect(entry().after).toMatchObject({
+        vendorId: VENDOR_ID,
+        amount: '1956.25',
+        reference: 'NEFT-2026-08-17-001',
+        jobsSettled: 2,
+      })
+      expect(entry().after.jobIds).toEqual([JOB_A, JOB_B])
+    })
+
+    it("shares the settlement's own transaction, so a rolled-back payment leaves no row claiming it", async () => {
+      settleOk()
+
+      await settle()
+
+      // Not merely "truthy": the SAME handle the insert and the stamp used. A
+      // row written on `db` would survive the rollback of the payment it
+      // describes and stand as evidence a supplier was paid when none was.
+      expect(sharedTx()).toBe(txBox.last)
+      expect(sharedTx()).toBeDefined()
+    })
+
+    it('records a refused settlement as a failure — a rejected double-settle is evidence', async () => {
+      queueRows({
+        'select:vendors': [[{ id: VENDOR_ID }]],
+        'select:production_jobs': [[JOBS[0], JOBS[2]]],
+      })
+
+      const res = await settle({ ...validBody, jobIds: [JOB_A, JOB_SETTLED] })
+      expect(res.status).toBe(422)
+
+      expect(recordAudit).toHaveBeenCalledTimes(1)
+      expect(entry()).toMatchObject({
+        action: 'vendor.payable_settled',
+        outcome: 'failure',
+      })
+      expect(String(entry().summary)).toMatch(/settled/i)
+      expect(entry().after).toMatchObject({ vendorId: VENDOR_ID, amount: '1956.25' })
+    })
+
+    it('writes the refusal OUTSIDE the transaction, or the rollback erases the evidence', async () => {
+      queueRows({
+        'select:vendors': [[{ id: VENDOR_ID }]],
+        'select:production_jobs': [[JOBS[0], JOBS[2]]],
+      })
+
+      await settle({ ...validBody, jobIds: [JOB_A, JOB_SETTLED] })
+
+      // The trap, and the instinct is the wrong way round: a refusal row records
+      // that a transaction was ROLLED BACK. Writing it inside that transaction
+      // rolls the row back too and destroys the one thing it exists to preserve.
+      expect(sharedTx()).toBeUndefined()
+    })
+
+    it('lets a failed shared-transaction audit write fail the settlement rather than silently rolling it back', async () => {
+      settleOk()
+      recordAudit.mockRejectedValueOnce(new Error('audit insert deadlocked'))
+
+      const res = await settle()
+
+      // `recordAudit` rethrows when it was handed a `tx`, because that insert
+      // aborted the CALLER'S transaction: returning 201 here would report a
+      // payment that Postgres executed as a ROLLBACK.
+      expect(res.status).toBe(500)
+    })
   })
 })
 

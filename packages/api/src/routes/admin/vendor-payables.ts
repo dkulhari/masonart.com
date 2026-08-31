@@ -67,6 +67,7 @@ import {
   payableJobsCondition,
   type PayableJob,
 } from "../../lib/vendor-payables";
+import { recordAudit } from "../../lib/audit";
 
 // ============================================================================
 // Validation
@@ -342,6 +343,42 @@ adminVendorPayablesApp.post(
           );
         }
 
+        // Money out the door, under the `money` category the launch gate
+        // filters on. Shares `tx` because the row would be a LIE if the
+        // settlement rolled back: nothing is worse in a payment trail than a
+        // row saying a supplier was paid beside a job still sitting unsettled.
+        //
+        // Sharing the transaction also means sharing its failures — a failed
+        // insert here aborts this transaction and `recordAudit` rethrows, which
+        // is deliberate. Do NOT catch it: swallowing would let drizzle issue a
+        // COMMIT that Postgres executes as a ROLLBACK, returning 201 over a
+        // payment that never happened.
+        //
+        // The amount and the job ids are recorded because a settlement with
+        // neither answers none of the questions a settlement dispute asks.
+        await recordAudit(
+          c,
+          {
+            action: "vendor.payable_settled",
+            entityType: "vendor_settlement",
+            entityId: settlement.id,
+            summary:
+              `Settled ₹${amount} to vendor ${id} across ` +
+              `${stamped.length} job(s)${reference ? ` (ref ${reference})` : ""}`,
+            after: {
+              vendorId: id,
+              settlementId: settlement.id,
+              amount,
+              reference: reference ?? null,
+              paidAt: paidAt ?? null,
+              note: note ?? null,
+              jobIds,
+              jobsSettled: stamped.length,
+            },
+          },
+          tx
+        );
+
         return { settlement, jobsSettled: stamped.length };
       });
 
@@ -355,6 +392,29 @@ adminVendorPayablesApp.post(
       );
     } catch (error) {
       if (error instanceof SettlementRejected) {
+        // A refused settlement is evidence, not noise: "someone tried to pay
+        // this job twice and was stopped" is exactly what a payment dispute
+        // needs, and the floor `admin.request` row carries neither the amount
+        // nor the reason.
+        //
+        // NO `tx`, deliberately, and the instinct is the wrong way round. This
+        // row records that a transaction was ROLLED BACK; writing it inside
+        // that transaction would roll the row back too and erase the one thing
+        // it exists to preserve. It is written independently, after the fact.
+        await recordAudit(c, {
+          action: "vendor.payable_settled",
+          entityType: "vendor",
+          entityId: id,
+          outcome: "failure",
+          summary: `Settlement refused: ${error.message}`,
+          after: {
+            vendorId: id,
+            amount,
+            reference: reference ?? null,
+            jobIds,
+          },
+        });
+
         return c.json({ error: error.message }, 422);
       }
       return c.json(failed("record settlement", error), 500);
