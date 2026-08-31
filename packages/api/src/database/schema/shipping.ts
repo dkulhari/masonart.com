@@ -23,7 +23,18 @@ import { users } from "./users";
 // ============================================================================
 
 /**
- * Shipment status enum for tracking order delivery lifecycle
+ * Shipment status enum for tracking order delivery lifecycle.
+ *
+ * Sorted as the work moves, not as the values were added: an NDR happens on a
+ * delivery ATTEMPT so it sits before `delivered`, and the three ways a parcel
+ * ends up somewhere other than the customer sit after it. The order matters
+ * because `enumsortorder` is what a status filter sorts by.
+ *
+ * `failed` is a failed DELIVERY and always was — it is NOT a voided label.
+ * `cancelled` is the voided one. Keeping them apart is why this type grew:
+ * `order_shipments` had no way to say "this label is dead", so
+ * `lib/vendor-scope.ts` had to guess the live label by recency and a vendor who
+ * reloaded could be handed a PDF the courier would not honour.
  */
 export const shipmentStatusEnum = pgEnum("shipment_status", [
   "pending", // Shipment created, awaiting label
@@ -31,7 +42,12 @@ export const shipmentStatusEnum = pgEnum("shipment_status", [
   "shipped", // Package handed to carrier
   "in_transit", // Package in transit
   "out_for_delivery", // Out for final delivery
+  "undelivered", // NDR: an attempt failed, the courier is holding it
   "delivered", // Successfully delivered
+  "rto_initiated", // On its way back to the pickup location
+  "rto_delivered", // Back at the pickup location
+  "lost", // The courier cannot account for it
+  "cancelled", // The label was voided, or the shipment cancelled
   "failed", // Delivery failed
 ]);
 

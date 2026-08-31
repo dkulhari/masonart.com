@@ -183,6 +183,13 @@
       "when": 1788097010096,
       "tag": "0025_production_transfers",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788148803003,
+      "tag": "0026_shipment_dispatch_statuses",
+      "breakpoints": true
     }
   ]
 }

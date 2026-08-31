@@ -249,6 +249,34 @@ describe("Order Shipments Table Schema", () => {
   });
 
   describe("Shipment Status Enum", () => {
+    /**
+     * The type in lifecycle order — the order `enumsortorder` reports.
+     *
+     * One list, asserted three ways: against the live catalog, against the
+     * drizzle DSL, and against the exported TS union. Three hand-maintained
+     * copies is how the old version of this block drifted — it pinned
+     * `toHaveLength(7)` in two places and a literal array in a third, so
+     * extending the type meant finding all three.
+     *
+     * The narrower per-value assertions live in
+     * tests/database/shipment-status-enum.test.ts, which also holds the #580
+     * rule for the migration that added the last five.
+     */
+    const SHIPMENT_STATUS_LIFECYCLE = [
+      "pending",
+      "label_created",
+      "shipped",
+      "in_transit",
+      "out_for_delivery",
+      "undelivered",
+      "delivered",
+      "rto_initiated",
+      "rto_delivered",
+      "lost",
+      "cancelled",
+      "failed",
+    ] as const;
+
     dbTest("should have shipment_status enum with correct values", async () => {
       const result = await client!`
         SELECT enumlabel FROM pg_enum
@@ -258,38 +286,21 @@ describe("Order Shipments Table Schema", () => {
       `;
 
       const enumValues = result.map((row: any) => row.enumlabel);
-      expect(enumValues).toContain("pending");
-      expect(enumValues).toContain("label_created");
-      expect(enumValues).toContain("shipped");
-      expect(enumValues).toContain("in_transit");
-      expect(enumValues).toContain("out_for_delivery");
-      expect(enumValues).toContain("delivered");
-      expect(enumValues).toContain("failed");
-      expect(enumValues).toHaveLength(7);
+      // The database's own order, which is `enumsortorder` — so this asserts
+      // the BEFORE anchors in 0026 landed where they were aimed, not just that
+      // the values exist.
+      expect(enumValues).toEqual(SHIPMENT_STATUS_LIFECYCLE);
     });
 
     it("should export shipmentStatusEnum with correct enumValues", () => {
-      expect(shipmentStatusEnum.enumValues).toContain("pending");
-      expect(shipmentStatusEnum.enumValues).toContain("label_created");
-      expect(shipmentStatusEnum.enumValues).toContain("shipped");
-      expect(shipmentStatusEnum.enumValues).toContain("in_transit");
-      expect(shipmentStatusEnum.enumValues).toContain("out_for_delivery");
-      expect(shipmentStatusEnum.enumValues).toContain("delivered");
-      expect(shipmentStatusEnum.enumValues).toContain("failed");
-      expect(shipmentStatusEnum.enumValues).toHaveLength(7);
+      expect([...shipmentStatusEnum.enumValues]).toEqual(SHIPMENT_STATUS_LIFECYCLE);
     });
 
     it("should export ShipmentStatus type with correct values", () => {
-      const validStatuses: ShipmentStatus[] = [
-        "pending",
-        "label_created",
-        "shipped",
-        "in_transit",
-        "out_for_delivery",
-        "delivered",
-        "failed",
-      ];
-      expect(validStatuses).toHaveLength(7);
+      // Typed, so a value added to the enum without being added here is a
+      // compile error rather than a silently short list.
+      const validStatuses: ShipmentStatus[] = [...SHIPMENT_STATUS_LIFECYCLE];
+      expect(validStatuses).toHaveLength(SHIPMENT_STATUS_LIFECYCLE.length);
     });
   });
 
