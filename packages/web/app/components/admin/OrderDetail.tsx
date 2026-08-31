@@ -57,6 +57,8 @@ export interface OrderItem {
   customizations?: Record<string, unknown> | null
   isFulfilled: boolean
   fulfilledAt?: string | null
+  /** `order_items.gift_card_purchase IS NOT NULL`. Nothing is produced for one. */
+  isGiftCard?: boolean
   product?: {
     id: string
     slug: string

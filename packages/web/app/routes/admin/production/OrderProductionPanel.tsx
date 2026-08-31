@@ -83,6 +83,7 @@ import {
   formatRupees,
   type AdminProductionJobListItem,
   type AdminProductionPage,
+  type ProductionStage,
 } from './index'
 import type { ProductionJobItemRow } from './$id'
 
@@ -106,6 +107,10 @@ export interface OrderProductionPanelItem {
   snapshot?: { title?: string; sizeLabel?: string } | null
   product?: { title: string } | null
   variant?: { sizeLabel: string } | null
+  /** A frame on the line means print THEN frame; absent means a rolled poster. */
+  frame?: { id: string } | null
+  /** `order_items.gift_card_purchase IS NOT NULL`. Nothing is produced for one. */
+  isGiftCard?: boolean
 }
 
 /**
@@ -129,23 +134,67 @@ const NON_COVERING_STATUSES: ReadonlySet<string> = new Set<ProductionJobStatus>(
 // ============================================================================
 
 /**
- * The order items that appear on no live production job.
+ * The production stages an order line needs before it can be packed.
+ *
+ * `requiredStagesFor` in `packages/api/src/lib/production-readiness.ts`, over
+ * the fields this payload carries. The panel and the readiness gate answer the
+ * same question about the same order, so they must ask it the same way.
+ */
+export function requiredStagesForItem(
+  item: OrderProductionPanelItem
+): readonly ProductionStage[] {
+  if (item.isGiftCard) return []
+  return item.frame ? ['print', 'frame'] : ['print']
+}
+
+/** An order line and the stages nothing live is making. */
+export interface UncoveredOrderItem {
+  item: OrderProductionPanelItem
+  missingStages: ProductionStage[]
+}
+
+/**
+ * The order items whose required stages are not all on a live production job.
+ *
+ * Per STAGE, not per item. Treating any live job as coverage let a framed line
+ * with a print job and no frame job read as covered, so the panel printed
+ * "Every item on this order is on a live production job" directly above the
+ * readiness panel listing `item_uncovered` — "still needs a frame job" — for
+ * that same line. A framed piece covered only by its print job is a poster in
+ * a tube, and shipping it is the bug.
  *
  * Order preserved from the order itself, so the panel reads down the invoice
  * rather than in whatever order the jobs happened to come back.
  */
-export function unassignedOrderItems(
+export function uncoveredOrderItems(
   orderItems: OrderProductionPanelItem[],
   jobs: OrderProductionJob[]
-): OrderProductionPanelItem[] {
-  const covered = new Set<string>()
+): UncoveredOrderItem[] {
+  const coveredStages = new Map<string, Set<string>>()
 
   for (const job of jobs) {
     if (NON_COVERING_STATUSES.has(job.status)) continue
-    for (const item of job.items) covered.add(item.orderItemId)
+    for (const jobItem of job.items) {
+      let stages = coveredStages.get(jobItem.orderItemId)
+      if (!stages) {
+        stages = new Set<string>()
+        coveredStages.set(jobItem.orderItemId, stages)
+      }
+      stages.add(job.stage)
+    }
   }
 
-  return orderItems.filter((item) => !covered.has(item.id))
+  const uncovered: UncoveredOrderItem[] = []
+
+  for (const item of orderItems) {
+    const stages = coveredStages.get(item.id)
+    const missingStages = requiredStagesForItem(item).filter(
+      (stage) => !stages?.has(stage)
+    )
+    if (missingStages.length > 0) uncovered.push({ item, missingStages })
+  }
+
+  return uncovered
 }
 
 export function itemTitle(item: OrderProductionPanelItem): string {
@@ -544,7 +593,7 @@ export function OrderProductionPanelBody({
     )
   }
 
-  const unassigned = unassignedOrderItems(orderItems, jobs)
+  const uncovered = uncoveredOrderItems(orderItems, jobs)
 
   return (
     <div className="space-y-4">
@@ -612,7 +661,7 @@ export function OrderProductionPanelBody({
 
       {/* The coverage verdict, and it is only ever printed over a read that
           completed — an error above returns before reaching here. */}
-      {unassigned.length > 0 ? (
+      {uncovered.length > 0 ? (
         <div
           data-testid="admin-order-production-unassigned"
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
@@ -621,13 +670,16 @@ export function OrderProductionPanelBody({
             On no production job — nobody is making these:
           </p>
           <ul className="space-y-0.5">
-            {unassigned.map((item) => (
+            {uncovered.map(({ item, missingStages }) => (
               <li
                 key={item.id}
                 data-testid={`admin-order-production-unassigned-item-${item.id}`}
               >
                 {itemTitle(item)}
                 {itemSize(item) ? ` — ${itemSize(item)}` : ''}
+                {' — needs a '}
+                {missingStages.map((stage) => STAGE_LABELS[stage].toLowerCase()).join(' and a ')}
+                {' job'}
               </li>
             ))}
           </ul>

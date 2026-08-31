@@ -69,7 +69,7 @@ import {
   orderVendorOptions,
   provenanceFromConsolidation,
   setOrderConsolidator,
-  unassignedOrderItems,
+  uncoveredOrderItems,
   vendorNameFor,
   type LabelBlockerCode,
   type OrderConsolidation,
@@ -92,6 +92,7 @@ const ORDER_ITEMS: OrderProductionPanelItem[] = [
     variant: { sizeLabel: '24×36' },
   },
   {
+    frame: { id: 'frame-1', name: 'Oak', type: 'wood' },
     id: 'oi-frame',
     quantity: 1,
     snapshot: { title: 'Teak Frame', sizeLabel: '24×36' },
@@ -106,6 +107,16 @@ const ORDER_ITEMS: OrderProductionPanelItem[] = [
     variant: { sizeLabel: '12×18' },
   },
 ]
+
+/** A gift card buys no goods, so nothing is ever produced for it. */
+const GIFT_CARD_ITEM: OrderProductionPanelItem = {
+  id: 'oi-gift',
+  quantity: 1,
+  snapshot: { title: 'Gift card' },
+  product: { title: 'Gift card' },
+  variant: null,
+  isGiftCard: true,
+}
 
 const JOBS: OrderProductionJob[] = [
   {
@@ -166,6 +177,24 @@ const JOBS: OrderProductionJob[] = [
   },
 ]
 
+/** The framed line's OWN print job. A frame is a print inside a frame. */
+const FRAME_LINE_PRINT_JOB: OrderProductionJob = {
+  ...JOBS[0]!,
+  id: 'job-print-frame-line',
+  items: [
+    {
+      id: 'ji-3',
+      orderItemId: 'oi-frame',
+      quantity: 1,
+      widthInches: 24,
+      heightInches: 36,
+      sizeLabel: '24×36',
+    },
+  ],
+}
+
+const COVERED_JOBS: OrderProductionJob[] = [...JOBS, FRAME_LINE_PRINT_JOB]
+
 const TRANSFER: OrderTransfer = {
   id: 'tr-1',
   orderId: 'order-1',
@@ -192,18 +221,20 @@ const TRANSFER: OrderTransfer = {
 // The gap
 // ============================================================================
 
-describe('unassignedOrderItems', () => {
+describe('uncoveredOrderItems', () => {
+  const ids = (rows: ReturnType<typeof uncoveredOrderItems>) => rows.map((r) => r.item.id)
+
   it('is the order items that appear on no job at all', () => {
-    expect(unassignedOrderItems(ORDER_ITEMS, JOBS).map((i) => i.id)).toEqual(['oi-orphan'])
+    expect(ids(uncoveredOrderItems(ORDER_ITEMS, COVERED_JOBS))).toEqual(['oi-orphan'])
   })
 
   it('is empty when every item is covered', () => {
-    expect(unassignedOrderItems(ORDER_ITEMS.slice(0, 2), JOBS)).toEqual([])
+    expect(uncoveredOrderItems(ORDER_ITEMS.slice(0, 2), COVERED_JOBS)).toEqual([])
   })
 
   /** No jobs yet means every line is uncovered, not that nothing is missing. */
   it('is every item when the order has no jobs', () => {
-    expect(unassignedOrderItems(ORDER_ITEMS, []).map((i) => i.id)).toEqual([
+    expect(ids(uncoveredOrderItems(ORDER_ITEMS, []))).toEqual([
       'oi-print',
       'oi-frame',
       'oi-orphan',
@@ -216,14 +247,46 @@ describe('unassignedOrderItems', () => {
    */
   it('does not let a cancelled job count as coverage', () => {
     const cancelled: OrderProductionJob[] = [
-      { ...JOBS[0], status: 'cancelled' },
-      JOBS[1],
+      { ...JOBS[0]!, status: 'cancelled' },
+      JOBS[1]!,
+      FRAME_LINE_PRINT_JOB,
     ]
 
-    expect(unassignedOrderItems(ORDER_ITEMS, cancelled).map((i) => i.id)).toEqual([
+    expect(ids(uncoveredOrderItems(ORDER_ITEMS, cancelled))).toEqual([
       'oi-print',
       'oi-orphan',
     ])
+  })
+
+  /**
+   * Coverage is PER STAGE, the same question `production-readiness` asks. A
+   * framed line covered only by its print job is a poster in a tube, and the
+   * panel used to print "Every item on this order is on a live production job"
+   * directly above a readiness panel listing `item_uncovered` for that line.
+   */
+  it('wants both stages of a framed line', () => {
+    const printOnly = [FRAME_LINE_PRINT_JOB]
+
+    expect(uncoveredOrderItems([ORDER_ITEMS[1]!], printOnly)).toEqual([
+      { item: ORDER_ITEMS[1], missingStages: ['frame'] },
+    ])
+  })
+
+  it('wants the print of a framed line that only has its frame job', () => {
+    expect(uncoveredOrderItems([ORDER_ITEMS[1]!], [JOBS[1]!])).toEqual([
+      { item: ORDER_ITEMS[1], missingStages: ['print'] },
+    ])
+  })
+
+  it('asks a rolled poster for its print alone', () => {
+    expect(uncoveredOrderItems([ORDER_ITEMS[0]!], [])).toEqual([
+      { item: ORDER_ITEMS[0], missingStages: ['print'] },
+    ])
+  })
+
+  /** A gift card buys no goods. Listing it in red says work is missing. */
+  it('asks nothing of a gift-card line', () => {
+    expect(uncoveredOrderItems([GIFT_CARD_ITEM], [])).toEqual([])
   })
 })
 
@@ -237,7 +300,7 @@ describe('OrderProductionPanelBody', () => {
   ) =>
     render(
       <OrderProductionPanelBody
-        jobs={JOBS}
+        jobs={COVERED_JOBS}
         orderItems={ORDER_ITEMS}
         isLoading={false}
         error={null}
@@ -316,6 +379,26 @@ describe('OrderProductionPanelBody', () => {
     expect(gap.textContent).toMatch(/Howrah Bridge/)
     expect(gap.textContent).toMatch(/12×18/)
     expect(gap.textContent).not.toMatch(/Sundarbans at Dawn/)
+  })
+
+  /**
+   * And which stage is missing, because "on no production job" was never the
+   * whole truth: a framed line can be half made.
+   */
+  it('names the stage a half-covered framed line still needs', () => {
+    renderPanel({ jobs: [FRAME_LINE_PRINT_JOB], orderItems: [ORDER_ITEMS[1]!] })
+
+    const gap = screen.getByTestId('admin-order-production-unassigned')
+    expect(gap.textContent).toMatch(/Teak Frame/)
+    expect(gap.textContent).toMatch(/needs a frame job/i)
+  })
+
+  /** A gift card is not half made either. It is not made. */
+  it('leaves a gift-card line out of the gap entirely', () => {
+    renderPanel({ jobs: [], orderItems: [GIFT_CARD_ITEM] })
+
+    expect(screen.queryByTestId('admin-order-production-unassigned')).not.toBeInTheDocument()
+    expect(screen.getByTestId('admin-order-production-all-covered')).toBeInTheDocument()
   })
 
   it('says so plainly when nothing is missing, rather than showing an empty box', () => {
