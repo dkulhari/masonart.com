@@ -952,6 +952,14 @@ framed-main.jpg,room-living-room-warm.jpg|room-reading-nook.jpg</code></pre>
               <td><code>--frame "…" has no render spec.</code></td>
               <td>The override slug isn't in <code>frame-renders.json</code>.</td>
             </tr>
+            <tr>
+              <td><code>Flag … was passed more than once.</code></td>
+              <td>The same flag appears twice on the command line. The second value would otherwise silently win. Pass it once.</td>
+            </tr>
+            <tr>
+              <td><code>Poster filenames collide on the same output folder — rename one of each: …</code></td>
+              <td>Two posters share a basename once the extension is stripped (e.g. <code>sunset.jpg</code> and <code>sunset.png</code>) — both map to the same <code>out/&lt;slug&gt;/</code> folder, and one would silently overwrite the other. Rename one of them.</td>
+            </tr>
           </tbody>
         </table>
       </div>

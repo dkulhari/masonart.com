@@ -10,8 +10,48 @@
  */
 
 import sharp from 'sharp';
+import { readFileSync } from 'node:fs';
 import { fitIntoBox, shadowParams, type Placed, type ShadowSpec } from './geometry';
 import type { FrameRender, RoomTemplate } from './templates';
+
+/**
+ * Correct EXIF orientation, but only when there is something to correct, and
+ * losslessly when there is.
+ *
+ * `sharp(x).autoOrient().toBuffer()` with no format call re-encodes JPEG/WebP
+ * input at sharp's own default quality — unconditionally, even for the
+ * overwhelming majority of images that carry no orientation tag and need no
+ * rotation at all. That silent re-encode happens before the pipeline's one
+ * deliberate lossy step (`.jpeg({ quality: 92 })` at the very end of
+ * `renderRoomMockup`), so the quality it throws away can never be recovered
+ * downstream — and EXIF/ICC/density metadata goes with it. It also
+ * contradicts this module's own "never clamp, default, or skip quietly"
+ * philosophy by introducing exactly such a silent default.
+ *
+ * So: read the metadata first. No `orientation` tag, or `orientation: 1`
+ * ("already displayed correctly"), means nothing to correct — the input is
+ * returned unchanged, with no sharp round trip at all. An orientation that
+ * genuinely needs correcting is materialised as PNG, not re-encoded to a
+ * lossy format at an unspecified quality — the pipeline's only deliberate
+ * lossy encode stays the only one.
+ */
+export async function orientBuffer(input: Buffer): Promise<Buffer> {
+  const meta = await sharp(input).metadata();
+  if (meta.orientation === undefined || meta.orientation === 1) return input;
+  return sharp(input).autoOrient().png().toBuffer();
+}
+
+/**
+ * Same correction as `orientBuffer`, for a file on disk. When no correction
+ * is needed the file's own bytes are read back unchanged (`readFileSync`)
+ * rather than round-tripped through sharp, for the same reason: no sharp call
+ * at all means no chance of an accidental re-encode.
+ */
+export async function orientFile(path: string): Promise<Buffer> {
+  const meta = await sharp(path).metadata();
+  if (meta.orientation === undefined || meta.orientation === 1) return readFileSync(path);
+  return sharp(path).autoOrient().png().toBuffer();
+}
 
 /**
  * Wrap artwork in a frame face, with a thin dark bevel hairline between the
@@ -23,10 +63,11 @@ import type { FrameRender, RoomTemplate } from './templates';
  * with an orientation tag (landscape pixels + "rotate me") would size the
  * frame face off the wrong short edge if read before rotation. Materialising
  * the oriented buffer once, up front, means every metadata read and every
- * extend() below sees the pixels as they will actually display.
+ * extend() below sees the pixels as they will actually display — see
+ * `orientBuffer` above for why that materialisation is conditional.
  */
 export async function frameArtwork(art: Buffer, frame: FrameRender): Promise<Buffer> {
-  const oriented = await sharp(art).autoOrient().toBuffer();
+  const oriented = await orientBuffer(art);
 
   if (frame.widthRatio === 0) return oriented;
 
@@ -129,8 +170,9 @@ export async function renderRoomMockup(
   // this later in the chain would not help — sharp(roomPath).metadata() has
   // already reported the wrong numbers by then — so the oriented buffer is
   // materialised here and used for every dimension read and for the
-  // composite base below.
-  const roomBuf = await sharp(roomPath).autoOrient().toBuffer();
+  // composite base below. Conditional and lossless for the same reason as
+  // `orientFile` above.
+  const roomBuf = await orientFile(roomPath);
   const rmeta = await sharp(roomBuf).metadata();
   const canvasW = rmeta.width ?? 0;
   const canvasH = rmeta.height ?? 0;

@@ -10,10 +10,16 @@
 
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { frameArtwork, shadowLayer, renderRoomMockup } from '../../../src/lib/room-mockup/render';
+import {
+  frameArtwork,
+  shadowLayer,
+  renderRoomMockup,
+  orientBuffer,
+  orientFile,
+} from '../../../src/lib/room-mockup/render';
 import type { FrameRender, RoomTemplate } from '../../../src/lib/room-mockup/templates';
 
 const OAK: FrameRender = { widthRatio: 0.05, color: [178, 141, 94], depthRatio: 0.024 };
@@ -56,6 +62,21 @@ const rotatedArt = (w: number, h: number) =>
     .withMetadata({ orientation: 6 })
     .jpeg()
     .toBuffer();
+
+/**
+ * Photographic noise, not a flat colour. A flat-colour JPEG compresses to
+ * nearly the same byte size regardless of quality, so it cannot tell "quietly
+ * re-encoded at a different quality" apart from "passed through untouched" —
+ * exactly the distinction these tests need to make. Random per-pixel noise
+ * makes JPEG's quantisation step (and therefore its quality setting) visible
+ * in the output size.
+ */
+const noisyJpeg = (w: number, h: number, quality: number, orientation?: number) => {
+  const raw = Buffer.alloc(w * h * 3);
+  for (let i = 0; i < raw.length; i++) raw[i] = Math.floor(Math.random() * 256);
+  const img = sharp(raw, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality });
+  return (orientation === undefined ? img : img.withMetadata({ orientation })).toBuffer();
+};
 
 const TEMPLATE: RoomTemplate = {
   id: 'test-room',
@@ -206,5 +227,78 @@ describe('EXIF orientation', () => {
     // Stored (bug): 800x400 art -> 844x444 framed — exactly swapped.
     expect(meta.width).toBe(444);
     expect(meta.height).toBe(844);
+  });
+});
+
+describe('orientation correction does not silently re-encode', () => {
+  // Regression: autoOrient().toBuffer() with no format call re-encodes
+  // JPEG/WebP input at sharp's own default quality, unconditionally — even
+  // for the overwhelming majority of images that carry no orientation tag
+  // and need no rotation. That silent re-encode happened BEFORE the
+  // pipeline's one deliberate lossy step, so the quality it threw away could
+  // never be recovered downstream.
+
+  it('passes an untagged JPEG through byte-identical — no sharp round trip at all', async () => {
+    const source = await noisyJpeg(256, 256, 95);
+
+    const result = await orientBuffer(source);
+
+    expect(result.equals(source)).toBe(true);
+  });
+
+  it('passes an untagged JPEG room file through byte-identical', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'room-mockup-'));
+    const path = join(dir, 'room.jpg');
+    const source = await noisyJpeg(256, 256, 95);
+    writeFileSync(path, source);
+
+    const result = await orientFile(path);
+
+    expect(result.equals(source)).toBe(true);
+  });
+
+  it('frameArtwork returns a frameless, untagged JPEG byte-identical, not just dimension-identical', async () => {
+    // A dimensions-only check would not have caught the regression: the
+    // buggy re-encode preserves width/height while silently discarding
+    // quality. This is the assertion that actually falsifies it.
+    const source = await noisyJpeg(256, 256, 95);
+
+    const framed = await frameArtwork(source, FRAMELESS);
+
+    expect(framed.equals(source)).toBe(true);
+  });
+
+  it('still corrects a tagged image (orientation swap still holds)', async () => {
+    const source = await noisyJpeg(800, 400, 92, 6);
+
+    const result = await orientBuffer(source);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.width).toBe(400);
+    expect(meta.height).toBe(800);
+  });
+
+  it('materialises a genuinely rotated image losslessly (PNG), never re-encoded to a lossy format at an unspecified quality', async () => {
+    const source = await noisyJpeg(256, 256, 95, 6);
+
+    const result = await orientBuffer(source);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.format).toBe('png');
+  });
+
+  it('the lossless rotation is not degraded to sharp default-quality JPEG size', async () => {
+    const source = await noisyJpeg(256, 256, 95, 6);
+
+    // The old, buggy behaviour this replaces: autoOrient().toBuffer() with
+    // no format call, re-encoding at sharp's own default JPEG quality.
+    const defaultQualityReencode = await sharp(source).autoOrient().toBuffer();
+
+    const result = await orientBuffer(source);
+
+    // A lossless PNG of photographic noise is reliably much larger than a
+    // default-quality lossy JPEG re-encode of the same pixels — a cheap,
+    // format-agnostic way to prove no lossy default snuck back in.
+    expect(result.length).toBeGreaterThan(defaultQualityReencode.length);
   });
 });
