@@ -398,22 +398,63 @@ export function StatusPill({ status }: { status: string }) {
   )
 }
 
+/** Why the assign route would refuse this job, in the order the route checks. */
+export type AssignRefusalCode = 'settled' | 'status' | 'negotiated_amount'
+
 /**
- * Whether an admin could assign THIS job to a vendor right now.
+ * The three fields the refusals are decided from, and nothing else.
  *
- * Two refusals, both the API's:
- *
- * 1. The transition matrix — only the `ASSIGNABLE_STATUSES` rows carry an admin
- *    edge to `assigned`. Anything else is a 409.
- * 2. Settlement. A settled job is frozen because payables are DERIVED with no
- *    stored total, so re-pricing one makes the settlement's amount disagree
- *    with the sum of its jobs, silently. The assign route refuses it with a 409
- *    before it reads anything else, and a tick box that leads only to that
- *    refusal is a worse control than no tick box.
+ * Structural on purpose: the queue holds `AdminProductionJobListItem` and the
+ * detail screen holds `ProductionJobRecord`, and the answer has to be the same
+ * on both. A screen that computes its own version of this is how the detail
+ * screen came to offer Assign on a `dispatched` job.
  */
-export function isAssignable(job: AdminProductionJobListItem): boolean {
-  if (job.settlementId !== null) return false
-  return ASSIGNABLE_STATUSES.includes(job.status)
+export interface AssignCandidate {
+  status: ProductionStatus
+  settlementId: string | null
+  amountActual: string | null
+}
+
+/**
+ * Which of the assign route's unconditional refusals THIS job would hit, or
+ * null if none would.
+ *
+ * Three refusals, all the API's, all decidable from the list payload:
+ *
+ * 1. Settlement. A settled job is frozen because payables are DERIVED with no
+ *    stored total, so re-pricing one makes the settlement's amount disagree
+ *    with the sum of its jobs, silently. The route refuses it before it reads
+ *    anything else, so it is checked first here too.
+ * 2. The transition matrix — only the `ASSIGNABLE_STATUSES` rows carry an admin
+ *    edge to `assigned`. Anything else is a 409.
+ * 3. A negotiated `amount_actual`. The route refuses it unless the request
+ *    carries a replacement price, and NOTHING in this app has a control that
+ *    sets or clears one — so from either screen the refusal is unconditional.
+ *    Clearing it is a decision only a human who spoke to the vendor can make.
+ *
+ * A control that leads only to a 409 is a worse control than no control, which
+ * is why this is a predicate over the payload rather than an error handler.
+ */
+export function assignRefusal(job: AssignCandidate): AssignRefusalCode | null {
+  if (job.settlementId !== null) return 'settled'
+  if (!ASSIGNABLE_STATUSES.includes(job.status)) return 'status'
+  if (job.amountActual !== null) return 'negotiated_amount'
+  return null
+}
+
+/** One sentence per refusal, for a screen that has room to explain itself. */
+export const ASSIGN_REFUSAL_MESSAGES: Record<AssignRefusalCode, string> = {
+  settled:
+    'This job has been settled. Re-pricing it would make the settlement disagree with the sum of its jobs, so it can no longer be assigned.',
+  status:
+    'This job cannot be assigned from its current status. Only a draft, assigned or QC-failed job carries an admin edge to assigned.',
+  negotiated_amount:
+    'This job carries a negotiated amount agreed with the vendor holding it. Reassigning it would pay a new vendor that number instead of their own rate, and no screen here can clear it — settle the price with the vendor first.',
+}
+
+/** Whether an admin could assign THIS job to a vendor right now. */
+export function isAssignable(job: AssignCandidate): boolean {
+  return assignRefusal(job) === null
 }
 
 /** "24x36" as the API spells it, "24×36" as a person reads it. */

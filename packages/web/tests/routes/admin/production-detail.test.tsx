@@ -1379,6 +1379,15 @@ const jobDetail = (status: ProductionJobStatus) => ({
   payableAmount: '1200.00',
 })
 
+/** The same payload with the assign-refusal fields moved off their defaults. */
+const jobDetailWith = (
+  status: ProductionJobStatus,
+  over: { settlementId?: string | null; amountActual?: string | null }
+) => {
+  const base = jobDetail(status)
+  return { ...base, job: { ...base.job, ...over } }
+}
+
 const jsonResponse = (ok: boolean, status: number, body: unknown) =>
   ({ ok, status, json: async () => body }) as Response
 
@@ -1416,6 +1425,48 @@ function stubApi(options: {
 
 describe('AdminProductionJobPage', () => {
   afterEach(() => vi.unstubAllGlobals())
+
+  /**
+   * The Assign section used to render for any job that loaded, applying neither
+   * guard the queue applies. Opening a `dispatched` or settled job listed
+   * vendors with live Assign buttons whose only outcome was a 409 — and
+   * `settlementId` was on the payload the whole time.
+   */
+  it.each([
+    ['dispatched', () => jobDetail('dispatched'), /cannot be assigned from its current status/i],
+    [
+      'settled',
+      () => jobDetailWith('draft', { settlementId: 'settlement-1' }),
+      /has been settled/i,
+    ],
+    [
+      'negotiated',
+      () => jobDetailWith('assigned', { amountActual: '350.00' }),
+      /negotiated amount/i,
+    ],
+  ])('offers no vendor to assign a %s job, and says why', async (_name, detail, message) => {
+    stubApi({ detail: () => jsonResponse(true, 200, detail()) })
+
+    render(<Page />)
+    await screen.findByTestId('admin-production-items')
+
+    expect(screen.getByTestId('admin-production-assign-refusal').textContent).toMatch(
+      message
+    )
+    expect(screen.queryByTestId('admin-production-candidates')).toBeNull()
+    expect(screen.queryByTestId('admin-production-candidates-empty')).toBeNull()
+    expect(screen.queryByTestId('admin-production-candidates-skeleton')).toBeNull()
+  })
+
+  it('still offers vendors on a job an admin can assign', async () => {
+    stubApi({ detail: () => jsonResponse(true, 200, jobDetail('draft')) })
+
+    render(<Page />)
+    await screen.findByTestId('admin-production-items')
+
+    expect(screen.queryByTestId('admin-production-assign-refusal')).toBeNull()
+    await screen.findByTestId('admin-production-candidates-empty')
+  })
 
   /**
    * D4. A session expires; the 401 body carries no `code`/`from`/`to`, so it

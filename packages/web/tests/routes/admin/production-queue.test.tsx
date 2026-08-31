@@ -72,6 +72,8 @@ import {
   STATUS_STYLES,
   StatusPill,
   isAssignable,
+  assignRefusal,
+  ASSIGN_REFUSAL_MESSAGES,
   assignJobsToVendor,
   BulkAssignBar,
   BulkAssignResults,
@@ -536,6 +538,58 @@ describe('isAssignable', () => {
     expect(
       isAssignable(jobWith({ status: 'draft', settlementId: 's1111111-1111-4111-8111-111111111111' }))
     ).toBe(false)
+  })
+
+  /**
+   * The assign route's third unconditional refusal. Neither this screen nor the
+   * detail screen has a control that sets or clears `amountActual`, so nothing
+   * either of them can send satisfies `NEGOTIATED_AMOUNT_PRESENT`: a job
+   * carrying one is refused 100% of the time, and ticking it into a bulk
+   * assign only spends a round trip to be told so.
+   */
+  it('refuses a job carrying a negotiated amount', () => {
+    expect(isAssignable(jobWith({ status: 'assigned', amountActual: '350.00' }))).toBe(false)
+  })
+})
+
+describe('assignRefusal — which refusal, so a screen can say it', () => {
+  it('names no refusal for a job an admin can assign', () => {
+    expect(assignRefusal(jobWith({ status: 'draft' }))).toBeNull()
+  })
+
+  it('names the settlement first, which the API checks first', () => {
+    expect(
+      assignRefusal(
+        jobWith({
+          status: 'dispatched',
+          settlementId: 's1111111-1111-4111-8111-111111111111',
+          amountActual: '350.00',
+        })
+      )
+    ).toBe('settled')
+  })
+
+  it('names the status when the matrix has no admin edge to assigned', () => {
+    expect(assignRefusal(jobWith({ status: 'dispatched' }))).toBe('status')
+  })
+
+  it('names the negotiated amount on an otherwise assignable job', () => {
+    expect(assignRefusal(jobWith({ status: 'assigned', amountActual: '350.00' }))).toBe(
+      'negotiated_amount'
+    )
+  })
+
+  it('gives every refusal a sentence to render', () => {
+    for (const code of ['settled', 'status', 'negotiated_amount'] as const) {
+      expect(ASSIGN_REFUSAL_MESSAGES[code].length).toBeGreaterThan(0)
+    }
+  })
+
+  it('agrees with isAssignable on every status the matrix knows', () => {
+    for (const status of PRODUCTION_JOB_STATUSES) {
+      const job = jobWith({ status })
+      expect(isAssignable(job)).toBe(assignRefusal(job) === null)
+    }
   })
 })
 

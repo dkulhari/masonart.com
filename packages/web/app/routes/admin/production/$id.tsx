@@ -108,9 +108,11 @@ import { cn, getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
 import { ADMIN_PRODUCTION_SEARCH } from '~/lib/admin-nav'
 import {
+  ASSIGN_REFUSAL_MESSAGES,
   STAGE_LABELS,
   STATUS_LABELS,
   StatusPill,
+  assignRefusal,
   formatDate,
   formatRupees,
   type ProductionStage,
@@ -1645,8 +1647,19 @@ function AdminProductionJobPage() {
   const longestEdge = useMemo(() => largestLongestEdge(items), [items])
   const stage = detail?.job.stage ?? null
 
+  /**
+   * Which of the assign route's refusals this job would hit, from the same
+   * predicate the queue ticks its boxes with.
+   *
+   * The queue has always applied these; this screen applied none of them and
+   * rendered live Assign buttons on a dispatched, settled or negotiated job —
+   * every one of which the API 409s. Null while the job is still loading, so
+   * nothing is claimed about a job nobody has read.
+   */
+  const refusedAssign = detail ? assignRefusal(detail.job) : null
+
   const loadCandidates = useCallback(async () => {
-    if (!stage || longestEdge === null) {
+    if (!stage || longestEdge === null || refusedAssign !== null) {
       setCandidates([])
       return
     }
@@ -1661,7 +1674,7 @@ function AdminProductionJobPage() {
     } finally {
       setCandidatesLoading(false)
     }
-  }, [stage, longestEdge])
+  }, [stage, longestEdge, refusedAssign])
 
   useEffect(() => {
     void loadCandidates()
@@ -1990,7 +2003,14 @@ function AdminProductionJobPage() {
               vendorName={assignVendorName}
             />
 
-            {longestEdge === null ? (
+            {refusedAssign !== null ? (
+              <p
+                data-testid="admin-production-assign-refusal"
+                className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
+              >
+                {ASSIGN_REFUSAL_MESSAGES[refusedAssign]}
+              </p>
+            ) : longestEdge === null ? (
               <p
                 data-testid="admin-production-unsizable"
                 className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
