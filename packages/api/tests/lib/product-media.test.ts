@@ -172,4 +172,31 @@ describe('buildProductMedia', () => {
     });
     expect(a.id).not.toBe(b.id);
   });
+
+  /**
+   * The artBox this returns is what the orientation guard in
+   * routes/admin/products.ts weighs the admin's declared `orientation`
+   * against, and what backfill-art-box.ts audits the column with. A phone
+   * photograph stored landscape under `orientation: 6` therefore reaches the
+   * guard as whatever this measures — so if the upload path read the stored
+   * rectangle, the guard built to catch orientation drift would refuse a
+   * correct `portrait` declaration and accept a wrong `landscape` one, on
+   * exactly the inputs it exists to police. #716.
+   */
+  it('measures the artBox on the displayed rectangle of an EXIF-tagged source', async () => {
+    const tagged = await sharp({
+      create: { width: 1600, height: 800, channels: 3, background: { r: 9, g: 40, b: 90 } },
+    })
+      .withMetadata({ orientation: 6 }) // rotate 90 CW to display: 800x1600
+      .jpeg({ quality: 100 })
+      .toBuffer();
+
+    const image = await buildProductMedia(tagged, 'phone.jpg', 'image/jpeg', {
+      type: 'main',
+      altText: 'a',
+    });
+
+    expect(image.artBox).toBeDefined();
+    expect(image.artBox!.h).toBeGreaterThan(image.artBox!.w);
+  });
 });

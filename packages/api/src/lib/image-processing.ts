@@ -67,20 +67,50 @@ export type ImageSizeName = keyof typeof IMAGE_SIZES;
 // ============================================================================
 
 /**
+ * Materialise the image as it is DISPLAYED, honouring its EXIF orientation tag.
+ *
+ * A phone held in portrait very often stores the frame landscape and tags it
+ * "rotate 90 to display". Finder, Preview and the admin form's own preview all
+ * honour that tag; sharp does not unless asked — and it STRIPS the tag on
+ * write, so once an output exists the rotation is unrecoverable. Every function
+ * below measures or transforms whatever pixels it is handed, so each takes its
+ * source from here first. #716.
+ *
+ * The buffer has to be MATERIALISED, not chained: `sharp(x).metadata()` reports
+ * the input's stored dimensions, so an `.autoOrient()` further along the same
+ * pipeline does not retroactively correct a measurement taken before it.
+ *
+ * An untagged source — everything already in the catalogue — is returned
+ * untouched rather than re-encoded, so this costs nothing off the phone path.
+ * A source sharp cannot read is returned untouched too: every caller has its
+ * own fallback, and an unreadable asset must never fail an upload here.
+ */
+async function autoOriented(input: Buffer): Promise<Buffer> {
+  try {
+    const { orientation } = await sharp(input).metadata();
+    if (!orientation || orientation === 1) return input;
+    return await sharp(input).autoOrient().toBuffer();
+  } catch {
+    return input;
+  }
+}
+
+/**
  * Process an image: convert to WebP and generate responsive variants.
  *
  * @param input - Image buffer (JPEG, PNG, WebP, or GIF)
  * @returns Processed image with original + responsive variants
  */
 export async function processImage(input: Buffer): Promise<ProcessedImage> {
-  const image = sharp(input);
+  const source = await autoOriented(input);
+  const image = sharp(source);
   const metadata = await image.metadata();
 
   const originalWidth = metadata.width || 1200;
   const originalHeight = metadata.height || 1200;
 
   // Convert original to WebP (preserving dimensions)
-  const originalWebP = await sharp(input)
+  const originalWebP = await sharp(source)
     .webp({ quality: 85 })
     .toBuffer();
 
@@ -92,7 +122,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     if (config.width >= originalWidth) continue;
 
     try {
-      const buffer = await sharp(input)
+      const buffer = await sharp(source)
         .resize(config.width, null, {
           fit: "inside",
           withoutEnlargement: true,
@@ -134,19 +164,23 @@ export async function convertToWebP(
   input: Buffer,
   quality: number = 80
 ): Promise<Buffer> {
-  return sharp(input).webp({ quality }).toBuffer();
+  return sharp(await autoOriented(input)).webp({ quality }).toBuffer();
 }
 
 /**
  * Get image metadata (dimensions, format, size).
+ *
+ * Dimensions are the DISPLAYED ones. A caller deciding portrait vs landscape
+ * from a stored rectangle files a portrait poster as landscape.
  */
 export async function getImageMetadata(input: Buffer) {
-  const metadata = await sharp(input).metadata();
+  const source = await autoOriented(input);
+  const metadata = await sharp(source).metadata();
   return {
     width: metadata.width || 0,
     height: metadata.height || 0,
     format: metadata.format || "unknown",
-    size: metadata.size || input.length,
+    size: metadata.size || source.length,
   };
 }
 
@@ -242,7 +276,9 @@ async function stripUniformBorder(
  */
 export async function matToSquare(input: Buffer): Promise<Buffer> {
   const inner = Math.round(MAT_CANVAS * MAT_ART_INSET);
-  const { art: source, sourceLongest } = await stripUniformBorder(input);
+  const { art: source, sourceLongest } = await stripUniformBorder(
+    await autoOriented(input)
+  );
   const target = sourceLongest ? Math.min(inner, sourceLongest) : inner;
 
   const art = await sharp(source)
@@ -341,8 +377,10 @@ export async function measureArtBox(
   let data: Buffer;
   let info: { width: number; height: number; channels: number };
 
+  const source = await autoOriented(squared);
+
   try {
-    const raw = await sharp(squared)
+    const raw = await sharp(source)
       .resize(ART_SCAN, ART_SCAN, { kernel: "nearest", fit: "fill" })
       .removeAlpha()
       .raw()
@@ -474,7 +512,11 @@ export async function cropToSquare(
   input: Buffer,
   crop?: ImageCrop
 ): Promise<Buffer> {
-  const meta = await sharp(input).metadata();
+  // The admin chose the window against the image as their browser DISPLAYED
+  // it, so the rect is normalised against the oriented rectangle, not the
+  // stored one. Measuring the stored one lands the window somewhere else.
+  const source = await autoOriented(input);
+  const meta = await sharp(source).metadata();
   const sw = meta.width || MAT_CANVAS;
   const sh = meta.height || MAT_CANVAS;
 
@@ -493,7 +535,7 @@ export async function cropToSquare(
   left = Math.max(0, Math.min(left, sw - width));
   top = Math.max(0, Math.min(top, sh - height));
 
-  return sharp(input)
+  return sharp(source)
     .extract({ left, top, width, height })
     .resize(MAT_CANVAS, MAT_CANVAS, { fit: "fill" })
     .webp({ quality: 88 })
