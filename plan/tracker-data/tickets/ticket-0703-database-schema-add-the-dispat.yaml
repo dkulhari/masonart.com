@@ -1,0 +1,288 @@
+ticket_number: 703
+title: Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+description: |-
+  ## Task
+  `order_shipments` can hold a carrier name and a tracking number and nothing else. Real dispatch needs the AWB, the aggregator's own ids, the courier that actually carries it, the shipped weight and dimensions, what WE paid (essential for margin now that the customer pays ₹0), the consolidating vendor whose address is the pickup location, and a way to say a label is dead.
+
+  Two of these are not new requests — other code already names them:
+
+  - `label_object_token` is read TODAY by `packages/api/src/lib/vendor-scope.ts:433` as a raw SQL fragment against a column that does not exist. That is why `GET /api/vendor/jobs/:id/label` answers 503 in every environment.
+  - `voided_at` is the "void marker" the same file's doc block (`vendor-scope.ts:~640`) defers to this feature by name, so `getVendorJobLabelKey` can stop guessing the live label by recency.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 1 — Database Schema
+
+  **Expect `packages/api/tests/lib/vendor-label-seam.test.ts` to go RED when this lands.** That is designed: its failure message is the checklist for the next ticket. Do not fix it here.
+
+  The token must match `LABEL_TOKEN_PATTERN` in `vendor-scope.ts:530` — `/^[A-Za-z0-9_-]+$/` — because the key it builds is `fulfilment/labels/<token>.pdf` and rides in the path of a signed URL. A random token, following the `production_approvals.approval_token` precedent, and **never the order id**: an order id in a URL path is a stable person-linked handle.
+
+  Express the partial unique index in the drizzle DSL, not only in SQL, so `db:push` and `db:migrate` cannot diverge (#663).
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:20:37.557Z'
+last_updated: '2026-08-31T02:20:37.557Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 702
+    feature: order-dispatch-tracking
+    description: Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing test for the new columns, the token contract and the one-live-label index
+    file: packages/api/tests/database/order-shipments-dispatch.test.ts
+    command: cd packages/api && bunx vitest run tests/database/order-shipments-dispatch.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * The columns real dispatch needs, and the two that other code already names.
+       *
+       * `label_object_token` is not a new idea here — `lib/vendor-scope.ts` reads it
+       * TODAY as a raw SQL fragment, which is why the vendor label route answers 503
+       * everywhere. `voided_at` is the void marker that same file's doc block defers
+       * to this feature so `getVendorJobLabelKey` can stop choosing the live label by
+       * recency.
+       *
+       * Column NAMES are asserted, not just the drizzle keys: the SQL fragment in
+       * `vendor-scope.ts` spells `label_object_token` as a string, and a schema that
+       * named it anything else would leave that route broken with every test green.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { resolve } from 'node:path'
+      import { getTableConfig } from 'drizzle-orm/pg-core'
+
+      import { orderShipments } from '../../src/database/schema/shipping'
+
+      const MIGRATION = resolve(
+        __dirname,
+        '../../src/database/migrations/0027_order_shipments_dispatch.sql'
+      )
+
+      /** `LABEL_TOKEN_PATTERN`, copied from lib/vendor-scope.ts:530 on purpose. */
+      const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/
+
+      const config = getTableConfig(orderShipments)
+      const columnByName = new Map(config.columns.map((c) => [c.name, c]))
+
+      describe('order_shipments carries a real dispatch', () => {
+        it('names the label token exactly as vendor-scope spells it', () => {
+          // A rename here is silent: the fragment is a string, so the route would
+          // keep 503ing with the whole schema suite green.
+          expect(columnByName.has('label_object_token')).toBe(true)
+          expect(orderShipments.labelObjectToken.name).toBe('label_object_token')
+        })
+
+        it('adds the void marker vendor-scope asks for by name', () => {
+          expect(columnByName.has('voided_at')).toBe(true)
+          expect(columnByName.has('voided_reason')).toBe(true)
+        })
+
+        it('adds the carrier handles, the parcel and what we paid', () => {
+          for (const name of [
+            'awb_number',
+            'external_shipment_id',
+            'external_order_id',
+            'courier_name',
+            'shipped_weight_grams',
+            'length_cm',
+            'width_cm',
+            'height_cm',
+            'cost_paise',
+            'pickup_vendor_id',
+          ]) {
+            expect(columnByName.has(name), `${name} is missing`).toBe(true)
+          }
+        })
+
+        it('leaves every column nullable — an unlabelled shipment is an ordinary row', () => {
+          for (const name of ['label_object_token', 'awb_number', 'cost_paise', 'voided_at']) {
+            expect(columnByName.get(name)!.notNull, `${name} is NOT NULL`).toBe(false)
+          }
+        })
+
+        it('holds at most ONE live labelled shipment per order', () => {
+          // The property `getVendorJobLabelKey` needs. Without it the choice of
+          // "which label will the courier honour" is whichever row the planner
+          // reached first, and a vendor who reloads gets a different PDF.
+          const live = config.indexes.find((i) => getTableConfig(orderShipments) && i.config.name === 'order_shipments_live_label_idx')
+          expect(live, 'order_shipments_live_label_idx is missing').toBeDefined()
+          expect(live!.config.unique).toBe(true)
+          expect(live!.config.where).toBeDefined()
+        })
+
+        it('makes the token itself unique — two orders cannot share one object key', () => {
+          const sql = readFileSync(MIGRATION, 'utf8')
+          expect(sql).toMatch(/unique/i)
+          expect(sql).toContain('label_object_token')
+        })
+
+        it('adds no enum value — that was 0026, and the two cannot share a batch', () => {
+          const sql = readFileSync(MIGRATION, 'utf8').replace(/^\s*--.*$/gm, '')
+          expect(sql).not.toContain('ADD VALUE')
+        })
+
+        it('accepts the token shape the signed-URL path requires', () => {
+          // Documentation of the contract the WRITER must honour: the key is
+          // `fulfilment/labels/<token>.pdf` and rides in a URL path.
+          expect(LABEL_TOKEN_PATTERN.test('r7Kq2-_aZ9')).toBe(true)
+          expect(LABEL_TOKEN_PATTERN.test('a/b')).toBe(false)
+          expect(LABEL_TOKEN_PATTERN.test('')).toBe(false)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — none of the columns exist
+    command: cd packages/api && bunx vitest run tests/database/order-shipments-dispatch.test.ts
+    expected_result: FAIL - orderShipments.labelObjectToken is undefined and the migration file does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the dispatch columns and the one-live-label partial unique index to the drizzle table
+    file: packages/api/src/database/schema/shipping.ts
+    status: pending
+    code: |-
+      // Add inside the orderShipments column object, after `notes`:
+
+          // ------------------------------------------------------------------
+          // Dispatch (order-dispatch-tracking)
+          // ------------------------------------------------------------------
+
+          /**
+           * The identity-free handle on this shipment's label object.
+           *
+           * The object lives at `fulfilment/labels/<token>.pdf` and the token rides
+           * in the PATH of a signed URL, which is the one place an assertion about
+           * JSON keys can never reach. So it is RANDOM — following the
+           * `production_approvals.approval_token` precedent — and never the order id,
+           * which is a stable person-linked handle.
+           *
+           * Must match `LABEL_TOKEN_PATTERN` in `lib/vendor-scope.ts`.
+           */
+          labelObjectToken: text("label_object_token").unique(),
+
+          /**
+           * This label is dead: voided, or the shipment cancelled.
+           *
+           * The marker `lib/vendor-scope.ts` asks for by name. Before it,
+           * `getVendorJobLabelKey` chose the live label by recency, because the
+           * table had no way to say which one a courier would actually honour.
+           */
+          voidedAt: timestamp("voided_at", { withTimezone: true }),
+          voidedReason: text("voided_reason"),
+
+          /** The courier's own handle on the parcel. */
+          awbNumber: varchar("awb_number", { length: 64 }),
+          /** The aggregator's ids, so a support call can be traced both ways. */
+          externalShipmentId: varchar("external_shipment_id", { length: 64 }),
+          externalOrderId: varchar("external_order_id", { length: 64 }),
+          /**
+           * Who actually carries it, which is not `carrier`.
+           *
+           * `carrier` is the aggregator we bought through (Shiprocket). This is the
+           * courier it picked (Delhivery, Bluedart). Collapsing them loses the only
+           * field a customer recognises on a tracking page.
+           */
+          courierName: varchar("courier_name", { length: 100 }),
+
+          /** What actually went out, which is not what the cart estimated. */
+          shippedWeightGrams: integer("shipped_weight_grams"),
+          lengthCm: integer("length_cm"),
+          widthCm: integer("width_cm"),
+          heightCm: integer("height_cm"),
+
+          /**
+           * What WE paid, in paise.
+           *
+           * Not what the customer paid — since shipping was baked into the price the
+           * customer pays zero, so this is the only number margin can be computed
+           * from. Paise because it is a real cost, not a displayed figure.
+           */
+          costPaise: integer("cost_paise"),
+
+          /**
+           * The consolidating vendor, whose address is the pickup location.
+           *
+           * `restrict`: a vendor who has despatched an order cannot be deleted out
+           * from under the record of where the courier collected it.
+           */
+          pickupVendorId: uuid("pickup_vendor_id").references(() => vendors.id, {
+            onDelete: "restrict",
+          }),
+
+      // ...and in the table's second argument, beside the existing indexes:
+
+          /**
+           * At most ONE live labelled shipment per order.
+           *
+           * `order_id` is a plain indexed FK, so an order whose label was voided and
+           * re-bought carries several rows. Without this, "which label will the
+           * courier honour" is answered by whichever row the planner reached first —
+           * and a vendor who reloads their label gets a different PDF.
+           *
+           * Partial on both predicates, not one: an UNLABELLED shipment (the row
+           * `POST /orders/:orderId/ship` creates before a label is bought) is an
+           * ordinary state and several of them must not collide.
+           */
+          liveLabelIdx: uniqueIndex("order_shipments_live_label_idx")
+            .on(table.orderId)
+            .where(sql`${table.voidedAt} is null and ${table.labelObjectToken} is not null`),
+          pickupVendorIdIdx: index("order_shipments_pickup_vendor_id_idx").on(
+            table.pickupVendorId
+          ),
+  - id: 4
+    action: implement
+    description: Generate the migration and annotate it; confirm it contains no ADD VALUE
+    file: packages/api/src/database/migrations/0027_order_shipments_dispatch.sql
+    command: cd packages/api && bun run db:generate
+    status: pending
+    code: |-
+      -- order-dispatch-tracking phase 1: what a real dispatch has to record.
+      --
+      -- Separate from 0026 on purpose. That one is ALTER TYPE ADD VALUE, and nothing
+      -- in the same batch may USE a value it added (#580) — keeping the columns here
+      -- means this file is free to reference the type normally in a later migration.
+      --
+      -- Two of these columns are not new requests. `label_object_token` is read TODAY
+      -- by lib/vendor-scope.ts as a raw SQL fragment, which is why the vendor label
+      -- route answers 503 in every environment; `voided_at` is the void marker that
+      -- file's doc block defers to this feature by name.
+      --
+      -- The partial unique index is the property `getVendorJobLabelKey` needs: at
+      -- most one LIVE LABELLED shipment per order. Unlabelled rows are exempt — the
+      -- row POST /orders/:orderId/ship writes before a label is bought is ordinary,
+      -- and several must not collide.
+  - id: 5
+    action: verify-pass
+    description: Confirm the suite passes and the migration applies
+    command: cd packages/api && bunx vitest run tests/database/order-shipments-dispatch.test.ts && bun run db:migrate
+    expected_result: PASS - and the migration applies cleanly
+    status: pending
+  - id: 6
+    action: verify-fail
+    description: Confirm the seam test is now RED, and that its failure message is the checklist for the next ticket. Do NOT fix it here
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
+    expected_result: FAIL - 'order_shipments.label_object_token has LANDED. The label route is still wired for its absence...'
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit, noting the expected red
+    command: 'git add packages/api/src/database packages/api/tests/database/order-shipments-dispatch.test.ts && git commit -m "feat(api): give order_shipments the columns a real dispatch records"'
+    status: pending
+current_step: 1

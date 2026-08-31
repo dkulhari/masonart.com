@@ -1,0 +1,244 @@
+ticket_number: 711
+title: One Tracking Store - The two production label guards read order_shipments
+description: |-
+  ## Task
+  Two production-pipeline guards ask "does this order carry a shipping label" of `orders.shipping_details`:
+
+  - `packages/api/src/lib/vendor-scope.ts:991` — `ORDER_HAS_LABEL`, a SQL fragment coalescing `awbNumber`, `trackingNumber` and `shipmentId` out of the jsonb.
+  - `packages/api/src/routes/admin/production-jobs.ts:713` — `orderShippingLabel()`, feeding `despatchEvidence()`, which decides whether a job may take the `dispatched` edge on the basis `open-transfer-or-order-label`.
+
+  After this phase nothing writes that jsonb. Both silently start answering "no label", and the `dispatched` edge becomes untakeable for any order whose only evidence was the label — a pipeline with no way to despatch, which `lib/production-transitions.ts` calls "an edge nothing in the codebase can take".
+
+  This is not optional cleanup. It moves in the same pass or production breaks.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  **R1 is preserved exactly.** `ORDER_HAS_LABEL` is a BOOLEAN on the vendor boundary and stays one: the AWB is a courier's handle on a customer's parcel and no vendor-facing projection may name it. The vendor needs the answer, never the value. `despatchEvidence` is admin-side and may keep naming the label in its `detail` — that is an audit payload, not a vendor projection.
+
+  No seam violation: these read `order_shipments`, a table. Neither imports anything named `shiprocket`, so the reverse scan in `tests/lib/production-seam.test.ts:203` stays green. `vendor-scope.ts` is `lib/vendor-*` and not covered by that scan at all, but do not give it a reason to be.
+
+  "Carries a label" means a LIVE shipment with a handle: `voided_at IS NULL` and at least one of `label_object_token`, `awb_number`, `tracking_number`. A voided label is not evidence that goods left.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:26:01.210Z'
+last_updated: '2026-08-31T02:26:01.210Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 703
+    feature: order-dispatch-tracking
+    description: Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+  - ticket: 707
+    feature: order-dispatch-tracking
+    description: One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write the failing test: both guards read order_shipments and a voided label is not evidence'
+    file: packages/api/tests/lib/order-label-guard.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/order-label-guard.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * "Does this order carry a label" — asked of the store that has the answer.
+       *
+       * Two guards asked it of `orders.shipping_details`. That jsonb stops being
+       * written this phase, so both would answer `false` forever and the `dispatched`
+       * edge would become untakeable: a pipeline with no way to despatch, which is
+       * the failure `lib/production-transitions.ts` names as "an edge nothing in the
+       * codebase can take".
+       *
+       * R1 is not relaxed by any of this. The vendor-facing guard stays a BOOLEAN —
+       * the AWB is a courier's handle on a customer's parcel, and the vendor needs
+       * the answer, never the value.
+       */
+
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { resolve } from 'node:path'
+      import '../setup'
+
+      const API_SRC = resolve(__dirname, '../../src')
+
+      const recorder = await vi.hoisted(async () =>
+        (await import('../helpers/query-recorder')).createQueryRecorder({ rows: 'repeatLast' })
+      )
+      vi.mock('../../src/database', () => ({ db: recorder.db }))
+
+      describe('the vendor-facing guard', () => {
+        beforeEach(() => recorder.reset())
+
+        it('reads order_shipments, not the jsonb', () => {
+          const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+          const guard = src.slice(src.indexOf('ORDER_HAS_LABEL'), src.indexOf('ORDER_HAS_LABEL') + 900)
+
+          expect(guard).not.toContain('shippingDetails')
+          expect(guard).toMatch(/orderShipments|order_shipments/)
+        })
+
+        it('stays a BOOLEAN — R1 says no vendor projection names the AWB', () => {
+          const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+          expect(src).toContain('sql<boolean>')
+        })
+
+        it('does not count a VOIDED label as evidence goods left', () => {
+          const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+          const guard = src.slice(src.indexOf('ORDER_HAS_LABEL'), src.indexOf('ORDER_HAS_LABEL') + 900)
+          expect(guard.toLowerCase()).toMatch(/voided_at|voidedat/)
+        })
+      })
+
+      describe('the admin despatch guard', () => {
+        beforeEach(() => recorder.reset())
+
+        it('queries order_shipments when it looks for a label', async () => {
+          // The `open-transfer-or-order-label` guard. Its second branch was the
+          // jsonb read; it is the branch that keeps a consolidator able to despatch.
+          recorder.queue([])
+          recorder.queue([{ id: SHIPMENT_ID, awbNumber: 'AWB1', voidedAt: null }])
+
+          await takeDispatchedEdge(JOB_ID)
+
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql).toContain('order_shipments')
+          expect(sql).not.toContain('shipping_details')
+        })
+
+        it('refuses the edge when the only label on the order is voided', async () => {
+          recorder.queue([])
+          recorder.queue([])
+
+          const result = await takeDispatchedEdge(JOB_ID)
+
+          expect(result.satisfied).toBe(false)
+        })
+      })
+
+      describe('the seam is untouched by any of this', () => {
+        it('still imports nothing named shiprocket under lib/production-*', () => {
+          // These guards read a TABLE. If a fix here ever reached for a carrier
+          // client, tests/lib/production-seam.test.ts would say so — assert it here
+          // too, beside the change that could cause it.
+          const src = readFileSync(resolve(API_SRC, 'lib/production-readiness.ts'), 'utf8')
+          expect(src.toLowerCase()).not.toMatch(/from ['"].*shiprocket/)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — both guards still read the jsonb
+    command: cd packages/api && bunx vitest run tests/lib/order-label-guard.test.ts
+    expected_result: FAIL - ORDER_HAS_LABEL still coalesces out of shippingDetails
+    status: pending
+  - id: 3
+    action: implement
+    description: Repoint the vendor-facing boolean guard
+    file: packages/api/src/lib/vendor-scope.ts
+    status: pending
+    code: |-
+      /**
+       * Does the order carry a live shipping label?
+       *
+       * Asked as a BOOLEAN rather than fetched: the AWB is a courier's handle on a
+       * customer's parcel, and R1 says no vendor-facing projection names it. The
+       * vendor needs the answer, never the value — that part is unchanged.
+       *
+       * What changed is the STORE. This used to coalesce three fields out of
+       * `orders.shipping_details`, which `order-dispatch-tracking` stopped writing:
+       * the guard would have answered `false` for every order forever, and a
+       * consolidator would never have been able to take the `dispatched` edge again.
+       *
+       * A VOIDED label is not evidence that goods left. It is evidence that a label
+       * was bought and then killed.
+       */
+      const ORDER_HAS_LABEL = sql<boolean>`exists (
+        select 1
+        from ${orderShipments}
+        where ${orderShipments.orderId} = ${orders.id}
+          and ${orderShipments.voidedAt} is null
+          and coalesce(
+            ${orderShipments.labelObjectToken},
+            ${orderShipments.awbNumber},
+            ${orderShipments.trackingNumber}
+          ) is not null
+      )`
+  - id: 4
+    action: implement
+    description: Repoint the admin despatch-evidence guard
+    file: packages/api/src/routes/admin/production-jobs.ts
+    status: pending
+    code: |-
+      // Delete `orderShippingLabel()` and the `OrderShippingDetails` import with it —
+      // nothing else in this file uses either.
+      //
+      // In despatchEvidence(), the second branch reads the shipment instead:
+
+        // The order already carries a label: the consolidator handed the goods to
+        // the courier. `evaluateLabelReadiness` reads this same case as "dispatched
+        // and on no inter-vendor transfer".
+        //
+        // LIVE only. A voided label is evidence a label was bought and then killed,
+        // not evidence anything left the building.
+        const [shipment] = await tx
+          .select({
+            id: orderShipments.id,
+            awbNumber: orderShipments.awbNumber,
+            trackingNumber: orderShipments.trackingNumber,
+            labelObjectToken: orderShipments.labelObjectToken,
+          })
+          .from(orderShipments)
+          .where(
+            and(
+              eq(orderShipments.orderId, job.orderId),
+              isNull(orderShipments.voidedAt),
+              or(
+                isNotNull(orderShipments.labelObjectToken),
+                isNotNull(orderShipments.awbNumber),
+                isNotNull(orderShipments.trackingNumber)
+              )
+            )
+          )
+          .limit(1);
+
+        // Admin-side, and the detail is an AUDIT payload rather than a vendor
+        // projection — naming the handle here is what lets a dispute say WHICH label
+        // the edge was taken on. R1 constrains the vendor boundary, not this one.
+        const label = shipment
+          ? (shipment.awbNumber ?? shipment.trackingNumber ?? shipment.id)
+          : null;
+
+        return label
+          ? { satisfied: true, detail: { basis: "order_label", orderLabel: label } }
+          : { satisfied: false, detail: { transferId: null, orderLabel: null } };
+  - id: 5
+    action: verify-pass
+    description: Confirm the guard suite, the production suites and the seam scans all pass
+    command: cd packages/api && bunx vitest run tests/lib/order-label-guard.test.ts tests/lib/production-seam.test.ts tests/lib/vendor-scope.test.ts tests/routes/admin/production-jobs.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Typecheck — a stale OrderShippingDetails import fails the gate
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/lib/vendor-scope.ts packages/api/src/routes/admin/production-jobs.ts packages/api/tests/lib/order-label-guard.test.ts && git commit -m "fix(api): keep the dispatched edge takeable after the tracking stores merge"'
+    status: pending
+current_step: 1

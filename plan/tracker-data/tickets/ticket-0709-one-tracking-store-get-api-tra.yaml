@@ -1,0 +1,217 @@
+ticket_number: 709
+title: One Tracking Store - GET /api/tracking reads the live shipment
+description: |-
+  ## Task
+  `routes/tracking.ts` picks a shipment with `orderBy(desc(createdAt))` and no predicate. Once voided labels exist that is the same defect `getVendorJobLabelKey` had: a customer could be shown a dead AWB.
+
+  Both handlers also load `shippingDetails: true` in their `with` clause and no longer need it — nothing reads it after this pass.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  Two handlers, not one: `POST /api/tracking/lookup` (~line 122) and `GET /api/tracking/:orderNumber` (~line 223). They have the same read and the same bug. Fix both, and pull the read into one local helper so a third handler cannot get it wrong.
+
+  The `tracking: shipment ? {...} : null` shape STAYS. It was never the bug — the bug was that nothing wrote the table it reads. A fallback to `orders.shipping_details` would reintroduce the second source of truth this whole phase removes.
+
+  Add `courierName` and `awbNumber` to the response: they are the fields a customer recognises. `carrier` is the aggregator we bought through and means nothing to them.
+
+  The two tracking handlers are anti-enumeration surfaces — a wrong contact returns the same 404 as a missing order. Do not let the new fields change any status code.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:24:02.757Z'
+last_updated: '2026-08-31T02:24:02.757Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 703
+    feature: order-dispatch-tracking
+    description: Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+  - ticket: 707
+    feature: order-dispatch-tracking
+    description: One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write the failing test: the live shipment wins, and a voided one is never shown'
+    file: packages/api/tests/routes/tracking-live-shipment.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/tracking-live-shipment.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * A customer is never shown a dead AWB.
+       *
+       * The read had no predicate at all — newest row wins — which was harmless only
+       * because voided labels did not exist. They do now, and `order_shipments` holds
+       * both the voided label and its replacement.
+       *
+       * Both handlers are covered: the lookup and the by-order-number route share the
+       * bug because they share the read.
+       */
+
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import '../setup'
+
+      const recorder = await vi.hoisted(async () =>
+        (await import('../helpers/query-recorder')).createQueryRecorder({ rows: 'repeatLast' })
+      )
+      vi.mock('../../src/database', () => ({ db: recorder.db }))
+
+      describe('the tracking page shows the LIVE shipment', () => {
+        beforeEach(() => recorder.reset())
+
+        it('filters on voided_at is null in the lookup handler', async () => {
+          await app.request('/api/tracking/lookup', {
+            method: 'POST',
+            body: JSON.stringify({ orderNumber: 'CH-1', email: 'a@b.com' }),
+          })
+
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql.toLowerCase()).toMatch(/voided_at"?\s+is\s+null/)
+        })
+
+        it('filters on voided_at is null in the by-order-number handler too', async () => {
+          await app.request('/api/tracking/CH-1?email=a%40b.com')
+
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql.toLowerCase()).toMatch(/voided_at"?\s+is\s+null/)
+        })
+
+        it('stops loading orders.shipping_details — nothing reads it any more', async () => {
+          await app.request('/api/tracking/CH-1?email=a%40b.com')
+
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql).not.toContain('shipping_details')
+        })
+
+        it('returns the courier and AWB the customer recognises', async () => {
+          // `carrier` is the aggregator we bought through and means nothing to them.
+          const res = await app.request('/api/tracking/CH-1?email=a%40b.com')
+          const body = await res.json()
+
+          expect(body.tracking).toHaveProperty('courierName')
+          expect(body.tracking).toHaveProperty('awbNumber')
+        })
+
+        it('still answers null — not a fallback — when there is no shipment', async () => {
+          // A fallback to orders.shipping_details would put the second source of
+          // truth back, which is the whole defect this phase removes.
+          recorder.queue([ORDER_ROW])
+          recorder.queue([])
+
+          const res = await app.request('/api/tracking/CH-1?email=a%40b.com')
+          const body = await res.json()
+
+          expect(body.tracking).toBeNull()
+        })
+
+        it('gives a wrong contact the same answer as a missing order', async () => {
+          // The anti-enumeration property. New fields must not change it.
+          const res = await app.request('/api/tracking/CH-1?email=wrong%40b.com')
+          expect(res.status).toBe(404)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/routes/tracking-live-shipment.test.ts
+    expected_result: FAIL - no voided_at predicate, shipping_details still selected
+    status: pending
+  - id: 3
+    action: implement
+    description: Pull the read into one helper with the predicate, and use it from both handlers
+    file: packages/api/src/routes/tracking.ts
+    status: pending
+    code: |-
+      /**
+       * The shipment a customer is actually looking at.
+       *
+       * ONE helper, used by both handlers, because they had the same read and
+       * therefore the same bug — a third handler copying a fourth version of it is
+       * how this feature started.
+       *
+       * `voided_at IS NULL` is the whole point. Without it the newest row wins, and
+       * once a label has been voided and re-bought the newest row can be the dead
+       * one: the customer is shown an AWB the courier will not honour. The ordering
+       * survives as a tiebreak, not as the choice.
+       */
+      async function liveShipmentFor(orderId: string) {
+        const [shipment] = await db
+          .select()
+          .from(orderShipments)
+          .where(and(eq(orderShipments.orderId, orderId), isNull(orderShipments.voidedAt)))
+          .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
+          .limit(1);
+
+        return shipment ?? null;
+      }
+
+      /**
+       * The tracking block, or null.
+       *
+       * Null STAYS. It was never the bug — the bug was that nothing wrote the table
+       * this reads. Falling back to `orders.shipping_details` would put the second
+       * source of truth back that this phase exists to remove.
+       */
+      function trackingPayload(shipment: Awaited<ReturnType<typeof liveShipmentFor>>) {
+        return shipment
+          ? {
+              // What we bought through, and what actually carries it. The customer
+              // recognises the second one.
+              carrier: shipment.carrier,
+              courierName: shipment.courierName,
+              awbNumber: shipment.awbNumber,
+              trackingNumber: shipment.trackingNumber,
+              trackingUrl: shipment.trackingUrl,
+              status: shipment.status,
+              shippedAt: shipment.shippedAt,
+              estimatedDeliveryAt: shipment.estimatedDeliveryAt,
+              deliveredAt: shipment.deliveredAt,
+            }
+          : null;
+      }
+  - id: 4
+    action: implement
+    description: Call the helper from both handlers and drop shippingDetails from their column sets
+    file: packages/api/src/routes/tracking.ts
+    status: pending
+    code: |-
+      // In BOTH handlers — POST /lookup (~122) and GET /:orderNumber (~223):
+      //
+      //   - delete `shippingDetails: true,` from the `with`/columns selection
+      //   - replace the inline db.query.orderShipments.findFirst with:
+      //
+      //       const shipment = await liveShipmentFor(order.id);
+      //
+      //   - replace the inline `tracking: shipment ? {...} : null` with:
+      //
+      //       tracking: trackingPayload(shipment),
+      //
+      // Leave `timeline` exactly as it is. `orders.shippedAt` / `deliveredAt` are
+      // facts about the ORDER, not about a parcel, and they are what a customer sees
+      // while no shipment exists yet.
+  - id: 5
+    action: verify-pass
+    description: Confirm the new suite and the existing tracking suite pass
+    command: cd packages/api && bunx vitest run tests/routes/tracking-live-shipment.test.ts tests/routes/tracking.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/tracking.ts packages/api/tests/routes/tracking-live-shipment.test.ts && git commit -m "fix(api): never show a customer a voided AWB"'
+    status: pending
+current_step: 1
