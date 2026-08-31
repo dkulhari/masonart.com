@@ -36,7 +36,7 @@
  * | `GET /api/admin/production?orderId=` | which jobs exist, and so which items are on none |
  * | `GET /api/admin/orders/:id/production-readiness` | why this order cannot be labelled yet |
  * | `GET /api/admin/transfers?orderId=` | where the goods physically are |
- * | `GET /api/admin/audit-log` | whether the consolidator was chosen by the system or by a person |
+ * | `GET /api/admin/orders/:id/consolidator` | whether the consolidator was chosen by the system or by a person |
  *
  * A failed read renders an error and claims nothing. Readiness in particular
  * renders the BLOCKER LIST and never a bare "not ready", and a failed readiness
@@ -47,12 +47,21 @@
  *
  * `decided_by IS NULL` means the SYSTEM chose because there was nothing to
  * choose; a value means an admin stood behind an arbitrary call. That
- * distinction is the whole point of the column, and no GET exposes it —
- * `production-readiness` returns `consolidatorVendorId` and nothing more. So
- * the panel reads the newest successful `order.consolidator_set` row from the
- * audit log, whose `metadata.decision` is exactly `system_default` or
- * `admin_confirmed`. When that read fails or finds no row, the panel says the
- * provenance is unknown rather than picking one.
+ * distinction is the whole point of the column, and `GET
+ * /api/admin/orders/:id/consolidator` (#698) is what exposes it — the
+ * `order_consolidation` row itself, `vendorId` / `decidedBy` / `decidedAt`, so
+ * this file decides how to render it rather than being handed a verdict.
+ *
+ * It used to come off the newest successful `order.consolidator_set` audit row
+ * instead, because nothing else returned the column. That was the right
+ * fallback over the wrong source: `queues/audit-retention.ts` sweeps the trail
+ * at 400 days while `order_consolidation` never expires, so the panel would
+ * have started saying "unknown" about a fact the database still held — and the
+ * audit log is admin-and-super-admin-only, which is no basis for a display.
+ *
+ * Three answers stay three answers. The read FAILED, the read is still
+ * RUNNING, and the order has NO consolidation row are different states, and
+ * none of them is a guess at which way it was decided.
  *
  * ## This panel reports; it does not produce
  *
@@ -326,17 +335,27 @@ export interface ConsolidatorProvenance {
   /** Null on a system default: nobody decided, so nobody is named. */
   actorEmail: string | null
   decidedAt: string | null
-  /** `sole_vendor` / `confirmed_proposal` / `admin_override`. */
-  basis: string | null
 }
 
-/** One audit row, reduced to the fields the provenance is read out of. */
-export interface ConsolidatorAuditEntry {
-  action: string
-  outcome: string
-  createdAt: string
-  actorEmail: string | null
-  metadata?: Record<string, unknown> | null
+/**
+ * The `order_consolidation` row, verbatim —
+ * `GET /api/admin/orders/:orderId/consolidator`.
+ *
+ * The ROW, not a verdict about it. `null` in place of one is an ANSWER: nobody
+ * has decided, which is a different fact from the rules having chosen.
+ *
+ * `basis` is deliberately absent. WHY a vendor was proposed — `sole_vendor`,
+ * `confirmed_proposal`, `admin_override` — is history, and history is the audit
+ * log's job; this row carries the current fact and nothing else.
+ */
+export interface OrderConsolidation {
+  orderId: string
+  vendorId: string
+  /** NULL means the system chose, because there was nothing to choose. */
+  decidedBy: string | null
+  /** `decided_by` resolved to an account, when there is one to resolve. */
+  decidedByEmail: string | null
+  decidedAt: string | null
 }
 
 export interface ConsolidatorOption {
@@ -396,33 +415,28 @@ export function vendorNameFor(
 }
 
 /**
- * The provenance of the standing consolidator, read off the audit trail.
+ * How the standing consolidator was decided, out of the row that records it.
  *
- * Null when no successful `order.consolidator_set` row is in the page, or when
- * the row does not carry a decision this file recognises. Null means UNKNOWN
- * and is rendered as such — guessing `system_default` from a missing actor
- * would invent the very claim the column exists to make checkable.
+ * `decided_by` is the whole rule and the only one: NULL is the system, a value
+ * is an admin. The email beside it never decides — an address over a NULL
+ * `decided_by` is a stale join or a bug, and reading it as a confirmation would
+ * invent the exact claim the column exists to make checkable.
+ *
+ * Null in, null out: no row means nobody has decided, which is UNKNOWN
+ * provenance and NOT a system default.
  */
-export function provenanceFromAuditEntries(
-  entries: ConsolidatorAuditEntry[]
+export function provenanceFromConsolidation(
+  row: OrderConsolidation | null
 ): ConsolidatorProvenance | null {
-  // The API returns newest first, so the first match is the standing decision.
-  const entry = entries.find(
-    (row) => row.action === 'order.consolidator_set' && row.outcome === 'success'
-  )
-  if (!entry) return null
+  if (!row) return null
 
-  const raw = entry.metadata?.decision
-  const decision: ConsolidatorDecision | null =
-    raw === 'system_default' || raw === 'admin_confirmed' ? raw : null
-  if (decision === null) return null
+  const decision: ConsolidatorDecision =
+    row.decidedBy === null ? 'system_default' : 'admin_confirmed'
 
-  const basis = entry.metadata?.basis
   return {
     decision,
-    actorEmail: decision === 'admin_confirmed' ? entry.actorEmail : null,
-    decidedAt: entry.createdAt,
-    basis: typeof basis === 'string' ? basis : null,
+    actorEmail: decision === 'admin_confirmed' ? row.decidedByEmail : null,
+    decidedAt: row.decidedAt,
   }
 }
 
@@ -791,7 +805,7 @@ export function OrderReadinessPanel({
  *
  * Three different reads back one box. Who the consolidator IS comes from
  * readiness; who it COULD be comes from the jobs read; how it was decided comes
- * from the audit trail. Hanging all three off `isLoading`/`error` — which is
+ * from the consolidation row. Hanging all three off `isLoading`/`error` — which is
  * what this component used to do — meant a 500 on the jobs read still rendered
  * "no vendor holds a live job on this order yet, so there is nobody to
  * consolidate at. Assign a job first", in full confidence, over a list that was
@@ -803,9 +817,9 @@ export interface ConsolidatorPickerProps {
   consolidatorVendorId: string | null
   /** Null means the provenance is UNKNOWN, not that the system chose. */
   provenance: ConsolidatorProvenance | null
-  /** The audit read is still running: unknown, and not yet answerable. */
+  /** The consolidation read is still running: unknown, not yet answerable. */
   provenanceLoading: boolean
-  /** The audit read FAILED, which is a different unknown from "no row". */
+  /** The consolidation read FAILED — a different unknown from "no row". */
   provenanceError: string | null
   /** From the jobs read: the vendors holding a live job on this order. */
   options: ConsolidatorOption[]
@@ -936,16 +950,15 @@ export function ConsolidatorPicker({
                 )}
               </p>
             ) : provenanceError ? (
-              /* A read that FAILED, told apart from a trail with no row in it.
+              /* A read that FAILED, told apart from an order with no row.
                  Both end in "unknown" and neither guesses, but only one of them
-                 is worth retrying, and printing "not recorded" over a 500 says
-                 the audit trail is empty when nobody has looked. #698 is the
-                 standing bill for the missing GET; this is not it. */
+                 is worth retrying, and printing "no row" over a 500 says the
+                 record was read and found absent when nobody looked. */
               <p
                 data-testid="admin-order-consolidator-provenance-error"
                 className="mt-1 text-muted-foreground"
               >
-                How this was decided could not be read — the audit trail read
+                How this was decided could not be read — the consolidation read
                 failed: {provenanceError}. Whether the system defaulted to it or
                 an admin confirmed it is unknown, and nothing was found saying
                 otherwise because nothing was read.
@@ -955,16 +968,17 @@ export function ConsolidatorPicker({
                 data-testid="admin-order-consolidator-provenance-loading"
                 className="mt-1 text-muted-foreground"
               >
-                Reading how this was decided from the audit trail…
+                Reading how this was decided…
               </p>
             ) : (
               <p
                 data-testid="admin-order-consolidator-provenance-unknown"
                 className="mt-1 text-muted-foreground"
               >
-                How this was decided is not recorded here — the audit trail holds
-                no successful order.consolidator_set row for this order. Whether
-                the system defaulted to it or an admin confirmed it is unknown.
+                How this was decided is not recorded — no consolidation record
+                came back for this order, though the readiness check names a
+                consolidator. Whether the system defaulted to it or an admin
+                confirmed it is unknown.
               </p>
             )}
           </>
@@ -1288,28 +1302,17 @@ export async function fetchOrderTransfers(orderId: string): Promise<OrderTransfe
 }
 
 /**
- * The standing consolidator decision, out of the audit trail.
+ * `GET /api/admin/orders/:orderId/consolidator` — the standing decision.
  *
- * The only place `decided_by` is legible from outside the database: no read
- * route returns the `order_consolidation` row, and `production-readiness`
- * reports the vendor id alone. `order.consolidator_set` is audited on every
- * write — by an admin and by the system default alike — with
- * `metadata.decision` spelling out which it was, so the trail answers a
- * question the API does not.
+ * The row, or `null` when the order has none. `null` is an ANSWER and is
+ * rendered as one; a failed read THROWS, because "nobody has decided" and "we
+ * could not tell" are not the same thing and must not share a return value.
  */
-export async function fetchConsolidatorProvenance(
+export async function fetchOrderConsolidation(
   orderId: string
-): Promise<ConsolidatorProvenance | null> {
-  const query = new URLSearchParams({
-    entityType: 'order',
-    entityId: orderId,
-    action: 'order.consolidator_set',
-    outcome: 'success',
-    limit: '1',
-  })
-
+): Promise<OrderConsolidation | null> {
   const response = await fetch(
-    `${getApiUrl()}/api/admin/audit-log?${query.toString()}`,
+    `${getApiUrl()}/api/admin/orders/${orderId}/consolidator`,
     { credentials: 'include' }
   )
 
@@ -1318,8 +1321,8 @@ export async function fetchConsolidatorProvenance(
     throw new Error(body.error ?? 'Failed to read who chose the consolidator')
   }
 
-  const data = (await response.json()) as { entries: ConsolidatorAuditEntry[] }
-  return provenanceFromAuditEntries(data.entries ?? [])
+  const data = (await response.json()) as { consolidation: OrderConsolidation | null }
+  return data.consolidation ?? null
 }
 
 /**
@@ -1421,8 +1424,8 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
   const transfersRead = useAsyncRead(
     useCallback(() => fetchOrderTransfers(orderId), [orderId])
   )
-  const provenanceRead = useAsyncRead(
-    useCallback(() => fetchConsolidatorProvenance(orderId), [orderId])
+  const consolidationRead = useAsyncRead(
+    useCallback(() => fetchOrderConsolidation(orderId), [orderId])
   )
 
   const [isSaving, setIsSaving] = useState(false)
@@ -1451,10 +1454,10 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
       setRefusal(null)
       try {
         await setOrderConsolidator(orderId, vendorId)
-        // Both reads move: the vendor comes from readiness, the provenance from
-        // the audit row this write just made.
+        // Both reads move: the vendor comes from readiness, the provenance
+        // from the order_consolidation row this write just made.
         readinessRead.reload()
-        provenanceRead.reload()
+        consolidationRead.reload()
       } catch (saveError) {
         setRefusal(
           saveError instanceof ConsolidatorRefused
@@ -1504,12 +1507,12 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
 
         {/* Each prop below is wired to the read that actually answers it:
             readiness for who the consolidator is, the jobs read for who it
-            could be, the audit trail for how it was decided. */}
+            could be, the consolidation row for how it was decided. */}
         <ConsolidatorPicker
           consolidatorVendorId={consolidatorVendorId}
-          provenance={provenanceRead.data}
-          provenanceLoading={provenanceRead.isLoading}
-          provenanceError={provenanceRead.error}
+          provenance={provenanceFromConsolidation(consolidationRead.data)}
+          provenanceLoading={consolidationRead.isLoading}
+          provenanceError={consolidationRead.error}
           options={options}
           optionsLoading={jobsRead.isLoading}
           optionsError={jobsRead.error}

@@ -13,6 +13,7 @@
  * is mounted on `/api/admin/orders`:
  *
  * - POST  /api/admin/orders/:orderId/consolidator          who assembles and ships it
+ * - GET   /api/admin/orders/:orderId/consolidator          who assembles it, and who said so
  * - GET   /api/admin/orders/:orderId/production-readiness  why it cannot ship yet
  *
  * File shape follows `routes/admin/vendors.ts` — `new Hono<{ Variables:
@@ -137,6 +138,7 @@ import {
   productionTransferJobs,
 } from "../../database/schema/production-transfers";
 import { productVariants } from "../../database/schema/products";
+import { users } from "../../database/schema/users";
 import { vendors, vendorRates } from "../../database/schema/vendors";
 import {
   requireAuth,
@@ -1715,6 +1717,7 @@ adminProductionApp.get(
 
 /**
  * `POST /api/admin/orders/:orderId/consolidator`
+ * `GET  /api/admin/orders/:orderId/consolidator`
  * `GET  /api/admin/orders/:orderId/production-readiness`
  *
  * A second router in the same module, mounted on `/api/admin/orders`. Both
@@ -2039,6 +2042,70 @@ adminOrderProductionApp.post(
       const refused = await refusedConsolidator(c, orderId, error);
       if (refused) return refused;
       return c.json(failed("set the order consolidator", error), 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/admin/orders/:orderId/consolidator
+// ============================================================================
+
+/**
+ * The standing decision — the ROW, not a verdict about it.
+ *
+ * `production-readiness` reports `consolidatorVendorId` and nothing else, so
+ * until this route existed `decided_by` was invisible outside the database and
+ * the admin panel read the provenance off the newest `order.consolidator_set`
+ * audit row instead. Two things are wrong with that source, and only one of
+ * them is tidiness:
+ *
+ * - `queues/audit-retention.ts` sweeps the trail at 400 days. This row does not
+ *   expire. After a sweep the screen would print "unknown" over a fact the
+ *   database still holds.
+ * - the audit log is a filtered, paginated, admin-and-super-admin-only read. A
+ *   display should not depend on one.
+ *
+ * **Absence is meaningful.** `consolidation: null` means nobody has decided,
+ * which is NOT a system default — collapsing the two would invent exactly the
+ * claim `decided_by` exists to make checkable. The caller renders the
+ * difference; this route does not derive a boolean over it.
+ *
+ * `decidedByEmail` is the `decided_by` foreign key resolved, the same way the
+ * POST resolves `vendor_id` to a name — not an extra fact. It is nullable for
+ * two different reasons that read alike here and are told apart by `decidedBy`:
+ * the system decided, or the account was since deleted (`ON DELETE set null`,
+ * which nulls `decided_by` with it — see the schema note). The durable answer
+ * to "who" remains the audit log, which snapshots the email at write time.
+ *
+ * **Not a history endpoint.** One order, one current row. The audit log is the
+ * history and stays the history.
+ */
+adminOrderProductionApp.get(
+  "/:orderId/consolidator",
+  zValidator("param", orderParamSchema),
+  async (c) => {
+    const { orderId } = c.req.valid("param");
+
+    try {
+      const [consolidation] = await db
+        .select({
+          orderId: orderConsolidation.orderId,
+          vendorId: orderConsolidation.vendorId,
+          /** NULL is the record of "the system chose". See the schema note. */
+          decidedBy: orderConsolidation.decidedBy,
+          decidedByEmail: users.email,
+          decidedAt: orderConsolidation.decidedAt,
+        })
+        .from(orderConsolidation)
+        .leftJoin(users, eq(users.id, orderConsolidation.decidedBy))
+        .where(eq(orderConsolidation.orderId, orderId))
+        .limit(1);
+
+      // No row is an ANSWER — "nobody has decided" — so it is 200 with an
+      // explicit null rather than a 404, which would say the order is missing.
+      return c.json({ orderId, consolidation: consolidation ?? null });
+    } catch (error) {
+      return c.json(failed("read the order consolidator", error), 500);
     }
   }
 );

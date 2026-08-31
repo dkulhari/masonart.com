@@ -2900,6 +2900,193 @@ describe('POST /api/admin/orders/:orderId/consolidator', () => {
 })
 
 // ============================================================================
+// GET /api/admin/orders/:orderId/consolidator
+// ============================================================================
+
+/**
+ * The standing decision, read from the table that holds it.
+ *
+ * `decided_by` is the whole point of the row — NULL is "the rules chose",
+ * an id is "an admin stood behind an arbitrary call" — and until this route
+ * existed nothing outside the database could see it. `production-readiness`
+ * answers `consolidatorVendorId` alone, so the panel read the provenance off
+ * the newest `order.consolidator_set` audit row instead. That trail is swept
+ * at 400 days (`queues/audit-retention.ts`) while `order_consolidation` never
+ * expires, so the screen would eventually print "unknown" over a fact the
+ * database still holds.
+ *
+ * The ROW comes back, not a derived boolean: absence means nobody has decided,
+ * which is a different answer from a system default, and only the caller can
+ * render that difference.
+ *
+ * NOT a history endpoint. One order, one current fact; the audit log is the
+ * history and stays the history.
+ */
+describe('GET /api/admin/orders/:orderId/consolidator', () => {
+  const readConsolidator = (orderId = ORDER_ID) =>
+    buildRouteApp('/api/admin/orders', adminOrderProductionApp).request(
+      `/api/admin/orders/${orderId}/consolidator`
+    )
+
+  const DECIDED_AT = new Date('2026-03-05T00:00:00.000Z')
+
+  interface Consolidation {
+    orderId: string
+    vendorId: string
+    decidedBy: string | null
+    decidedByEmail: string | null
+    decidedAt: string | null
+  }
+
+  interface Body {
+    orderId: string
+    consolidation: Consolidation | null
+  }
+
+  /**
+   * `decided_by IS NULL` — the rules chose, because one vendor already held
+   * every job. The panel must be able to say so without the audit log.
+   */
+  it('returns the row a system default wrote, with decidedBy null', async () => {
+    queueRows({
+      'select:order_consolidation': [
+        [
+          {
+            orderId: ORDER_ID,
+            vendorId: VENDOR_ID,
+            decidedBy: null,
+            decidedByEmail: null,
+            decidedAt: DECIDED_AT,
+          },
+        ],
+      ],
+    })
+
+    const res = await readConsolidator()
+    const body = await readJson<Body>(res)
+
+    expect(res.status).toBe(200)
+    expect(body.orderId).toBe(ORDER_ID)
+    expect(body.consolidation).toEqual({
+      orderId: ORDER_ID,
+      vendorId: VENDOR_ID,
+      decidedBy: null,
+      decidedByEmail: null,
+      decidedAt: DECIDED_AT.toISOString(),
+    })
+  })
+
+  /** An id, and the account behind it — "somebody chose", nameable. */
+  it('names the admin who confirmed the choice', async () => {
+    queueRows({
+      'select:order_consolidation': [
+        [
+          {
+            orderId: ORDER_ID,
+            vendorId: VENDOR_ID_2,
+            decidedBy: 'admin-user-1',
+            decidedByEmail: 'ops@chobii.art',
+            decidedAt: DECIDED_AT,
+          },
+        ],
+      ],
+    })
+
+    const body = await readJson<Body>(await readConsolidator())
+
+    expect(body.consolidation?.decidedBy).toBe('admin-user-1')
+    expect(body.consolidation?.decidedByEmail).toBe('ops@chobii.art')
+  })
+
+  /**
+   * Absence is meaningful, and it is NOT a system default. An order nobody has
+   * routed yet and an order the rules routed automatically are two different
+   * facts, and collapsing them is exactly the invention `decided_by` exists to
+   * make checkable.
+   */
+  it('answers a null consolidation when nobody has decided, not a default', async () => {
+    queueRows({ 'select:order_consolidation': [[]] })
+
+    const res = await readConsolidator()
+    const body = await readJson<Body>(res)
+
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ orderId: ORDER_ID, consolidation: null })
+  })
+
+  /**
+   * The PROJECTION, not the fixture. Rows come from `queueRows`, so every
+   * assertion above passes just as well over a `.select()` that never asked
+   * for `decided_by` — which is the exact shape this ticket exists to fix.
+   */
+  it('asks the database for decidedBy and decidedAt, not the vendor alone', async () => {
+    queueRows({ 'select:order_consolidation': [[]] })
+
+    await readConsolidator()
+
+    const [read] = selects(orderConsolidation)
+    expect(read?.fields).toEqual(
+      expect.arrayContaining(['vendorId', 'decidedBy', 'decidedAt'])
+    )
+    expect(read?.limit).toBe(1)
+    // The COLUMN as well as the value. `order_id` is the primary key and the
+    // only thing that makes this one order's decision; matching the same uuid
+    // against `vendor_id` renders identical parameters and answers a different
+    // question.
+    const where = render(read?.where)
+    expect(where.sql).toContain('"order_consolidation"."order_id"')
+    expect(where.params).toContain(ORDER_ID)
+  })
+
+  /**
+   * The point of the ticket: the provenance comes out of a table that never
+   * expires, not out of a trail swept at 400 days.
+   */
+  it('reads order_consolidation and never the audit log', async () => {
+    queueRows({ 'select:order_consolidation': [[]] })
+
+    await readConsolidator()
+
+    expect(selects(orderConsolidation)).toHaveLength(1)
+    expect(selects(adminAuditLog)).toHaveLength(0)
+    // A read is not an act. Nothing is written and nothing is audited.
+    expect(inserts(adminAuditLog)).toHaveLength(0)
+  })
+
+  /** Not a history endpoint — one order, one current row. */
+  it('answers with one row and no history', async () => {
+    queueRows({
+      'select:order_consolidation': [
+        [
+          {
+            orderId: ORDER_ID,
+            vendorId: VENDOR_ID,
+            decidedBy: null,
+            decidedByEmail: null,
+            decidedAt: DECIDED_AT,
+          },
+        ],
+      ],
+    })
+
+    const body = await readJson<Record<string, unknown>>(await readConsolidator())
+
+    expect(Object.keys(body).sort()).toEqual(['consolidation', 'orderId'])
+    expect(Array.isArray(body.consolidation)).toBe(false)
+  })
+
+  it('400s an orderId that is not a uuid', async () => {
+    expect((await readConsolidator('not-a-uuid')).status).toBe(400)
+  })
+
+  it('500s rather than answering over a read that failed', async () => {
+    failNext('select:order_consolidation')
+
+    expect((await readConsolidator()).status).toBe(500)
+  })
+})
+
+// ============================================================================
 // GET /api/admin/orders/:orderId/production-readiness
 // ============================================================================
 
@@ -3032,6 +3219,10 @@ describe('GET /api/admin/orders/:orderId/production-readiness', () => {
 describe('role gating: /api/admin/orders', () => {
   const routes: Array<[string, RequestInit]> = [
     [`/api/admin/orders/${ORDER_ID}/consolidator`, json({})],
+    // The READ is gated exactly as the write is. The audit log the panel used
+    // to read the provenance out of is admin-and-super-admin-only too, so
+    // moving the source does not widen who can see the decision.
+    [`/api/admin/orders/${ORDER_ID}/consolidator`, {}],
     [`/api/admin/orders/${ORDER_ID}/production-readiness`, {}],
   ]
 

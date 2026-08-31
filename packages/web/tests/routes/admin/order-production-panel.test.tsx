@@ -21,8 +21,8 @@
  * - a transfer list that failed to load never reads as an order with no
  *   transfers;
  * - a consolidator whose provenance was not read is UNKNOWN, not a system
- *   default, and an audit read that FAILED is told apart from a trail with no
- *   row in it;
+ *   default, and a consolidation read that FAILED is told apart from an order
+ *   with no consolidation row in it;
  * - every claim in the consolidator box is wired to the read it depends on:
  *   the jobs read backs the vendor options and half the name lookup, so a
  *   failed jobs read must never render "nobody holds a live job on this
@@ -63,16 +63,16 @@ import {
   OrderTransfersPanel,
   blockerAction,
   consolidatorRefusalAdvice,
-  fetchConsolidatorProvenance,
+  fetchOrderConsolidation,
   fetchOrderProductionJobs,
   fetchOrderTransfers,
   orderVendorOptions,
-  provenanceFromAuditEntries,
+  provenanceFromConsolidation,
   setOrderConsolidator,
   unassignedOrderItems,
   vendorNameFor,
-  type ConsolidatorAuditEntry,
   type LabelBlockerCode,
+  type OrderConsolidation,
   type OrderProductionJob,
   type OrderProductionPanelItem,
   type OrderReadiness,
@@ -614,14 +614,15 @@ describe('OrderReadinessPanel', () => {
 // The consolidator
 // ============================================================================
 
-const auditEntry = (
-  overrides: Partial<ConsolidatorAuditEntry> = {}
-): ConsolidatorAuditEntry => ({
-  action: 'order.consolidator_set',
-  outcome: 'success',
-  createdAt: '2026-03-05T00:00:00.000Z',
-  actorEmail: 'ops@chobii.art',
-  metadata: { decision: 'admin_confirmed', basis: 'admin_override' },
+/** `GET /api/admin/orders/:orderId/consolidator`, verbatim. */
+const consolidationRow = (
+  overrides: Partial<OrderConsolidation> = {}
+): OrderConsolidation => ({
+  orderId: 'order-1',
+  vendorId: 'v1',
+  decidedBy: 'admin-user-1',
+  decidedByEmail: 'ops@chobii.art',
+  decidedAt: '2026-03-05T00:00:00.000Z',
   ...overrides,
 })
 
@@ -673,47 +674,51 @@ describe('vendorNameFor', () => {
   })
 })
 
-describe('provenanceFromAuditEntries', () => {
+/**
+ * `decided_by` is the whole answer, and it comes out of a table that never
+ * expires. The audit log this used to be read from is swept at 400 days, so
+ * the panel would have started saying "unknown" about a fact the database
+ * still held.
+ */
+describe('provenanceFromConsolidation', () => {
   it('reads an admin confirmation, with who and when', () => {
-    expect(provenanceFromAuditEntries([auditEntry()])).toEqual({
+    expect(provenanceFromConsolidation(consolidationRow())).toEqual({
       decision: 'admin_confirmed',
       actorEmail: 'ops@chobii.art',
       decidedAt: '2026-03-05T00:00:00.000Z',
-      basis: 'admin_override',
     })
   })
 
-  /** Nobody decided, so nobody is named — even if a request carried an actor. */
+  /** Nobody decided, so nobody is named. */
   it('names nobody on a system default', () => {
-    const provenance = provenanceFromAuditEntries([
-      auditEntry({
-        actorEmail: 'ops@chobii.art',
-        metadata: { decision: 'system_default', basis: 'sole_vendor' },
-      }),
-    ])
+    const provenance = provenanceFromConsolidation(
+      consolidationRow({ decidedBy: null, decidedByEmail: null })
+    )
 
     expect(provenance?.decision).toBe('system_default')
     expect(provenance?.actorEmail).toBeNull()
   })
 
-  it('ignores refusals and other actions on the same order', () => {
-    expect(
-      provenanceFromAuditEntries([
-        auditEntry({ outcome: 'failure', metadata: { decision: 'admin_confirmed' } }),
-        auditEntry({ action: 'order.status_changed' }),
-        auditEntry({ metadata: { decision: 'system_default' } }),
-      ])?.decision
-    ).toBe('system_default')
+  /**
+   * `decided_by` decides, not the email beside it. An email over a NULL
+   * `decided_by` is a bug or a stale join, and reading it as a confirmation
+   * would invent the very claim the column exists to make checkable.
+   */
+  it('lets decidedBy decide, never the email beside it', () => {
+    const provenance = provenanceFromConsolidation(
+      consolidationRow({ decidedBy: null, decidedByEmail: 'ops@chobii.art' })
+    )
+
+    expect(provenance?.decision).toBe('system_default')
+    expect(provenance?.actorEmail).toBeNull()
   })
 
   /**
-   * Unknown, not assumed. Guessing "the system chose" off a missing actor would
-   * invent the exact claim `decided_by` exists to make checkable.
+   * Absence is meaningful and it is NOT a default: no row means nobody has
+   * decided at all, which is a different fact from the rules having chosen.
    */
-  it('is null when no row says which it was', () => {
-    expect(provenanceFromAuditEntries([])).toBeNull()
-    expect(provenanceFromAuditEntries([auditEntry({ metadata: {} })])).toBeNull()
-    expect(provenanceFromAuditEntries([auditEntry({ metadata: null })])).toBeNull()
+  it('is null when there is no consolidation row', () => {
+    expect(provenanceFromConsolidation(null)).toBeNull()
   })
 })
 
@@ -778,7 +783,6 @@ describe('ConsolidatorPicker', () => {
         decision: 'system_default',
         actorEmail: null,
         decidedAt: '2026-03-05T00:00:00.000Z',
-        basis: 'sole_vendor',
       },
     })
     const asDefault = screen.getByTestId('admin-order-consolidator-provenance')
@@ -795,7 +799,6 @@ describe('ConsolidatorPicker', () => {
         decision: 'admin_confirmed',
         actorEmail: 'ops@chobii.art',
         decidedAt: '2026-03-05T00:00:00.000Z',
-        basis: 'admin_override',
       },
     })
     const asConfirmed = screen.getByTestId('admin-order-consolidator-provenance')
@@ -808,21 +811,24 @@ describe('ConsolidatorPicker', () => {
   it('says the provenance is unknown rather than assuming the system chose', () => {
     renderPicker({ provenance: null })
 
-    expect(
-      screen.getByTestId('admin-order-consolidator-provenance-unknown').textContent
-    ).toMatch(/not recorded here/i)
+    const unknown = screen.getByTestId('admin-order-consolidator-provenance-unknown')
+    expect(unknown.textContent).toMatch(/not recorded/i)
+    expect(unknown.textContent).toMatch(/unknown/i)
+    // The one claim a missing row must never turn into.
+    expect(unknown.textContent).not.toMatch(/nothing to choose/i)
     expect(
       screen.queryByTestId('admin-order-consolidator-provenance')
     ).not.toBeInTheDocument()
   })
 
   /**
-   * Both are UNKNOWN and neither guesses — but "the trail holds no row" is a
-   * statement about the audit trail, and printing it over a 500 says the trail
-   * was read and found empty when nobody looked at it. Only one of the two is
-   * worth retrying.
+   * Both are UNKNOWN and neither guesses — but "no row came back" is a
+   * statement about the consolidation record, and printing it over a 500 says
+   * the record was read and found absent when nobody looked at it. Only one of
+   * the two is worth retrying. Moving the source off the audit log did not
+   * merge these three states back together.
    */
-  it('tells a failed audit read apart from an audit trail with no row', () => {
+  it('tells a failed consolidation read apart from an order with no row', () => {
     renderPicker({
       provenance: null,
       provenanceError: 'Failed to read who chose the consolidator',
@@ -831,7 +837,7 @@ describe('ConsolidatorPicker', () => {
     const failed = screen.getByTestId('admin-order-consolidator-provenance-error')
     expect(failed.textContent).toMatch(/could not be read/i)
     expect(failed.textContent).toMatch(/Failed to read who chose the consolidator/)
-    expect(failed.textContent).not.toMatch(/holds no successful/i)
+    expect(failed.textContent).not.toMatch(/no consolidation record/i)
     expect(
       screen.queryByTestId('admin-order-consolidator-provenance-unknown')
     ).not.toBeInTheDocument()
@@ -841,13 +847,13 @@ describe('ConsolidatorPicker', () => {
     renderPicker({ provenance: null })
     expect(
       screen.getByTestId('admin-order-consolidator-provenance-unknown').textContent
-    ).toMatch(/holds no successful/i)
+    ).toMatch(/no consolidation record/i)
     expect(
       screen.queryByTestId('admin-order-consolidator-provenance-error')
     ).not.toBeInTheDocument()
   })
 
-  it('does not report an empty audit trail while it is still reading one', () => {
+  it('does not report a missing consolidation row while it is still reading', () => {
     renderPicker({ provenance: null, provenanceLoading: true })
 
     expect(
@@ -1138,37 +1144,55 @@ describe('fetchOrderTransfers', () => {
   })
 })
 
-describe('fetchConsolidatorProvenance', () => {
-  it('asks the audit trail for this order’s consolidator decision', async () => {
+describe('fetchOrderConsolidation', () => {
+  /**
+   * The consolidator route, not the audit log. The trail is swept at 400 days
+   * and is admin-and-super-admin-only; `order_consolidation` is neither.
+   */
+  it('asks the consolidator route for this order, not the audit trail', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       status: 200,
-      json: async () => ({ entries: [auditEntry()], nextCursor: null }),
+      json: async () => ({ orderId: 'order-1', consolidation: consolidationRow() }),
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const provenance = await fetchConsolidatorProvenance('order-1')
+    const row = await fetchOrderConsolidation('order-1')
 
     const url = String(fetchMock.mock.calls[0][0])
-    expect(url).toContain('entityType=order')
-    expect(url).toContain('entityId=order-1')
-    expect(url).toContain('action=order.consolidator_set')
-    expect(provenance?.decision).toBe('admin_confirmed')
+    expect(url).toContain('/api/admin/orders/order-1/consolidator')
+    expect(url).not.toContain('audit-log')
+    expect(row?.decidedBy).toBe('admin-user-1')
+    expect(row?.decidedAt).toBe('2026-03-05T00:00:00.000Z')
   })
 
-  /** A failed audit read is UNKNOWN provenance, and must not read as a default. */
+  /** `consolidation: null` is an ANSWER — nobody has decided — not a failure. */
+  it('returns null when the order has no consolidation row', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ orderId: 'order-1', consolidation: null }),
+      }))
+    )
+
+    await expect(fetchOrderConsolidation('order-1')).resolves.toBeNull()
+  })
+
+  /** A failed read is UNKNOWN provenance, and must not read as a default. */
   it('throws rather than reporting a decision it did not read', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
         ok: false,
         status: 500,
-        json: async () => ({ error: 'audit log unavailable' }),
+        json: async () => ({ error: 'consolidation unavailable' }),
       }))
     )
 
-    await expect(fetchConsolidatorProvenance('order-1')).rejects.toThrow(
-      /audit log unavailable/
+    await expect(fetchOrderConsolidation('order-1')).rejects.toThrow(
+      /consolidation unavailable/
     )
   })
 })
@@ -1213,8 +1237,12 @@ describe('OrderProductionPanel', () => {
         }
       }
 
-      if (target.includes('/api/admin/audit-log')) {
-        return { ok: true, status: 200, json: async () => ({ entries: [] }) }
+      if (target.includes('/consolidator')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ orderId: 'order-1', consolidation: null }),
+        }
       }
 
       if (target.includes('/api/admin/production?')) {
@@ -1300,5 +1328,28 @@ describe('OrderProductionPanel', () => {
     expect(
       screen.getByTestId('admin-order-consolidator-select').querySelectorAll('option')
     ).toHaveLength(2)
+  })
+
+  /**
+   * #698. The provenance used to come off the newest `order.consolidator_set`
+   * audit row. The audit log is swept at 400 days and `order_consolidation` is
+   * not, so that read would eventually print "unknown" over a fact the database
+   * still holds — and it tied a display to an endpoint a content-manager cannot
+   * reach at all. The indirection is gone, not merely unused.
+   */
+  it('reads the consolidator decision from its own route and never the audit log', async () => {
+    const fetchMock = stubReads()
+
+    render(<OrderProductionPanel orderId="order-1" orderItems={ORDER_ITEMS} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-order-production-jobs')).toBeInTheDocument()
+    })
+
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]))
+    expect(urls.some((url) => url.includes('/api/admin/orders/order-1/consolidator'))).toBe(
+      true
+    )
+    expect(urls.some((url) => url.includes('audit-log'))).toBe(false)
   })
 })
