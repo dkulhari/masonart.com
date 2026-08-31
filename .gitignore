@@ -99,3 +99,9 @@ plan/tracker-data/.mcp-exits.jsonl
 # is ignored alongside it.
 packages/web/public/dev-reference/
 scripts/dev/fetch-reference-imagery.sh
+
+# Worktrees the agent harness creates. `.claude/` is a TRACKED directory here
+# (skills, hooks, settings.json all live in it), so without this line a
+# worktree under it would be staged as ordinary repo content — the whole
+# checkout committed into itself.
+.claude/worktrees/

@@ -1,0 +1,274 @@
+ticket_number: 712
+title: One Tracking Store - Admin and customer order detail render the shipment
+description: |-
+  ## Task
+  Three read surfaces still project `orders.shipping_details`, which is no longer written:
+
+  - `packages/api/src/routes/admin/orders.ts:556` — `GET /api/admin/orders/:id`
+  - `packages/api/src/routes/orders.ts:920` — the customer's own order detail
+  - `packages/web/app/components/admin/OrderDetail.tsx:905-1053` — the block that renders it, plus the form at `:1053` whose `currentDetails` prop feeds the PATCH
+
+  Left alone, all three render an empty panel on every order shipped after this pass: the admin types a tracking number, the page saves it, and the panel it came from goes blank.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  Depends on the PATCH rewrite, which already changed that endpoint's RESPONSE to return `shipment`. This ticket does the two GETs and the component.
+
+  The API returns `shipment` — the live row, same predicate as everywhere else in this phase. Do not return both `shipment` and `shippingDetails`; a component reading whichever is populated is the split brain wearing a different hat.
+
+  The customer-facing projection at `routes/orders.ts:920` must not gain fields the tracking route deliberately withholds. Compare against `trackingPayload` in `routes/tracking.ts` and match it — cost, weight, dims, external ids and the label token are internal.
+
+  `packages/web` tests are NOT typechecked, so a stale prop type will not fail the gate. Check the component renders with the new shape rather than trusting types.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:26:01.271Z'
+last_updated: '2026-08-31T02:26:01.271Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 707
+    feature: order-dispatch-tracking
+    description: One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
+  - ticket: 709
+    feature: order-dispatch-tracking
+    description: One Tracking Store - GET /api/tracking reads the live shipment
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing test for both API projections
+    file: packages/api/tests/routes/order-detail-shipment.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/order-detail-shipment.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * Order detail shows the shipment, on both sides of the fence.
+       *
+       * Both projections returned `shippingDetails`, which this phase stopped
+       * writing. Left alone, the admin types a tracking number, the save succeeds,
+       * and the panel it was typed into goes blank.
+       *
+       * The customer projection is checked for what it must NOT carry as much as for
+       * what it must: cost, weight, dims and the label token are internal, and
+       * `routes/tracking.ts` is the reference for the public shape.
+       */
+
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import '../setup'
+
+      const recorder = await vi.hoisted(async () =>
+        (await import('../helpers/query-recorder')).createQueryRecorder({ rows: 'repeatLast' })
+      )
+      vi.mock('../../src/database', () => ({ db: recorder.db }))
+
+      const INTERNAL_FIELDS = [
+        'costPaise',
+        'shippedWeightGrams',
+        'lengthCm',
+        'widthCm',
+        'heightCm',
+        'labelObjectToken',
+        'externalShipmentId',
+        'externalOrderId',
+        'pickupVendorId',
+      ]
+
+      describe('GET /api/admin/orders/:id', () => {
+        beforeEach(() => recorder.reset())
+
+        it('returns the live shipment', async () => {
+          const res = await app.request(`/api/admin/orders/${ORDER_ID}`, { headers: adminSession() })
+          const body = await res.json()
+
+          expect(body).toHaveProperty('shipment')
+        })
+
+        it('does not also return shippingDetails — two shapes is the split brain again', async () => {
+          const res = await app.request(`/api/admin/orders/${ORDER_ID}`, { headers: adminSession() })
+          const body = await res.json()
+
+          expect(body).not.toHaveProperty('shippingDetails')
+        })
+
+        it('may show an admin what we paid — that is the margin number', async () => {
+          const res = await app.request(`/api/admin/orders/${ORDER_ID}`, { headers: adminSession() })
+          const body = await res.json()
+
+          expect(body.shipment).toHaveProperty('costPaise')
+        })
+      })
+
+      describe("GET the customer's own order", () => {
+        beforeEach(() => recorder.reset())
+
+        it('returns the same public shape the tracking route does', async () => {
+          const res = await app.request(`/api/orders/${ORDER_ID}`, { headers: customerSession() })
+          const body = await res.json()
+
+          expect(body.shipment).toHaveProperty('trackingNumber')
+          expect(body.shipment).toHaveProperty('courierName')
+        })
+
+        it('withholds every internal field', async () => {
+          const res = await app.request(`/api/orders/${ORDER_ID}`, { headers: customerSession() })
+          const body = await res.json()
+
+          for (const field of INTERNAL_FIELDS) {
+            expect(body.shipment, `${field} leaked to the customer`).not.toHaveProperty(field)
+          }
+        })
+
+        it('reads the live shipment, not the newest', async () => {
+          const res = await app.request(`/api/orders/${ORDER_ID}`, { headers: customerSession() })
+          await res.json()
+
+          expect(recorder.queries.map((q) => q.sql).join('\n').toLowerCase()).toMatch(
+            /voided_at"?\s+is\s+null/
+          )
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/routes/order-detail-shipment.test.ts
+    expected_result: FAIL - neither route returns `shipment`
+    status: pending
+  - id: 3
+    action: implement
+    description: Return the live shipment from both order-detail endpoints
+    file: packages/api/src/routes/admin/orders.ts
+    status: pending
+    code: |-
+      // admin/orders.ts around line 556 — replace `shippingDetails: order.shippingDetails`
+      // with the live shipment. Admins get the whole row: `costPaise` is the only
+      // number margin can be computed from now that the customer pays zero for
+      // shipping, and this is the screen it belongs on.
+      //
+      //   shipment: await liveShipmentFor(order.id),
+      //
+      // routes/orders.ts around line 920 — the customer's own order. Project it
+      // through the SAME shape `routes/tracking.ts` uses. That function is the
+      // reference for what is public; a second hand-written list here is how a cost
+      // or a label token eventually leaks.
+      //
+      //   shipment: trackingPayload(await liveShipmentFor(order.id)),
+      //
+      // If `liveShipmentFor` / `trackingPayload` are still local to tracking.ts,
+      // export them, or lift them to a small shared module. Three copies of "which
+      // shipment is live" is the bug this whole phase removes.
+  - id: 4
+    action: verify-pass
+    description: Confirm the API suites pass
+    command: cd packages/api && bunx vitest run tests/routes/order-detail-shipment.test.ts tests/routes/admin/orders.test.ts tests/routes/orders.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: write-test
+    description: Write the failing component test for the admin order detail panel
+    file: packages/web/tests/routes/admin/order-detail-shipment.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin/order-detail-shipment.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * The panel the admin typed into does not go blank after they save.
+       *
+       * `OrderDetail.tsx` rendered `order.shippingDetails`, which the API stopped
+       * returning. web tests are NOT typechecked (#662 covers api only), so a stale
+       * prop type fails nothing — this has to be asserted by rendering.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { render, screen } from '@testing-library/react'
+      import '../../setup'
+
+      import { OrderDetail } from '../../../app/components/admin/OrderDetail'
+
+      const SHIPMENT = {
+        id: 'ship-1',
+        carrier: 'Shiprocket',
+        courierName: 'Delhivery',
+        awbNumber: 'AWB55512345',
+        trackingNumber: 'AWB55512345',
+        trackingUrl: 'https://track.example/AWB55512345',
+        status: 'in_transit',
+        estimatedDeliveryAt: '2026-09-04T00:00:00.000Z',
+        costPaise: 8900,
+      }
+
+      describe('the admin order shipment panel', () => {
+        it('renders the courier and the tracking number', () => {
+          render(<OrderDetail order={{ ...BASE_ORDER, shipment: SHIPMENT }} />)
+
+          expect(screen.getByText('Delhivery')).toBeInTheDocument()
+          expect(screen.getByText('AWB55512345')).toBeInTheDocument()
+        })
+
+        it('links out to the carrier', () => {
+          render(<OrderDetail order={{ ...BASE_ORDER, shipment: SHIPMENT }} />)
+
+          expect(screen.getByRole('link', { name: /track/i })).toHaveAttribute(
+            'href',
+            SHIPMENT.trackingUrl
+          )
+        })
+
+        it('shows what we paid — the margin number, admin-only', () => {
+          render(<OrderDetail order={{ ...BASE_ORDER, shipment: SHIPMENT }} />)
+          expect(screen.getByText(/89/)).toBeInTheDocument()
+        })
+
+        it('renders an empty state, not a crash, when nothing has shipped', () => {
+          render(<OrderDetail order={{ ...BASE_ORDER, shipment: null }} />)
+          expect(screen.getByText(/no shipment/i)).toBeInTheDocument()
+        })
+      })
+  - id: 6
+    action: implement
+    description: Render the shipment and feed the edit form from it
+    file: packages/web/app/components/admin/OrderDetail.tsx
+    status: pending
+    code: |-
+      // Replace the `ShippingDetails` prop type with the shipment shape the API now
+      // returns, and the `order.shippingDetails &&` block at ~905 with `order.shipment &&`.
+      //
+      // Show `courierName` as the carrier line, falling back to `carrier`: the
+      // customer-recognisable name first, the aggregator second.
+      //
+      // Add `costPaise` — admin-only, and the only number margin can be computed from
+      // now that shipping is baked into the price.
+      //
+      // At ~1053, `currentDetails={order.shippingDetails}` becomes
+      // `currentShipment={order.shipment}`. That form PATCHes
+      // /admin/orders/:id/shipping, which now upserts order_shipments and returns the
+      // shipment — so the value it seeds from and the value it gets back are finally
+      // the same object.
+      //
+      // Add an explicit empty state. Rendering nothing is how a broken projection
+      // stays invisible; "No shipment yet" is a fact.
+  - id: 7
+    action: verify-pass
+    description: Confirm the component suite and the existing admin order suites pass
+    command: cd packages/web && bunx vitest run tests/routes/admin
+    expected_result: PASS
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes packages/api/tests/routes/order-detail-shipment.test.ts packages/web/app/components/admin/OrderDetail.tsx packages/web/tests/routes/admin/order-detail-shipment.test.tsx && git commit -m "feat(web): show the shipment on order detail, not the store nobody writes"'
+    status: pending
+current_step: 1

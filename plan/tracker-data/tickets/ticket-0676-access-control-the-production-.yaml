@@ -1,0 +1,39 @@
+ticket_number: 676
+title: Access Control - the production transition matrix and assertTransition
+description: |-
+  ## Task
+  Create packages/api/src/lib/production-transitions.ts with a total transition matrix, `assertTransition(from, to, actor)` and `nextStatuses(from, actor)`. This is the only place that decides whether a production job may move.
+
+  ## Context
+  Feature: production-pipeline. Phase 2 of 7. Depends on #pp01.
+
+  Matrix (actor in parens): draft->assigned (admin), draft->cancelled (admin), assigned->assigned (admin, reassign+reprice), assigned->received (VENDOR), received->qc_submitted (VENDOR, shot list complete), qc_submitted->qc_passed|qc_failed (admin, reviews route only), qc_failed->received (VENDOR, rework in place), qc_failed->assigned (admin, reassign elsewhere), qc_passed->qc_failed (admin), qc_passed->dispatched (VENDOR or admin, on an open transfer or the order has a label), any pre-terminal->cancelled (admin). dispatched and cancelled are terminal. `sent` has zero edges in both directions.
+
+  Design constraints:
+  - Code chokepoint, NO database trigger. A trigger cannot express the stage and consolidation rules (they read other rows, and under READ COMMITTED that is a race dressed as enforcement), and every trigger costs a RAW_SQL_OBJECTS entry plus a database that silently lacks it after db:push.
+  - Illegal transition is 409, not 422. In this router 422 already means 'your payload names things that do not line up' (missingOrderItemIds, unpriced) - fixable by editing the body. A transition conflict is not.
+  - Response body carries { error, code, from, to, allowed } so the UI renders the remedy without a second round trip.
+  - A self-edge is a 200 no-op and writes NO audit row. One row per transition.
+  - qc_passed and qc_failed are unreachable except through the reviews route: a verdict with no review row is a verdict with no evidence.
+  - VENDOR_SETTABLE_STATUSES derives FROM this matrix so the two cannot drift.
+  - Concurrency copies routes/admin/vendor-payables.ts:242-317 exactly: FOR UPDATE on the read, the predicate repeated in the UPDATE WHERE (eq(status, from), isNull(settlementId)), row-count mismatch throws and rolls back.
+  - A settled job (settlement_id IS NOT NULL) refuses every transition and every amount edit. Today PATCH will change amountActual on a settled job, and since payables are derived with no stored total, the settlement amount would disagree with the sum of its jobs silently.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.228Z'
+last_updated: '2026-08-30T12:02:20.228Z'
+time_spent_minutes: 0
+labels:
+  - core
+  - state-machine
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

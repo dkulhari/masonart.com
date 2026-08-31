@@ -1,0 +1,36 @@
+ticket_number: 683
+title: Admin API - transfer oversight, declaring a transfer lost and the replacement job
+description: |-
+  ## Task
+  Add GET /api/admin/transfers and POST /api/admin/transfers/:id/lost. Declaring one lost creates a replacement draft job per lost job, linked by replaces_job_id.
+
+  ## Context
+  Feature: production-pipeline. Phase 3 of 7. Depends on #pp03.
+
+  Design constraints:
+  - ADMIN ONLY. It costs money, and a vendor declaring it is a vendor deciding who eats a cost.
+  - The original job STAYS `dispatched` WITH ITS PAYABLE INTACT. We owe vendor A for work they genuinely did; the parcel is what vanished. Moving it to qc_failed would slander their QC record and pollute the defect history that future scorecards read. Erasing the payable to make the pipeline look tidy is the ledger-drift class this repo keeps guarding against.
+  - A transfer with received_at set cannot later be declared lost (409).
+  - replaces_job_id exists because without it two print jobs for one order item look like a duplicate-entry mistake.
+  - production_transfer.declared_lost is category `money` and carries both job id sets.
+  - All of it in one transaction.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.496Z'
+last_updated: '2026-08-30T12:02:20.496Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - admin
+  - transfers
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

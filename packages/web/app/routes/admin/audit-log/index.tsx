@@ -27,7 +27,22 @@ import { AlertCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react'
 
 import { cn, getApiUrl } from '~/lib/utils'
 
-const CATEGORIES = ['money', 'privilege', 'catalogue', 'config', 'content'] as const
+/**
+ * A whitelist, and one of three sites that move with the `audit_category` enum
+ * (the others are `auditCategorySchema` in shared and `auditCategoryEnum` in the
+ * API schema). Anything absent here is DROPPED from the URL rather than
+ * rejected — right for a stale bookmark, and quietly wrong for a live category:
+ * `?category=fulfilment` would degrade to the unfiltered view with no error and
+ * no empty state, and the admin would read the whole table as the filtered one.
+ */
+const CATEGORIES = [
+  'money',
+  'privilege',
+  'catalogue',
+  'config',
+  'content',
+  'fulfilment',
+] as const
 const OUTCOMES = ['success', 'failure'] as const
 
 /** A URL value that is a real category, or nothing. Never an error. */
@@ -89,6 +104,10 @@ const CATEGORY_STYLES: Record<string, string> = {
   catalogue: 'bg-blue-50 text-blue-700',
   config: 'bg-muted text-muted-foreground',
   content: 'bg-green-50 text-green-700',
+  // Needs its own entry, not just a CATEGORIES row: the badge falls back to the
+  // same neutral grey `config` uses, so a missing style makes every fulfilment
+  // row look like a config row rather than break anything visibly.
+  fulfilment: 'bg-purple-50 text-purple-700',
 }
 
 function formatWhen(iso: string) {

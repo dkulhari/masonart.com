@@ -1,0 +1,40 @@
+ticket_number: 678
+title: Access Control - vendor signing scopes and the replacement customer-data rule
+description: |-
+  ## Task
+  Generalise VENDOR_ARTWORK_PREFIXES into VENDOR_SIGNING_SCOPES (artwork | qcPhoto | label) with `objectKeyForScope(scope, ref)` keeping today's fail-closed logic. Add `getVendorJobLabelKey`. Replace the dead absolute in vendor-scope.ts:14-20 with R1/R2/R3.
+
+  ## Context
+  Feature: production-pipeline. Phase 2 of 7.
+
+  The old rule ('no return value here contains customer data') was assertable ONLY because dispatch was in-house. Vendors now despatch directly, so a carrier label carries the customer's name, address and phone.
+
+  R1 - the JSON stays clean, absolutely. No JSON body on any /api/vendor/* route contains a customer name, address, phone, email or person-linked order reference, at any depth, in any casing. No exception, ever.
+  R2 - customer data reaches a vendor only as opaque rendered bytes behind a short-lived signature: a rendered document from a signed expiring URL, handed to the OS. Never as fields, never composed by our API, never rendered into the vendor portal's own DOM. Exactly one such document exists: the carrier label PDF.
+  R3 - the allow-list is the enforcement, and the scopes are disjoint.
+
+  Design constraints:
+  - The label key is identity-free BY CONSTRUCTION: `fulfilment/labels/<random token>.pdf`, never `<orderId>`. An order id in a URL path is a stable person-linked handle, and it lives where no assertion about JSON KEYS can see it. Follows the production_approvals.approval_token precedent.
+  - getVendorJobLabelKey puts all three conditions in the WHERE - the job is this vendor's, the order's consolidator is this vendor, a label token exists - so a non-consolidator gets null -> 404 AND THE PRESIGNER IS NEVER CALLED. A signed URL that is generated and then withheld has still been generated.
+  - TTL stays 300s, same shape as artwork, so the existing 'expires in minutes, not days' property extends unchanged.
+  - Vendors need NO pickup address (the courier collects from their own facility, already in vendors.address_*) and NO delivery pincode (we pick the courier). State it so nobody adds one.
+  - Scopes must be pairwise disjoint and non-substitutable: the artwork route refuses a fulfilment/labels/ key, the label route refuses a products/ key. That is what stops the label hole widening into a general signer.
+feature: production-pipeline
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.298Z'
+last_updated: '2026-08-30T12:02:20.298Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - vendor-isolation
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

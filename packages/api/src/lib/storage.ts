@@ -63,9 +63,9 @@ function sanitizeKeySegment(segment: string, fallback: string): string {
 /**
  * Storage path prefixes for different content types
  *
- * String members are bare prefixes ending in `/`. `reviewMedia` is a key
- * builder rather than a prefix because review media is partitioned per
- * review id.
+ * String members are bare prefixes ending in `/`. `reviewMedia` and
+ * `productionQcPhoto` are key builders rather than prefixes because their
+ * objects are partitioned per entity id — a review, and a production job.
  */
 export const StoragePaths = {
   PRODUCTS: 'products/',
@@ -88,6 +88,49 @@ export const StoragePaths = {
     const safeReviewId = sanitizeKeySegment(reviewId, 'unknown');
     const safeFilename = sanitizeKeySegment(filename, 'file');
     return `reviews/${safeReviewId}/media/${safeFilename}`;
+  },
+
+  /**
+   * Build the object key for one production QC photograph (#674).
+   *
+   * `production-qc/<jobId>/<slot>/<filename>` — the same shape as
+   * `reviewMedia` above, with one more level because a job's shots are
+   * partitioned by slot as well as by job.
+   *
+   * **Identity-free.** A job id is a production handle: nothing in this path
+   * names the customer, the order or the vendor's staff.
+   *
+   * **Recomputable.** `production_job_photos.object_key` stores this key and
+   * never a URL — `approval_photos.url` is the counter-example, and a stored
+   * URL cannot be re-signed. The complete step runs minutes after presign and
+   * rebuilds the key from the same `(jobId, slot, filename)`, so nothing
+   * time-varying may enter it.
+   *
+   * **The slot is sanitised even though it comes from a vocabulary.** `slot` is
+   * a `text` column; the database checks nothing, so a value that skipped
+   * `qcSlotSchema` can reach here and must still not escape its job's prefix.
+   * Every slot in `QC_SHOT_SLOTS` is `[a-z0-9_]` and passes through unchanged,
+   * which is what lets the retention sweep delete a job by prefix and lets a
+   * key be read back as a slot.
+   */
+  productionQcPhoto(jobId: string, slot: string, filename: string): string {
+    const safeJobId = sanitizeKeySegment(jobId, 'unknown');
+    const safeSlot = sanitizeKeySegment(slot, 'unknown');
+    const safeFilename = sanitizeKeySegment(filename, 'file');
+    return `production-qc/${safeJobId}/${safeSlot}/${safeFilename}`;
+  },
+
+  /**
+   * The prefix covering every QC photograph of one job, across every slot.
+   *
+   * Exists so the 400-day retention sweep (#697) deletes under exactly the
+   * same segment `productionQcPhoto` wrote under. Reimplementing the prefix
+   * at the call site would pass its own tests and then silently miss objects
+   * the moment `sanitizeKeySegment` changed on one side only — and a missed
+   * object is permanent, because the sweep drops the row that named it.
+   */
+  productionQcJobPrefix(jobId: string): string {
+    return `production-qc/${sanitizeKeySegment(jobId, 'unknown')}/`;
   },
 } as const;
 

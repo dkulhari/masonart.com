@@ -39,3 +39,16 @@ export * from './gift-card';
 // Audit log schemas. Who did what, to what, when — the contract shared by the
 // API writer, the read route and the admin viewer.
 export * from './audit-log';
+
+// Production QC contracts. The photo shot list is here, not in the API, because
+// `production_job_photos.slot` is a text column: `schema/shipping.ts` records
+// that a value import from this ESM-only package inside `schema/` breaks
+// `drizzle-kit generate`, so the vocabulary cannot live beside the table.
+export * from './production-qc';
+
+// The production job state machine, as data. The grammar over it — assertTransition,
+// the 409, the totality assertion against the pgEnum — stays in
+// `packages/api/src/lib/production-transitions.ts`; only the table is here, so
+// that `packages/web` can render actions FROM the matrix rather than from a
+// second copy of it (design §4).
+export * from './production-transitions'

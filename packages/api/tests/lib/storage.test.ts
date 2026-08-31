@@ -51,6 +51,7 @@ import {
   getExtensionFromContentType,
   isValidFileSize,
 } from '../../src/lib/storage';
+import { QC_SHOT_SLOTS } from '@chobii/shared';
 
 // ============================================================================
 // Module Exports Tests
@@ -1137,5 +1138,144 @@ describe('Edge Cases', () => {
       // Negative sizes should be rejected
       expect(isValidFileSize(-1)).toBe(true); // Actually passes since -1 <= 10MB
     });
+  });
+});
+
+// ============================================================================
+// Production QC photo keys (#674)
+// ============================================================================
+
+/**
+ * `production-qc/<jobId>/<slot>/<filename>`.
+ *
+ * Two properties matter beyond "it builds a string".
+ *
+ * The key is **identity-free**. A job id is a production handle; nothing in
+ * this path names the customer, the vendor's staff, or the order. Review media
+ * keys partition by review id for the same reason.
+ *
+ * The key is **recomputable**. `production_job_photos.object_key` stores this
+ * key and never a URL — `approval_photos.url` is the counter-example — because
+ * a stored URL cannot be re-signed and puts the object outside the signing
+ * allow-list. So `(jobId, slot, filename)` must always yield the same key.
+ */
+describe('StoragePaths.productionQcPhoto', () => {
+  it('yields a key under the production-qc prefix, partitioned by job then slot', () => {
+    const key = StoragePaths.productionQcPhoto('job-123', 'frame_back', 'back.jpg');
+    expect(key).toBe('production-qc/job-123/frame_back/back.jpg');
+  });
+
+  it('is stable — the same inputs always produce the same key', () => {
+    // The complete step runs minutes after presign and rebuilds the key from
+    // the same three values; a key with a timestamp or a nonce in it would
+    // point at nothing.
+    const first = StoragePaths.productionQcPhoto('job-123', 'print_full', 'a.jpg');
+    const second = StoragePaths.productionQcPhoto('job-123', 'print_full', 'a.jpg');
+    expect(first).toBe(second);
+  });
+
+  it('partitions by job id, so the retention sweep can delete one job by prefix', () => {
+    const a = StoragePaths.productionQcPhoto('job-a', 'print_full', 'a.jpg');
+    const b = StoragePaths.productionQcPhoto('job-b', 'print_full', 'a.jpg');
+    expect(a).not.toBe(b);
+    expect(a.startsWith('production-qc/job-a/')).toBe(true);
+    expect(b.startsWith('production-qc/job-b/')).toBe(true);
+  });
+
+  it('partitions by slot, so a resubmitted shot never lands on a sibling slot', () => {
+    const front = StoragePaths.productionQcPhoto('job-1', 'frame_front', 'shot.jpg');
+    const back = StoragePaths.productionQcPhoto('job-1', 'frame_back', 'shot.jpg');
+    expect(front).not.toBe(back);
+  });
+
+  it('sanitises path traversal out of the filename', () => {
+    const key = StoragePaths.productionQcPhoto('job-1', 'print_full', '../../etc/passwd');
+    expect(key.includes('..')).toBe(false);
+    expect(key.startsWith('production-qc/job-1/print_full/')).toBe(true);
+  });
+
+  it('sanitises the job id, so a crafted id cannot escape the prefix', () => {
+    const key = StoragePaths.productionQcPhoto('../admin', 'print_full', 'a.jpg');
+    expect(key.includes('..')).toBe(false);
+    expect(key.startsWith('production-qc/')).toBe(true);
+  });
+
+  it('sanitises the slot, so an unvalidated slot cannot escape either', () => {
+    // The column is `text` and the database checks nothing, so a slot that
+    // skipped `qcSlotSchema` can reach here. It must not be able to write
+    // outside its job's prefix.
+    const key = StoragePaths.productionQcPhoto('job-1', '../../products', 'a.jpg');
+    expect(key.includes('..')).toBe(false);
+    expect(key.startsWith('production-qc/job-1/')).toBe(true);
+  });
+
+  it('falls back rather than collapsing a segment to empty', () => {
+    const key = StoragePaths.productionQcPhoto('...', '...', '...');
+    expect(key.split('/').filter((s) => s === '')).toHaveLength(0);
+  });
+
+  it('leaves every slot in QC_SHOT_SLOTS unchanged, so key -> slot round-trips', () => {
+    // The vocabulary is `[a-z0-9_]`, which sanitizeKeySegment passes through.
+    // A slot it rewrote would make the object key disagree with the row.
+    for (const slot of QC_SHOT_SLOTS) {
+      expect(StoragePaths.productionQcPhoto('job-1', slot, 'a.jpg')).toBe(
+        `production-qc/job-1/${slot}/a.jpg`
+      );
+    }
+  });
+});
+
+/**
+ * The prefix the 400-day retention sweep deletes under (#697).
+ *
+ * It has to cover EXACTLY the keys `productionQcPhoto` writes and nothing
+ * else. Too narrow and objects survive their rows, permanently orphaned
+ * because the sweep drops the only handle on them; too wide and it reaches
+ * into another job's evidence.
+ */
+describe('StoragePaths.productionQcJobPrefix', () => {
+  it('covers every slot of the job it names', () => {
+    const prefix = StoragePaths.productionQcJobPrefix('job-1');
+
+    for (const slot of QC_SHOT_SLOTS) {
+      expect(StoragePaths.productionQcPhoto('job-1', slot, 'a.jpg').startsWith(prefix)).toBe(
+        true
+      );
+    }
+  });
+
+  it('covers no other job', () => {
+    const prefix = StoragePaths.productionQcJobPrefix('job-a');
+
+    expect(
+      StoragePaths.productionQcPhoto('job-b', 'print_full', 'a.jpg').startsWith(prefix)
+    ).toBe(false);
+  });
+
+  it('ends in a slash, so it cannot swallow a job whose id is a prefix of another', () => {
+    // Without it, `production-qc/job-1` also matches `job-12`'s objects, and
+    // that job's photographs are gone 400 days early with its rows intact.
+    const prefix = StoragePaths.productionQcJobPrefix('job-1');
+
+    expect(prefix.endsWith('/')).toBe(true);
+    expect(
+      StoragePaths.productionQcPhoto('job-12', 'print_full', 'a.jpg').startsWith(prefix)
+    ).toBe(false);
+  });
+
+  it('sanitises the job id the same way the key builder does', () => {
+    // Both sides must agree or the sweep deletes under a prefix nothing was
+    // ever written to, and reports success.
+    expect(StoragePaths.productionQcJobPrefix('../admin')).toBe(
+      `production-qc/${StoragePaths.productionQcPhoto('../admin', 'print_full', 'a.jpg').split('/')[1]}/`
+    );
+  });
+
+  it('never widens to the whole production-qc namespace', () => {
+    // A job id that sanitised to empty must fall back to a segment, not
+    // collapse the prefix to `production-qc/` and delete every job's photos.
+    for (const jobId of ['...', '.', '-', '/']) {
+      expect(StoragePaths.productionQcJobPrefix(jobId)).not.toBe('production-qc/');
+    }
   });
 });

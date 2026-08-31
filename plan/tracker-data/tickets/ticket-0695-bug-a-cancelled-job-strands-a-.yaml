@@ -1,0 +1,173 @@
+ticket_number: 695
+title: Bug - a cancelled job strands a phantom payable in the vendor's own portal
+description: |-
+  ## Task
+  Add `status <> 'cancelled'` to the three payables queries: routes/admin/vendor-payables.ts:172, :308, and lib/vendor-scope.ts getVendorPayableTotal.
+
+  ## Context
+  Feature: production-pipeline. Filed alongside the phases, following vendor-management's #623/#624 precedent.
+
+  All three filter on `settlement_id IS NULL` alone and never look at status. A cancelled job that carries an amount_expected therefore still shows as owed - and the vendor sees it in their own portal, permanently, with no way to clear it.
+
+  This is latent today only because cancellation is not reachable: nothing creates jobs and the state machine does not exist. This feature makes cancellation a real, routine transition, so the bug goes live here.
+
+  Design constraints:
+  - 'cancelled' is an EXISTING enum value used in application code, not migration SQL, so the enum-literal rule does not apply.
+  - The admin payables UI and the vendor payments screen must render `status`, so a cancelled zero-rupee line is legible rather than mysterious.
+  - Cancelling from draft or assigned should also null the amounts; cancelling from a later state PRESERVES the payable, because the vendor did work. That kill fee is stated explicitly by an admin, not inferred.
+  - Regression test: getVendorPayableTotal and the admin payables total must agree over one row set - the assertion carried over from #611.
+feature: production-pipeline
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.955Z'
+last_updated: '2026-08-30T21:35:33.479Z'
+time_spent_minutes: 14
+labels:
+  - bug
+  - money
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-30T21:21:16.755Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-30T21:21:57.586Z'
+    text: |-
+      ## Verified the three sites (line numbers had moved)
+
+      - `packages/api/src/routes/admin/vendor-payables.ts:169-174` — GET payables list WHERE. `and(eq(vendorId), isNull(settlementId))`. Confirmed, no status.
+      - `packages/api/src/routes/admin/vendor-payables.ts:301-310` — the settlement UPDATE WHERE. Confirmed, no status. The FOR UPDATE verification read at :242-252 does not select `status` at all.
+      - `packages/api/src/lib/vendor-scope.ts:189-200` `getVendorPayableTotal` — `and(eq(vendorId), isNull(settlementId))`. Confirmed, no status.
+
+      **A fourth site with the identical defect, not named in the design:** `packages/api/src/routes/admin/vendors.ts:304-318` `unsettledJobRows` → `amountOwed` via `sumPayable`. Its own comment claims it is "the same predicate lib/vendor-payables documents", which is exactly how the drift happened. Fixing three of four would leave the vendor list printing the phantom.
+
+      **A fifth, in the web package:** `packages/web/app/routes/vendor/index.tsx:840` re-implements `amountActual ?? amountExpected` client-side for the vendor's own job cards. That is literally the surface the ticket title names — "in the vendor's own portal".
+
+      ## The predicate, derived from §5/§10.6/§11
+
+      `status <> 'cancelled'` alone is **wrong**. Design §10.6 states the money invariant: *"cancelling an assigned-or-later job without an `amountActual` is refused; a cancelled job at `'0.00'` contributes zero and still renders as a line."* Under that rule every cancelled-from-assigned job carries an explicit `amount_actual`, so `status <> 'cancelled'` would silently drop agreed kill fees — the opposite bug, and a quieter one.
+
+      The rule the two halves actually share is about which *column* may be trusted on a cancelled job:
+
+      > On a cancelled job, `amount_expected` is not a payable. Only an `amount_actual` an admin explicitly stated is.
+
+      `amount_expected` is what the rate card said the work *would* cost. `amount_actual` is what a human said we owe. Inferring the first as the second is the phantom.
+
+          settlement_id IS NULL AND (status <> 'cancelled' OR amount_actual IS NOT NULL)
+
+      - cancel from `draft`/`assigned` → nothing stated → excluded, no line, no phantom ✓
+      - cancel from a later status with an agreed kill fee → `amount_actual` set → **preserved** ✓
+      - cancel at `'0.00'` → included, contributes zero, still renders as a line (§10.6, verbatim) ✓
+      - a lost transfer's original job stays `dispatched` → untouched, payable intact (`transfers.ts`) ✓
+
+      It is also correct whether or not §10.6's write-side refusal is ever implemented, which `status <> 'cancelled'` is not.
+
+      ## Design/code divergence to report
+
+      §10.6's refusal (cancelling assigned-or-later without an `amountActual` is refused) is **not implemented** — `PATCH /:jobId` has no cancel-specific amount logic. Nor is the ticket's "cancelling from draft or assigned should also null the amounts". The two also disagree with each other about `assigned`. Neither is needed: the read-side predicate makes the payable 0 by default without a destructive write, and preserves `amount_expected` as the record of what the job was priced at. Not implementing them here; recorded as a divergence rather than picked silently.
+
+      ## Steps
+
+      1. RED: `tests/lib/vendor-payables.test.ts` — `isJobPayable`, `jobPayableAmount` and `sumPayable` under the four cancellation shapes.
+      2. RED: `tests/routes/admin/vendor-payables.test.ts` — the mock's aggregate evaluator reads the predicate off the *rendered SQL* rather than hardcoding it, so dropping the source predicate fails the test; #611 agreement extended over a row set carrying a phantom, a ₹0 cancel and a kill fee; rendered-WHERE assertions on the list and the settlement UPDATE; a 422 for settling a phantom.
+      3. GREEN: `lib/vendor-payables.ts` becomes the one owner — `isJobPayable`, the drizzle twin `payableJobsCondition()`, `sumRupees` for the pricing call site that was abusing `sumPayable`.
+      4. GREEN: the four SQL sites use the twin; `vendors.ts` selects `status`.
+      5. GREEN: `web/app/routes/vendor/index.tsx` stops showing a phantom on a cancelled card.
+      6. Mutation-verify every new assertion, typecheck, commit.
+  - author: mcp-client
+    timestamp: '2026-08-30T21:35:25.270Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f0e942b9` — fix(api): stop a cancelled job stranding a phantom payable
+      **Branch**: `feature/production-pipeline-design`
+
+      ## What the predicate turned out to be
+
+      Not `status <> 'cancelled'`. That is what the task line and §11 both say, and it is wrong: §10.6 requires an explicit `amountActual` when cancelling an assigned-or-later job, so a blanket status exclusion would silently delete agreed kill fees, and it would contradict `transfers.ts` leaving a lost transfer's original payable intact.
+
+          settlement_id IS NULL AND (status <> 'cancelled' OR amount_actual IS NOT NULL)
+
+      On a cancelled job, `amount_expected` (the rate card's guess) is not a payable; only an `amount_actual` an admin stated is. Correct in both worlds — whether or not §10.6's write-side refusal is ever implemented.
+
+      ## Design/code divergences, reported not resolved silently
+
+      - §10.6's "cancelling an assigned-or-later job without an `amountActual` is refused" is **not implemented** — `PATCH /:jobId` has no cancel-specific amount logic.
+      - The ticket's "cancelling from draft or assigned should also null the amounts" is **not implemented**, and disagrees with §10.6 about `assigned`.
+
+      Neither is added here. The read-side predicate makes the payable zero by default without a destructive write and preserves `amount_expected` as the record of what the job was priced at. Both are still open if someone wants the write-side invariant.
+
+      ## Files Changed
+
+      - `packages/api/src/lib/vendor-payables.ts` — one owner for the rule: `isJobPayable`, the drizzle twin `payableJobsCondition()`, `jobPayableAmount` no longer falling back to the expectation on a cancelled job, and `sumRupees` split out. `PayableJob.status` is **required**, so a new call site cannot forget it.
+      - `packages/api/src/lib/vendor-scope.ts` — `getVendorPayableTotal` (site 3, the one the VENDOR reads).
+      - `packages/api/src/routes/admin/vendor-payables.ts` — the list WHERE (site 1), the settlement UPDATE WHERE (site 2), `status` in the FOR UPDATE verification read, and a 422 naming a phantom rather than stamping it paid.
+      - `packages/api/src/routes/admin/vendors.ts` — **site 4**, `amountOwed`, which no document names. Its comment claimed "the same predicate lib/vendor-payables documents" while spelling out half of it.
+      - `packages/api/src/routes/admin/production-jobs.ts` — pricing calls `sumRupees` instead of building fake `PayableJob` rows to borrow `sumPayable`'s adder.
+      - `packages/web/app/routes/vendor/index.tsx` + `jobs/$id.tsx` — **site 5**, the portal named in the ticket title. Both re-implemented `amountActual ?? amountExpected` in the "You are paid" column; one exported helper now mirrors `jobPayableAmount`. Status already renders beside the amount on all three surfaces.
+      - 4 test files.
+
+      Payables stay DERIVED — no stored total added; the SUM is unchanged, only the row set narrows. No `recordAudit` call sites touched, so the refusal-transaction rule does not apply. `'cancelled'` is bound as a parameter from application code.
+
+      ## Verification
+
+      - `packages/api`: `bunx vitest run` over 17 named files (vendor-payables lib+route, vendor-scope, vendors, production-jobs, transfers, vendor routes, readiness/seam/rates) → **783 passed**
+      - `packages/web`: `bunx vitest run tests/routes/vendor tests/routes/admin-vendor-payables.test.tsx` → **285 passed**
+      - typecheck: api src + `tsconfig.test.json` + web → **0 errors** (pre-commit `turbo run typecheck` also green)
+
+      ## Non-vacuity — 14 mutations, each watched red, each reverted
+
+      | # | Mutation | Red |
+      |---|---|---|
+      | M1 | `payableJobsCondition` loses the cancellation half (pre-#695) | 5 |
+      | M2 | `status <> 'cancelled'` **alone** — the task line's literal fix | 4 |
+      | M3 | `isJobPayable` always true | 2 |
+      | M4 | `isJobPayable` excludes every cancelled job (kill fee deleted) | 6 |
+      | M5 | `jobPayableAmount` back to unconditional COALESCE | 1 |
+      | M6 | `getVendorPayableTotal` reverts | 1 |
+      | M7 | payables list WHERE reverts | 2 |
+      | M8 | settlement UPDATE WHERE reverts | 1 |
+      | M9 | the not-payable refusal deleted | 1 |
+      | M10 | `status` dropped from the verification select | 1 |
+      | M11 | `vendors.ts` amountOwed WHERE reverts | 1 |
+      | M12 | web helper reverts to COALESCE | 2 |
+      | M13 | web helper zeroes every cancelled job | 1 |
+      | M14 | job detail reads `amountExpected` raw | 1 |
+
+      Both directions are covered, which is the point: M1 proves the fix is present, M2 and M4 prove it is not the over-fix.
+
+      The route mock was upgraded so the payables list AND the aggregate are answered by evaluating the **compiled WHERE** (`render(where)`), not a hand-copied filter — it distinguishes "names cancelled" from "spares agreed amounts" so the two wrong shapes produce two different numbers. A predicate that never reaches the database can no longer leave these green.
+  - author: system
+    timestamp: '2026-08-30T21:35:33.479Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-30T21:21:20.260Z'
+    agent: claude-code
+    summary: Derived the payable predicate from §5/§10.6/§11 (settlement_id IS NULL AND (status <> 'cancelled' OR amount_actual IS NOT NULL)) rather than the task line's status <> 'cancelled', which would have deleted agreed kill fees. Found two extra sites beyond the three named (vendors.ts amountOwed, and the vendor portal's own "You are paid" column on both screens). Moved the rule into lib/vendor-payables as its single owner in both JS and SQL form, with PayableJob.status required so a new call site cannot forget it. Added a 422 for settling a phantom. TDD throughout; 14 mutations verified red in both directions; 783 api + 285 web tests passing, 0 type errors. Commit f0e942b9.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-30T21:35:31.454Z'
+    duration: '00:14:11'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-30T21:21:16.755Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:14:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:14:00'
+      tokens: 0
+completed: '2026-08-30T21:35:33.479Z'

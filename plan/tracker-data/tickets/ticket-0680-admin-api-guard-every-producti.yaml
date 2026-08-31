@@ -1,0 +1,37 @@
+ticket_number: 680
+title: Admin API - guard every production job transition and audit it
+description: |-
+  ## Task
+  Route PATCH /api/admin/production/:jobId through assertTransition. Add the missing status guard to POST /:jobId/assign and wrap its untransacted update. Retire the header comment at :16-21 and the design comment at :523-525.
+
+  ## Context
+  Feature: production-pipeline. Phase 3 of 7. Depends on #pp04, #pp07.
+
+  Design constraints:
+  - POST /:jobId/assign NEVER READS job.status today, so a cancelled or qc_passed job is assignable right now. Legal only from draft, assigned and qc_failed.
+  - That route's db.update is also not in a transaction. Wrap it with the audit write.
+  - PATCH must SELECT before UPDATE so `before` exists for diffRecords. It currently derives its 404 from an empty returning(), so the 404 path and its test change.
+  - Narrow updateJobSchema.status: qc_passed and qc_failed are removed entirely. A verdict with no review row is a verdict with no evidence.
+  - Pricing ignores order_items.quantity - priceItems adds one rate per item row, so a line with quantity 3 is priced as one. Latent only because nothing creates jobs yet; fix it here.
+  - Reassignment carries a compare-and-swap expectedVendorId and answers a mismatch with 409 plus the ACTUAL current state, so the losing screen can name who took it rather than say 'version mismatch'.
+  - Every refusal lands an audit row with outcome 'failure', written OUTSIDE the rolled-back transaction.
+  - No new POST /:jobId/transition endpoint beside PATCH - two ways to move a job means one of them ends up ungated.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.373Z'
+last_updated: '2026-08-30T12:02:20.373Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

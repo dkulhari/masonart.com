@@ -1,0 +1,160 @@
+ticket_number: 713
+title: E2E - An admin-entered tracking number reaches the customer tracking page
+description: |-
+  ## Task
+  The regression test for the bug this whole feature exists to fix. Every unit test in this phase asserts a write target or a predicate against a mocked database; none of them proves the two halves meet.
+
+  Drive it end to end: an admin opens an order, enters a carrier and tracking number, saves. A customer then looks the order up on the public tracking page and sees that tracking number.
+
+  Before this feature, that walkthrough failed silently — the save succeeded and the tracking page showed nothing.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 4 — E2E
+
+  Also update `tests/e2e/production-pipeline.spec.ts:1130`, whose comment reads "Manual dispatch is today's reality — the Shiprocket client is...". Half of that is still true after pass 1 (there is no Shiprocket client yet) and half is not (a shipment row now exists and the vendor label route no longer 503s). Correct it rather than leaving a comment that will be read as current.
+
+  Project gotchas that bite here:
+  - `await page.goto('/path', { waitUntil: 'networkidle' })` in `beforeEach`.
+  - Scope selectors for mobile vs desktop — the same test ids exist in both trees. `const desktopFilters = page.locator('div.hidden.lg\\:block')`.
+  - Playwright test titles must be STATIC. A title built from a variable breaks the runner here.
+  - Port `:5173` is a DIFFERENT app and makes E2E pass vacuously. Run your own server pair (`:3010` web / `:4321` api), with `FRONTEND_URL` matching the web port or all auth setup fails, and `VITE_API_PROXY_TARGET` overriding the hardcoded `:3000` proxy.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:26:01.323Z'
+last_updated: '2026-08-31T02:26:01.323Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 708
+    feature: order-dispatch-tracking
+    description: One Tracking Store - Backfill orders.shipping_details into order_shipments
+  - ticket: 709
+    feature: order-dispatch-tracking
+    description: One Tracking Store - GET /api/tracking reads the live shipment
+  - ticket: 711
+    feature: order-dispatch-tracking
+    description: One Tracking Store - The two production label guards read order_shipments
+  - ticket: 712
+    feature: order-dispatch-tracking
+    description: One Tracking Store - Admin and customer order detail render the shipment
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing end-to-end walkthrough
+    file: tests/e2e/order-dispatch-tracking.spec.ts
+    command: SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:3010 npx playwright test tests/e2e/order-dispatch-tracking.spec.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * The bug this feature exists for, proved end to end.
+       *
+       * `PATCH /admin/orders/:id/shipping` wrote `orders.shipping_details`;
+       * `GET /api/tracking/*` read `order_shipments`. Nothing bridged them, so an
+       * admin entered a tracking number, the save succeeded, and the customer's page
+       * showed nothing. Forever.
+       *
+       * Every unit test in this phase asserts a write target or a predicate against a
+       * mocked database. None of them can see that the two halves meet. This can.
+       */
+
+      import { test, expect } from '@playwright/test'
+
+      test.describe('an admin-entered tracking number reaches the customer', () => {
+        test.beforeEach(async ({ page }) => {
+          await page.goto('/admin/orders', { waitUntil: 'networkidle' })
+        })
+
+        test('saves on the admin screen and shows on the public tracking page', async ({ page }) => {
+          // Title is STATIC — a title built from a variable breaks the runner here.
+          const order = await seedShippableOrder()
+
+          await page.goto(`/admin/orders/${order.id}`, { waitUntil: 'networkidle' })
+
+          await page.getByLabel('Carrier').fill('Delhivery')
+          await page.getByLabel('Tracking number').fill('AWB55512345')
+          await page.getByRole('button', { name: /save shipping/i }).click()
+
+          // The panel must not go blank after the save — that was the second half of
+          // the defect: the value went to a store the page did not read back.
+          await expect(page.getByText('AWB55512345')).toBeVisible()
+
+          // The customer's view, in a clean context: no admin session, the public
+          // lookup only.
+          await page.context().clearCookies()
+          await page.goto('/track', { waitUntil: 'networkidle' })
+
+          await page.getByLabel('Order number').fill(order.orderNumber)
+          await page.getByLabel('Email').fill(order.email)
+          await page.getByRole('button', { name: /track/i }).click()
+
+          await expect(page.getByText('AWB55512345')).toBeVisible()
+          await expect(page.getByText('Delhivery')).toBeVisible()
+        })
+
+        test('a customer never sees a voided label', async ({ page }) => {
+          const order = await seedOrderWithVoidedAndLiveLabel()
+
+          await page.goto('/track', { waitUntil: 'networkidle' })
+          await page.getByLabel('Order number').fill(order.orderNumber)
+          await page.getByLabel('Email').fill(order.email)
+          await page.getByRole('button', { name: /track/i }).click()
+
+          await expect(page.getByText(order.liveAwb)).toBeVisible()
+          await expect(page.getByText(order.voidedAwb)).toHaveCount(0)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Run it against a server pair built from the branch point to see the old behaviour fail
+    command: SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:3010 npx playwright test tests/e2e/order-dispatch-tracking.spec.ts
+    expected_result: FAIL - the tracking page shows no AWB
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Run it against the branch
+    command: SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:3010 npx playwright test tests/e2e/order-dispatch-tracking.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: implement
+    description: Correct the stale manual-dispatch note in the production pipeline spec
+    file: tests/e2e/production-pipeline.spec.ts
+    status: pending
+    code: |-
+      // Line ~1130 reads: "Manual dispatch is today's reality — the Shiprocket client
+      // is...". Half of that survived pass 1 and half did not, which is the worst
+      // state for a comment to be in.
+      //
+      // Still true: there is no Shiprocket client. Labels are not bought here.
+      // No longer true: `order_shipments` now has a row a human can create, the
+      // vendor label route no longer answers 503 in every environment, and
+      // `orders.shipping_details` is not the tracking store.
+      //
+      // Rewrite it to say exactly that, and name the pass-2 phases (5-10 on the
+      // feature) as where the client lands.
+  - id: 5
+    action: verify-pass
+    description: Run the production pipeline spec to confirm nothing regressed
+    command: SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:3010 npx playwright test tests/e2e/production-pipeline.spec.ts tests/e2e/order-dispatch-tracking.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git add tests/e2e/order-dispatch-tracking.spec.ts tests/e2e/production-pipeline.spec.ts && git commit -m "test(e2e): prove an admin-entered tracking number reaches the customer"'
+    status: pending
+current_step: 1

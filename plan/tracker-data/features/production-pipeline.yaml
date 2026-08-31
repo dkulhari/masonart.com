@@ -1,7 +1,7 @@
 name: production-pipeline
 title: Production Pipeline
 priority: high
-created: '2026-08-16T21:22:47.873Z'
+created: "2026-08-16T21:22:47.873Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -21,14 +21,253 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: '00:00:00'
+  total_sessions: 23
+  total_duration: "04:53:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 23
+      duration: "04:53:00"
+      tokens: 0
 tickets:
-  todo: {}
+  todo:
+    "696": Bug - the two new job statuses are settable and unrenderable before the guard lands
+    "697": Ops - retention sweep for QC photos, deleting R2 objects before their rows
+    "698": Admin API - expose the consolidator decision, so the panel stops reading it from the audit log
+    "699": Ops - R2 bucket CORS must allow GET from the app origin, or every QC photo fails to display
+    "700": Docs - DEV_ENVIRONMENT.md still tells you to use db:push, which silently omits triggers
   in_progress: {}
-  done: {}
-total_tickets: 0
-completion_percentage: 0
+  done:
+    "673": Database Schema - production job workflow statuses and the fulfilment audit category
+    "674": Database Schema - QC photos, the shot list contract and storage paths
+    "675": Database Schema - inter-vendor transfers, order consolidation and job lifecycle columns
+    "676": Access Control - the production transition matrix and assertTransition
+    "677": Access Control - isOrderReadyToLabel, readiness blockers and the single-consumer scan
+    "678": Access Control - vendor signing scopes and the replacement customer-data rule
+    "679": Access Control - recordAudit carries vendorId, and the refusal transaction rule
+    "680": Admin API - guard every production job transition and audit it
+    "681": Admin API - QC review moves the job, requires defects and judges the photos
+    "682": Admin API - consolidator selection, the orderId filter and the readiness endpoint
+    "683": Admin API - transfer oversight, declaring a transfer lost and the replacement job
+    "684": Vendor Portal API - the three settable statuses and the guarded PATCH
+    "685": Vendor Portal API - QC photo upload by presign and complete
+    "686": Vendor Portal API - inter-vendor transfers, dispatch and receipt
+    "687": Vendor Portal API - the signed label and the rewritten isolation properties
+    "688": Admin UI - the production queue reshaped around the new statuses
+    "689": Admin UI - photo QC review with per-slot verdict and defects
+    "690": Admin UI - consolidator picker, readiness blockers and transfers on the order panel
+    "691": Vendor Portal UI - job actions rebuilt from the transition matrix
+    "692": Vendor Portal UI - the shot-list uploader and the QC verdict banner
+    "693": Vendor Portal UI - inbound transfers and the label handover card
+    "694": E2E - two-vendor consolidation happy path and the access-denied cases
+    "695": Bug - a cancelled job strands a phantom payable in the vendor's own portal
+total_tickets: 28
+completion_percentage: 82
 is_completed: false
+design:
+  approach: |-
+    ## 1. Context and problem
+
+    An order goes to a third-party print shop, is framed, and ships. vendor-management (sub-project 1 of 5, done) built the RECORDS: vendors, capabilities, effective-dated rate cards, a row-scoped portal, production_jobs, production_job_reviews, derived payables. It deliberately stopped short of the WORKFLOW and said so in the schema (schema/production-jobs.ts:1-12): "the status enum here is a vocabulary, not a state machine ... production-pipeline defines the WORKFLOW over it".
+
+    Live consequences: PATCH /api/admin/production/:jobId accepts any of the seven statuses from any state (routes/admin/production-jobs.ts:523-525 documents this as deliberate); POST /:jobId/assign never reads job.status, so a cancelled or already-passed job is assignable; POST /:jobId/reviews records a verdict and does not move the job; the vendor portal writes sent/received unguarded; nothing anywhere CREATES a job from an order; stated_turnaround_days feeds no calculation. Above it all, orders.status collapses the entire production phase into "processing".
+
+    ## 2. The fulfilment model changed mid-design
+
+    Vendors now own the piece from production through despatch. The courier collects FROM THE VENDOR'S FACILITY. Goods never come back to us. That voids three things written into shipped code:
+
+    - lib/vendor-scope.ts:15 "Second rule, equally absolute: no return value here contains customer data", justified by "dispatch is in-house: the piece comes back to us before it ships", and enforced as a blanket property by two test suites. A carrier label carries the customer's name, address and phone. The absolute is dead and needs a replacement that is just as mechanically checkable.
+    - order-dispatch-tracking's "dispatch is MANUAL at launch ... No Shiprocket API". Vendors printing labels needs the label API; sub-project 3 is promoted to API-integrated.
+    - QC as "inspect it when it arrives back". There is no back. QC is remote, on photographs, at the vendor, and it happens BEFORE despatch.
+
+    ## 3. Scope
+
+    IN: the transition matrix and its chokepoint; job creation from order items; photo QC with a fixed shot list and an admin verdict that moves the job; the inter-vendor transfer leg; order consolidation; the isOrderReadyToLabel predicate; a full audit trail over all of it; the replacement customer-data rule.
+
+    OUT (each named to prevent absorption):
+    - The Shiprocket client - auth, token refresh, webhooks, AWB creation, pickup scheduling, courier selection, label retrieval -> order-dispatch-tracking. This spec produces a predicate and consumes an object key. It never speaks to a carrier.
+    - The customer tracking page and the order-vs-order_shipments split-brain -> order-dispatch-tracking.
+    - order_shipments schema changes, including the label token -> order-dispatch-tracking. Declared here only as the seam.
+    - AI defect detection, the controlled defect vocabulary, live video, artwork-vs-photo matching -> production-qc-inspection. Only the shot list, the upload path and the human verdict move forward.
+    - Per-tier price uplift and margin calibration from transfer cost -> shipping-price-baked-in.
+    - Vendor payment execution -> outside the system, permanently.
+    - Lead-time calculation and the customer delivery estimate -> DEFERRED WITHIN THIS FEATURE, not dropped. It depends on the courier leg (sub-project 3) and on transfer duration, of which there is no history. Ship the state machine, then estimate from data.
+    - Refused outright: any orders.status enum change; a production_batches entity; multi-parcel orders; CHECK constraints of any kind; dropping `sent` from the Postgres type; reusing photo-approval-workflow's tables; vendor-initiated remakes without an admin; reconciling the five-plus divergent order-status definitions across shared/ and web/.
+
+    ## 4. The state machine
+
+    Reused unchanged: draft, assigned, qc_passed, qc_failed, cancelled.
+
+    Re-meant: `received` - was "the vendor received the physical piece from us", now "THE VENDOR HAS EVERYTHING NEEDED TO START". For a print job that is the artwork; for a frame job it is the printed sheet that arrived by transfer. Same actor, same moment in the vendor's day; only the label changes.
+
+    Added (2): `qc_submitted` - work finished, shot list uploaded, BLOCKED ON US. The only state meaning the ball is in our court, the entire content of the admin QC queue, and the precondition the label gate reads. `dispatched` - this vendor's custody has ended.
+
+    Retired in code, kept in the type: `sent`. Removed from the matrix, from VENDOR_SETTABLE_STATUSES and from VENDOR_JOB_STATUSES, with a test asserting no path produces it. Dropping the value would mean recreating the type and rewriting every dependent column.
+
+    Matrix (actor): draft->assigned (admin, priced from the live rate card); draft->cancelled (admin); assigned->assigned (admin, reassign + reprice); assigned->received (VENDOR); received->qc_submitted (VENDOR, every required shot-list slot has a live photo); qc_submitted->qc_passed|qc_failed (admin, reviews route ONLY, fail requires >=1 defect); qc_failed->received (VENDOR, rework in place); qc_failed->assigned (admin, reassign elsewhere, reprices); qc_passed->qc_failed (admin, a second review may still fail it pre-despatch); qc_passed->dispatched (VENDOR or admin, on an open transfer OR the order has a label); any pre-terminal->cancelled (admin). dispatched and cancelled are terminal.
+
+    VENDOR_SETTABLE_STATUSES becomes ['received','qc_submitted','dispatched'], DERIVED from the matrix so the two cannot drift. qc_passed/qc_failed are removed from PATCH's accepted targets entirely: a verdict with no review row is a verdict with no evidence. A self-edge is a 200 no-op writing no audit row - one row per TRANSITION.
+
+    Enforcement: pure assertTransition(from, to, actor) in lib/production-transitions.ts, plus nextStatuses(from, actor) so both UIs render actions FROM the matrix. Illegal is 409, not 422: in this router 422 already means "your payload names things that do not line up" (missingOrderItemIds, unpriced), fixable by editing the body; a transition conflict is not. The body carries { error, code, from, to, allowed } so the UI renders the remedy without a second round trip.
+
+    Concurrency copies routes/admin/vendor-payables.ts:242-317 exactly: FOR UPDATE on the read, the predicate repeated in the UPDATE WHERE, row-count mismatch throws and rolls back. A settled job refuses every transition and every amount edit - today PATCH will change amountActual on a settled job, and since payables are derived with no stored total, the settlement's amount would then disagree with the sum of its jobs silently.
+
+    ## 5. Transfers and consolidation
+
+    production_transfers (order, from/to vendor, carrier, reference, piece_count, cost_amount, dispatched_at, expected_by, received_at, lost_at, lost_note) + production_transfer_jobs, with a unique index putting a job on at most one transfer ever. NO transfer status enum - state derives from the three timestamps, mirroring production_jobs' own date-driven shape, so a fourth state later costs a nullable timestamp rather than a migration.
+
+    Vendor B is told { id, reference, carrier, pieceCount, dispatchedAt, expectedBy, receivedAt }. No vendor names, no order id, no customer anything. B does not learn it came from A - surfacing another vendor's row would break the isolation suite's first property. If B needs to chase, an admin chases; the admin sees both ends.
+
+    Lost: admin only. Sets lost_at and creates a replacement draft job per lost job, linked by replaces_job_id. The original STAYS dispatched WITH ITS PAYABLE INTACT - we owe A for work they genuinely did; the parcel is what vanished. Moving it to qc_failed would slander their QC record and pollute the defect history future scorecards read. A received transfer cannot later be declared lost (409).
+
+    order_consolidation (order_id PK, vendor_id, decided_by, decided_at) - a separate table so a supplier FK stays off the customer table and out of every wholesale select() of orders. The system PROPOSES, an admin CONFIRMS, decided_by NULL records "system default": one vendor holds everything -> that vendor automatically; a frame job exists -> its vendor (a finished framed piece is bulky, fragile and glazed - you never courier it TO a poster shop); all posters across two print vendors -> most items, ties by earliest assigned_at. Overridable until the first transfer dispatches, then 409.
+
+    The seam: lib/production-readiness.ts exports getOrderLabelReadiness(orderId, reader?) -> { ready, consolidatorVendorId, blockers[] } and isOrderReadyToLabel = blockers.length === 0. ONE implementation, so the gate and the screen cannot disagree; two functions because a "not ready" with no reason is the class of bug OrderProductionPanel already guards against. Ready iff every required item is covered, a consolidator C is set, every live job is qc_passed or dispatched, every qc_passed job is AT C, and every dispatched job rode a received un-lost transfer TO C. A property falls out free: once C's own jobs go dispatched, readiness goes false - structurally one label per order. Optional `reader` lets sub-project 3 evaluate inside the transaction that creates the shipment, having taken FOR UPDATE on the job rows. Single consumer enforced by a source scan, plus a reverse scan asserting nothing under lib/production-* imports anything named shiprocket.
+
+    ## 6. The replacement customer-data rule
+
+    R1 - THE JSON STAYS CLEAN, ABSOLUTELY. No JSON body on any /api/vendor/* route contains a customer name, address, phone, email or person-linked order reference, at any depth, in any casing. No exception, ever. The existing forbidden-key vocabulary, recursive walker, wholesale-select() ban and SELECT-projection assertion are unchanged and now cover every new route.
+
+    R2 - CUSTOMER DATA REACHES A VENDOR ONLY AS OPAQUE RENDERED BYTES, BEHIND A SHORT-LIVED SIGNATURE. Only as a rendered document from a signed expiring URL, handed to the operating system. Never as fields, never composed by our API, never rendered into the vendor portal's own DOM. Exactly one such document exists: the carrier label PDF.
+
+    R3 - THE ALLOW-LIST IS THE ENFORCEMENT, AND THE SCOPES ARE DISJOINT.
+
+    VENDOR_ARTWORK_PREFIXES generalises to VENDOR_SIGNING_SCOPES = { artwork: ['products/'], qcPhoto: ['production-qc/'], label: ['fulfilment/labels/'] } with objectKeyForScope(scope, ref) keeping today's fail-closed logic. The label key is identity-free BY CONSTRUCTION - fulfilment/labels/<random token>.pdf, never <orderId>, because an order id in a URL path is a stable person-linked handle living where no assertion about JSON keys can see it. getVendorJobLabelKey puts all three conditions in the WHERE, so a non-consolidator gets 404 AND THE PRESIGNER IS NEVER CALLED: a signed URL generated and then withheld has still been generated. TTL 300s, same shape as artwork.
+
+    Vendors need NO pickup address (the courier collects from their own facility, already in vendors.address_*) and NO delivery pincode (we choose the courier). Stated so nobody adds one.
+
+    Test consequences: isolation Property 1 unchanged, so every new route needs a ROUTE_TABLE entry or the suite fails. Property 2 unchanged in mechanism, retitled "no customer data crosses the vendor boundary AS DATA". Property 3 generalises to all signatures and asserts the scopes PAIRWISE DISJOINT AND NON-SUBSTITUTABLE - the artwork route must refuse a label key and vice versa, which is what stops the label hole widening into a general signer. New Property 4: every presign matches exactly one scope; a planted customer name in shipment metadata appears in no JSON; a non-consolidator 404s with mockPresign never called. The web suite's one-line replacement for the dead absolute: no iframe/embed/object in the container, and no X-Amz-Signature in innerHTML.
+
+    FIVE test files are affected, not two: api tests/routes/vendor/{isolation,jobs,artwork}.test.ts and web tests/routes/vendor/{no-customer-data,vendor-screens,layout-guard}.test.tsx.
+
+    ## 7. Photo QC (minimum viable; the AI stays in sub-project 4)
+
+    production_job_photos (job_id, slot, object_key, content_type, size_bytes, uploaded_by, uploaded_at, superseded_at, review_id) with a partial unique index on (job_id, slot) WHERE superseded_at IS NULL - exactly one live photo per slot with full history, the same append-only philosophy as production_job_reviews. `slot` is TEXT, not a pgEnum: schema/shipping.ts records that a VALUE import from the ESM-only @chobii/shared inside schema/ breaks drizzle-kit generate outright, so the vocabulary lives in shared where the portal and API read one copy.
+
+    QC_SHOT_LIST - print: whole print flat and front-on, print beside the colour reference, raking light across the surface, optional detail. Frame: framed piece front-on, raking light across the glazing, all four corners, back showing the hanging fixture, optional detail.
+
+    Upload REUSES routes/review-media.ts's presign -> complete pattern verbatim: bytes go direct to R2, and complete re-validates because the two calls are minutes apart. Keys production-qc/<jobId>/<slot>/<filename> via the existing sanitizeKeySegment.
+
+    The received -> qc_submitted edge calls assertShotListComplete; a miss is 422 NAMING THE MISSING SLOTS. POST /:jobId/reviews becomes one transaction: guard qc_submitted, insert the review, move the job, REQUIRE a non-empty defects array on a fail (today nullish - a fail with no defect is unactionable), and stamp review_id onto every judged photo so a dispute can say WHICH shots were approved. A refused transition means the review is not inserted either, so the append-only guarantee is untouched.
+
+    Photos retained 400 days, matching the audit window - the audit row and the photograph it refers to must not outlive each other in opposite directions. ON DELETE CASCADE drops rows and leaves R2 objects orphaned forever, so the sweep calls deleteByPrefix and only THEN deletes rows.
+
+    DELIBERATELY NOT REUSED: photo-approval-workflow (schema/approvals.ts, 21 tickets, complete). That is the CUSTOMER approving production photos - different actor, token-gated, deadline-driven - and approval_photos.url stores a URL rather than an object key, violating R3 outright. Stated so a third photo system is not built by someone who finds neither.
+
+    ## 8. Audit
+
+    New category `fulfilment` via ALTER TYPE ADD VALUE - safe because nothing uses it as a literal in SQL. Three sites move together: auditCategorySchema (shared), auditCategoryEnum (api), CATEGORIES (viewer).
+
+    money: production_job.assigned, .reassigned, .amount_overridden, production_transfer.declared_lost. fulfilment: production_job.created, .transitioned, .transition_refused, .photos_submitted, .qc_approved, .qc_rejected, .label_issued, production_transfer.dispatched, .received, order.consolidator_set. No separate production_job.cancelled - a cancellation is a transition, keeping "one row per transition" true.
+
+    #667 already specifies `money` for all production_job.* and must be reconciled by what the row is ABOUT rather than by table, and marked superseded-in-part. #671 fails the build on any declared action nothing emits, so NOTHING is declared here for sub-project 3: an action is declared in the same phase as its emitter, or not at all. #668/#669/#670 already cover the four dangling vendor actions - depend on them, do not re-file.
+
+    recordAudit reads c.get('vendorId') ITSELF, merged AFTER the caller's metadata so a caller cannot overwrite it. The module's entire design is that a caller cannot get a context fact wrong - category is derived, ip/user-agent/request-id/method/path are captured. Per call site means the first vendor route added next year forgets. It also retro-improves every existing vendor.request floor row.
+
+    THE TRANSACTION RULE, written into lib/audit.ts's doc comment because no call site in the repo passes tx today (all 40 omit it): SHARE the transaction when the row would be a LIE if the write rolled back. NEVER share it for a refusal - a refusal row records that a transaction was rolled back, so writing it inside that transaction erases the very evidence it exists to preserve.
+
+    What this still does not prevent, named because recordAudit swallows its own failures: a transition can commit with NO audit row at all (recordAudit claims the request before inserting, precisely so a failed insert cannot produce a misleading floor row - the price is a missing one, and nobody may later conclude "no row means it did not happen"); the chokepoint is a source-scanning test, not a database guarantee; backdating is detectable, not impossible; 400-day retention is shorter than a dispute window.
+
+    ## 9. Migrations
+
+    NNNN_snake_case.sql, hand-written since 0014. THE RULE GOVERNING EVERY MIGRATION HERE: no new enum value may appear as a literal in ANY migration, ever. 0018:6-8 records that drizzle-kit replays the whole pending batch in one transaction, so splitting ADD VALUE and its first use across two files does NOT help a fresh database. The `sent`-retirement backfill is a SCRIPT.
+
+    No CHECK constraints and no new trigger. Zero CHECKs exist in the repo and tests/database/raw-sql-objects.test.ts scans only FUNCTION|TRIGGER|POLICY, so one would be silently absent from every db:push-built database. A trigger cannot express the stage and consolidation rules anyway - they read other rows, and under READ COMMITTED that is a race dressed as enforcement. The one database object that genuinely serialises concurrent writers, a unique index, is used where needed.
+
+    Build with db:migrate, never db:push (#663).
+
+    ## 10. Testing
+
+    Cadence: unit + integration per ticket (Vitest), E2E per feature (Playwright).
+
+    Property tests: (1) transition-matrix exhaustiveness - over every (status, status, actor) triple the matrix is total and answers exactly one of allow/deny, the API agrees, `sent` has zero edges both ways, terminals have zero out-edges, and the vendor-allowed set cannot drift from VENDOR_SETTABLE_STATUSES. (2) The label gate cannot open without QC - enumerate every status assignment over 2- and 3-job orders; named negatives include a dispatched job whose transfer is un-received, a lost transfer, a qc_passed job at a non-consolidator, and the already-labelled case. (3) The customer-data boundary - R1 over every route-table entry, scopes disjoint and non-substitutable, non-consolidator 404 with the presigner never called, no iframe and no signature in the DOM. (4) Transfer-leg integrity - a job is never on two transfers, received_at settable only by to_vendor_id, a received transfer cannot be lost, a lost transfer creates exactly one replacement and leaves the original payable untouched. (5) One audit row per transition, exactly one refusal row per illegal edge SURVIVING A ROLLED-BACK TRANSACTION, every /api/vendor/* row carrying metadata.vendorId, and every declared action having an emitter. (6) Money invariants.
+
+    E2E: two vendors, consolidation, transfer, QC pass, label, handover - plus the refusal cases in the same spec.
+
+    Repo hazards to write into tickets rather than rediscover: run E2E against the CORRECT PORT (:5173 is a DIFFERENT APP and makes suites pass vacuously); no admin suites in parallel with other admin suites; stub localStorage in vi.hoisted above imports; static Playwright test titles; db:migrate not db:push; and the new one - no enum literal in any migration.
+
+    ## 11. Pre-existing defects fixed here
+
+    POST /:jobId/assign never reads job.status (a cancelled job is assignable today) and its update is untransacted. Pricing ignores order_items.quantity, so a line of 3 is priced as one. settlement_id is ON DELETE set null, so deleting a settlement silently un-settles every job it paid for. OrderProductionPanel client-side-scans because GET /api/admin/production has no orderId filter. vendor-nav.ts:35 claims the array is "in the order the work moves" while listing sent before received, contradicting its own labels four lines down.
+
+    AND ONE THIS FEATURE MAKES LIVE: a cancelled job strands a phantom payable. vendor-payables.ts:172, :308 and getVendorPayableTotal all filter on settlement_id IS NULL alone and never look at status. Cancellation becomes a routine transition here, so the bug ships with the feature unless fixed. Filed as its own bug ticket.
+
+    Named debt, not fixed: production_jobs' five date columns are bare `timestamp` while admin_audit_log.created_at is timestamptz, so a year later they are not comparable across a server timezone change. All NEW columns here are timestamptz.
+
+    ## 12. Neighbouring features needing amendment
+
+    vendor-management's zero-customer-data rationale ("because dispatch is in-house: the piece returns to you before it ships") and order-dispatch-tracking's "dispatch is MANUAL at launch ... No Shiprocket API" both now assert dead premises and must be amended, or the tracker keeps contradicting the code.
+  decisions:
+    - "Hold and combine AT THE LAST VENDOR. A mixed basket (rolled poster at print vendor A, framed piece at frame vendor B) is couriered A->B; B packs both and one label is issued. One box, one tracking number. Rejected: each vendor ships its own parcel, which needs multi-shipment orders, two AWBs, partial-delivery mail and split returns, and roughly doubles sub-project 3."
+    - "No batch entity. The queue multi-selects and assigns many jobs to one vendor in one action, but each job keeps its own status, dates and payable. Rejected: a production_batches table. Revisit only when a vendor invoices per batch rather than per job."
+    - "orders.status is UNTOUCHED - not one value added. Production state lives on production_jobs and is derived upward. Rejected: extending the enum, because every switch, status filter, mail template and the public tracking page would have to handle new values or silently break, and there are already five-plus divergent copies of that enum across shared/ and web/."
+    - "Photo QC gates the label. The vendor uploads a fixed shot list, an admin approves remotely, and only then does the label unlock. Rejected: vendor self-certification, which means you learn about defects from the customer and hold no evidence in a dispute - the opposite of the point."
+    - "Our server calls Shiprocket; the vendor receives a signed, expiring label PDF. We keep the AWB, the pickup location, the rate and the tracking. Rejected: the vendor using their own Shiprocket login and pasting an AWB back, which surrenders pickup and rate control, makes the AWB depend on someone typing correctly, and hands our shipping-cost data to a supplier."
+    - "The scope splits at one function. This feature owns the state machine, the QC gate, the audit trail and isOrderReadyToLabel; order-dispatch-tracking owns the label, the AWB and pickup. Rejected: one feature covering production through despatch - nothing to coordinate, but too large to ship incrementally or review."
+    - "`dispatched` is ONE status, not two. Parcel-to-next-vendor and parcel-to-courier are the same fact about the job: custody ended, payable owed. The destination already lives on production_transfers.to_vendor_id or order_shipments. Two values would encode one job fact twice, distinguished only by a foreign row - and `shipped` on a job is a category error, since the order ships and a job never does."
+    - "Rework happens IN PLACE (qc_failed -> received), because QC now catches the defect before the goods leave the vendor, so there is no second freight leg and no second counterparty in the ordinary case. The trade-off is stated rather than hidden: one job holds one amount_expected and one amount_actual, so a CHARGEABLE rework is expressed by overriding amount_actual, not by a second row. Rework that must go elsewhere is qc_failed -> assigned, which re-prices."
+    - "`sent` is retired in code but KEPT in the Postgres type, removed from the matrix and both status lists with a test asserting no path produces it. Rejected: dropping the value, which requires recreating the type and rewriting every dependent column - disproportionate to deleting a word."
+    - "No CHECK constraints and no new trigger. Zero CHECKs exist in this repo and tests/database/raw-sql-objects.test.ts scans only FUNCTION|TRIGGER|POLICY, so one would be silently absent from every db:push-built database and invisible to the #663 guard. A trigger cannot express the stage and consolidation rules anyway: they read OTHER rows, and under READ COMMITTED that is a race dressed as enforcement. The one object that genuinely serialises concurrent writers - a unique index - is used where it is needed."
+    - "The inter-vendor transfer is its own entity, not 'A dispatched, B received'. The fatal reason: in the consolidation case the rolled poster has frame_id NULL, so VENDOR B HAS NO JOB FOR IT AT ALL. Also one parcel carries several jobs, there is freight money with nowhere to sit, and 'lost' is a gap in the record with no docket to chase."
+    - WE pay the transfer leg, and cost_amount is deliberately NOT a payable. We chose the routing, so a vendor cannot be asked to price a distance we decided, and asking A to absorb it is how rate cards get padded. Keeping it out of sumPayable preserves amount_expected versus amount_actual meaning 'negotiation on the work'. shipping-price-baked-in is its consumer.
+    - A lost transfer leaves the original job `dispatched` WITH ITS PAYABLE INTACT and creates a replacement job. We owe the vendor for work they genuinely did; the parcel is what vanished. Moving it to qc_failed would slander their QC record and pollute the defect history future scorecards read, and erasing the payable to make the pipeline look tidy is the ledger-drift class this repo keeps guarding against.
+    - "A new `fulfilment` audit category. Rejected: filing production traffic under `config`, where roughly five rows per job would drown the request floor, shipping config and wallet config in a filter that is a primary navigation control in the viewer. ALTER TYPE ADD VALUE is DDL, touches no rows, and does not involve the immutability trigger. Reconcile #667, which currently specifies `money` for all production_job.*, by what the row is ABOUT rather than by table."
+    - recordAudit reads vendorId ITSELF rather than every call site passing it. The module's entire design is that a caller cannot get a context fact wrong - the category is derived, and ip, user-agent, request id, method and path are captured. requireVendor already sets c.set('vendorId') and nothing has ever read it. Doing it per call site means the first vendor route added next year forgets, and it retro-improves every existing vendor.request floor row for free.
+    - "Refusal audit rows NEVER share the business transaction. This is the sharpest trap in the design and the natural instinct is wrong: a refusal row records that a transaction was ROLLED BACK, so writing it inside that transaction erases the very evidence it exists to preserve. No recordAudit call site in the repo passes tx today, so the rule is documented in lib/audit.ts rather than assumed."
+    - "The dead 'zero customer data' absolute is replaced by three clauses, each as mechanically checkable as the one it replaces: R1 the JSON stays clean absolutely; R2 customer data reaches a vendor only as opaque rendered bytes behind a short-lived signature, handed to the OS and never rendered into the portal's own DOM; R3 the allow-list is the enforcement and the scopes are disjoint. The label key is identity-free by construction - a random token, never an order id, because an order id in a URL path is a person-linked handle living where no assertion about JSON keys can see it."
+    - "photo-approval-workflow's tables are deliberately NOT reused, and the reason is recorded so a third photo system is not built by someone who finds neither. That feature is the CUSTOMER approving production photos: different actor, token-gated, deadline-driven, email-reminded - and approval_photos.url stores a URL rather than an object key, which violates R3 outright."
+    - Lead-time calculation and the customer-facing delivery estimate are DEFERRED WITHIN THIS FEATURE, not dropped. They depend on the courier leg, which sub-project 3 owns, and on transfer duration, of which there is no history yet. Ship the state machine, then estimate from data. stated_turnaround_days stays unused for now rather than feeding a number nobody can defend.
+  approved: true
+  approved_at: "2026-08-30T12:04:17.008Z"
+plan:
+  phases:
+    - name: "Phase 1: Database Schema"
+      location: packages/api/src/database/schema, packages/api/src/database/migrations
+      tickets:
+        - 673
+        - 674
+        - 675
+    - name: "Phase 2: Access Control and Workflow Core"
+      location: packages/api/src/lib, packages/shared/src/schemas
+      tickets:
+        - 676
+        - 677
+        - 678
+        - 679
+    - name: "Phase 3: Admin API"
+      location: packages/api/src/routes/admin
+      tickets:
+        - 680
+        - 681
+        - 682
+        - 683
+    - name: "Phase 4: Vendor Portal API"
+      location: packages/api/src/routes/vendor.ts, packages/api/src/lib/vendor-scope.ts
+      tickets:
+        - 684
+        - 685
+        - 686
+        - 687
+    - name: "Phase 5: Admin UI"
+      location: packages/web/app/routes/admin/production
+      tickets:
+        - 688
+        - 689
+        - 690
+    - name: "Phase 6: Vendor Portal UI"
+      location: packages/web/app/routes/vendor, packages/web/app/lib/vendor-nav.ts
+      tickets:
+        - 691
+        - 692
+        - 693
+    - name: "Phase 7: E2E"
+      location: tests/e2e
+      tickets:
+        - 694
+    - name: Bug
+      location: packages/api/src/routes/admin, packages/api/src/lib
+      tickets:
+        - 695
+  generated_at: "2026-08-30T12:04:22.546Z"
+last_activity: "2026-08-30T21:35:33.497Z"
+started: "2026-08-30T13:05:57.612Z"

@@ -1,0 +1,36 @@
+ticket_number: 684
+title: Vendor Portal API - the three settable statuses and the guarded PATCH
+description: |-
+  ## Task
+  VENDOR_SETTABLE_STATUSES becomes ['received','qc_submitted','dispatched']. updateVendorJob stops being a blind whitelist patch and becomes re-read -> assertTransition -> edge guard -> server-stamped write -> re-read, in one transaction, returning a discriminated result.
+
+  ## Context
+  Feature: production-pipeline. Phase 4 of 7. Depends on #pp04.
+
+  Design constraints:
+  - sentAt and receivedAt LEAVE the patch surface entirely. A vendor back-dating 'I received it three days ago' is a lie about an SLA clock. The server stamps receivedAt, qcSubmittedAt and dispatchedAt. This breaks packages/api/tests/routes/vendor/jobs.test.ts:206-228, which asserts receivedAt is written from the request body.
+  - updateVendorJob must return { ok: true; job } | { ok: false; reason } instead of null-for-everything, because the route now has to distinguish 404 from 409 from 422.
+  - The vendor is told 'this job was cancelled' rather than 404 - a DELIBERATE exception to the portal's 404-not-403 rule. They already know the job exists (it is theirs, it is in their queue), so nothing leaks, and withholding it means they keep working on something nobody will pay for.
+  - routes/vendor.ts keeps its zero-database-import invariant. All access stays in lib/vendor-scope.ts.
+  - updateJobSchema narrows to { status } only.
+  - Refusals emit production_job.transition_refused OUTSIDE any transaction.
+  - jobs.test.ts:151-159 filters on status 'sent' and must be rewritten.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.530Z'
+last_updated: '2026-08-30T12:02:20.530Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - vendor-portal
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

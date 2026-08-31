@@ -1,0 +1,299 @@
+ticket_number: 707
+title: One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
+description: |-
+  ## Task
+  This is the bug the whole feature exists for.
+
+  `PATCH /api/admin/orders/:id/shipping` (`packages/api/src/routes/admin/orders.ts:939`) merges carrier, tracking number and tracking URL into `orders.shipping_details`, a jsonb column. `GET /api/tracking/*` (`routes/tracking.ts:122`) reads `order_shipments` and returns `tracking: shipment ? {...} : null` with no fallback. The only writer of `order_shipments` is `routes/admin/shipments.ts`, which has no UI.
+
+  So the admin screen that exists writes to a store the customer page does not read. An admin enters a tracking number and the customer's tracking page shows nothing. Permanently. The whole completed `order-tracking-notifications` feature is starved by this.
+
+  Make the handler upsert the live `order_shipments` row instead.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  Depends on the audit ticket: this emits `shipment.tracking_updated`, and `AuditAction` is a closed tuple.
+
+  `orders.shipping_details` is NOT dropped and NOT cleared. It stops being written. Leaving it means the backfill can be re-run and nothing loses history; dropping it in the same pass that starts writing elsewhere is how a bad backfill becomes unrecoverable.
+
+  `orders.shipped_at` KEEPS being set here — it is the order timeline, which `routes/tracking.ts` returns separately from `tracking`, and it is not a shipment fact.
+
+  Upsert target: the live row, meaning `voided_at is null`. If none exists, insert one. `carrier` is NOT NULL on the table, so an insert with no carrier supplied needs a value — refuse with 400 rather than inventing `'unknown'`: an admin who typed a tracking number and no carrier has made a mistake worth telling them about.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:24:02.648Z'
+last_updated: '2026-08-31T02:24:02.648Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 703
+    feature: order-dispatch-tracking
+    description: Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+  - ticket: 706
+    feature: order-dispatch-tracking
+    description: One Tracking Store - Declare and emit shipment.*, and wire the orphan order.shipment_marked_delivered
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write the failing test: the PATCH must reach order_shipments and the tracking route must then see it'
+    file: packages/api/tests/routes/admin/order-shipping-upsert.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/order-shipping-upsert.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * The split brain, closed.
+       *
+       * `PATCH /admin/orders/:id/shipping` wrote `orders.shipping_details`;
+       * `GET /api/tracking/*` reads `order_shipments`. Nothing bridged them, and the
+       * only writer of `order_shipments` had no UI — so an admin typed a tracking
+       * number and the customer's page stayed empty forever.
+       *
+       * These assert the WRITE TARGET, not a round trip: the recording db is blind to
+       * what a real Postgres would do with the row, and the round trip is the E2E's
+       * job. What matters here is that the statement goes to the right table.
+       */
+
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import '../../setup'
+
+      const recorder = await vi.hoisted(async () =>
+        (await import('../../helpers/query-recorder')).createQueryRecorder({ rows: 'repeatLast' })
+      )
+      vi.mock('../../../src/database', () => ({ db: recorder.db }))
+
+      describe('PATCH /admin/orders/:id/shipping writes the store the customer reads', () => {
+        beforeEach(() => recorder.reset())
+
+        it('touches order_shipments', async () => {
+          recorder.queue([{ id: ORDER_ID, orderNumber: 'CH-1', status: 'processing' }])
+
+          const res = await app.request(`/api/admin/orders/${ORDER_ID}/shipping`, {
+            method: 'PATCH',
+            headers: adminSession(),
+            body: JSON.stringify({ carrier: 'Delhivery', trackingNumber: 'AWB123' }),
+          })
+
+          expect(res.status).toBe(200)
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql).toContain('order_shipments')
+        })
+
+        it('does NOT write orders.shipping_details any more', async () => {
+          // The jsonb column stays in the schema — the backfill needs it and nothing
+          // loses history — but a second writer is a second source of truth, which is
+          // the defect.
+          recorder.queue([{ id: ORDER_ID, orderNumber: 'CH-1', status: 'processing' }])
+
+          await app.request(`/api/admin/orders/${ORDER_ID}/shipping`, {
+            method: 'PATCH',
+            headers: adminSession(),
+            body: JSON.stringify({ carrier: 'Delhivery', trackingNumber: 'AWB123' }),
+          })
+
+          const writes = recorder.queries.filter((q) => /update .*"orders"/i.test(q.sql))
+          for (const write of writes) {
+            expect(write.sql, 'shipping_details is still being written').not.toContain(
+              'shipping_details'
+            )
+          }
+        })
+
+        it('still stamps orders.shipped_at — that is the order timeline, not a shipment fact', async () => {
+          recorder.queue([{ id: ORDER_ID, orderNumber: 'CH-1', status: 'processing' }])
+
+          await app.request(`/api/admin/orders/${ORDER_ID}/shipping`, {
+            method: 'PATCH',
+            headers: adminSession(),
+            body: JSON.stringify({ carrier: 'Delhivery', trackingNumber: 'AWB123' }),
+          })
+
+          expect(recorder.queries.map((q) => q.sql).join('\n')).toContain('shipped_at')
+        })
+
+        it('updates the LIVE row rather than opening a second one', async () => {
+          recorder.queue([{ id: ORDER_ID, orderNumber: 'CH-1', status: 'processing' }])
+          recorder.queue([{ id: SHIPMENT_ID, carrier: 'Delhivery' }])
+
+          await app.request(`/api/admin/orders/${ORDER_ID}/shipping`, {
+            method: 'PATCH',
+            headers: adminSession(),
+            body: JSON.stringify({ trackingNumber: 'AWB999' }),
+          })
+
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql.toLowerCase()).toMatch(/voided_at"?\s+is\s+null/)
+        })
+
+        it('refuses to open a shipment with no carrier rather than inventing one', async () => {
+          // `carrier` is NOT NULL. Defaulting it to 'unknown' would put a word the
+          // customer reads on a tracking page there because a form was incomplete.
+          recorder.queue([{ id: ORDER_ID, orderNumber: 'CH-1', status: 'processing' }])
+          recorder.queue([])
+
+          const res = await app.request(`/api/admin/orders/${ORDER_ID}/shipping`, {
+            method: 'PATCH',
+            headers: adminSession(),
+            body: JSON.stringify({ trackingNumber: 'AWB123' }),
+          })
+
+          expect(res.status).toBe(400)
+        })
+
+        it('records that a customer-visible tracking number changed', async () => {
+          recorder.queue([{ id: ORDER_ID, orderNumber: 'CH-1', status: 'processing' }])
+
+          await app.request(`/api/admin/orders/${ORDER_ID}/shipping`, {
+            method: 'PATCH',
+            headers: adminSession(),
+            body: JSON.stringify({ carrier: 'Delhivery', trackingNumber: 'AWB123' }),
+          })
+
+          expect(recorder.queries.map((q) => q.sql).join('\n')).toContain('admin_audit_log')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — the handler writes only the jsonb
+    command: cd packages/api && bunx vitest run tests/routes/admin/order-shipping-upsert.test.ts
+    expected_result: FAIL - no statement touches order_shipments
+    status: pending
+  - id: 3
+    action: implement
+    description: Rewrite the handler to upsert the live shipment inside one transaction
+    file: packages/api/src/routes/admin/orders.ts
+    status: pending
+    code: |-
+      // Replace the body of PATCH /:id/shipping (around line 939).
+      //
+      // One transaction, because three facts have to become true together: the
+      // shipment carries the tracking number, the order is stamped shipped, and the
+      // audit row says who did it. A tracking number a customer can read, with no row
+      // naming who typed it, is the shape of an unanswerable support call.
+      //
+      // `orders.shippingDetails` is deliberately NOT written and NOT cleared. It is
+      // the backfill's source; a pass that starts writing elsewhere AND destroys the
+      // old store leaves nothing to re-run against.
+
+        const result = await db.transaction(async (tx) => {
+          const [existingOrder] = await tx
+            .select({
+              id: orders.id,
+              orderNumber: orders.orderNumber,
+              status: orders.status,
+              shippedAt: orders.shippedAt,
+            })
+            .from(orders)
+            .where(eq(orders.id, id))
+            .limit(1);
+
+          if (!existingOrder) return { error: "Order not found", status: 404 } as const;
+
+          // The LIVE shipment: not the newest. A voided label and its replacement
+          // both hang off the order, and `order_shipments_live_label_idx` is what
+          // makes at most one of them live.
+          const [existing] = await tx
+            .select()
+            .from(orderShipments)
+            .where(and(eq(orderShipments.orderId, id), isNull(orderShipments.voidedAt)))
+            .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
+            .limit(1);
+
+          // `carrier` is NOT NULL. An admin who typed a tracking number and no
+          // carrier has made a mistake worth telling them about — defaulting it puts
+          // a placeholder on the page the customer reads.
+          if (!existing && !input.carrier) {
+            return { error: "A carrier is required to open a shipment", status: 400 } as const;
+          }
+
+          const trackingNumber = input.trackingNumber ?? existing?.trackingNumber ?? null;
+          const carrier = input.carrier ?? existing!.carrier;
+          const trackingUrl =
+            input.trackingUrl ??
+            (trackingNumber ? generateTrackingUrl(carrier, trackingNumber) : null);
+
+          const [shipment] = existing
+            ? await tx
+                .update(orderShipments)
+                .set({ carrier, trackingNumber, trackingUrl, updatedAt: new Date() })
+                .where(eq(orderShipments.id, existing.id))
+                .returning()
+            : await tx
+                .insert(orderShipments)
+                .values({ orderId: id, carrier, trackingNumber, trackingUrl, status: "pending" })
+                .returning();
+
+          // The order timeline, which is a fact about the ORDER and stays here.
+          // `routes/tracking.ts` returns it separately from `tracking` for that
+          // reason.
+          if (trackingNumber && !existingOrder.shippedAt) {
+            await tx
+              .update(orders)
+              .set({ shippedAt: new Date(), updatedAt: new Date() })
+              .where(eq(orders.id, id));
+          }
+
+          // `tx`, not `db`: this row asserts something the transaction must make
+          // true, so it shares the transaction's failures. See lib/audit.ts.
+          await recordAudit(
+            c,
+            {
+              action: "shipment.tracking_updated",
+              entityType: "order_shipment",
+              entityId: shipment.id,
+              summary: `Tracking set on order ${existingOrder.orderNumber}`,
+              before: existing
+                ? { carrier: existing.carrier, trackingNumber: existing.trackingNumber }
+                : null,
+              after: { carrier, trackingNumber },
+            },
+            tx
+          );
+
+          return { shipment } as const;
+        });
+  - id: 4
+    action: implement
+    description: Return the shipment in the response, and stop returning shippingDetails from this route
+    file: packages/api/src/routes/admin/orders.ts
+    status: pending
+    code: |-
+      // The response used to hand back `shippingDetails`. It now hands back the
+      // shipment — the thing that was actually written. Returning the jsonb after
+      // writing somewhere else would tell the admin screen its edit did not take.
+      //
+      // `packages/web/app/components/admin/OrderDetail.tsx` is updated in its own
+      // ticket; until then it renders nothing for this block, which is honest.
+
+        if ('error' in result) return c.json({ error: result.error }, result.status);
+
+        return c.json({
+          message: "Shipping details updated",
+          shipment: result.shipment,
+        });
+  - id: 5
+    action: verify-pass
+    description: Confirm the new suite and the existing admin orders suite pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/order-shipping-upsert.test.ts tests/routes/admin/orders.test.ts tests/routes/admin/orders-audit.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/admin/orders.ts packages/api/tests/routes/admin/order-shipping-upsert.test.ts && git commit -m "fix(api): make an admin-entered tracking number reach the customer"'
+    status: pending
+current_step: 1

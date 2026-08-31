@@ -585,6 +585,11 @@ adminOrdersApp.get("/:id", async (c) => {
         customizations: item.customizations,
         isFulfilled: item.isFulfilled,
         fulfilledAt: item.fulfilledAt,
+        // The flag, not the row: a gift-card line buys no goods, so nothing is
+        // ever produced for it, and the production panel has to leave it out of
+        // "nobody is making these". The purchase itself is the gift-card
+        // module's business and has no place in an order payload.
+        isGiftCard: item.giftCardPurchase != null,
         product: item.product,
         variant: item.variant,
         frame: item.frame,

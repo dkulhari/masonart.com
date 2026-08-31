@@ -10,11 +10,32 @@ description: |-
 
   Sub-project 1 of 5 in the fulfilment decomposition (order: vendor-management → production-pipeline → order-dispatch-tracking → production-qc-inspection → shipping-price-baked-in).
 
-  Fulfilment reality this serves: an order is sent out to third-party print shops, then framed, then returned, then dispatched. Multiple vendors exist for both printing and framing. Today the schema has no vendor concept at all, and order_status collapses the entire pipeline into one opaque "processing" state.
+  ~~Fulfilment reality this serves: an order is sent out to third-party print shops, then framed, then returned, then dispatched.~~ **The "then returned" half is SUPERSEDED — see the amendment below.** Multiple vendors exist for both printing and framing. Today the schema has no vendor concept at all, and order_status collapses the entire pipeline into one opaque "processing" state.
 
   Scope: vendors + contacts; capabilities (kind print|frame, size limits, finishes, stated turnaround) used to filter assignment; per-vendor rate cards with effective dating; vendor logins with a limited, row-scoped portal; a minimal production_jobs record (order, stage, vendor, status, dates, expected/actual amount); job↔order_items join so mixed baskets split; production_job_reviews for QC verdict + defects with full rework history; payables derived from unsettled jobs plus vendor_settlements recording out-of-band payment.
 
   Explicitly out of scope: the two-stage state machine, routing rules, reprint loops and lead-time calculation (production-pipeline); AI defect inspection (production-qc-inspection); executing vendor payments (stays outside the system by decision).
+
+  ## AMENDMENT — 2026-08-30: the zero-customer-data absolute is superseded
+
+  This feature shipped an absolute rule, stated in `packages/api/src/lib/vendor-scope.ts:15` and enforced as a blanket property by `packages/api/tests/routes/vendor/isolation.test.ts` and `packages/web/tests/routes/vendor/no-customer-data.test.tsx`:
+
+  > Second rule, equally absolute: no return value here contains customer data.
+
+  Its justification was explicitly conditional — *"because dispatch is in-house: the piece returns to you before it ships"*. **That premise is now false.** Vendors own the piece from production through despatch, the courier collects from the vendor's facility, and goods never come back. A carrier's shipping label necessarily carries the customer's name, address and phone.
+
+  The rule is not weakened into a vague guideline. `production-pipeline` replaces it with three clauses, each as mechanically checkable as the one they replace:
+
+  - **R1 — the JSON stays clean, absolutely.** No JSON body on any `/api/vendor/*` route contains a customer name, address, phone, email or person-linked order reference, at any depth, in any casing. No exception, ever. The existing forbidden-key vocabulary, recursive body walker, wholesale-`select()` ban and SELECT-projection assertion are unchanged and extend to every new route.
+  - **R2 — customer data reaches a vendor only as opaque rendered bytes, behind a short-lived signature.** Only as a rendered document fetched from a signed expiring URL and handed to the operating system. Never as fields, never composed by our API, never rendered into the vendor portal's own DOM. Exactly one such document exists: the carrier label PDF.
+  - **R3 — the allow-list is the enforcement, and the scopes are disjoint.** `VENDOR_ARTWORK_PREFIXES` becomes `VENDOR_SIGNING_SCOPES` (`artwork` | `qcPhoto` | `label`), and each route may sign only within its own scope — asserted pairwise disjoint and non-substitutable, which is what stops the label exception widening into a general signer.
+
+  **Nothing in this feature's shipped code is wrong.** The row-scoping design, the scoped query module, the signed expiring artwork URLs and the fail-closed prefix allow-list are exactly what made the boundary extensible when the premise moved. What changes is the justification sentence in the module header and the shape of the tests. Five test files are affected: `packages/api/tests/routes/vendor/{isolation,jobs,artwork}.test.ts` and `packages/web/tests/routes/vendor/{no-customer-data,vendor-screens,layout-guard}.test.tsx`.
+
+  Two further consequences recorded here so this feature's own text stops asserting them:
+
+  - `production_job_status`'s `sent` / `received` pair was ambiguous and is now settled. `packages/web/app/lib/vendor-nav.ts:35` claims the array is *"in the order the work moves"* while listing `sent` before `received`, contradicting its own labels four lines below. `production-pipeline` re-means `received` as *"the vendor has everything needed to start"*, retires `sent` in code, and adds `qc_submitted` and `dispatched`.
+  - **A defect this feature left latent goes live with the next one:** `routes/admin/vendor-payables.ts:172`, `:308` and `lib/vendor-scope.ts`'s `getVendorPayableTotal` all filter on `settlement_id IS NULL` alone and never look at `status`, so a cancelled job strands a phantom payable that the vendor sees in their own portal permanently. Harmless only while cancellation is unreachable. Filed as its own bug ticket under `production-pipeline`.
 
   ## Objectives
   - TBD
@@ -109,7 +130,7 @@ design:
     - **requireVendor** resolves the caller's vendorId into context; a missing link is 403, never an unscoped query.
     - **Scoped query module** — all vendor-facing data access goes through functions taking vendorId as a required first argument. Routes cannot reach the tables directly. This makes unfiltered access inexpressible rather than merely discouraged, and puts the isolation guarantee in one testable place instead of an audit across every route forever.
 
-    **Vendors need zero customer data.** Because dispatch is in-house, the piece returns to you before it ships, so no vendor-facing payload contains a customer name, address, phone, or person-linked order reference. Stated as an absolute so it can be tested as one.
+    **Vendors need zero customer data.** Because dispatch is in-house, the piece returns to you before it ships, so no vendor-facing payload contains a customer name, address, phone, or person-linked order reference. Stated as an absolute so it can be tested as one. [SUPERSEDED 2026-08-30: dispatch moved to the vendor, so a carrier label now necessarily carries customer PII. Replaced by R1/R2/R3 in production-pipeline - see the AMENDMENT in this feature description. The row-scoping design and the signed-URL allow-list below are unaffected; only this justification and the shape of the tests change.]
 
     A vendor sees: their jobs, the items on them, the artwork to print, size, finish, due date, their own rate card, their own amounts and settlements. Not other vendors' anything, not retail prices, not margins.
 
@@ -163,7 +184,7 @@ design:
     - Scope is directory + capability matching with human assignment. Not auto-routing (needs capacity data that does not exist), not full procurement (needs production history to be meaningful).
     - Vendors get logins and a limited portal, and this is the decision that adds real security surface.
     - 'Row-scoping, not role-gating. Every existing role is a blanket grant: a content-manager sees ALL products, so requireRole is the complete check. A vendor sees only their own rows, which requireRole cannot express. Enforced in one scoped query module where vendorId is a required first argument, so unfiltered access is not expressible rather than merely discouraged.'
-    - 'Vendors need ZERO customer data, because dispatch is in-house: the piece returns to you before it ships. This is a consequence of the fulfilment model, not an imposed restriction, which is why it can be tested as a blanket rule (no vendor-facing payload contains a customer field).'
+    - 'Vendors need ZERO customer data, because dispatch is in-house: the piece returns to you before it ships. This is a consequence of the fulfilment model, not an imposed restriction, which is why it can be tested as a blanket rule (no vendor-facing payload contains a customer field). SUPERSEDED 2026-08-30: vendors now despatch directly and the carrier label carries customer PII, so the premise (dispatch is in-house) is false. Replaced by R1/R2/R3 in production-pipeline; see the AMENDMENT in this feature description.'
     - Rate card per vendor WITH per-job override. The computed expected amount keeps cost data structured for shipping-price-baked-in calibration; the override acknowledges that print shops negotiate. Rate-card-only pushes staff into workarounds; manual-only makes overcharging invisible.
     - Rate cards are effective-dated, following the shipping_config precedent (lib/shipping-config.ts resolves against the caller's clock). A vendor announcing a price rise from the 1st is the ordinary case, not an edge case.
     - 'QC verdicts live in production_job_reviews, a separate table rather than a column on the job, so reject -> rework -> re-review keeps its history. Deliberately mirrors ai_generation_reviews (schema/ai-generation-reviews.ts): same problem, same shape, existing repo pattern.'

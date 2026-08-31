@@ -1,0 +1,202 @@
+ticket_number: 704
+title: Label Seam - Read the real column and delete the 42703 to 503 path
+description: |-
+  ## Task
+  `packages/api/src/lib/vendor-scope.ts` reads `order_shipments.label_object_token` as a raw SQL fragment because the column did not exist. Postgres raised `42703`, a catch turned it into `LabelSeamNotReady`, and `routes/vendor.ts` answered a fixed `503`. The column landed in the previous ticket, so all of that is now scaffolding around a working query — and worse than useless: it converts every genuine failure of that read into "not available yet".
+
+  `packages/api/tests/lib/vendor-label-seam.test.ts:211` is already RED and its failure message is the checklist. Follow it literally.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 2 — Close the label seam
+
+  Delete list, from that test's own message:
+  1. `lib/vendor-scope.ts` — replace the `LABEL_OBJECT_TOKEN` sql fragment with `orderShipments.labelObjectToken`, and delete the catch in `getVendorJobLabelKey` that turns 42703 into `LabelSeamNotReady`.
+  2. `routes/vendor.ts` — delete the `LabelSeamNotReady` branch that answers 503 on `GET /jobs/:id/label`.
+  3. Delete that test, and check the rest of the file still passes.
+
+  What must NOT change: the ordering of the four authorisation predicates, and the rule that nothing is signed before they all pass. `getPresignedDownloadUrl` is reached only after the read returns a row. A signed URL that is generated and then withheld has still been generated.
+
+  Keep the whole `LABEL_ACCESS_STATUSES` section of the test file — that is the status bound, not the seam.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:20:37.640Z'
+last_updated: '2026-08-31T02:20:37.640Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 703
+    feature: order-dispatch-tracking
+    description: Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: verify-fail
+    description: Confirm the seam test is red and read its failure message as the checklist
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
+    expected_result: FAIL - 'order_shipments.label_object_token has LANDED'
+    status: pending
+  - id: 2
+    action: implement
+    description: Replace the SQL fragment with the real column and delete the seam machinery
+    file: packages/api/src/lib/vendor-scope.ts
+    status: pending
+    code: |-
+      // DELETE, in full:
+      //   - the LABEL_OBJECT_TOKEN doc block and `const LABEL_OBJECT_TOKEN = sql`...``
+      //   - const LABEL_OBJECT_TOKEN_COLUMN
+      //   - const UNDEFINED_COLUMN
+      //   - export class LabelSeamNotReady
+      //   - the isMissingLabelSeam helper and the cause-chain walker it uses, IF
+      //     nothing else calls them (grep first)
+      //
+      // In getVendorJobLabelKey, the select and the predicate become ordinary column
+      // references:
+
+        const read = db
+          // Narrow on purpose, like every read above: the token and nothing else.
+          // `orders`, `order_shipments` and `order_consolidation` all hold or point
+          // at customer data, and a wholesale select of any of them would drag it
+          // across a boundary R1 says it may never cross.
+          .select({ token: orderShipments.labelObjectToken })
+          .from(productionJobs)
+          .innerJoin(orderConsolidation, eq(orderConsolidation.orderId, productionJobs.orderId))
+          .innerJoin(orderShipments, eq(orderShipments.orderId, productionJobs.orderId))
+          .where(
+            and(
+              eq(productionJobs.id, jobId),
+              // The job is theirs...
+              eq(productionJobs.vendorId, vendorId),
+              // ...AND they are the one despatching the order...
+              eq(orderConsolidation.vendorId, vendorId),
+              // ...AND the job is in a status where a label is legitimately needed,
+              // which is derived from the matrix rather than listed here...
+              inArray(productionJobs.status, [...LABEL_ACCESS_STATUSES]),
+              // ...AND a label actually exists. All four, or no row.
+              isNotNull(orderShipments.labelObjectToken)
+            )
+          )
+          .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
+          .limit(1)
+
+        // The try/catch is GONE. It existed to convert `42703` on a column that did
+        // not exist into a deliberate refusal; the column exists, so every failure
+        // this read can now produce is a real one and must travel.
+        const rows = await read
+  - id: 3
+    action: implement
+    description: Delete the 503 branch from the vendor label route
+    file: packages/api/src/routes/vendor.ts
+    status: pending
+    code: |-
+      // In GET /jobs/:id/label:
+      //   - delete the `if (error instanceof LabelSeamNotReady)` branch and the
+      //     LABEL_NOT_AVAILABLE body it returns
+      //   - delete LabelSeamNotReady from the import list
+      //   - leave the generic 500 catch exactly as it is: it already refuses to echo
+      //     the driver, which is the property the seam work was protecting
+      //   - update the route's doc block: the paragraph titled '## The seam under all
+      //     of this, and the 503' describes a state that no longer exists. Replace it
+      //     with what is now true — the token column exists, a miss is an ordinary
+      //     404, and the 404 still covers all of: no such job, not your job, you are
+      //     not the consolidator, no label bought yet.
+  - id: 4
+    action: implement
+    description: Delete the two seam-detection tests; keep everything else in the file
+    file: packages/api/tests/lib/vendor-label-seam.test.ts
+    status: pending
+    code: |-
+      // DELETE the whole `describe('the label seam is detectable in BOTH directions')`
+      // block — both its tests. It existed to notice the column arriving; it has.
+      //
+      // DELETE `describe('the missing seam fails clearly, and says nothing about the
+      // schema')` EXCEPT the two cases that are still true and still worth holding:
+      //   - 'does NOT echo the driver on the generic 500 either'
+      //   - 'signs nothing and claims no disclosure when the seam is missing' —
+      //     reword to 'signs nothing when no label row matches', driven by an empty
+      //     result rather than by a thrown 42703.
+      //
+      // KEEP, untouched: describe('the label is bound to the statuses where it is
+      // legitimately needed') — all three tests. That is the status bound, not the
+      // seam, and it is the reason a cancelled job cannot fetch a customer's address.
+      //
+      // Update the file's header comment: points 1 and 2 describe a seam that is
+      // closed. Say what the file now holds — the status bound, and the rule that
+      // nothing is signed before all four predicates pass.
+  - id: 5
+    action: write-test
+    description: 'Write the test that the route now WORKS: a live label signs and returns a URL'
+    file: packages/api/tests/lib/vendor-label-seam.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      describe('the label route works now that the column exists', () => {
+        it('signs the token as fulfilment/labels/<token>.pdf and answers 200', async () => {
+          // The whole point of the previous ticket: this used to be a 503 in every
+          // environment, including production.
+          recorder.queue([{ token: 'r7Kq2-_aZ9' }])
+
+          const res = await app.request('/api/vendor/jobs/' + JOB_ID + '/label', {
+            headers: vendorSessionFor(VENDOR_ID),
+          })
+
+          expect(res.status).toBe(200)
+          const body = await res.json()
+          expect(body.jobId).toBe(JOB_ID)
+          expect(typeof body.url).toBe('string')
+          expect(body.expiresInSeconds).toBeGreaterThan(0)
+        })
+
+        it('still answers 404 — never 503 — when no label row matches', async () => {
+          recorder.queue([])
+
+          const res = await app.request('/api/vendor/jobs/' + JOB_ID + '/label', {
+            headers: vendorSessionFor(VENDOR_ID),
+          })
+
+          expect(res.status).toBe(404)
+        })
+
+        it('names no column, table or driver in any body it produces', async () => {
+          recorder.queue([])
+
+          const res = await app.request('/api/vendor/jobs/' + JOB_ID + '/label', {
+            headers: vendorSessionFor(VENDOR_ID),
+          })
+          const text = await res.text()
+
+          for (const leak of ['label_object_token', 'order_shipments', '42703', 'column']) {
+            expect(text.toLowerCase()).not.toContain(leak)
+          }
+        })
+      })
+  - id: 6
+    action: verify-pass
+    description: Confirm the whole label suite passes, plus the vendor isolation suite that asserted the 503
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts tests/lib/vendor-scope.test.ts tests/routes/vendor
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: 'Typecheck — api tests are typechecked as of #662, so a stale LabelSeamNotReady import fails the gate'
+    command: cd packages/api && bun run typecheck
+    expected_result: PASS - no reference to LabelSeamNotReady remains
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/lib/vendor-scope.ts packages/api/src/routes/vendor.ts packages/api/tests/lib/vendor-label-seam.test.ts && git commit -m "fix(api): let a vendor actually fetch the label for the order they consolidate"'
+    status: pending
+current_step: 1

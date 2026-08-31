@@ -1,0 +1,37 @@
+ticket_number: 685
+title: Vendor Portal API - QC photo upload by presign and complete
+description: |-
+  ## Task
+  Add GET /jobs/:id/photos, POST /jobs/:id/photos/presign, POST /jobs/:id/photos/complete and DELETE /jobs/:id/photos/:photoId to the vendor portal, plus `assertShotListComplete` gating the received -> qc_submitted edge.
+
+  ## Context
+  Feature: production-pipeline. Phase 4 of 7. Depends on #pp02, #pp06.
+
+  Design constraints:
+  - REUSE routes/review-media.ts's presign -> complete pattern verbatim: bytes go direct to R2, never through Hono, and `complete` re-validates because the two calls are minutes apart. Reuse lib/storage.ts's getPresignedUploadUrl and the content-type-to-extension map and size cap.
+  - An incomplete shot list is 422 NAMING THE MISSING SLOTS.
+  - Re-uploading a slot sets superseded_at on the previous row rather than deleting it.
+  - Photos sign under the `qcPhoto` scope only. The scope must refuse a products/ or fulfilment/labels/ key.
+  - Every new route needs a ROUTE_TABLE entry in tests/routes/vendor/isolation.test.ts or the suite fails - which is the point.
+  - production_job.photos_submitted records the slots and keys in `after`.
+  - Retention is 400 days, matching the audit window: the audit row and the photograph it refers to must not outlive each other in opposite directions. ON DELETE CASCADE drops rows and leaves R2 objects orphaned FOREVER, so the sweep calls deleteByPrefix and only THEN deletes rows.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.564Z'
+last_updated: '2026-08-30T12:02:20.564Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - vendor-portal
+  - qc
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

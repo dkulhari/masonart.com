@@ -1,0 +1,226 @@
+ticket_number: 702
+title: Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
+description: |-
+  ## Task
+  `shipment_status` has seven values and stops at `failed`, which means a failed DELIVERY. It has no word for a voided label, for an NDR the courier is holding, for a parcel travelling back to us, or for one that was lost. Dispatch cannot record what a courier actually reports without them.
+
+  Five new values: `undelivered` (NDR), `rto_initiated`, `rto_delivered`, `lost`, `cancelled` (the label was voided or the shipment cancelled — NOT a delivery failure).
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 1 — Database Schema
+
+  Pattern to follow: `packages/api/src/database/migrations/0023_production_pipeline_statuses.sql`. That migration is `ALTER TYPE ... ADD VALUE` statements and **nothing else**, and its header says why: `drizzle-kit migrate` wraps the whole pending batch in ONE transaction, and Postgres refuses any use of a value added by `ALTER TYPE ... ADD VALUE` in that same transaction. Splitting the ADD VALUE and its first use across two migration FILES does not help — on a fresh database both files are in the same batch. That is #580.
+
+  So: no backfill, no index predicate, no CHECK constraint in this migration. `BEFORE` places each value in lifecycle order rather than appending, so the enum's sort order still reads as the sequence of work and matches the drizzle DSL array.
+
+  Migrations are applied with `db:migrate`, never `db:push` (#663).
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:20:37.476Z'
+last_updated: '2026-08-31T02:20:37.476Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing test for the new enum values and the shape of the migration
+    file: packages/api/tests/database/shipment-status-enum.test.ts
+    command: cd packages/api && bunx vitest run tests/database/shipment-status-enum.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * `shipment_status` carries the states a real courier reports.
+       *
+       * The seven-value enum stopped at `failed`, which is a failed DELIVERY. It had
+       * no word for a voided label, for an NDR the courier is holding, or for a
+       * parcel on its way back to us, so dispatch could not record what Shiprocket
+       * says without inventing one.
+       *
+       * The migration is asserted as TEXT rather than by connecting. `ALTER TYPE ...
+       * ADD VALUE` and a use of the value it added cannot share a transaction, and
+       * `drizzle-kit migrate` runs the whole pending batch in one (#580) — a test
+       * that inserted a row would pass on a database where the batch had already
+       * been split and fail on a fresh one.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { resolve } from 'node:path'
+
+      import { shipmentStatusEnum } from '../../src/database/schema/shipping'
+
+      const MIGRATION = resolve(
+        __dirname,
+        '../../src/database/migrations/0026_shipment_dispatch_statuses.sql'
+      )
+
+      const PRE_EXISTING = [
+        'pending',
+        'label_created',
+        'shipped',
+        'in_transit',
+        'out_for_delivery',
+        'delivered',
+        'failed',
+      ] as const
+
+      const ADDED = ['undelivered', 'rto_initiated', 'rto_delivered', 'lost', 'cancelled'] as const
+
+      describe('shipment_status covers a real courier lifecycle', () => {
+        it('keeps every pre-existing value — dropping one rewrites every dependent column', () => {
+          for (const value of PRE_EXISTING) {
+            expect(shipmentStatusEnum.enumValues).toContain(value)
+          }
+        })
+
+        it('adds the five states a dispatch actually reports', () => {
+          for (const value of ADDED) {
+            expect(shipmentStatusEnum.enumValues).toContain(value)
+          }
+        })
+
+        it('sorts in lifecycle order, so the enum reads as the sequence of work', () => {
+          expect([...shipmentStatusEnum.enumValues]).toEqual([
+            'pending',
+            'label_created',
+            'shipped',
+            'in_transit',
+            'out_for_delivery',
+            'undelivered',
+            'delivered',
+            'rto_initiated',
+            'rto_delivered',
+            'lost',
+            'cancelled',
+            'failed',
+          ])
+        })
+
+        it('adds them in the migration, and adds NOTHING else', () => {
+          const statements = readFileSync(MIGRATION, 'utf8')
+            .split('--> statement-breakpoint')
+            .map((s) => s.replace(/^\s*--.*$/gm, '').trim())
+            .filter(Boolean)
+
+          expect(statements).toHaveLength(ADDED.length)
+          for (const statement of statements) {
+            expect(statement).toMatch(/^ALTER TYPE "public"\."shipment_status" ADD VALUE/)
+          }
+        })
+
+        it('uses no new value in the same batch — the #580 rule', () => {
+          const sql = readFileSync(MIGRATION, 'utf8').replace(/^\s*--.*$/gm, '')
+          for (const forbidden of ['UPDATE ', 'INSERT ', 'CREATE INDEX', 'CHECK (']) {
+            expect(sql, `${forbidden.trim()} uses the type in the transaction that extends it`).not.toContain(
+              forbidden
+            )
+          }
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — the values are absent and the migration does not exist
+    command: cd packages/api && bunx vitest run tests/database/shipment-status-enum.test.ts
+    expected_result: FAIL - ENOENT on 0026_shipment_dispatch_statuses.sql, and enumValues is missing all five new values
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the five values to the drizzle enum, in lifecycle order
+    file: packages/api/src/database/schema/shipping.ts
+    status: pending
+    code: |-
+      /**
+       * Shipment status enum for tracking order delivery lifecycle.
+       *
+       * Sorted as the work moves, not as the values were added: an NDR happens on a
+       * delivery ATTEMPT so it sits before `delivered`, and the three ways a parcel
+       * ends up somewhere other than the customer sit after it.
+       *
+       * `failed` is a failed DELIVERY and always was — it is NOT a voided label.
+       * `cancelled` is the voided one. Keeping them apart is the whole reason this
+       * type grew: `order_shipments` had no way to say "this label is dead", so
+       * `lib/vendor-scope.ts` had to guess the live label by recency.
+       */
+      export const shipmentStatusEnum = pgEnum("shipment_status", [
+        "pending", // Shipment created, awaiting label
+        "label_created", // Shipping label generated
+        "shipped", // Package handed to carrier
+        "in_transit", // Package in transit
+        "out_for_delivery", // Out for final delivery
+        "undelivered", // NDR: an attempt failed, the courier is holding it
+        "delivered", // Successfully delivered
+        "rto_initiated", // On its way back to the pickup location
+        "rto_delivered", // Back at the pickup location
+        "lost", // The courier cannot account for it
+        "cancelled", // The label was voided or the shipment cancelled
+        "failed", // Delivery failed
+      ]);
+  - id: 4
+    action: implement
+    description: Generate the migration, then annotate it and strip anything that is not an ADD VALUE
+    file: packages/api/src/database/migrations/0026_shipment_dispatch_statuses.sql
+    command: cd packages/api && bun run db:generate
+    status: pending
+    code: |-
+      -- order-dispatch-tracking phase 1: the states a real courier reports.
+      --
+      -- ADD VALUE statements and NOTHING else, deliberately.
+      --
+      -- `drizzle-kit migrate` wraps the whole pending batch in ONE transaction, and
+      -- Postgres refuses any use of a value added by `ALTER TYPE ... ADD VALUE` in
+      -- that same transaction: `unsafe use of new value "x" of enum type y`. Note
+      -- that splitting the ADD VALUE and its first use across two migration FILES
+      -- does not help — on a fresh database both files are in the same batch. That is
+      -- #580, and 0023 is the precedent.
+      --
+      -- So: no backfill here, no index predicate, no CHECK constraint. The dispatch
+      -- COLUMNS are a separate migration for the same reason.
+      --
+      -- BEFORE places each value in lifecycle order rather than appending it, so the
+      -- enum's sort order still reads as the sequence of work and matches the drizzle
+      -- DSL array. `delivered` and `failed` are pre-existing values, so naming them
+      -- here is a catalog lookup, not a use of anything new.
+
+      -- An attempt failed and the courier is holding the parcel. NOT `failed`, which
+      -- is the end of the line.
+      ALTER TYPE "public"."shipment_status" ADD VALUE 'undelivered' BEFORE 'delivered';--> statement-breakpoint
+      -- Going back to the pickup location, and arrived there.
+      ALTER TYPE "public"."shipment_status" ADD VALUE 'rto_initiated' BEFORE 'failed';--> statement-breakpoint
+      ALTER TYPE "public"."shipment_status" ADD VALUE 'rto_delivered' BEFORE 'failed';--> statement-breakpoint
+      -- The courier cannot account for it.
+      ALTER TYPE "public"."shipment_status" ADD VALUE 'lost' BEFORE 'failed';--> statement-breakpoint
+      -- The LABEL is dead. `failed` is a failed delivery and never meant this.
+      ALTER TYPE "public"."shipment_status" ADD VALUE 'cancelled' BEFORE 'failed';
+  - id: 5
+    action: verify-pass
+    description: Confirm the suite passes
+    command: cd packages/api && bunx vitest run tests/database/shipment-status-enum.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Apply the migration and confirm the whole api suite is no worse than the branch baseline
+    command: cd packages/api && bun run db:migrate && bunx vitest run tests/database tests/schema
+    expected_result: PASS - migration applies, no new failures
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/database/schema/shipping.ts packages/api/src/database/migrations packages/api/tests/database/shipment-status-enum.test.ts && git commit -m "feat(api): teach shipment_status the states a courier actually reports"'
+    status: pending
+current_step: 1

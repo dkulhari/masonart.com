@@ -1,0 +1,192 @@
+ticket_number: 710
+title: One Tracking Store - Shipped and delivered notifications read the shipment
+description: |-
+  ## Task
+  The shipped SMS and the shipped email both read the store nobody writes:
+
+  - `packages/api/src/services/notifications.ts:158` — `order.shippingDetails?.trackingUrl || "chobii.art/orders"`. The `||` means every shipped SMS has quietly linked to a generic page instead of the customer's parcel.
+  - `packages/api/src/services/email-templates.ts:303-307` and `:378` — `trackingUrl`, `carrier`, `trackingNumber`, `estimatedDelivery`, all from the same jsonb. The carrier falls back to the string `"our carrier partner"`.
+
+  After this phase that jsonb stops being written, so these go from wrong-but-populated to permanently empty. They move with it.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  Depends on the tracking-read ticket for the `liveShipmentFor` shape — use the same predicate. If it is worth exporting from a shared place rather than duplicating, do that; a second copy of "which shipment is live" is the class of bug this whole phase is about.
+
+  These are pure-ish template functions taking an `order`. Thread the shipment in as a second argument rather than making them query — `email-templates.ts` has no database import today and giving it one would make every template test need a mock.
+
+  Keep the fallbacks, but make them honest. "our carrier partner" is fine when there is genuinely no shipment yet. What is not fine is it appearing because the code read the wrong column.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:24:02.821Z'
+last_updated: '2026-08-31T02:24:02.821Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 709
+    feature: order-dispatch-tracking
+    description: One Tracking Store - GET /api/tracking reads the live shipment
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write the failing test: the shipped SMS and email carry the real tracking URL'
+    file: packages/api/tests/services/shipped-notification-tracking.test.ts
+    command: cd packages/api && bunx vitest run tests/services/shipped-notification-tracking.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * The shipped notification links to the parcel, not to a generic page.
+       *
+       * `notifications.ts:158` read `order.shippingDetails?.trackingUrl` and fell
+       * back to `chobii.art/orders` with a `||`. Because the admin screen wrote that
+       * jsonb and nothing else did, the value was sometimes there — which is why the
+       * fallback was never noticed. After this phase the jsonb is not written at all,
+       * so the fallback would be the only branch left.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { buildOrderSms } from '../../src/services/notifications'
+      import { renderShippedEmail } from '../../src/services/email-templates'
+      import '../setup'
+
+      const ORDER = { orderNumber: 'CH-1042', shippingDetails: null } as const
+      const SHIPMENT = {
+        carrier: 'Shiprocket',
+        courierName: 'Delhivery',
+        trackingNumber: 'AWB55512345',
+        trackingUrl: 'https://track.example/AWB55512345',
+        estimatedDeliveryAt: new Date('2026-09-04T00:00:00Z'),
+      } as const
+
+      describe('the shipped SMS', () => {
+        it('links to the parcel when a shipment exists', () => {
+          const text = buildOrderSms('shipped', ORDER, SHIPMENT)
+          expect(text).toContain(SHIPMENT.trackingUrl)
+          expect(text).not.toContain('chobii.art/orders')
+        })
+
+        it('falls back only when there is genuinely no shipment', () => {
+          const text = buildOrderSms('shipped', ORDER, null)
+          expect(text).toContain('chobii.art/orders')
+        })
+
+        it('never reads shippingDetails', () => {
+          // The jsonb is not written after this phase. A read of it is a silent
+          // permanent empty, not a fallback.
+          const withStale = { ...ORDER, shippingDetails: { trackingUrl: 'https://stale.example' } }
+          const text = buildOrderSms('shipped', withStale, SHIPMENT)
+          expect(text).not.toContain('stale.example')
+        })
+      })
+
+      describe('the shipped email', () => {
+        it('names the COURIER, which is what the customer recognises', () => {
+          // `carrier` is the aggregator we bought through.
+          const html = renderShippedEmail(ORDER, SHIPMENT)
+          expect(html).toContain('Delhivery')
+        })
+
+        it('carries the tracking number and the link', () => {
+          const html = renderShippedEmail(ORDER, SHIPMENT)
+          expect(html).toContain(SHIPMENT.trackingNumber)
+          expect(html).toContain(SHIPMENT.trackingUrl)
+        })
+
+        it("says 'our carrier partner' only when there is no shipment at all", () => {
+          expect(renderShippedEmail(ORDER, null)).toContain('our carrier partner')
+          expect(renderShippedEmail(ORDER, SHIPMENT)).not.toContain('our carrier partner')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — neither function accepts a shipment
+    command: cd packages/api && bunx vitest run tests/services/shipped-notification-tracking.test.ts
+    expected_result: FAIL - buildOrderSms and renderShippedEmail take no shipment argument
+    status: pending
+    code: ''
+  - id: 3
+    action: implement
+    description: Thread the shipment into the SMS builder
+    file: packages/api/src/services/notifications.ts
+    status: pending
+    code: |-
+      // The shipment is PASSED IN, not queried. This module is called from several
+      // places and giving it its own read would mean four callers each choosing which
+      // shipment is live — which is the exact defect this phase removes.
+      //
+      // Around line 158:
+
+          case "shipped":
+            // The LIVE shipment's URL, or the orders page. The old `||` read a jsonb
+            // nothing writes any more, so the fallback would have become the only
+            // branch — every shipped SMS pointing at a generic page.
+            return `chobii.art: Your order ${orderNumber} has shipped! Track: ${
+              shipment?.trackingUrl ?? "chobii.art/orders"
+            }`;
+
+      // Add `shipment` to the function's parameters and to every call site. Let the
+      // typechecker find them: packages/api is typechecked including its tests
+      // (#662), so a missed caller is a build failure, not a runtime surprise.
+  - id: 4
+    action: implement
+    description: Thread the shipment into the email templates
+    file: packages/api/src/services/email-templates.ts
+    status: pending
+    code: |-
+      // Lines ~303-307 and ~378. Same rule: passed in, never queried — this module
+      // has no database import today and giving it one would make every template test
+      // need a mock.
+      //
+      // The fallbacks STAY, because "no shipment yet" is a real state an email can be
+      // sent in. What changes is that they are reached for that reason and not
+      // because the code read a column nothing writes.
+
+        const trackingUrl = shipment?.trackingUrl ?? `${SITE_URL}/orders`;
+        // The COURIER, not the aggregator. A customer recognises 'Delhivery'; nobody
+        // outside this office recognises the name of the platform we bought through.
+        const carrier = shipment?.courierName ?? shipment?.carrier ?? "our carrier partner";
+        const trackingNumber = shipment?.trackingNumber ?? "";
+        const estimatedDelivery = shipment?.estimatedDeliveryAt ?? null;
+  - id: 5
+    action: implement
+    description: Update every caller to load and pass the live shipment
+    file: packages/api/src/services/notifications.ts
+    command: cd packages/api && bun run typecheck
+    status: pending
+    code: |-
+      // Find the callers with the typechecker rather than by grep:
+      //
+      //   cd packages/api && bun run typecheck
+      //
+      // Each caller loads the live shipment with the SAME predicate the tracking
+      // route uses — `voided_at IS NULL`, newest as tiebreak. If that read now exists
+      // in three places, extract it to one exported helper and have all three call
+      // it. Three copies of "which shipment is live" is how this feature's original
+      // bug happened.
+  - id: 6
+    action: verify-pass
+    description: Confirm the suites and the typecheck pass
+    command: cd packages/api && bunx vitest run tests/services && bun run typecheck
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/services packages/api/tests/services/shipped-notification-tracking.test.ts && git commit -m "fix(api): point the shipped notification at the parcel, not the orders page"'
+    status: pending
+current_step: 1

@@ -15,31 +15,76 @@
  * treating the cancelled row as "handled" would re-hide exactly what this panel
  * exists to reveal.
  *
- * ## Why it scans, and why it admits when the scan was cut short
+ * ## The scan is gone
  *
- * `GET /api/admin/production` filters by stage, status and vendor — there is no
- * `orderId` filter yet. So the panel pages the queue and matches client-side,
- * and sends `orderId` in the query anyway so it narrows for free the day the
- * API learns it.
+ * This file used to page the whole production queue and match client-side,
+ * because `GET /api/admin/production` had no `orderId` filter. It said so, and
+ * predicted its own repair: "the day it learns the filter this narrows the scan
+ * to nothing". #682 added the filter, so the queue read is now ONE request that
+ * asks for this order's jobs. `MAX_SCAN_PAGES`, `SCAN_PAGE_SIZE` and the
+ * `truncated` flag went with it — a guard whose reason for existing is gone is
+ * not a guard, it is a branch nobody can reach or test.
  *
- * The scan is bounded (`MAX_SCAN_PAGES`), and that bound has a consequence the
- * UI must not paper over: on a queue too long to scan, "these items are on no
- * job" is a guess. So a truncated scan sets a flag, the panel withholds the
- * coverage verdict entirely and says why. Printing a reassuring "all covered"
- * off an incomplete read is #602 and #606 wearing a different hat.
+ * ## What did NOT go with it
+ *
+ * The reason that flag existed outlives it: **a confident answer over an
+ * incomplete read is worse than no answer.** Four independent reads back this
+ * panel, and each one owns its own loading, empty and error state:
+ *
+ * | Read | Answers |
+ * |---|---|
+ * | `GET /api/admin/production?orderId=` | which jobs exist, and so which items are on none |
+ * | `GET /api/admin/orders/:id/production-readiness` | why this order cannot be labelled yet |
+ * | `GET /api/admin/transfers?orderId=` | where the goods physically are |
+ * | `GET /api/admin/orders/:id/consolidator` | whether the consolidator was chosen by the system or by a person |
+ *
+ * A failed read renders an error and claims nothing. Readiness in particular
+ * renders the BLOCKER LIST and never a bare "not ready", and a failed readiness
+ * read never renders "ready to ship" — that is the #602/#606 failure mode with
+ * a courier label attached to it.
+ *
+ * ## Where the consolidator's provenance comes from
+ *
+ * `decided_by IS NULL` means the SYSTEM chose because there was nothing to
+ * choose; a value means an admin stood behind an arbitrary call. That
+ * distinction is the whole point of the column, and `GET
+ * /api/admin/orders/:id/consolidator` (#698) is what exposes it — the
+ * `order_consolidation` row itself, `vendorId` / `decidedBy` / `decidedAt`, so
+ * this file decides how to render it rather than being handed a verdict.
+ *
+ * It used to come off the newest successful `order.consolidator_set` audit row
+ * instead, because nothing else returned the column. That was the right
+ * fallback over the wrong source: `queues/audit-retention.ts` sweeps the trail
+ * at 400 days while `order_consolidation` never expires, so the panel would
+ * have started saying "unknown" about a fact the database still held — and the
+ * audit log is admin-and-super-admin-only, which is no basis for a display.
+ *
+ * Three answers stay three answers. The read FAILED, the read is still
+ * RUNNING, and the order has NO consolidation row are different states, and
+ * none of them is a guess at which way it was decided.
+ *
+ * ## This panel reports; it does not produce
+ *
+ * It has never created a job, and still does not. The one thing it writes is
+ * the consolidator, because choosing who assembles the order is a judgement
+ * with no other home in the admin.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { AlertCircle } from 'lucide-react'
-import { getApiUrl } from '~/lib/utils'
+import { AlertCircle, CheckCircle2, Truck } from 'lucide-react'
+import type { ProductionJobStatus } from '@chobii/shared'
+import { cn, getApiUrl } from '~/lib/utils'
+import { useLatestOnly } from '~/lib/latest-request'
 import { Button } from '~/components/ui/Button'
 import {
   STAGE_LABELS,
   StatusPill,
+  formatDate,
   formatRupees,
   type AdminProductionJobListItem,
   type AdminProductionPage,
+  type ProductionStage,
 } from './index'
 import type { ProductionJobItemRow } from './$id'
 
@@ -63,33 +108,94 @@ export interface OrderProductionPanelItem {
   snapshot?: { title?: string; sizeLabel?: string } | null
   product?: { title: string } | null
   variant?: { sizeLabel: string } | null
+  /** A frame on the line means print THEN frame; absent means a rolled poster. */
+  frame?: { id: string } | null
+  /** `order_items.gift_card_purchase IS NOT NULL`. Nothing is produced for one. */
+  isGiftCard?: boolean
 }
 
-/** Statuses that do NOT mean the item is being made. */
-const NON_COVERING_STATUSES = new Set(['cancelled'])
+/**
+ * Statuses that do NOT mean the item is being made.
+ *
+ * Typed against the shared vocabulary rather than left as bare strings. This is
+ * the one file whose purpose is NOT to write the vocabulary down, and a `Set`
+ * of loose strings hides a typo perfectly: a misspelt status matches no job at
+ * all, so every job counts as coverage, every consolidator option survives, and
+ * the panel's one requirement — showing the items on no job — silently reports
+ * nothing. `Set<ProductionJobStatus>` makes that a compile error; the
+ * `ReadonlySet<string>` annotation keeps `.has()` open to a raw status off the
+ * wire, retired values included.
+ */
+const NON_COVERING_STATUSES: ReadonlySet<string> = new Set<ProductionJobStatus>([
+  'cancelled',
+])
 
 // ============================================================================
 // The gap
 // ============================================================================
 
 /**
- * The order items that appear on no live production job.
+ * The production stages an order line needs before it can be packed.
+ *
+ * `requiredStagesFor` in `packages/api/src/lib/production-readiness.ts`, over
+ * the fields this payload carries. The panel and the readiness gate answer the
+ * same question about the same order, so they must ask it the same way.
+ */
+export function requiredStagesForItem(
+  item: OrderProductionPanelItem
+): readonly ProductionStage[] {
+  if (item.isGiftCard) return []
+  return item.frame ? ['print', 'frame'] : ['print']
+}
+
+/** An order line and the stages nothing live is making. */
+export interface UncoveredOrderItem {
+  item: OrderProductionPanelItem
+  missingStages: ProductionStage[]
+}
+
+/**
+ * The order items whose required stages are not all on a live production job.
+ *
+ * Per STAGE, not per item. Treating any live job as coverage let a framed line
+ * with a print job and no frame job read as covered, so the panel printed
+ * "Every item on this order is on a live production job" directly above the
+ * readiness panel listing `item_uncovered` — "still needs a frame job" — for
+ * that same line. A framed piece covered only by its print job is a poster in
+ * a tube, and shipping it is the bug.
  *
  * Order preserved from the order itself, so the panel reads down the invoice
  * rather than in whatever order the jobs happened to come back.
  */
-export function unassignedOrderItems(
+export function uncoveredOrderItems(
   orderItems: OrderProductionPanelItem[],
   jobs: OrderProductionJob[]
-): OrderProductionPanelItem[] {
-  const covered = new Set<string>()
+): UncoveredOrderItem[] {
+  const coveredStages = new Map<string, Set<string>>()
 
   for (const job of jobs) {
     if (NON_COVERING_STATUSES.has(job.status)) continue
-    for (const item of job.items) covered.add(item.orderItemId)
+    for (const jobItem of job.items) {
+      let stages = coveredStages.get(jobItem.orderItemId)
+      if (!stages) {
+        stages = new Set<string>()
+        coveredStages.set(jobItem.orderItemId, stages)
+      }
+      stages.add(job.stage)
+    }
   }
 
-  return orderItems.filter((item) => !covered.has(item.id))
+  const uncovered: UncoveredOrderItem[] = []
+
+  for (const item of orderItems) {
+    const stages = coveredStages.get(item.id)
+    const missingStages = requiredStagesForItem(item).filter(
+      (stage) => !stages?.has(stage)
+    )
+    if (missingStages.length > 0) uncovered.push({ item, missingStages })
+  }
+
+  return uncovered
 }
 
 export function itemTitle(item: OrderProductionPanelItem): string {
@@ -101,6 +207,349 @@ export function itemSize(item: OrderProductionPanelItem): string | null {
 }
 
 // ============================================================================
+// Readiness: why this order cannot be labelled yet
+// ============================================================================
+
+/**
+ * `LabelBlockerCode` from `packages/api/src/lib/production-readiness.ts`,
+ * verbatim. One code per condition of the predicate, so a blocker always maps
+ * back to a line of the spec rather than to an implementation detail.
+ */
+export type LabelBlockerCode =
+  | 'order_not_found'
+  | 'no_jobs'
+  | 'no_consolidator'
+  | 'consolidator_holds_no_job'
+  | 'item_uncovered'
+  | 'job_not_qc_passed'
+  | 'goods_not_at_consolidator'
+  | 'transfer_in_flight'
+  | 'transfer_lost'
+
+export interface LabelBlocker {
+  code: LabelBlockerCode
+  /** The API's own sentence: what is wrong. */
+  message: string
+  jobId?: string
+  orderItemId?: string
+  transferId?: string
+  stage?: string
+}
+
+/** `GET /api/admin/orders/:orderId/production-readiness`, verbatim. */
+export interface OrderReadiness {
+  orderId: string
+  ready: boolean
+  consolidatorVendorId: string | null
+  blockers: LabelBlocker[]
+  blockerCodes: LabelBlockerCode[]
+}
+
+/**
+ * What to DO about each blocker.
+ *
+ * The API's `message` says what is wrong; these say what clears it, and they
+ * are deliberately all different. "Not ready" with no reason is the bug this
+ * whole seam exists to prevent, and a reason with no next step is only half a
+ * repair of it — an admin reading this panel is trying to get an order moving,
+ * not to admire a diagnosis.
+ */
+export const BLOCKER_ACTIONS: Record<LabelBlockerCode, string> = {
+  order_not_found:
+    'No order row was read for this id, so nothing on this screen describes a ' +
+    'real order. Check the id in the address bar — an order that was deleted ' +
+    'reads exactly like an order with nothing to make.',
+  no_jobs:
+    'Nothing has been ordered from a supplier yet. Raise the print job, and the ' +
+    'frame job too if any line on this order has a frame.',
+  no_consolidator:
+    'Nobody has decided which vendor assembles and ships this order. Choose one ' +
+    'in the consolidator picker above — that is the only place the decision is made.',
+  consolidator_holds_no_job:
+    'The consolidator holds no live job, so shipping from there would ship an ' +
+    'empty box. Either move work to them, or set the consolidator to the vendor ' +
+    'that actually holds the goods.',
+  item_uncovered:
+    'An order line has no live job for a stage it needs. Raise the missing job — ' +
+    'a framed piece needs BOTH a print and a frame job, and a cancelled job ' +
+    'covers nothing.',
+  job_not_qc_passed:
+    'A job has not passed inspection yet. Open it, review the photographs and ' +
+    'record a verdict; a job that failed needs re-printing, not a label.',
+  goods_not_at_consolidator:
+    'The goods for a job are not physically where the parcel would be collected ' +
+    'from. Book a transfer to the consolidator, or make the vendor already ' +
+    'holding them the consolidator.',
+  transfer_in_flight:
+    'A parcel is still travelling. Wait for the receiving vendor to mark it ' +
+    'arrived, or chase the carrier with the docket reference in the transfers ' +
+    'list below.',
+  transfer_lost:
+    'A parcel was declared lost, and a replacement draft job was raised for each ' +
+    'job it carried. Assign those replacements — the original will not arrive.',
+}
+
+/**
+ * The next step for a blocker code, including one the API learns after this
+ * file was written. An unknown code still renders its own message; what it
+ * loses is the advice, and saying so is better than silently dropping a
+ * blocker off a list whose completeness is the point.
+ */
+export function blockerAction(code: string): string {
+  return (
+    BLOCKER_ACTIONS[code as LabelBlockerCode] ??
+    'This panel has no guidance for this blocker yet. The message above comes ' +
+      'straight from the readiness check.'
+  )
+}
+
+// ============================================================================
+// Transfers: where the goods physically are
+// ============================================================================
+
+/**
+ * Derived from three timestamps rather than stored — there is no transfer
+ * status enum, deliberately, so a fourth state later costs a nullable column
+ * instead of a migration.
+ */
+export type TransferState = 'pending' | 'in_transit' | 'received' | 'lost'
+
+/** `GET /api/admin/transfers`, verbatim. */
+export interface OrderTransfer {
+  id: string
+  orderId: string
+  fromVendorId: string
+  fromVendorName: string | null
+  toVendorId: string
+  toVendorName: string | null
+  carrier: string | null
+  reference: string | null
+  pieceCount: number
+  /** decimal(10,2) INR as a string. */
+  costAmount: string | null
+  dispatchedAt: string | null
+  expectedBy: string | null
+  receivedAt: string | null
+  lostAt: string | null
+  lostNote: string | null
+  createdAt: string
+  updatedAt: string
+  state: TransferState
+  jobIds: string[]
+}
+
+export interface OrderTransfersPage {
+  items: OrderTransfer[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export const TRANSFER_STATE_LABELS: Record<TransferState, string> = {
+  pending: 'Booked',
+  in_transit: 'In transit',
+  received: 'Arrived',
+  lost: 'Lost',
+}
+
+/** In words beside the pill: a colour alone is invisible to half the readers. */
+export const TRANSFER_STATE_MEANING: Record<TransferState, string> = {
+  pending: 'Booked, not handed to the carrier yet',
+  in_transit: 'With the carrier, not yet marked arrived',
+  received: 'Arrived at the receiving vendor',
+  lost: 'Declared lost; replacement jobs were raised',
+}
+
+const TRANSFER_STATE_STYLES: Record<TransferState, string> = {
+  pending: 'bg-muted text-muted-foreground border-border',
+  in_transit: 'bg-amber-50 text-amber-700 border-amber-200',
+  received: 'bg-green-50 text-green-700 border-green-200',
+  lost: 'bg-red-50 text-red-700 border-red-200',
+}
+
+// ============================================================================
+// The consolidator: who assembles and ships the order
+// ============================================================================
+
+/**
+ * `decided_by IS NULL` versus a value. The system PROPOSES and an admin
+ * CONFIRMS, and this is the difference between "there was nothing to choose"
+ * and "somebody chose" — which is exactly why an arbitrary call is written as a
+ * confirmed one rather than silently.
+ */
+export type ConsolidatorDecision = 'system_default' | 'admin_confirmed'
+
+export interface ConsolidatorProvenance {
+  decision: ConsolidatorDecision
+  /** Null on a system default: nobody decided, so nobody is named. */
+  actorEmail: string | null
+  decidedAt: string | null
+}
+
+/**
+ * The `order_consolidation` row, verbatim —
+ * `GET /api/admin/orders/:orderId/consolidator`.
+ *
+ * The ROW, not a verdict about it. `null` in place of one is an ANSWER: nobody
+ * has decided, which is a different fact from the rules having chosen.
+ *
+ * `basis` is deliberately absent. WHY a vendor was proposed — `sole_vendor`,
+ * `confirmed_proposal`, `admin_override` — is history, and history is the audit
+ * log's job; this row carries the current fact and nothing else.
+ */
+export interface OrderConsolidation {
+  orderId: string
+  vendorId: string
+  /** NULL means the system chose, because there was nothing to choose. */
+  decidedBy: string | null
+  /** `decided_by` resolved to an account, when there is one to resolve. */
+  decidedByEmail: string | null
+  decidedAt: string | null
+}
+
+export interface ConsolidatorOption {
+  id: string
+  name: string
+}
+
+/**
+ * Who the consolidator may be: the vendors holding a live job on this order.
+ *
+ * Not every vendor in the directory. A consolidator holding no job on the order
+ * is itself a readiness blocker (`consolidator_holds_no_job`), so offering the
+ * whole directory would be offering a list of ways to jam the order.
+ */
+export function orderVendorOptions(jobs: OrderProductionJob[]): ConsolidatorOption[] {
+  const byId = new Map<string, string>()
+
+  for (const job of jobs) {
+    if (NON_COVERING_STATUSES.has(job.status)) continue
+    if (!job.vendorId) continue
+    byId.set(job.vendorId, job.vendorName ?? job.vendorId)
+  }
+
+  return [...byId.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * A vendor's name from the rows already on screen, or null.
+ *
+ * Null rather than the id: the caller shows the id and says it could not name
+ * it, which is honest, where a bare uuid in a "Consolidator" field reads as a
+ * rendering bug.
+ */
+export function vendorNameFor(
+  vendorId: string | null,
+  jobs: OrderProductionJob[],
+  transfers: OrderTransfer[]
+): string | null {
+  if (!vendorId) return null
+
+  for (const job of jobs) {
+    if (job.vendorId === vendorId && job.vendorName) return job.vendorName
+  }
+
+  for (const transfer of transfers) {
+    if (transfer.fromVendorId === vendorId && transfer.fromVendorName) {
+      return transfer.fromVendorName
+    }
+    if (transfer.toVendorId === vendorId && transfer.toVendorName) {
+      return transfer.toVendorName
+    }
+  }
+
+  return null
+}
+
+/**
+ * How the standing consolidator was decided, out of the row that records it.
+ *
+ * `decided_by` is the whole rule and the only one: NULL is the system, a value
+ * is an admin. The email beside it never decides — an address over a NULL
+ * `decided_by` is a stale join or a bug, and reading it as a confirmation would
+ * invent the exact claim the column exists to make checkable.
+ *
+ * Null in, null out: no row means nobody has decided, which is UNKNOWN
+ * provenance and NOT a system default.
+ */
+export function provenanceFromConsolidation(
+  row: OrderConsolidation | null
+): ConsolidatorProvenance | null {
+  if (!row) return null
+
+  const decision: ConsolidatorDecision =
+    row.decidedBy === null ? 'system_default' : 'admin_confirmed'
+
+  return {
+    decision,
+    actorEmail: decision === 'admin_confirmed' ? row.decidedByEmail : null,
+    decidedAt: row.decidedAt,
+  }
+}
+
+/** A refusal from `POST /:orderId/consolidator`, kept whole. */
+export interface ConsolidatorRefusal {
+  status: number
+  code: string | null
+  /** The API's own sentence. */
+  message: string
+  currentVendorId?: string | null
+  proposedVendorId?: string | null
+}
+
+export class ConsolidatorRefused extends Error {
+  constructor(readonly refusal: ConsolidatorRefusal) {
+    super(refusal.message)
+    this.name = 'ConsolidatorRefused'
+  }
+}
+
+/**
+ * What an admin can actually do about a refusal.
+ *
+ * The 409 is the one that matters: the goods are already moving, and a screen
+ * that swallowed it would leave somebody clicking a button that will never
+ * work. Each case names the action that resolves it instead.
+ */
+export function consolidatorRefusalAdvice(refusal: ConsolidatorRefusal): string {
+  switch (refusal.code) {
+    case 'TRANSFER_DISPATCHED':
+      return (
+        'A parcel on this order has already been handed to the carrier, so the ' +
+        'goods are physically on their way to the current consolidator. ' +
+        'Re-routing them is a phone call to the carrier, not a database write. ' +
+        'If the parcel is genuinely gone, declare that transfer lost — the ' +
+        'replacement work is free to go somewhere else.'
+      )
+    case 'CONFIRMATION_REQUIRED':
+      return (
+        'The jobs on this order sit at more than one vendor, so which one ' +
+        'assembles it is a judgement rather than a fact. The system will not ' +
+        'write that silently: pick the vendor yourself and confirm it, so the ' +
+        'record shows who chose.'
+      )
+    case 'NOTHING_TO_PROPOSE':
+      return (
+        'No job on this order is assigned to a vendor yet, so there is nobody ' +
+        'to consolidate at. Assign a job first, then come back.'
+      )
+    case 'CONCURRENT_MODIFICATION':
+      return (
+        'Somebody else changed the consolidator while this was open, so nothing ' +
+        'was written. Reload the order and look at the current value before ' +
+        'choosing again.'
+      )
+    default:
+      return refusal.status === 404
+        ? 'Either the order or the vendor no longer exists. Reload the order.'
+        : 'Nothing was written. Try again, and if it keeps failing check the API logs.'
+  }
+}
+
+// ============================================================================
 // The panel body — skeleton / error / empty / content
 // ============================================================================
 
@@ -109,8 +558,6 @@ export interface OrderProductionPanelBodyProps {
   orderItems: OrderProductionPanelItem[]
   isLoading: boolean
   error: string | null
-  /** The queue scan hit its page bound, so coverage cannot be answered. */
-  truncated: boolean
   onRetry: () => void
 }
 
@@ -119,53 +566,35 @@ export function OrderProductionPanelBody({
   orderItems,
   isLoading,
   error,
-  truncated,
   onRetry,
 }: OrderProductionPanelBodyProps) {
   // Error first, and it claims nothing: no job count, no coverage verdict.
   if (error) {
     return (
-      <div
-        data-testid="admin-order-production-error"
-        role="alert"
-        className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
-      >
-        <div className="mb-1 flex items-center gap-2 font-medium">
-          <AlertCircle className="h-4 w-4" aria-hidden="true" />
-          {error}
-        </div>
-        <p className="mb-3 text-muted-foreground">
-          Whether anything on this order is being made is unknown — the queue was
-          not read. That is not the same as nothing being made.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          data-testid="admin-order-production-retry"
-          onClick={onRetry}
-        >
-          Try again
-        </Button>
-      </div>
+      <SectionError
+        testId="admin-order-production-error"
+        retryTestId="admin-order-production-retry"
+        error={error}
+        hint={
+          'Whether anything on this order is being made is unknown — the queue ' +
+          'was not read. That is not the same as nothing being made.'
+        }
+        onRetry={onRetry}
+      />
     )
   }
 
   if (isLoading) {
     return (
-      <div
-        data-testid="admin-order-production-skeleton"
-        className="space-y-2"
-        aria-busy="true"
-        aria-label="Loading production for this order"
-      >
-        {['a', 'b'].map((key) => (
-          <div key={key} className="h-16 animate-pulse rounded bg-muted" aria-hidden="true" />
-        ))}
-      </div>
+      <SectionSkeleton
+        testId="admin-order-production-skeleton"
+        label="Loading production for this order"
+        rows={['a', 'b']}
+      />
     )
   }
 
-  const unassigned = truncated ? [] : unassignedOrderItems(orderItems, jobs)
+  const uncovered = uncoveredOrderItems(orderItems, jobs)
 
   return (
     <div className="space-y-4">
@@ -231,19 +660,9 @@ export function OrderProductionPanelBody({
         </ul>
       )}
 
-      {/* The coverage verdict. Withheld outright when the scan was cut short —
-          a reassuring answer off an incomplete read is worse than no answer. */}
-      {truncated ? (
-        <div
-          data-testid="admin-order-production-truncated"
-          role="alert"
-          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-        >
-          The production queue is longer than this panel scans, so whether every
-          item on this order is on a job cannot be answered here. Check the queue
-          directly.
-        </div>
-      ) : unassigned.length > 0 ? (
+      {/* The coverage verdict, and it is only ever printed over a read that
+          completed — an error above returns before reaching here. */}
+      {uncovered.length > 0 ? (
         <div
           data-testid="admin-order-production-unassigned"
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
@@ -252,13 +671,16 @@ export function OrderProductionPanelBody({
             On no production job — nobody is making these:
           </p>
           <ul className="space-y-0.5">
-            {unassigned.map((item) => (
+            {uncovered.map(({ item, missingStages }) => (
               <li
                 key={item.id}
                 data-testid={`admin-order-production-unassigned-item-${item.id}`}
               >
                 {itemTitle(item)}
                 {itemSize(item) ? ` — ${itemSize(item)}` : ''}
+                {' — needs a '}
+                {missingStages.map((stage) => STAGE_LABELS[stage].toLowerCase()).join(' and a ')}
+                {' job'}
               </li>
             ))}
           </ul>
@@ -276,83 +698,778 @@ export function OrderProductionPanelBody({
 }
 
 // ============================================================================
+// Shared read states
+// ============================================================================
+
+/**
+ * The failure state every read on this panel shares.
+ *
+ * `hint` is required rather than optional on purpose: an error banner with no
+ * sentence saying what is now UNKNOWN invites the reader to fill the gap in
+ * themselves, and they fill it in optimistically every time.
+ */
+function SectionError({
+  testId,
+  retryTestId,
+  error,
+  hint,
+  onRetry,
+}: {
+  testId: string
+  retryTestId: string
+  error: string
+  hint: string
+  onRetry: () => void
+}) {
+  return (
+    <div
+      data-testid={testId}
+      role="alert"
+      className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+    >
+      <div className="mb-1 flex items-center gap-2 font-medium">
+        <AlertCircle className="h-4 w-4" aria-hidden="true" />
+        {error}
+      </div>
+      <p className="mb-3 text-muted-foreground">{hint}</p>
+      <Button type="button" variant="outline" data-testid={retryTestId} onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  )
+}
+
+function SectionSkeleton({
+  testId,
+  label,
+  rows,
+}: {
+  testId: string
+  label: string
+  rows: string[]
+}) {
+  return (
+    <div data-testid={testId} className="space-y-2" aria-busy="true" aria-label={label}>
+      {rows.map((key) => (
+        <div key={key} className="h-16 animate-pulse rounded bg-muted" aria-hidden="true" />
+      ))}
+    </div>
+  )
+}
+
+// ============================================================================
+// The readiness panel — blockers, never a bare "not ready"
+// ============================================================================
+
+export interface OrderReadinessPanelProps {
+  readiness: OrderReadiness | null
+  isLoading: boolean
+  error: string | null
+  onRetry: () => void
+}
+
+export function OrderReadinessPanel({
+  readiness,
+  isLoading,
+  error,
+  onRetry,
+}: OrderReadinessPanelProps) {
+  // Error FIRST, and it never falls through to a verdict. A readiness read that
+  // failed is the one state where an optimistic "ready to ship" buys a courier
+  // label for goods that are not there.
+  if (error) {
+    return (
+      <SectionError
+        testId="admin-order-readiness-error"
+        retryTestId="admin-order-readiness-retry"
+        error={error}
+        hint={
+          'Whether this order can be labelled is unknown — the check did not ' +
+          'answer. Unknown is not the same as ready, and nothing below should ' +
+          'be read as clearance to ship.'
+        }
+        onRetry={onRetry}
+      />
+    )
+  }
+
+  if (isLoading || !readiness) {
+    return (
+      <SectionSkeleton
+        testId="admin-order-readiness-skeleton"
+        label="Checking whether this order can be labelled"
+        rows={['a', 'b']}
+      />
+    )
+  }
+
+  if (readiness.ready) {
+    return (
+      <div
+        data-testid="admin-order-readiness-ready"
+        className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+      >
+        <div className="flex items-center gap-2 font-medium">
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          Ready to label
+        </div>
+        <p className="mt-1">
+          Every item is on a job, every job has passed inspection, and the goods
+          are all at the consolidator.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      data-testid="admin-order-readiness-blockers"
+      className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+    >
+      <p className="mb-2 font-medium">
+        Not ready to label. {readiness.blockers.length === 1 ? 'One thing is' : 'These are'}{' '}
+        in the way:
+      </p>
+      <ul className="space-y-2">
+        {readiness.blockers.map((blocker, index) => (
+          <li
+            // The code is on the id AND on an attribute: a screen reader gets
+            // the sentences, and a test gets the code without matching English.
+            key={`${blocker.code}-${blocker.jobId ?? blocker.orderItemId ?? blocker.transferId ?? index}`}
+            data-testid={`admin-order-readiness-blocker-${blocker.code}`}
+            data-blocker-code={blocker.code}
+            className="rounded border border-amber-200 bg-white/60 p-2"
+          >
+            <p className="font-medium">{blocker.message}</p>
+            <p className="mt-1 text-amber-800">{blockerAction(blocker.code)}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ============================================================================
+// The consolidator picker
+// ============================================================================
+
+/**
+ * Every claim this section makes is wired to the read it depends on.
+ *
+ * Three different reads back one box. Who the consolidator IS comes from
+ * readiness; who it COULD be comes from the jobs read; how it was decided comes
+ * from the consolidation row. Hanging all three off `isLoading`/`error` — which is
+ * what this component used to do — meant a 500 on the jobs read still rendered
+ * "no vendor holds a live job on this order yet, so there is nobody to
+ * consolidate at. Assign a job first", in full confidence, over a list that was
+ * never read. That sentence sends an admin to raise a second set of jobs for an
+ * order that already has them: #602/#606 with a purchase order attached.
+ */
+export interface ConsolidatorPickerProps {
+  /** From the readiness read — the only endpoint that reports it. */
+  consolidatorVendorId: string | null
+  /** Null means the provenance is UNKNOWN, not that the system chose. */
+  provenance: ConsolidatorProvenance | null
+  /** The consolidation read is still running: unknown, not yet answerable. */
+  provenanceLoading: boolean
+  /** The consolidation read FAILED — a different unknown from "no row". */
+  provenanceError: string | null
+  /** From the jobs read: the vendors holding a live job on this order. */
+  options: ConsolidatorOption[]
+  /** The jobs read's own states — `options` is empty under both of them. */
+  optionsLoading: boolean
+  optionsError: string | null
+  onRetryOptions: () => void
+  /** Names the vendor id when a job or transfer on screen carries the name. */
+  vendorName: string | null
+  /**
+   * Whether BOTH reads that could name the vendor completed. A null
+   * `vendorName` under a failed jobs or transfers read means "not read", not
+   * "nothing on this order names it".
+   */
+  nameLookupComplete: boolean
+  /** The readiness read's states: whether there IS a consolidator. */
+  isLoading: boolean
+  error: string | null
+  isSaving: boolean
+  refusal: ConsolidatorRefusal | null
+  onChoose: (vendorId: string) => void
+  onUseSystemDefault: () => void
+  onRetry: () => void
+}
+
+export function ConsolidatorPicker({
+  consolidatorVendorId,
+  provenance,
+  provenanceLoading,
+  provenanceError,
+  options,
+  optionsLoading,
+  optionsError,
+  onRetryOptions,
+  vendorName,
+  nameLookupComplete,
+  isLoading,
+  error,
+  isSaving,
+  refusal,
+  onChoose,
+  onUseSystemDefault,
+  onRetry,
+}: ConsolidatorPickerProps) {
+  const [selected, setSelected] = useState('')
+
+  if (error) {
+    return (
+      <SectionError
+        testId="admin-order-consolidator-error"
+        retryTestId="admin-order-consolidator-retry"
+        error={error}
+        hint={
+          'Who assembles and ships this order is unknown — the read failed. ' +
+          'Setting one from here now would be choosing without seeing what is ' +
+          'already recorded.'
+        }
+        onRetry={onRetry}
+      />
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <SectionSkeleton
+        testId="admin-order-consolidator-skeleton"
+        label="Loading the consolidator for this order"
+        rows={['a']}
+      />
+    )
+  }
+
+  return (
+    <div data-testid="admin-order-consolidator" className="space-y-3">
+      <div
+        data-testid="admin-order-consolidator-current"
+        className="rounded-lg border border-border p-3 text-sm"
+      >
+        {consolidatorVendorId ? (
+          <>
+            <p className="font-medium">
+              {vendorName ?? (
+                <>
+                  <span className="font-mono text-xs">{consolidatorVendorId}</span>{' '}
+                  {/* The name is looked up in the jobs and transfers on screen,
+                      so "nothing names it" is only sayable once both were
+                      read. Under a failed read the id is unnamed, not unnamable. */}
+                  {nameLookupComplete ? (
+                    <span
+                      data-testid="admin-order-consolidator-name-none"
+                      className="font-normal text-muted-foreground"
+                    >
+                      (no job or transfer on this order names this vendor)
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="admin-order-consolidator-name-unread"
+                      className="font-normal text-muted-foreground"
+                    >
+                      (the jobs and transfers on this order were not read, so
+                      this id could not be named — that is not the same as
+                      nothing naming it)
+                    </span>
+                  )}
+                </>
+              )}
+            </p>
+            {provenance ? (
+              <p
+                data-testid="admin-order-consolidator-provenance"
+                data-decision={provenance.decision}
+                className="mt-1 text-muted-foreground"
+              >
+                {provenance.decision === 'system_default' ? (
+                  <>
+                    <span className="font-medium text-foreground">System default</span> —
+                    one vendor already held every job, so there was nothing to
+                    choose and nobody confirmed it.
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground">
+                      Confirmed by an admin
+                    </span>{' '}
+                    — {provenance.actorEmail ?? 'an admin'} stood behind this choice on{' '}
+                    {formatDate(provenance.decidedAt)}.
+                  </>
+                )}
+              </p>
+            ) : provenanceError ? (
+              /* A read that FAILED, told apart from an order with no row.
+                 Both end in "unknown" and neither guesses, but only one of them
+                 is worth retrying, and printing "no row" over a 500 says the
+                 record was read and found absent when nobody looked. */
+              <p
+                data-testid="admin-order-consolidator-provenance-error"
+                className="mt-1 text-muted-foreground"
+              >
+                How this was decided could not be read — the consolidation read
+                failed: {provenanceError}. Whether the system defaulted to it or
+                an admin confirmed it is unknown, and nothing was found saying
+                otherwise because nothing was read.
+              </p>
+            ) : provenanceLoading ? (
+              <p
+                data-testid="admin-order-consolidator-provenance-loading"
+                className="mt-1 text-muted-foreground"
+              >
+                Reading how this was decided…
+              </p>
+            ) : (
+              <p
+                data-testid="admin-order-consolidator-provenance-unknown"
+                className="mt-1 text-muted-foreground"
+              >
+                How this was decided is not recorded — no consolidation record
+                came back for this order, though the readiness check names a
+                consolidator. Whether the system defaulted to it or an admin
+                confirmed it is unknown.
+              </p>
+            )}
+          </>
+        ) : (
+          <p data-testid="admin-order-consolidator-none" className="text-muted-foreground">
+            Nobody has decided which vendor assembles and ships this order.
+          </p>
+        )}
+      </div>
+
+      {/* The picker offers only vendors holding a live job on this order — a
+          consolidator holding nothing is itself a blocker. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="sr-only" htmlFor="admin-order-consolidator-select">
+          Consolidating vendor
+        </label>
+        <select
+          id="admin-order-consolidator-select"
+          data-testid="admin-order-consolidator-select"
+          className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          value={selected}
+          disabled={isSaving || optionsLoading || Boolean(optionsError) || options.length === 0}
+          onChange={(event) => setSelected(event.target.value)}
+        >
+          <option value="">Choose a vendor…</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+
+        <Button
+          type="button"
+          data-testid="admin-order-consolidator-save"
+          disabled={!selected || isSaving}
+          onClick={() => onChoose(selected)}
+        >
+          {isSaving ? 'Saving…' : 'Set consolidator'}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          data-testid="admin-order-consolidator-default"
+          disabled={isSaving}
+          onClick={onUseSystemDefault}
+        >
+          Use the system default
+        </Button>
+      </div>
+
+      {/* `options` is empty three ways, and only ONE of them is "nobody holds
+          a live job". The other two are "not read yet" and "the read failed",
+          and telling an admin to assign a job over either of those is telling
+          them to duplicate the jobs this order already has. */}
+      {optionsError ? (
+        <SectionError
+          testId="admin-order-consolidator-options-error"
+          retryTestId="admin-order-consolidator-options-retry"
+          error={optionsError}
+          hint={
+            'Which vendors hold a live job on this order is unknown — the job ' +
+            'list did not load. That is not the same as nobody holding one, so ' +
+            'do not raise fresh jobs on the strength of this screen.'
+          }
+          onRetry={onRetryOptions}
+        />
+      ) : optionsLoading ? (
+        <p
+          data-testid="admin-order-consolidator-options-loading"
+          className="text-sm text-muted-foreground"
+        >
+          Reading which vendors hold a live job on this order…
+        </p>
+      ) : options.length === 0 ? (
+        <p
+          data-testid="admin-order-consolidator-no-options"
+          className="text-sm text-muted-foreground"
+        >
+          No vendor holds a live job on this order yet, so there is nobody to
+          consolidate at. Assign a job first.
+        </p>
+      ) : null}
+
+      {/* The refusal is EXPLAINED, not swallowed. A 409 here means the goods
+          are already moving, which no amount of retrying changes. */}
+      {refusal && (
+        <div
+          data-testid="admin-order-consolidator-refusal"
+          data-refusal-status={String(refusal.status)}
+          data-refusal-code={refusal.code ?? 'none'}
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
+          <p className="font-medium">{refusal.message}</p>
+          <p className="mt-1 text-muted-foreground">
+            {consolidatorRefusalAdvice(refusal)}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// The transfers on this order
+// ============================================================================
+
+export interface OrderTransfersPanelProps {
+  transfers: OrderTransfer[] | null
+  isLoading: boolean
+  error: string | null
+  onRetry: () => void
+}
+
+export function OrderTransfersPanel({
+  transfers,
+  isLoading,
+  error,
+  onRetry,
+}: OrderTransfersPanelProps) {
+  if (error) {
+    return (
+      <SectionError
+        testId="admin-order-transfers-error"
+        retryTestId="admin-order-transfers-retry"
+        error={error}
+        hint={
+          'Where the goods physically are is unknown — the transfer list did not ' +
+          'load. An order with no transfers and an order whose transfers could ' +
+          'not be read look identical, and they are not the same thing.'
+        }
+        onRetry={onRetry}
+      />
+    )
+  }
+
+  if (isLoading || !transfers) {
+    return (
+      <SectionSkeleton
+        testId="admin-order-transfers-skeleton"
+        label="Loading the transfers on this order"
+        rows={['a']}
+      />
+    )
+  }
+
+  if (transfers.length === 0) {
+    return (
+      <p
+        data-testid="admin-order-transfers-empty"
+        className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
+      >
+        Nothing has been couriered between vendors for this order.
+      </p>
+    )
+  }
+
+  return (
+    <ul data-testid="admin-order-transfers" className="space-y-2">
+      {transfers.map((transfer) => (
+        <li
+          key={transfer.id}
+          data-testid={`admin-order-transfer-${transfer.id}`}
+          data-transfer-state={transfer.state}
+          className="rounded-lg border border-border p-3 text-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Truck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <span>
+                {transfer.fromVendorName ?? 'Unknown vendor'} →{' '}
+                {transfer.toVendorName ?? 'Unknown vendor'}
+              </span>
+              <span
+                className={cn(
+                  'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
+                  TRANSFER_STATE_STYLES[transfer.state]
+                )}
+              >
+                {TRANSFER_STATE_LABELS[transfer.state]}
+              </span>
+            </div>
+            <span className="tabular-nums text-muted-foreground">
+              {transfer.pieceCount} {transfer.pieceCount === 1 ? 'piece' : 'pieces'}
+              {formatRupees(transfer.costAmount) ? ` · ${formatRupees(transfer.costAmount)}` : ''}
+            </span>
+          </div>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            {TRANSFER_STATE_MEANING[transfer.state]}
+            {transfer.carrier ? ` · ${transfer.carrier}` : ''}
+            {transfer.reference ? ` · ${transfer.reference}` : ''}
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Dispatched {formatDate(transfer.dispatchedAt)} · expected{' '}
+            {formatDate(transfer.expectedBy)} · arrived {formatDate(transfer.receivedAt)}
+          </p>
+
+          {transfer.lostAt && (
+            <p className="mt-1 text-xs text-destructive">
+              Declared lost {formatDate(transfer.lostAt)}
+              {transfer.lostNote ? ` — ${transfer.lostNote}` : ''}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// ============================================================================
 // Data access
 // ============================================================================
 
 /**
- * How many 100-row pages of the queue to walk before giving up. Ten pages is a
- * thousand jobs — comfortably the whole queue today, and the flag exists for
- * the day it is not.
+ * The API's own page cap. One order cannot plausibly carry more jobs than this
+ * — it is one job per stage per item — so a single page is the whole answer.
  */
-const MAX_SCAN_PAGES = 10
-const SCAN_PAGE_SIZE = 100
+const JOB_PAGE_SIZE = 100
 
-export interface OrderProductionScan {
-  jobs: OrderProductionJob[]
-  truncated: boolean
-}
-
-export async function scanOrderProductionJobs(
+/**
+ * This order's production jobs, each carrying the order items it covers.
+ *
+ * ONE queue request. If the answer somehow does not fit on a page this throws
+ * rather than returning a short list: the panel's coverage verdict is only
+ * honest over a complete read, and a quietly truncated list is the fabrication
+ * the deleted `truncated` flag existed to prevent. An error the admin can see
+ * is the cheap, correct replacement for the page loop.
+ */
+export async function fetchOrderProductionJobs(
   orderId: string
-): Promise<OrderProductionScan> {
-  const matched: AdminProductionJobListItem[] = []
-  let truncated = false
-  let page = 1
+): Promise<OrderProductionJob[]> {
+  const query = new URLSearchParams({
+    page: '1',
+    pageSize: String(JOB_PAGE_SIZE),
+    orderId,
+  })
 
-  for (;;) {
-    const query = new URLSearchParams({
-      page: String(page),
-      pageSize: String(SCAN_PAGE_SIZE),
-      // Ignored by the API today; the day it learns the filter this narrows
-      // the scan to nothing and the loop exits on the first page.
-      orderId,
-    })
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/production?${query.toString()}`,
+    { credentials: 'include' }
+  )
 
-    const response = await fetch(
-      `${getApiUrl()}/api/admin/production?${query.toString()}`,
-      { credentials: 'include' }
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to load production jobs')
+  }
+
+  const data = (await response.json()) as AdminProductionPage
+
+  // `undefined > n` is false, so a page that carried no `total` used to walk
+  // straight past this guard into a coverage verdict over an unverified list.
+  // Unverifiable is not the same as complete.
+  if (typeof data.total !== 'number' || data.total > data.items.length) {
+    throw new Error(
+      'This order has more production jobs than this panel reads in one page, ' +
+        'or the queue did not say how many there are, so what is covered ' +
+        'cannot be answered here. Check the production queue.'
     )
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string }
-      throw new Error(body.error ?? 'Failed to load production jobs')
-    }
-
-    const data = (await response.json()) as AdminProductionPage
-    matched.push(...data.items.filter((job) => job.orderId === orderId))
-
-    if (page >= data.totalPages || data.items.length === 0) break
-    if (page >= MAX_SCAN_PAGES) {
-      truncated = true
-      break
-    }
-    page += 1
   }
 
   // Items come from the detail endpoint — the queue row carries none, and
   // "which item is on which job" is half of what this panel answers.
-  const jobs = await Promise.all(
-    matched.map(async (job) => {
-      const response = await fetch(`${getApiUrl()}/api/admin/production/${job.id}`, {
-        credentials: 'include',
-      })
+  return Promise.all(
+    data.items.map(async (job) => {
+      const detailResponse = await fetch(
+        `${getApiUrl()}/api/admin/production/${job.id}`,
+        { credentials: 'include' }
+      )
 
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string }
+      if (!detailResponse.ok) {
+        const body = (await detailResponse.json().catch(() => ({}))) as {
+          error?: string
+        }
         throw new Error(body.error ?? 'Failed to load a production job')
       }
 
-      const detail = (await response.json()) as { items: ProductionJobItemRow[] }
+      const detail = (await detailResponse.json()) as { items: ProductionJobItemRow[] }
       return { ...job, items: detail.items }
     })
   )
+}
 
-  return { jobs, truncated }
+/** `GET /api/admin/orders/:orderId/production-readiness`. */
+export async function fetchOrderReadiness(orderId: string): Promise<OrderReadiness> {
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/orders/${orderId}/production-readiness`,
+    { credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to check whether this order can be labelled')
+  }
+
+  return (await response.json()) as OrderReadiness
+}
+
+/** `GET /api/admin/transfers?orderId=`. One order's legs, newest first. */
+export async function fetchOrderTransfers(orderId: string): Promise<OrderTransfer[]> {
+  const query = new URLSearchParams({
+    page: '1',
+    pageSize: String(JOB_PAGE_SIZE),
+    orderId,
+  })
+
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/transfers?${query.toString()}`,
+    { credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to load the transfers on this order')
+  }
+
+  return ((await response.json()) as OrderTransfersPage).items
+}
+
+/**
+ * `GET /api/admin/orders/:orderId/consolidator` — the standing decision.
+ *
+ * The row, or `null` when the order has none. `null` is an ANSWER and is
+ * rendered as one; a failed read THROWS, because "nobody has decided" and "we
+ * could not tell" are not the same thing and must not share a return value.
+ */
+export async function fetchOrderConsolidation(
+  orderId: string
+): Promise<OrderConsolidation | null> {
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/orders/${orderId}/consolidator`,
+    { credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? 'Failed to read who chose the consolidator')
+  }
+
+  const data = (await response.json()) as { consolidation: OrderConsolidation | null }
+  return data.consolidation ?? null
+}
+
+/**
+ * `POST /api/admin/orders/:orderId/consolidator`.
+ *
+ * `vendorId` omitted asks for the system default, which the API writes only
+ * when there is genuinely nothing to choose; otherwise it comes back 422
+ * carrying its proposal. A refusal is thrown WHOLE — status, code and the
+ * API's own sentence — because "could not save" over a 409 would hide the one
+ * fact that matters: the goods are already moving.
+ */
+export async function setOrderConsolidator(
+  orderId: string,
+  vendorId?: string
+): Promise<void> {
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/orders/${orderId}/consolidator`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(vendorId ? { vendorId } : {}),
+    }
+  )
+
+  if (response.ok) return
+
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string
+    code?: string
+    currentVendorId?: string | null
+    proposal?: { vendorId?: string | null }
+  }
+
+  throw new ConsolidatorRefused({
+    status: response.status,
+    code: body.code ?? null,
+    message: body.error ?? 'Failed to set the consolidator',
+    currentVendorId: body.currentVendorId ?? null,
+    proposedVendorId: body.proposal?.vendorId ?? null,
+  })
 }
 
 // ============================================================================
 // The panel
 // ============================================================================
+
+/**
+ * One read, with its own loading, empty and error state.
+ *
+ * The data is dropped WITH the error every time: a stale answer under a failure
+ * banner is a claim nobody can back, and on the readiness read specifically it
+ * is a claim that buys a courier label.
+ */
+interface AsyncRead<T> {
+  data: T | null
+  isLoading: boolean
+  error: string | null
+  reload: () => void
+}
+
+function useAsyncRead<T>(read: () => Promise<T>): AsyncRead<T> {
+  const [data, setData] = useState<T | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const claim = useLatestOnly()
+
+  // Guarded because the panel reloads: a pre-save readiness response landing
+  // after the post-save one put the OLD consolidator back on screen, over a
+  // saved decision, with nothing to say it had happened.
+  const run = useCallback(async () => {
+    const isCurrent = claim()
+    setIsLoading(true)
+    try {
+      const result = await read()
+      if (!isCurrent()) return
+      setData(result)
+      setError(null)
+    } catch (readError) {
+      if (!isCurrent()) return
+      setData(null)
+      setError((readError as Error).message)
+    } finally {
+      if (isCurrent()) setIsLoading(false)
+    }
+  }, [read, claim])
+
+  useEffect(() => {
+    void run()
+  }, [run])
+
+  return { data, isLoading, error, reload: () => void run() }
+}
 
 export interface OrderProductionPanelProps {
   orderId: string
@@ -360,37 +1477,71 @@ export interface OrderProductionPanelProps {
 }
 
 export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPanelProps) {
-  const [jobs, setJobs] = useState<OrderProductionJob[]>([])
-  const [truncated, setTruncated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const jobsRead = useAsyncRead(
+    useCallback(() => fetchOrderProductionJobs(orderId), [orderId])
+  )
+  const readinessRead = useAsyncRead(
+    useCallback(() => fetchOrderReadiness(orderId), [orderId])
+  )
+  const transfersRead = useAsyncRead(
+    useCallback(() => fetchOrderTransfers(orderId), [orderId])
+  )
+  const consolidationRead = useAsyncRead(
+    useCallback(() => fetchOrderConsolidation(orderId), [orderId])
+  )
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const scan = await scanOrderProductionJobs(orderId)
-      setJobs(scan.jobs)
-      setTruncated(scan.truncated)
-      setError(null)
-    } catch (loadError) {
-      // Both the jobs and the truncation flag are dropped with the error: a
-      // stale coverage verdict under a failure banner is a claim we cannot back.
-      setJobs([])
-      setTruncated(false)
-      setError((loadError as Error).message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [orderId])
+  const [isSaving, setIsSaving] = useState(false)
+  const [refusal, setRefusal] = useState<ConsolidatorRefusal | null>(null)
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  const jobs = jobsRead.data ?? []
+  const transfers = transfersRead.data ?? []
+  const options = useMemo(() => orderVendorOptions(jobs), [jobs])
+  const consolidatorVendorId = readinessRead.data?.consolidatorVendorId ?? null
+
+  /**
+   * The vendor's NAME is looked up across two reads, so "nothing names it" is
+   * only sayable when both of them answered. `jobs` and `transfers` are `[]`
+   * under a failure as well as under a genuinely empty order, and the panel
+   * must not read the first as the second.
+   */
+  const nameLookupComplete =
+    !jobsRead.isLoading &&
+    !jobsRead.error &&
+    !transfersRead.isLoading &&
+    !transfersRead.error
+
+  const save = useCallback(
+    async (vendorId?: string) => {
+      setIsSaving(true)
+      setRefusal(null)
+      try {
+        await setOrderConsolidator(orderId, vendorId)
+        // Both reads move: the vendor comes from readiness, the provenance
+        // from the order_consolidation row this write just made.
+        readinessRead.reload()
+        consolidationRead.reload()
+      } catch (saveError) {
+        setRefusal(
+          saveError instanceof ConsolidatorRefused
+            ? saveError.refusal
+            : {
+                status: 0,
+                code: null,
+                message: (saveError as Error).message,
+              }
+        )
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orderId]
+  )
 
   return (
     <section
       data-testid="admin-order-production"
-      className="space-y-3 rounded-xl border border-border bg-card p-6"
+      className="space-y-6 rounded-xl border border-border bg-card p-6"
     >
       <div>
         <h2 className="text-lg text-foreground">Production</h2>
@@ -402,11 +1553,75 @@ export function OrderProductionPanel({ orderId, orderItems }: OrderProductionPan
       <OrderProductionPanelBody
         jobs={jobs}
         orderItems={orderItems}
-        isLoading={isLoading}
-        error={error}
-        truncated={truncated}
-        onRetry={() => void load()}
+        isLoading={jobsRead.isLoading}
+        error={jobsRead.error}
+        onRetry={jobsRead.reload}
       />
+
+      <div className="space-y-3 border-t border-border pt-5">
+        <div>
+          <h3 className="text-sm font-medium text-foreground">Consolidator</h3>
+          <p className="text-sm text-muted-foreground">
+            Which vendor assembles the order and hands it to the courier. The
+            system proposes; an admin confirms.
+          </p>
+        </div>
+
+        {/* Each prop below is wired to the read that actually answers it:
+            readiness for who the consolidator is, the jobs read for who it
+            could be, the consolidation row for how it was decided. */}
+        <ConsolidatorPicker
+          consolidatorVendorId={consolidatorVendorId}
+          provenance={provenanceFromConsolidation(consolidationRead.data)}
+          provenanceLoading={consolidationRead.isLoading}
+          provenanceError={consolidationRead.error}
+          options={options}
+          optionsLoading={jobsRead.isLoading}
+          optionsError={jobsRead.error}
+          onRetryOptions={jobsRead.reload}
+          vendorName={vendorNameFor(consolidatorVendorId, jobs, transfers)}
+          nameLookupComplete={nameLookupComplete}
+          isLoading={readinessRead.isLoading}
+          error={readinessRead.error}
+          isSaving={isSaving}
+          refusal={refusal}
+          onChoose={(vendorId) => void save(vendorId)}
+          onUseSystemDefault={() => void save()}
+          onRetry={readinessRead.reload}
+        />
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-5">
+        <div>
+          <h3 className="text-sm font-medium text-foreground">Ready to label?</h3>
+          <p className="text-sm text-muted-foreground">
+            Every reason this order cannot be handed to a courier yet, listed.
+          </p>
+        </div>
+
+        <OrderReadinessPanel
+          readiness={readinessRead.data}
+          isLoading={readinessRead.isLoading}
+          error={readinessRead.error}
+          onRetry={readinessRead.reload}
+        />
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-5">
+        <div>
+          <h3 className="text-sm font-medium text-foreground">Transfers</h3>
+          <p className="text-sm text-muted-foreground">
+            Parcels moving between vendors for this order.
+          </p>
+        </div>
+
+        <OrderTransfersPanel
+          transfers={transfersRead.data}
+          isLoading={transfersRead.isLoading}
+          error={transfersRead.error}
+          onRetry={transfersRead.reload}
+        />
+      </div>
     </section>
   )
 }

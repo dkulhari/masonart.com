@@ -169,13 +169,16 @@ export interface AuditEntryInput {
 }
 
 /**
- * The subset of a Hono context this module reads.
+ * The subset of a Hono context this module reads: `user`, `requestId` and
+ * `vendorId`, plus the request's method, path and headers.
  *
  * Declared structurally rather than as `Pick<Context, …>` for two reasons: a
  * caller inside a queue or a script can hand over a stub instead of faking a
  * whole request, and — the reason it is written this way — `Context` is generic
  * over its Variables map, so a `Pick` of the default instantiation refuses every
- * route that declares its own variables.
+ * route that declares its own variables. Reading one more key must not change
+ * that: `get` stays `(key: string) => unknown`, and each key is narrowed at the
+ * point it is read.
  */
 interface AuditContext {
   get(key: string): unknown;
@@ -193,24 +196,70 @@ type AuditWriter = { insert: typeof db.insert };
 /**
  * Record one audited action.
  *
- * ## Never throws
+ * ## Never throws — except back into a transaction it was handed
  *
  * A refund that already moved money must not be rolled back because an INSERT
  * into the audit table deadlocked. Failures are logged with the request id and
  * escalated through `alertCritical` — a silently-dropped audit row is worse than
  * a loud one, because the gap is invisible at exactly the moment it matters.
  *
+ * That contract is only coherent for an INDEPENDENT write, where the business
+ * write has already committed and the trail is the only thing left to lose. It
+ * cannot hold when `tx` is supplied. In Postgres a failed statement aborts the
+ * WHOLE transaction, so by the time this catch runs the caller's write is
+ * already doomed: returning normally lets the callback finish, drizzle issue a
+ * COMMIT, and Postgres execute that COMMIT as a ROLLBACK — silently, with no
+ * error anywhere and a 200 on the wire over a business write that never
+ * happened. So a shared-`tx` failure is logged, alerted as its own distinct
+ * thing, and RETHROWN. Only the caller owns that transaction and only the
+ * caller can decide what to do about it.
+ *
+ * This scopes "never throws" rather than contradicting it: swallowing protects
+ * a committed action from its own audit row, and there is no committed action
+ * to protect once the audit row and the action share a fate.
+ *
  * ## Claims the request
  *
- * Sets `audited` on the context. `middleware/audit.ts` reads that flag and skips
- * its own coarse `admin.request` row, so one action produces one row.
+ * Sets `audited` on the context, BEFORE the insert. `middleware/audit.ts` reads
+ * that flag and skips its own coarse `admin.request` row, so one action produces
+ * one row. Claiming first is deliberate: if the insert then fails, the price is
+ * a *missing* row rather than a *misleading* floor row attributing the action to
+ * nothing in particular. Nobody may read an absent row as "it did not happen".
  *
- * ## Atomicity is opt-in
+ * ## The caller supplies the change; the context supplies the facts
  *
- * Pass `tx` when the audit belongs to the same transaction as the business
- * write — a gift-card ledger entry, say — and the two commit or fail together.
- * Omit it and the audit is written independently, which is what you want when
- * the business write has already committed.
+ * The category is derived from the action, and the ip, user agent, request id,
+ * method, path and `vendorId` are read off the context here. None of them is a
+ * parameter, because a caller cannot get a context fact wrong if a caller never
+ * supplies it — per-call-site capture means the first route added next year
+ * forgets. `vendorId` is merged AFTER `entry.metadata` for the same reason: a
+ * handler that spreads a request body cannot make the row claim it was written
+ * for a shop it was not. An admin request has no `vendorId` and gets no key —
+ * "has a vendorId" must keep meaning "was written for a vendor".
+ *
+ * ## Atomicity is opt-in — and getting it backwards destroys evidence
+ *
+ * **Share the transaction when the audit row would be a LIE if the business
+ * write rolled back.** A row saying "job moved to qc_passed" beside a job still
+ * sitting in `qc_submitted` is worse than no row. So a state move, an
+ * assignment, an amount override, a transfer despatch — anything whose row only
+ * makes sense if the write committed — passes the same `tx` the write uses.
+ *
+ * **NEVER share the transaction for a refusal.** This is the trap, and the
+ * instinct is the wrong way round. A refusal row (`outcome: 'failure'`, e.g.
+ * `production_job.transition_refused`) records that a transaction was *rolled
+ * back*; writing it inside that transaction rolls the row back too and erases
+ * the very evidence it exists to preserve. Refusals — and any row written after
+ * the business write already committed — omit `tx` and are written
+ * independently.
+ *
+ * Rule of thumb: `tx` when the row asserts something the transaction must make
+ * true; no `tx` when the row asserts something about the transaction itself.
+ *
+ * Sharing the transaction also means sharing its failures: a `tx` write that
+ * fails throws out of here, and the caller must let it abort the transaction
+ * rather than catching it to "keep going". Catching it would recreate exactly
+ * the silent rollback described above.
  */
 export async function recordAudit(
   c: AuditContext,
@@ -226,6 +275,9 @@ export async function recordAudit(
     | null
     | undefined;
   const requestId = (c.get("requestId") as string | undefined) ?? null;
+  // Set by `requireVendor` on every /api/vendor/* request. Read here rather
+  // than passed by each call site — see the doc comment above.
+  const vendorId = (c.get("vendorId") as string | undefined) ?? null;
 
   try {
     const writer = tx ?? db;
@@ -246,13 +298,17 @@ export async function recordAudit(
         method: c.req.method,
         path: c.req.path,
         ...(entry.metadata ?? {}),
+        // Last, so a caller cannot overwrite which vendor this was written for.
+        // Absent entirely on an admin request: an admin acts for nobody, and a
+        // null here would make the field stop answering its one question.
+        ...(vendorId ? { vendorId } : {}),
       }) as never,
       requestId,
       ipAddress: getClientIp(c as unknown as Context),
       userAgent: c.req.header("user-agent") ?? null,
     });
   } catch (error) {
-    // Loud, but not fatal. The business action already happened.
+    // Loud on both paths. Fatal on only one of them.
     logger.error(
       {
         err: error,
@@ -261,15 +317,39 @@ export async function recordAudit(
         entityType: entry.entityType,
         entityId: entry.entityId,
         actorUserId: user?.id ?? null,
+        vendorId,
+        // Which of the two failures this is, without reading the message.
+        sharedTransaction: tx !== undefined,
       },
-      "audit write failed"
+      tx ? "audit write failed inside the caller's transaction" : "audit write failed"
     );
+
+    const subject = `${entry.action} on ${entry.entityType ?? "unknown"} ${
+      entry.entityId ?? ""
+    }`.trim();
+
+    if (tx) {
+      // This insert did not fail on its own: it aborted the CALLER'S
+      // transaction. Every later statement in it will fail and the COMMIT
+      // drizzle issues when the callback returns is executed by Postgres as a
+      // ROLLBACK. Swallowing here would hand the handler a clean return over a
+      // business write that never landed — a 200 for nothing, and an alert
+      // saying the action succeeded when it is precisely what was lost.
+      alertCritical(
+        "Audit write failed inside a shared transaction",
+        `Could not record ${subject}. The row shared the caller's transaction, ` +
+          `so that transaction is aborted and the action did NOT take effect. ` +
+          `Rethrowing, so the caller sees the failure instead of a silent rollback.`,
+        { action: entry.action, requestId: requestId ?? "unknown" }
+      );
+
+      throw error;
+    }
 
     alertCritical(
       "Audit write failed",
-      `Could not record ${entry.action} on ${entry.entityType ?? "unknown"} ${
-        entry.entityId ?? ""
-      }. The action itself succeeded; the trail did not.`,
+      `Could not record ${subject}. This row was written independently of the ` +
+        `action, so the action itself succeeded; only the trail did not.`,
       { action: entry.action, requestId: requestId ?? "unknown" }
     );
   }

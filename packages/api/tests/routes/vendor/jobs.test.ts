@@ -25,8 +25,20 @@ import { buildRouteApp } from '../../helpers/route-app'
 import { vendorSessionFor } from '../../helpers/vendor-session'
 import '../../setup'
 
-import { productionJobs } from '../../../src/database/schema/production-jobs'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+import {
+  productionJobs,
+  productionJobPhotos,
+} from '../../../src/database/schema/production-jobs'
 import { vendorRates } from '../../../src/database/schema/vendors'
+import {
+  PRODUCTION_TRANSITIONS,
+  VENDOR_SETTABLE_STATUSES,
+  nextStatuses,
+  type ProductionJobStatus,
+} from '../../../src/lib/production-transitions'
 
 // ============================================================================
 // Recording database mock
@@ -52,7 +64,21 @@ vi.mock('../../../src/auth', () => ({
   },
 }))
 
+/**
+ * `recordAudit` is spied rather than left real, because the three things this
+ * suite has to prove about it are all about the CALL: which action, whether the
+ * caller's transaction was shared, and whether the row outlives a rollback.
+ * None of them is visible in an insert that a recording db swallows.
+ */
+const auditSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+
+vi.mock('../../../src/lib/audit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/audit')>()),
+  recordAudit: (...args: unknown[]) => auditSpy(...args),
+}))
+
 import { vendorApp } from '../../../src/routes/vendor'
+import { VENDOR_STATUS_STAMP } from '../../../src/lib/vendor-scope'
 import { readJson } from '../../helpers/json'
 
 // ============================================================================
@@ -93,6 +119,101 @@ const json = (body: unknown, method = 'PATCH') => ({
 })
 
 /**
+ * The row the LOCKED read inside the transaction returns.
+ *
+ * Deliberately not `jobRow()`: that models `getVendorJob`'s customer-free
+ * response projection, and the locked read is an INTERNAL one that additionally
+ * needs `settlementId` — the column the freeze is about, and one no vendor
+ * response has ever carried.
+ */
+function lockRow(over: Record<string, unknown> = {}) {
+  return { id: JOB_ID, stage: 'print', status: 'assigned', settlementId: null, ...over }
+}
+
+const readSource = (relative: string) =>
+  readFileSync(resolve(__dirname, '../../../src', relative), 'utf8')
+
+/** Source with every comment removed, so a scan judges CODE and not prose. */
+const stripComments = (source: string) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+// ----------------------------------------------------------------------------
+// Reading a transaction off the source, one transaction at a time
+// ----------------------------------------------------------------------------
+
+/**
+ * Every `db.transaction(...)` call in a source file, as its own text.
+ *
+ * Delimited by BALANCED PARENTHESES from the call's own `(`, not by "the next
+ * occurrence of something that looks like the end". A scan whose slice is wrong
+ * asserts over the wrong region and reports nothing while looking thorough.
+ */
+function transactionBodies(source: string): string[] {
+  const bodies: string[] = []
+  const marker = 'db.transaction('
+
+  for (let at = source.indexOf(marker); at !== -1; at = source.indexOf(marker, at + marker.length)) {
+    const open = at + marker.length - 1
+    let depth = 0
+    for (let i = open; i < source.length; i++) {
+      if (source[i] === '(') depth += 1
+      else if (source[i] === ')') {
+        depth -= 1
+        if (depth === 0) {
+          bodies.push(source.slice(open, i + 1))
+          break
+        }
+      }
+    }
+  }
+
+  return bodies
+}
+
+/** Brace depth at an index — 1 is the callback's own top level. */
+function nestingAt(body: string, index: number): number {
+  let depth = 0
+  for (let i = 0; i < index; i += 1) {
+    if (body[i] === '{') depth += 1
+    else if (body[i] === '}') depth -= 1
+  }
+  return depth
+}
+
+/**
+ * The transactions in this source that do not lock what they decide from.
+ *
+ * Three failures, because the count this replaces was blind to all three: a
+ * transaction with no lock at all, a lock issued after the first write, and a
+ * lock inside a nested block — which is a lock most callers never take.
+ */
+function unlockedTransactions(source: string): string[] {
+  return transactionBodies(source).flatMap((body, index) => {
+    const at = index + 1
+    const lock = body.search(/\.for\(["']update["']\)/)
+    const write = body.search(/\btx\s*\.\s*(update|insert|delete)\s*\(/)
+
+    if (lock === -1) return [`transaction ${at}: no FOR UPDATE at all`]
+
+    const problems: string[] = []
+    if (write !== -1 && lock > write) {
+      problems.push(`transaction ${at}: the lock is taken after the first write`)
+    }
+    if (nestingAt(body, lock) > 1) {
+      problems.push(`transaction ${at}: the lock is conditional — it sits inside a nested block`)
+    }
+    return problems
+  })
+}
+
+/** Every live shot the `print` shot list marks required. */
+const PRINT_REQUIRED_SLOTS = [
+  { slot: 'print_full' },
+  { slot: 'print_colour_reference' },
+  { slot: 'print_raking_light' },
+]
+
+/**
  * The forbidden vocabulary. Asserted over the serialised body so a leak nested
  * anywhere in the shape is caught, not only a leak at the top level.
  */
@@ -117,6 +238,8 @@ function expectNoCustomerData(body: unknown) {
 
 beforeEach(() => {
   recorder.reset()
+  auditSpy.mockReset()
+  auditSpy.mockResolvedValue(undefined)
   mockGetSession.mockReset()
   mockGetSession.mockResolvedValue(sessionFor('vendor'))
   // The vendor_users -> vendors join requireVendor resolves the caller with.
@@ -148,15 +271,19 @@ describe('GET /api/vendor/jobs', () => {
   })
 
   it('passes a status filter through to the scoped query', async () => {
-    queueRows({ 'select:production_jobs': [[jobRow({ status: 'sent' })]] })
+    // `qc_submitted`, not `sent`. The queue filter is a READ and would happily
+    // accept the retired status as a string, but a suite that keeps typing it
+    // is a suite that keeps it alive in everybody's head — and the vendor's own
+    // queue is the one screen where `sent` used to mean something.
+    queueRows({ 'select:production_jobs': [[jobRow({ status: 'qc_submitted' })]] })
 
-    const res = await buildApp().request('/api/vendor/jobs?status=sent')
+    const res = await buildApp().request('/api/vendor/jobs?status=qc_submitted')
     expect(res.status).toBe(200)
 
     const read = ops('select', productionJobs)[0]
     const where = params(read?.where)
     expect(where).toContain(VENDOR_ID)
-    expect(where).toContain('sent')
+    expect(where).toContain('qc_submitted')
   })
 })
 
@@ -201,41 +328,135 @@ describe('GET /api/vendor/jobs/:id', () => {
 // PATCH /api/vendor/jobs/:id
 // ============================================================================
 
-describe('PATCH /api/vendor/jobs/:id', () => {
-  it('updates status and the date fields', async () => {
-    const receivedAt = '2026-08-01T10:00:00.000Z'
+describe('PATCH /api/vendor/jobs/:id — the guarded transition', () => {
+  // --------------------------------------------------------------------
+  // Every vendor-legal edge, and the timestamp the SERVER stamps for it
+  // --------------------------------------------------------------------
+
+  /** `[from, to, the column the server stamps]`, straight off the matrix. */
+  const LEGAL_EDGES: Array<[ProductionJobStatus, ProductionJobStatus, string]> = [
+    ['assigned', 'received', 'receivedAt'],
+    // Rework in place. The clock RESTARTS: this is a second attempt at the
+    // piece, not a continuation of the first.
+    ['qc_failed', 'received', 'receivedAt'],
+    ['received', 'qc_submitted', 'qcSubmittedAt'],
+    ['qc_passed', 'dispatched', 'dispatchedAt'],
+  ]
+
+  /** Whatever the guard on `from -> to` needs to see, queued. */
+  function seedGuardRows(to: ProductionJobStatus) {
+    if (to === 'qc_submitted') {
+      queueRows({ 'select:production_job_photos': [PRINT_REQUIRED_SLOTS] })
+    }
+    if (to === 'dispatched') {
+      // An open transfer is one of the two ways the piece may legitimately go.
+      queueRows({
+        'select:production_jobs': [
+          [lockRow({ status: 'qc_passed' })],
+          [lockRow({ status: 'qc_passed' })],
+          [{ transferId: 'transfer-1', hasOrderLabel: false }],
+          [jobRow({ status: 'dispatched' })],
+        ],
+      })
+    }
+  }
+
+  it.each(LEGAL_EDGES)(
+    'moves %s -> %s and stamps %s itself',
+    async (from, to, stamped) => {
+      queueRows({
+        'select:production_jobs': [[lockRow({ status: from })], [lockRow({ status: from })], [jobRow({ status: to })]],
+        'update:production_jobs': [[{ id: JOB_ID }]],
+      })
+      seedGuardRows(to)
+
+      const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: to }))
+      const body = await readJson(res)
+      expect(res.status, JSON.stringify(body)).toBe(200)
+
+      const write = ops('update', productionJobs)[0]
+      expect(write).toBeDefined()
+      const values = write?.values as Record<string, unknown>
+      expect(values.status).toBe(to)
+
+      // The stamp is a Date this process made, not a string off the wire.
+      expect(values[stamped]).toBeInstanceOf(Date)
+
+      // ...and it is the ONLY clock this edge touches. Stamping two of them
+      // would let one edge rewrite an earlier edge's history.
+      for (const other of ['receivedAt', 'qcSubmittedAt', 'dispatchedAt', 'sentAt']) {
+        if (other !== stamped) expect(values).not.toHaveProperty(other)
+      }
+
+      // Scoped twice: the pre-read and the UPDATE both name the vendor, and the
+      // UPDATE repeats the from-status and the unsettled predicate.
+      const where = params(write?.where)
+      expect(where).toContain(VENDOR_ID)
+      expect(where).toContain(JOB_ID)
+      expect(where).toContain(from)
+
+      expectNoCustomerData(body)
+    }
+  )
+
+  it('stamps a clock for every vendor edge, and for nothing else', () => {
+    // A vendor edge added to the matrix with no clock behind it would move a
+    // job and record nothing about when — invisible until an SLA argument. The
+    // map is validated at module load, so this asserts the derived tuple and
+    // the declared clocks are the SAME set, in both directions.
+    expect(Object.keys(VENDOR_STATUS_STAMP).sort()).toEqual([...VENDOR_SETTABLE_STATUSES].sort())
+
+    // `expect(Object.values(VENDOR_STATUS_STAMP)).not.toContain('sentAt')` used
+    // to sit here and could not fail: `VendorStampColumn` is a three-member
+    // union that excludes `sentAt`, so the typechecker refuses the value before
+    // this ever runs — and `tests/` is typechecked as of #662. The runtime half
+    // of that property — no vendor edge WRITES `sent_at` — is asserted where it
+    // can go red, in the legal-edge loop above, which checks every edge's
+    // UPDATE names its own clock and none of the other three.
+  })
+
+  // --------------------------------------------------------------------
+  // The dates leave the patch surface entirely
+  // --------------------------------------------------------------------
+
+  it('never writes a receivedAt the VENDOR supplied — that is an SLA clock', async () => {
     queueRows({
-      'select:production_jobs': [
-        [jobRow()],
-        [jobRow()],
-        [jobRow({ status: 'received', receivedAt: new Date(receivedAt) })],
-      ],
-      'update:production_jobs': [[]],
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      'update:production_jobs': [[{ id: JOB_ID }]],
     })
 
+    const backdated = '2020-01-01T00:00:00.000Z'
     const res = await buildApp().request(
       `/api/vendor/jobs/${JOB_ID}`,
-      json({ status: 'received', receivedAt })
+      json({ status: 'received', receivedAt: backdated, sentAt: backdated })
     )
     expect(res.status).toBe(200)
 
-    const body = await readJson(res)
-    expect(body.job.status).toBe('received')
-
-    const write = ops('update', productionJobs)[0]
-    expect(write).toBeDefined()
-    expect(write?.values).toMatchObject({ status: 'received' })
-    expect((write?.values as Record<string, unknown>).receivedAt).toBeInstanceOf(Date)
-    // The vendorId is in the UPDATE's WHERE as well as in the pre-read.
-    expect(params(write?.where)).toContain(VENDOR_ID)
-
-    expectNoCustomerData(body)
+    const values = ops('update', productionJobs)[0]?.values as Record<string, unknown>
+    expect(values).toBeDefined()
+    expect(values).not.toHaveProperty('sentAt')
+    expect(JSON.stringify(values)).not.toContain('2020-01-01')
+    // Stamped from the server clock instead, so "three days ago" is unsayable.
+    expect((values.receivedAt as Date).getTime()).toBeGreaterThan(
+      new Date('2026-01-01T00:00:00Z').getTime()
+    )
   })
 
-  it('ignores amountExpected and amountActual in the body — a vendor may not price their own job', async () => {
+  it('rejects a body carrying only dates, rather than silently writing nothing', async () => {
+    queueRows({ 'select:production_jobs': [[jobRow()]] })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ receivedAt: '2026-08-01T10:00:00.000Z' })
+    )
+    expect(res.status).toBe(400)
+    expect(ops('update', productionJobs)).toHaveLength(0)
+  })
+
+  it('ignores amountExpected and amountActual — a vendor may not price their own job', async () => {
     queueRows({
-      'select:production_jobs': [[jobRow()]],
-      'update:production_jobs': [[]],
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      'update:production_jobs': [[{ id: JOB_ID }]],
     })
 
     const res = await buildApp().request(
@@ -251,22 +472,295 @@ describe('PATCH /api/vendor/jobs/:id', () => {
     expect(JSON.stringify(written)).not.toContain('9999.00')
   })
 
-  it('rejects a body that carries only amounts rather than silently writing nothing', async () => {
-    queueRows({ 'select:production_jobs': [[jobRow()]] })
+  // --------------------------------------------------------------------
+  // The vocabulary: three statuses, and NOT the retired one
+  // --------------------------------------------------------------------
 
-    const res = await buildApp().request(
-      `/api/vendor/jobs/${JOB_ID}`,
-      json({ amountActual: '9999.00' })
+  it('accepts exactly the three statuses the matrix gives a vendor', () => {
+    expect([...VENDOR_SETTABLE_STATUSES]).toEqual(['received', 'qc_submitted', 'dispatched'])
+  })
+
+  it('does not re-declare the vocabulary as a literal beside the matrix', () => {
+    // The whole defect: a second copy of the list went stale the day `sent` was
+    // retired, and the route kept offering it. There must be ONE copy, and the
+    // route must be reading it.
+    //
+    // Comments are stripped before judging, deliberately. The prose SHOULD keep
+    // naming `sent` — a retired status with no explanation anywhere is a status
+    // somebody re-adds — and a scan that cannot tell prose from code would push
+    // the history out of the file to stay green.
+    const source = stripComments(readSource('routes/vendor.ts'))
+    expect(source).not.toMatch(/VENDOR_SETTABLE_STATUSES\s*=/)
+    expect(source).toMatch(/VENDOR_SETTABLE_STATUSES/)
+    expect(readSource('routes/vendor.ts')).toContain('production-transitions')
+    // No status literal of ANY kind: the vocabulary is imported, entire.
+    expect(source).not.toMatch(/["']sent["']/)
+    expect(source).not.toMatch(/["']received["']/)
+  })
+
+  it.each(['qc_passed', 'qc_failed', 'cancelled', 'assigned', 'draft', 'sent'])(
+    'refuses %s at the schema, before any read happens',
+    async (status) => {
+      queueRows({ 'select:production_jobs': [[lockRow()]] })
+
+      const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status }))
+      expect(res.status).toBe(400)
+      expect(ops('update', productionJobs)).toHaveLength(0)
+    }
+  )
+
+  it('NO reachable path produces the retired `sent` status', async () => {
+    // A property over the whole vocabulary, not one example: for every status a
+    // job can be in, and every status a CLIENT MAY ASK FOR, the value written
+    // is never `sent`. `sent` is edgeless in the matrix in both directions and
+    // `retire-sent-status.ts` erased it from the rows that carried it; a vendor
+    // writing it back would re-create exactly what that backfill removed.
+    //
+    // The inner loop runs over every status in the matrix — `sent` INCLUDED —
+    // and not over `VENDOR_SETTABLE_STATUSES`. That is the whole difference
+    // between a property and a tautology: pinned to the three settable values,
+    // `status !== 'sent'` was true by construction and the route could have
+    // re-declared its own literal vocabulary without this noticing. Asking for
+    // `sent` outright is the request that has to be refused, so it is the
+    // request that is made.
+    const everyStatus = Object.keys(PRODUCTION_TRANSITIONS) as ProductionJobStatus[]
+    const settable = new Set<string>(VENDOR_SETTABLE_STATUSES)
+    expect(settable.has('sent'), 'the vocabulary now contains the retired status').toBe(false)
+
+    for (const from of everyStatus) {
+      for (const to of everyStatus) {
+        recorder.reset()
+        auditSpy.mockReset()
+        auditSpy.mockResolvedValue(undefined)
+        queueRows({
+          'select:vendor_users': [[{ vendorId: VENDOR_ID, status: 'active' }]],
+          'select:production_jobs': [
+            [lockRow({ status: from })],
+            [lockRow({ status: from })],
+            [{ transferId: 'transfer-1', hasOrderLabel: false }],
+            [jobRow({ status: to })],
+          ],
+          'select:production_job_photos': [PRINT_REQUIRED_SLOTS],
+          'update:production_jobs': [[{ id: JOB_ID }]],
+        })
+
+        const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: to }))
+
+        // A status outside the derived tuple never reaches the module at all:
+        // the route's schema is built from `VENDOR_SETTABLE_STATUSES`, so it is
+        // a 400 with no read behind it. This is the assertion `sent` has to
+        // fail, and a second literal list anywhere would break it.
+        if (!settable.has(to)) {
+          expect(res.status, `'${to}' was accepted as a status a vendor may set`).toBe(400)
+          expect(ops('update', productionJobs)).toHaveLength(0)
+        }
+
+        for (const write of ops('update', productionJobs)) {
+          expect((write.values as Record<string, unknown>).status).not.toBe('sent')
+        }
+        // A refusal may NAME `sent` — a legacy row the backfill missed still has
+        // to be reportable, and `from: 'sent'` is the honest answer. What may
+        // never happen is a SUCCESS carrying it, which would mean the job is
+        // sitting in the retired status after a write we accepted.
+        if (res.status === 200) {
+          expect(JSON.stringify(await readJson(res))).not.toContain('"sent"')
+        }
+      }
+    }
+  })
+
+  // --------------------------------------------------------------------
+  // Every vendor-ILLEGAL edge, refused with the matrix's own remedy
+  // --------------------------------------------------------------------
+
+  /**
+   * Every `from` x `to` the matrix does NOT give a vendor.
+   *
+   * `cancelled` is excluded because it is refused EARLIER and on purpose, with
+   * its own code and its own message — see the cancellation test below. It is
+   * still an illegal edge; it is just one the vendor is owed a better answer
+   * about than "the matrix says no".
+   */
+  const ILLEGAL_EDGES = (Object.keys(PRODUCTION_TRANSITIONS) as ProductionJobStatus[])
+    .filter((from) => from !== 'cancelled')
+    .flatMap((from) =>
+      VENDOR_SETTABLE_STATUSES.filter(
+        (to) => !nextStatuses(from, 'vendor').includes(to)
+      ).map((to) => [from, to] as const)
     )
-    expect(res.status).toBe(400)
+
+  it.each(ILLEGAL_EDGES)('refuses %s -> %s with 409 and no UPDATE', async (from, to) => {
+    queueRows({
+      'select:production_jobs': [[lockRow({ status: from })], [lockRow({ status: from })]],
+    })
+
+    const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: to }))
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    // 409 and not 422: the body is fine, the world moved. And the remedy comes
+    // with it, scoped to THIS actor, so the portal re-renders its buttons
+    // without a second round trip.
+    expect(body.code).toBe('ILLEGAL_TRANSITION')
+    expect(body.from).toBe(from)
+    expect(body.to).toBe(to)
+    expect(body.allowed).toEqual(nextStatuses(from, 'vendor'))
+
     expect(ops('update', productionJobs)).toHaveLength(0)
   })
 
-  it('refuses a status a vendor does not own, such as passing their own QC', async () => {
-    queueRows({ 'select:production_jobs': [[jobRow()]] })
+  // --------------------------------------------------------------------
+  // The guards the matrix NAMES — evaluated, not assumed
+  // --------------------------------------------------------------------
 
-    const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: 'qc_passed' }))
-    expect(res.status).toBe(400)
+  it('refuses received -> qc_submitted with an incomplete shot list, naming what is missing', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'received' })],
+        [lockRow({ status: 'received' })],
+      ],
+      // The colour reference and the raking-light shot were never uploaded.
+      'select:production_job_photos': [[{ slot: 'print_full' }]],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'qc_submitted' })
+    )
+    // 422, not 409: this one IS fixable by the caller — upload the photos.
+    expect(res.status).toBe(422)
+
+    const body = await readJson(res)
+    expect(body.code).toBe('SHOT_LIST_INCOMPLETE')
+    expect(body.missingSlots).toEqual(['print_colour_reference', 'print_raking_light'])
+    expect(ops('update', productionJobs)).toHaveLength(0)
+  })
+
+  it('lets an OPTIONAL shot stay missing', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'received' })],
+        [lockRow({ status: 'received' })],
+        [jobRow({ status: 'qc_submitted' })],
+      ],
+      // `print_detail` is optional and absent; the three required ones are live.
+      'select:production_job_photos': [PRINT_REQUIRED_SLOTS],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'qc_submitted' })
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('only counts LIVE photos towards the shot list', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'received' })],
+        [lockRow({ status: 'received' })],
+      ],
+      'select:production_job_photos': [[{ slot: 'print_full' }]],
+    })
+
+    await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: 'qc_submitted' }))
+
+    // A superseded photo is a photo the vendor REPLACED. Counting it would let
+    // a reshoot that never happened satisfy the list.
+    const read = ops('select', productionJobPhotos)[0]
+    expect(read, 'the shot list was judged without reading any photo').toBeDefined()
+    expect(recorder.render(read?.where).sql).toContain('superseded_at')
+    expect(params(read?.where)).toContain(JOB_ID)
+  })
+
+  it('refuses qc_passed -> dispatched with no open transfer and no order label', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'qc_passed' })],
+        [lockRow({ status: 'qc_passed' })],
+        // Neither kind of evidence.
+        [{ transferId: null, hasOrderLabel: false }],
+      ],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'dispatched' })
+    )
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    expect(body.code).toBe('GUARD_UNSATISFIED')
+    expect(body.guard).toBe('open-transfer-or-order-label')
+    // `dispatched` is terminal with zero out-edges: taking this edge on no
+    // evidence leaves the order permanently unlabelable.
+    expect(ops('update', productionJobs)).toHaveLength(0)
+  })
+
+  it('accepts an ORDER LABEL as despatch evidence when there is no transfer', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'qc_passed' })],
+        [lockRow({ status: 'qc_passed' })],
+        [{ transferId: null, hasOrderLabel: true }],
+        [jobRow({ status: 'dispatched' })],
+      ],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'dispatched' })
+    )
+    expect(res.status).toBe(200)
+    expect(ops('update', productionJobs)).toHaveLength(1)
+  })
+
+  // --------------------------------------------------------------------
+  // The freezes
+  // --------------------------------------------------------------------
+
+  it.each([...VENDOR_SETTABLE_STATUSES])(
+    'a SETTLED job refuses %s — payables are derived and would silently disagree',
+    async (to) => {
+      queueRows({
+        'select:production_jobs': [
+          [lockRow({ status: 'assigned', settlementId: 'set-1' })],
+          [lockRow({ status: 'assigned', settlementId: 'set-1' })],
+        ],
+      })
+
+      const res = await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: to }))
+      expect(res.status).toBe(409)
+
+      const body = await readJson(res)
+      expect(body.code).toBe('JOB_SETTLED')
+      expect(ops('update', productionJobs)).toHaveLength(0)
+    }
+  )
+
+  it('tells a vendor their job was CANCELLED rather than 404ing them', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'cancelled' })],
+        [lockRow({ status: 'cancelled' })],
+      ],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    // A DELIBERATE exception to the portal's 404-not-403 rule. They already
+    // know the job exists — it is theirs and it is in their queue — so nothing
+    // leaks, and withholding it means they keep working on something nobody
+    // will pay for.
+    expect(res.status).toBe(409)
+
+    const body = await readJson(res)
+    expect(body.code).toBe('JOB_CANCELLED')
+    expect(String(body.error).toLowerCase()).toContain('cancelled')
     expect(ops('update', productionJobs)).toHaveLength(0)
   })
 
@@ -282,6 +776,262 @@ describe('PATCH /api/vendor/jobs/:id', () => {
     // Load-first, not update-then-check: an UPDATE was never issued at all.
     expect(ops('update', productionJobs)).toHaveLength(0)
     expect(params(ops('select', productionJobs)[0]?.where)).toContain(VENDOR_ID)
+  })
+
+  it("refuses another vendor's job even with a CORRECT id, inside the transaction too", async () => {
+    // The pre-read finds it (a race: an admin reassigned it a moment ago), the
+    // locked re-read does not. The scoped predicate is in both.
+    queueRows({
+      'select:production_jobs': [[jobRow()], []],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(404)
+    expect(ops('update', productionJobs)).toHaveLength(0)
+
+    for (const read of ops('select', productionJobs)) {
+      expect(params(read.where)).toContain(VENDOR_ID)
+    }
+  })
+
+  // --------------------------------------------------------------------
+  // Concurrency
+  // --------------------------------------------------------------------
+
+  it('rolls back when the UPDATE matches no row, rather than reporting success', async () => {
+    queueRows({
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      // Somebody moved or settled the job between the locked read and the write.
+      'update:production_jobs': [[]],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(409)
+    expect((await readJson(res)).code).toBe('CONCURRENT_MODIFICATION')
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+  })
+
+  it('leaves NO success row when the transaction throws at COMMIT', async () => {
+    // §8's property, on the third mutating handler: *"run each mutating handler
+    // against a `tx` that throws at commit; assert no success row survives and
+    // the refusal row does."* The callback runs to the END here — the UPDATE is
+    // issued and the audit row is handed the transaction — and only then does
+    // the commit fail, which is the one shape a callback-throws fixture cannot
+    // reach.
+    queueRows({
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+    recorder.failCommit()
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(500)
+
+    // ISSUED and SURVIVING are different facts, and only the second is the
+    // property.
+    expect(ops('update', productionJobs)).toHaveLength(1)
+    expect(recorder.survivors('update', productionJobs)).toEqual([])
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+
+    // The transition row SHARES that transaction, so it goes back with the move
+    // it describes rather than outliving it. `recordAudit` is a spy here, so
+    // the sharing is read off the call it was handed.
+    expect(auditSpy).toHaveBeenCalledTimes(1)
+    const [, entry, sharedTx] = auditSpy.mock.calls[0]!
+    expect(entry.action).toBe('production_job.transitioned')
+    expect(sharedTx, 'the success row did not share the transaction it describes').toBeDefined()
+  })
+
+  it('does the read, the guard and the write in ONE transaction', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'received' })],
+        [lockRow({ status: 'received' })],
+        [jobRow({ status: 'qc_submitted' })],
+      ],
+      'select:production_job_photos': [PRINT_REQUIRED_SLOTS],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+
+    await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: 'qc_submitted' }))
+
+    expect(recorder.tx.commits).toBe(1)
+    expect(recorder.tx.rollbacks).toBe(0)
+
+    // The route's own pre-read is outside; everything the decision rests on is
+    // inside, or the lock is decorative.
+    expect(ops('select', productionJobPhotos).every((q) => q.inTx)).toBe(true)
+    expect(ops('update', productionJobs).every((q) => q.inTx)).toBe(true)
+    expect(ops('select', productionJobs).filter((q) => q.inTx).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('locks the row every transaction decides from, before it writes', () => {
+    // The one part of the recipe no assertion above can reach: the recorder
+    // answers `.for('update')` exactly as it answers a plain read, so a lock
+    // dropped in a refactor is invisible to it.
+    //
+    // A PAIRING, not a count. This used to be `locks.length === transactions
+    // .length` — five against five — which three different broken modules
+    // satisfy: two locks in one transaction and none in another, a lock taken
+    // inside an `if` so most callers never take it, and a lock issued AFTER the
+    // write it was supposed to serialise. Each transaction is now judged on its
+    // own text, and `unlockedTransactions` is shown below deciding all three
+    // ways.
+    const source = stripComments(readSource('lib/vendor-scope.ts'))
+
+    expect(
+      transactionBodies(source).length,
+      'no transaction found — the scan is vacuous'
+    ).toBeGreaterThan(0)
+    expect(unlockedTransactions(source)).toEqual([])
+  })
+
+  it('the lock scan can actually fail — this property is not vacuous', () => {
+    // Three planted transactions, one per way the counting version was
+    // satisfiable while the module was wrong.
+    const planted = `
+      db.transaction(async (tx) => {
+        const rows = await tx.select({ id: t.id }).from(t).where(eq(t.id, id)).limit(1)
+        await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+      })
+      db.transaction(async (tx) => {
+        await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+        const rows = await tx.select({ id: t.id }).from(t).limit(1).for('update')
+      })
+      db.transaction(async (tx) => {
+        if (maybe) {
+          const rows = await tx.select({ id: t.id }).from(t).limit(1).for('update')
+        }
+        await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+      })
+    `
+
+    expect(transactionBodies(planted)).toHaveLength(3)
+    expect(unlockedTransactions(planted)).toEqual([
+      'transaction 1: no FOR UPDATE at all',
+      'transaction 2: the lock is taken after the first write',
+      'transaction 3: the lock is conditional — it sits inside a nested block',
+    ])
+
+    // ...and it clears a transaction that does it properly, so it is a check
+    // and not a blanket refusal.
+    expect(
+      unlockedTransactions(`
+        db.transaction(async (tx) => {
+          const rows = await tx.select({ id: t.id }).from(t).limit(1).for('update')
+          if (!rows[0]) throw new Error('gone')
+          await tx.update(t).set({ a: 1 }).where(eq(t.id, id))
+        })
+      `)
+    ).toEqual([])
+  })
+
+  // --------------------------------------------------------------------
+  // Audit
+  // --------------------------------------------------------------------
+
+  it('records ONE transition, sharing the transaction with the write', async () => {
+    queueRows({
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+
+    await buildApp().request(`/api/vendor/jobs/${JOB_ID}`, json({ status: 'received' }))
+
+    expect(auditSpy).toHaveBeenCalledTimes(1)
+    const [, entry, sharedTx] = auditSpy.mock.calls[0]!
+    expect(entry.action).toBe('production_job.transitioned')
+    expect(entry.entityType).toBe('production_job')
+    expect(entry.entityId).toBe(JOB_ID)
+    expect(entry.outcome ?? 'success').toBe('success')
+    expect(entry.metadata).toMatchObject({ from: 'assigned', to: 'received' })
+
+    // A row saying "the job moved" beside a job that did not is worse than no
+    // row, so this one SHARES the transaction.
+    expect(sharedTx).toBeDefined()
+  })
+
+  it('leaves exactly one failure row that SURVIVES the rollback, written outside the tx', async () => {
+    queueRows({
+      'select:production_jobs': [
+        [lockRow({ status: 'dispatched' })],
+        [lockRow({ status: 'dispatched' })],
+      ],
+    })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(409)
+
+    expect(auditSpy).toHaveBeenCalledTimes(1)
+    const [, entry, sharedTx] = auditSpy.mock.calls[0]!
+    expect(entry.action).toBe('production_job.transition_refused')
+    expect(entry.outcome).toBe('failure')
+    expect(entry.metadata).toMatchObject({ code: 'ILLEGAL_TRANSITION' })
+
+    // THE TRAP, and the instinct is the wrong way round: a refusal row records
+    // that a transaction was rolled back. Writing it inside that transaction
+    // rolls the evidence back with it.
+    expect(sharedTx).toBeUndefined()
+    expect(recorder.tx.rollbacks).toBe(1)
+  })
+
+  it('writes NO refusal row for a 404 — there is no entity to refuse', async () => {
+    queueRows({ 'select:production_jobs': [[]] })
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${OTHER_JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(404)
+    // The middleware's floor row is the right level of detail for a 404, and a
+    // refusal row here would confirm the job exists.
+    expect(auditSpy).not.toHaveBeenCalled()
+  })
+
+  it('an audit failure inside the transaction leaves NO success row', async () => {
+    queueRows({
+      'select:production_jobs': [[lockRow()], [lockRow()], [jobRow({ status: 'received' })]],
+      'update:production_jobs': [[{ id: JOB_ID }]],
+    })
+    // `recordAudit` RETHROWS when it is handed a tx: the insert did not fail on
+    // its own, it aborted the caller's transaction. Swallowing it would answer
+    // 200 over a write Postgres is about to roll back.
+    auditSpy.mockRejectedValueOnce(new Error('audit insert deadlocked'))
+
+    const res = await buildApp().request(
+      `/api/vendor/jobs/${JOB_ID}`,
+      json({ status: 'received' })
+    )
+    expect(res.status).toBe(500)
+    expect(recorder.tx.rollbacks).toBe(1)
+    expect(recorder.tx.commits).toBe(0)
+    // One attempt, and it failed. No second row claiming the move happened.
+    expect(auditSpy).toHaveBeenCalledTimes(1)
+  })
+
+  // --------------------------------------------------------------------
+  // The module boundary
+  // --------------------------------------------------------------------
+
+  it('keeps routes/vendor.ts free of every database import', () => {
+    const source = readSource('routes/vendor.ts')
+    expect(source).not.toMatch(/from ["'][^"']*\/database/)
+    expect(source).not.toMatch(/\bdb\./)
+    expect(source).not.toMatch(/drizzle-orm/)
   })
 })
 

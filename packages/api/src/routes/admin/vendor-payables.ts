@@ -14,12 +14,17 @@
  *
  * 1. **Payables are DERIVED, never stored.** There is no balance column, so
  *    there is no parallel ledger to drift. The total here is
- *    `lib/vendor-payables.sumPayable` over the rows with `settlement_id IS
- *    NULL` — the same module `routes/admin/vendors.ts` uses for `amountOwed`,
- *    and the arithmetic twin of `lib/vendor-scope.getVendorPayableTotal`,
- *    which is what the VENDOR sees. `tests/routes/admin/vendor-payables.test.ts`
- *    asserts the two agree over one set of rows (carried over from #611):
- *    admin and vendor opening the same month must not see two numbers.
+ *    `lib/vendor-payables.sumPayable` over the rows
+ *    `payableJobsCondition()` selects — the same module
+ *    `routes/admin/vendors.ts` uses for `amountOwed`, and the arithmetic twin
+ *    of `lib/vendor-scope.getVendorPayableTotal`, which is what the VENDOR
+ *    sees. `tests/routes/admin/vendor-payables.test.ts` asserts the two agree
+ *    over one set of rows (carried over from #611): admin and vendor opening
+ *    the same month must not see two numbers.
+ *
+ *    That predicate is imported, never retyped. Three queries once wrote
+ *    `settlement_id IS NULL` by hand and all three forgot the rest of it, so a
+ *    cancelled job kept billing us for work nobody did — #695.
  *
  * 2. **A settlement is one transaction or it is a way to overpay.** Every job
  *    is verified — it exists, it belongs to THIS vendor, and its
@@ -42,7 +47,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "../../database";
 import { vendors } from "../../database/schema/vendors";
@@ -58,6 +63,8 @@ import {
 import {
   sumPayable,
   jobPayableAmount,
+  isJobPayable,
+  payableJobsCondition,
   type PayableJob,
 } from "../../lib/vendor-payables";
 
@@ -148,9 +155,11 @@ adminVendorPayablesApp.get(
       if (!(await vendorExists(id)))
         return c.json({ error: "Vendor not found" }, 404);
 
-      // `settlement_id IS NULL` is in the WHERE, not a filter applied after
-      // the fact: unsettled is bounded by the settlement cycle, all-history is
-      // not.
+      // The payable predicate is in the WHERE, not a filter applied after the
+      // fact: unsettled is bounded by the settlement cycle, all-history is not.
+      // `status` is selected because the UI renders it beside the amount — a
+      // cancelled line at zero has to be legible, or it is the same support
+      // call as a phantom.
       const rows = await db
         .select({
           id: productionJobs.id,
@@ -166,17 +175,15 @@ adminVendorPayablesApp.get(
           createdAt: productionJobs.createdAt,
         })
         .from(productionJobs)
-        .where(
-          and(
-            eq(productionJobs.vendorId, id),
-            isNull(productionJobs.settlementId)
-          )
-        )
+        .where(and(eq(productionJobs.vendorId, id), payableJobsCondition()))
         .orderBy(asc(productionJobs.createdAt));
 
       const jobs = rows.map((job) => ({
         ...job,
-        /** What this one job is worth: the override if there is one. */
+        /**
+         * What this one job is worth: the override if there is one — and on a
+         * cancelled job, ONLY the override. Rendered next to `status` above.
+         */
         amount: jobPayableAmount(job as PayableJob),
       }));
 
@@ -243,6 +250,9 @@ adminVendorPayablesApp.post(
           .select({
             id: productionJobs.id,
             vendorId: productionJobs.vendorId,
+            // Selected so the not-payable check below has something to judge:
+            // without it this read cannot tell a kill fee from a phantom.
+            status: productionJobs.status,
             settlementId: productionJobs.settlementId,
             amountExpected: productionJobs.amountExpected,
             amountActual: productionJobs.amountActual,
@@ -278,6 +288,22 @@ adminVendorPayablesApp.post(
           );
         }
 
+        // A cancelled job with no amount anyone agreed to is not money we owe,
+        // so it is not money we can pay. The list will not offer one, but the
+        // ids come from a request body. Stamping it would record a payment
+        // against work nobody agreed to pay for, and since payables are
+        // derived, `settlement.amount` would then disagree with the sum over
+        // its jobs with nothing anywhere to say so.
+        const notPayable = jobs.filter((j) => !isJobPayable(j as PayableJob));
+        if (notPayable.length > 0) {
+          throw new SettlementRejected(
+            `These jobs are cancelled with no agreed amount, so there is ` +
+              `nothing to settle against them: ${summarise(
+                notPayable.map((j) => j.id)
+              )}`
+          );
+        }
+
         const [settlement] = await tx
           .insert(vendorSettlements)
           .values({
@@ -305,7 +331,7 @@ adminVendorPayablesApp.post(
             and(
               inArray(productionJobs.id, jobIds),
               eq(productionJobs.vendorId, id),
-              isNull(productionJobs.settlementId)
+              payableJobsCondition()
             )
           )
           .returning({ id: productionJobs.id });

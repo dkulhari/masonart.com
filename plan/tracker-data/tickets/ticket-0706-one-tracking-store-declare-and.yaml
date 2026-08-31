@@ -1,0 +1,185 @@
+ticket_number: 706
+title: One Tracking Store - Declare and emit shipment.*, and wire the orphan order.shipment_marked_delivered
+description: |-
+  ## Task
+  This feature needs audit actions, and one already-declared action has no emitter.
+
+  `AUDIT_ACTIONS` in `packages/shared/src/schemas/audit-log.ts` declares `order.shipment_marked_delivered`. Nothing in `packages/api/src` emits it — grep returns only the declaration and its category. #671 fails the build on exactly that shape. Its obvious emitter is `POST /api/admin/shipments/:id/mark-delivered`, which lives in this feature's own file.
+
+  Add two actions this pass emits: `shipment.created` and `shipment.tracking_updated`. Both are `fulfilment` — a parcel moving is not a money event; what we PAID for it is, and that lands in pass 2 with its own emitter.
+
+  Declare nothing else. `shipment.label_issued` and `shipment.voided` belong to the Shiprocket pass and must be declared in the same phase as their emitters.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  **This ticket must land before the PATCH rewrite**, which emits `shipment.tracking_updated` and cannot reference an undeclared action — `AuditAction` is a closed tuple, so it is a type error.
+
+  `packages/shared/tests/schemas/audit-log.test.ts:142` currently asserts that NO action starts with `shipment.`, with a comment explaining it is holding the line for #671. That test flips here: the actions now have emitters, so the assertion becomes "every declared `shipment.*` action is emitted by some file under `packages/api/src`".
+
+  `recordAudit(c, entry, tx?)` — pass `tx` when the row asserts something the transaction must make true, and share its failures. See `lib/audit.ts:264`.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:24:02.555Z'
+last_updated: '2026-08-31T02:24:02.555Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Flip the guard: every declared shipment.* action must have an emitter, and the orphan must gain one'
+    file: packages/shared/tests/schemas/audit-log.test.ts
+    command: cd packages/shared && bunx vitest run tests/schemas/audit-log.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      // REPLACE the test at line ~142, 'declares nothing for a later phase to emit'.
+      // Its comment says it is holding the line until order-dispatch-tracking has
+      // emitters. It does now, so the assertion inverts rather than being deleted:
+      // the rule (#671) never changed, only which side of it we are on.
+
+        /**
+         * #671: an action nothing emits fails the build. The registry used to hold
+         * NOTHING for this feature because its emitters did not exist; now they do,
+         * so the same rule is asserted from the other direction — every declared
+         * `shipment.*` action is emitted somewhere under `packages/api/src`.
+         *
+         * `order.shipment_marked_delivered` is checked with them. It was declared
+         * long before this feature and emitted by nothing at all, which is the exact
+         * defect the rule exists to catch.
+         */
+        it('emits every fulfilment action it declares', () => {
+          const apiSrc = resolve(__dirname, '../../../api/src')
+          const sources = readdirSync(apiSrc, { recursive: true, encoding: 'utf8' })
+            .filter((f) => f.endsWith('.ts'))
+            .map((f) => readFileSync(resolve(apiSrc, f), 'utf8'))
+            .join('\n')
+
+          const mustEmit = AUDIT_ACTIONS.filter(
+            (a) => a.startsWith('shipment.') || a === 'order.shipment_marked_delivered'
+          )
+
+          expect(mustEmit.length, 'the scan found no actions to check — it is vacuous').toBeGreaterThan(0)
+
+          for (const action of mustEmit) {
+            expect(sources, `${action} is declared and emitted by nothing (#671)`).toContain(
+              `"${action}"`
+            )
+          }
+        })
+
+        it('declares only the shipment actions THIS pass emits', () => {
+          // label_issued and voided belong to the Shiprocket pass and must arrive
+          // with their emitters, not ahead of them.
+          const shipmentActions = AUDIT_ACTIONS.filter((a) => a.startsWith('shipment.'))
+          expect([...shipmentActions].sort()).toEqual(['shipment.created', 'shipment.tracking_updated'])
+        })
+
+        it('files a parcel moving under fulfilment, not money', () => {
+          expect(AUDIT_ACTION_CATEGORY['shipment.created']).toBe('fulfilment')
+          expect(AUDIT_ACTION_CATEGORY['shipment.tracking_updated']).toBe('fulfilment')
+        })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/shared && bunx vitest run tests/schemas/audit-log.test.ts
+    expected_result: FAIL - shipment.created is not in AUDIT_ACTIONS, and order.shipment_marked_delivered is emitted by nothing
+    status: pending
+  - id: 3
+    action: implement
+    description: Declare the two actions and their category
+    file: packages/shared/src/schemas/audit-log.ts
+    status: pending
+    code: |-
+      // In AUDIT_ACTIONS, in the Fulfilment block beside the production actions:
+
+        // Fulfilment — the courier leg. A parcel moving is not a money event; what
+        // we PAID a carrier is, and that action arrives with its emitter in the
+        // Shiprocket pass, not here.
+        'shipment.created',
+        'shipment.tracking_updated',
+
+      // And in AUDIT_ACTION_CATEGORY:
+
+        'shipment.created': 'fulfilment',
+        'shipment.tracking_updated': 'fulfilment',
+  - id: 4
+    action: implement
+    description: Emit shipment.created on shipment creation and shipment.tracking_updated on the PATCH
+    file: packages/api/src/routes/admin/shipments.ts
+    status: pending
+    code: |-
+      // POST /api/admin/orders/:orderId/ship — after the insert returns, sharing
+      // nothing: the insert is a single statement and there is no transaction to
+      // share. A row asserting a shipment exists beside no shipment would be worse
+      // than none, so this goes AFTER the write, not before.
+
+            await recordAudit(c, {
+              action: "shipment.created",
+              entityType: "order_shipment",
+              entityId: newShipment.id,
+              summary: `Shipment opened for order ${order.orderNumber} with ${data.carrier}`,
+              after: {
+                orderId,
+                carrier: data.carrier,
+                trackingNumber: data.trackingNumber ?? null,
+              },
+            });
+
+      // PATCH /api/admin/shipments/:id — with a before/after diff, because the whole
+      // point of this row is that someone changed a tracking number a customer is
+      // reading.
+
+            await recordAudit(c, {
+              action: "shipment.tracking_updated",
+              entityType: "order_shipment",
+              entityId: id,
+              summary: `Tracking updated on shipment ${id}`,
+              before: existing,
+              after: updated,
+            });
+  - id: 5
+    action: implement
+    description: 'Wire the orphan: mark-delivered emits the action that was declared for it'
+    file: packages/api/src/routes/admin/shipments.ts
+    status: pending
+    code: |-
+      // POST /api/admin/shipments/:id/mark-delivered — `order.shipment_marked_delivered`
+      // has been declared since the audit-log feature and emitted by nothing. It is
+      // filed under `money` in AUDIT_ACTION_CATEGORY, which is right: delivery is
+      // what closes a return window and settles what we owe.
+
+            await recordAudit(c, {
+              action: "order.shipment_marked_delivered",
+              entityType: "order_shipment",
+              entityId: id,
+              summary: `Shipment ${id} marked delivered by hand`,
+              before: { status: existing.status, deliveredAt: existing.deliveredAt },
+              after: { status: "delivered", deliveredAt },
+            });
+  - id: 6
+    action: verify-pass
+    description: Confirm both suites pass
+    command: cd packages/shared && bunx vitest run tests/schemas/audit-log.test.ts && cd ../api && bunx vitest run tests/routes/admin/shipments.test.ts tests/lib/audit-record.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git add packages/shared/src/schemas/audit-log.ts packages/shared/tests/schemas/audit-log.test.ts packages/api/src/routes/admin/shipments.ts && git commit -m "feat(api): audit a shipment being opened, retracked and marked delivered"'
+    status: pending
+current_step: 1

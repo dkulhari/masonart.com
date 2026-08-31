@@ -1,0 +1,38 @@
+ticket_number: 677
+title: Access Control - isOrderReadyToLabel, readiness blockers and the single-consumer scan
+description: |-
+  ## Task
+  Create packages/api/src/lib/production-readiness.ts exporting `getOrderLabelReadiness(orderId, reader?)` returning { ready, consolidatorVendorId, blockers[] } and `isOrderReadyToLabel(orderId, reader?)` = blockers.length === 0. This is the seam order-dispatch-tracking consumes.
+
+  ## Context
+  Feature: production-pipeline. Phase 2 of 7. Depends on #pp03.
+
+  Ready iff: the order has jobs; every order item requiring production is covered; a consolidator C is set; every live job is qc_passed or dispatched; every qc_passed job is AT C; and every dispatched job rode a transfer to C that is received and not lost.
+
+  Design constraints:
+  - ONE implementation. The boolean is blockers.length === 0, so the gate and the admin screen cannot disagree.
+  - Two functions because a 'not ready' with no reason is the class of bug OrderProductionPanel.tsx already guards against: a confident answer over an incomplete read.
+  - `reader` is optional so order-dispatch-tracking can evaluate it INSIDE the transaction that creates the shipment, having taken FOR UPDATE on the order's job rows - the anti-double-write lock vendor-payables.ts already uses.
+  - Free property to assert: once the consolidator's own jobs go dispatched, readiness goes FALSE again (a dispatched job with no inbound transfer to C is a blocker). That structurally prevents a second label.
+  - Single consumer enforced by a source scan over packages/api/src failing on any caller of `isOrderReadyToLabel(` outside an allow-list, plus a REVERSE scan asserting no file under lib/production-* imports anything named shiprocket. Same manifest-plus-scan shape as raw-sql-objects.ts.
+  - Consolidator selection: system proposes, admin confirms, decided_by NULL records 'system default'. One vendor holds everything -> that vendor automatically; a frame job exists -> its vendor (a finished framed piece is bulky, fragile and glazed - you never courier it TO a poster shop); all posters across two print vendors -> most items, ties by earliest assigned_at.
+  - Overridable until the first transfer on the order dispatches, then 409.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.260Z'
+last_updated: '2026-08-30T12:02:20.260Z'
+time_spent_minutes: 0
+labels:
+  - core
+  - seam
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

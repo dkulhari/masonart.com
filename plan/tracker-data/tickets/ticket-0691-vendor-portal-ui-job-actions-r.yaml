@@ -1,0 +1,36 @@
+ticket_number: 691
+title: Vendor Portal UI - job actions rebuilt from the transition matrix
+description: |-
+  ## Task
+  Replace the two hardcoded buttons in /vendor/jobs/$id with a matrix-driven action strip, and fix the status vocabulary in lib/vendor-nav.ts.
+
+  ## Context
+  Feature: production-pipeline. Phase 6 of 7. Depends on #pp12.
+
+  Design constraints:
+  - vendor-nav.ts:35 claims the array is 'in the order the work moves' while listing `sent` before `received`, contradicting its own labels four lines down. Fixed BY CONSTRUCTION, not by editing the comment.
+  - VENDOR_JOB_STATUSES becomes assigned, received, qc_submitted, qc_failed, qc_passed, dispatched, cancelled. `sent` is gone.
+  - NO label anywhere says 'back to us'. Goods never come back. Suggested: received = 'In production', qc_submitted = 'Sent for approval', qc_failed = 'Changes needed', qc_passed = 'Approved - ready to ship', dispatched = 'Handed over'.
+  - 'Mark ready & sent back' is DELETED. 'Mark received' survives with the question reworded to 'Confirm you have everything you need to start?'.
+  - Add nextVendorActions(status, guards) so the buttons cannot disagree with the API's matrix.
+  - Keep the inline two-step InlineConfirm pattern; no native dialogs.
+  - packages/web/tests/routes/vendor/vendor-screens.test.tsx:266-309 drives vendor-job-mark-sent and must be rewritten.
+feature: production-pipeline
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.813Z'
+last_updated: '2026-08-30T12:02:20.813Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - vendor-portal
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

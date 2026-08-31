@@ -93,14 +93,31 @@ describe('admin_audit_log table', () => {
 });
 
 describe('audit enums', () => {
-  it('files a row under one of the five scope tiers', () => {
+  it('files a row under one of the six scope tiers', () => {
     expect(auditCategoryEnum.enumValues).toEqual([
       'money',
       'privilege',
       'catalogue',
       'config',
       'content',
+      'fulfilment',
     ]);
+  });
+
+  /**
+   * `fulfilment` (#673) is split from `money` by what the row is ABOUT, not by
+   * table. A production job's assignment and its amount override change what we
+   * owe a supplier, so those stay `money`; the job moving through print, QC and
+   * despatch is fulfilment. #667 filed all `production_job.*` under `money`;
+   * this is the reconciliation.
+   *
+   * The category lives in three places that must move together — this enum, the
+   * shared `auditCategorySchema`, and `CATEGORIES` in the admin viewer. A row
+   * the database accepts but the viewer's filter drops is a row nobody can find.
+   */
+  it('carries fulfilment, appended so existing rows keep their sort position', () => {
+    expect(auditCategoryEnum.enumValues).toContain('fulfilment');
+    expect(auditCategoryEnum.enumValues.at(-1)).toBe('fulfilment');
   });
 
   it('records a refusal as an outcome rather than dropping the row', () => {

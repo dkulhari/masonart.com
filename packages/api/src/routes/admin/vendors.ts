@@ -73,16 +73,21 @@ import {
   vendorStatusEnum,
   vendorCapabilityKindEnum,
 } from "../../database/schema/vendors";
+import { productionJobs } from "../../database/schema/production-jobs";
 import {
-  productionJobs,
+  TERMINAL_STATUSES,
   type ProductionJobStatus,
-} from "../../database/schema/production-jobs";
+} from "../../lib/production-transitions";
 import {
   requireAuth,
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { sumPayable, type PayableJob } from "../../lib/vendor-payables";
+import {
+  sumPayable,
+  payableJobsCondition,
+  type PayableJob,
+} from "../../lib/vendor-payables";
 
 // ============================================================================
 // Constants
@@ -92,13 +97,38 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 /**
- * A job stops being "open" once it has passed QC or been cancelled. Everything
- * else — draft, assigned, sent, received, qc_failed — is still work the admin
- * is carrying. `production_job_status` is a vocabulary, not a state machine
- * (see schema/production-jobs.ts), so this list is a reading of it, not a
- * transition rule.
+ * A job stops counting against its vendor once it reaches a status it can never
+ * leave. DERIVED from the transition matrix, never listed here (#696).
+ *
+ * This used to be the literal `["qc_passed", "cancelled"]`, under a comment
+ * explaining that `production_job_status` was "a vocabulary, not a state
+ * machine, so this list is a reading of it". Both halves stopped being true:
+ * there IS a state machine now (`lib/production-transitions.ts`), and a reading
+ * kept by hand is a reading that goes stale. It went stale twice over the
+ * moment #673 landed, in opposite directions, and the two errors hid each other
+ * behind an unchanged total:
+ *
+ * - **`dispatched` was missing.** It is terminal — this vendor's custody ended,
+ *   and a lost parcel creates a NEW job rather than resurrecting this one — so
+ *   every despatched job counted as open work against its vendor FOREVER. The
+ *   number on the admin vendor directory could only ever go up.
+ * - **`qc_passed` should not have been there.** It was the end of the line when
+ *   dispatch was in-house and the piece came back to us. Vendors despatch
+ *   directly now, so a passed job is a piece still on that vendor's shelf, and
+ *   calling it closed hid real work in hand.
+ *
+ * `TERMINAL_STATUSES` answers both, and answers the next one without being
+ * edited: it is "reachable, with nowhere to go", computed from the matrix's
+ * out-edges. Note what it is NOT — the retired `sent` has no way out either,
+ * but no way in, so it stays open and old rows carrying it keep counting.
+ *
+ * `qc_submitted` is likewise NOT closed. The ball is in our court, but the
+ * vendor is still holding the piece and the job is still live against them.
+ *
+ * No transition rule is applied here and none should be: this route reads a
+ * count, it does not move a job. The state machine is asked, not restated.
  */
-const CLOSED_JOB_STATUSES: ProductionJobStatus[] = ["qc_passed", "cancelled"];
+const CLOSED_JOB_STATUSES: ProductionJobStatus[] = [...TERMINAL_STATUSES];
 
 // ============================================================================
 // Validation
@@ -299,22 +329,23 @@ adminVendorsApp.get("/", zValidator("query", listQuerySchema), async (c) => {
       )
       .groupBy(productionJobs.vendorId);
 
-    // Unsettled only — the same predicate lib/vendor-payables documents. The
-    // sum itself is that module's, never a SUM() written here.
+    // The predicate lib/vendor-payables documents, IMPORTED rather than
+    // restated — this query used to claim it was "the same predicate" while
+    // spelling out only half of it, so a cancelled job kept inflating
+    // `amountOwed` on the vendor list (#695). The sum itself is that module's
+    // too, never a SUM() written here.
     const unsettledJobRows = await db
       .select({
         id: productionJobs.id,
         vendorId: productionJobs.vendorId,
+        status: productionJobs.status,
         amountExpected: productionJobs.amountExpected,
         amountActual: productionJobs.amountActual,
         settlementId: productionJobs.settlementId,
       })
       .from(productionJobs)
       .where(
-        and(
-          inArray(productionJobs.vendorId, pageIds),
-          isNull(productionJobs.settlementId)
-        )
+        and(inArray(productionJobs.vendorId, pageIds), payableJobsCondition())
       );
 
     const capabilitiesByVendor = new Map<
@@ -346,6 +377,7 @@ adminVendorsApp.get("/", zValidator("query", listQuerySchema), async (c) => {
       const list = jobsByVendor.get(job.vendorId) ?? [];
       list.push({
         id: job.id,
+        status: job.status,
         amountExpected: job.amountExpected,
         amountActual: job.amountActual,
         settlementId: job.settlementId,

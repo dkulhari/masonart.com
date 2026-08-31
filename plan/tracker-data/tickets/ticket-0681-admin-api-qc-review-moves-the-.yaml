@@ -1,0 +1,39 @@
+ticket_number: 681
+title: Admin API - QC review moves the job, requires defects and judges the photos
+description: |-
+  ## Task
+  POST /api/admin/production/:jobId/reviews becomes one transaction: guard that the job is qc_submitted, insert the review, move the job (pass -> qc_passed, fail -> qc_failed), require a non-empty defects array on a fail, and stamp review_id onto every live photo it judged. Add GET /:jobId/photos.
+
+  ## Context
+  Feature: production-pipeline. Phase 3 of 7. Depends on #pp02, #pp04.
+
+  Today the route inserts a row and touches nothing else, so the queue can show `received` for a job that failed inspection an hour ago.
+
+  Design constraints:
+  - `defects` is `nullish` today. A fail with no defect is unactionable for the vendor - require at least one.
+  - If the transition is refused, the review is NOT inserted either. Nothing is written, so the append-only guarantee of production_job_reviews is untouched.
+  - Stamping review_id onto the judged photos is what lets a dispute say WHICH shots were approved.
+  - One audit row (production_job.qc_approved or .qc_rejected) carrying metadata.reviewId and the defects. The verdict and the status move are the same fact - do not emit a second .transitioned row beside it or the same act is double-counted.
+  - The review insert and the transition share one transaction, so both audit writes take tx.
+  - production_job_reviews stays multi-row per job. qc_passed -> qc_failed exists precisely so a supervisor re-inspecting and overturning leaves a second row while the first survives.
+  - Admin photo review needs presigned DOWNLOAD urls; the admin side is not scope-limited the way the vendor side is.
+feature: production-pipeline
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-30T12:02:20.413Z'
+last_updated: '2026-08-30T12:02:20.413Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - admin
+  - qc
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

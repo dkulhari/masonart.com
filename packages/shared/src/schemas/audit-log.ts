@@ -25,6 +25,12 @@ import { z } from 'zod'
  * What a row can be filed under. `money` and `privilege` are the launch gate:
  * history cannot be backfilled, so an unrecorded refund or promotion is
  * unanswerable forever.
+ *
+ * `fulfilment` is the production-pipeline tier — a job moving through print, QC
+ * and despatch. Spelled the British way, matching the `audit_category` value;
+ * `fulfillment` here would refuse every row the database accepts. What we OWE a
+ * supplier stays `money` even when the row is about a production job: the split
+ * is by what the row is about, not by table.
  */
 export const auditCategorySchema = z.enum([
   'money',
@@ -32,6 +38,7 @@ export const auditCategorySchema = z.enum([
   'catalogue',
   'config',
   'content',
+  'fulfilment',
 ])
 
 /**
@@ -47,6 +54,13 @@ export const auditOutcomeSchema = z.enum(['success', 'failure'])
  * vendor request completes without a handler having written a precise row. It
  * is coarse on purpose — its job is that nothing escapes, not that everything
  * is legible.
+ *
+ * **An action is declared in the same phase as its emitter, or not at all.**
+ * #671 adds a build guard that fails when this tuple names an action no source
+ * file emits, so parking a name here for a later phase to fill in breaks the
+ * build the day that guard lands. The production actions below are the one
+ * deliberate window: they are declared by #679 and emitted by #680/#681/#684 in
+ * the same feature, ahead of the guard existing.
  */
 export const AUDIT_ACTIONS = [
   // Floor
@@ -73,6 +87,13 @@ export const AUDIT_ACTIONS = [
   'gift_card.adjusted',
   'wallet.adjusted',
   'vendor.payable_settled',
+
+  // Money — what we owe a supplier. These live on production tables but they
+  // commit or change a payable, so they file under money, not fulfilment.
+  'production_job.assigned',
+  'production_job.reassigned',
+  'production_job.amount_overridden',
+  'production_transfer.declared_lost',
 
   // Privilege
   'user.role_changed',
@@ -106,6 +127,22 @@ export const AUDIT_ACTIONS = [
   'review.deleted',
   'review_media.deleted',
   'ai_generation.moderated',
+
+  // Fulfilment — a job or a transfer moving through print, QC and despatch.
+  // There is deliberately no `production_job.cancelled`: a cancellation is a
+  // transition, and splitting it out would put two rows on one state move and
+  // break the "one row per transition" property the timeline is read through.
+  // Its money consequence, when there is one, is `production_job.amount_overridden`.
+  'production_job.created',
+  'production_job.transitioned',
+  'production_job.transition_refused',
+  'production_job.photos_submitted',
+  'production_job.qc_approved',
+  'production_job.qc_rejected',
+  'production_job.label_issued',
+  'production_transfer.dispatched',
+  'production_transfer.received',
+  'order.consolidator_set',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -141,6 +178,11 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'wallet.adjusted': 'money',
   'vendor.payable_settled': 'money',
 
+  'production_job.assigned': 'money',
+  'production_job.reassigned': 'money',
+  'production_job.amount_overridden': 'money',
+  'production_transfer.declared_lost': 'money',
+
   'user.role_changed': 'privilege',
   'user.status_changed': 'privilege',
   'vendor.invited': 'privilege',
@@ -169,6 +211,17 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'review.deleted': 'content',
   'review_media.deleted': 'content',
   'ai_generation.moderated': 'content',
+
+  'production_job.created': 'fulfilment',
+  'production_job.transitioned': 'fulfilment',
+  'production_job.transition_refused': 'fulfilment',
+  'production_job.photos_submitted': 'fulfilment',
+  'production_job.qc_approved': 'fulfilment',
+  'production_job.qc_rejected': 'fulfilment',
+  'production_job.label_issued': 'fulfilment',
+  'production_transfer.dispatched': 'fulfilment',
+  'production_transfer.received': 'fulfilment',
+  'order.consolidator_set': 'fulfilment',
 }
 
 /** A filterless page must not be able to dump the whole table. */

@@ -26,6 +26,7 @@ import {
   vendorCapabilities,
   vendorRates,
 } from '../../../src/database/schema/vendors'
+import { productionJobs } from '../../../src/database/schema/production-jobs'
 
 // ============================================================================
 // Recording database mock
@@ -225,6 +226,35 @@ describe('GET /api/admin/vendors', () => {
 
     expect(body.items[0].amountOwed).toBe('90.00')
     expect(body.items[0].openJobCount).toBe(1)
+  })
+
+  it('asks the database for payable jobs, not merely unsettled ones (#695)', async () => {
+    // The fourth query with this defect, and the one the design never named.
+    // Its own comment claimed it used "the same predicate lib/vendor-payables
+    // documents" while spelling out half of it, so a cancelled job with a
+    // rate-card expectation and nothing agreed inflated `amountOwed` on the
+    // vendor list — a number an admin reads before deciding what to pay.
+    queueRows({
+      'select:vendors': [[{ value: 1 }], [vendorRow]],
+      'select:vendor_capabilities': [[]],
+      'select:production_jobs': [[{ vendorId: VENDOR_ID, value: 1 }], []],
+    })
+
+    await buildApp().request('/api/admin/vendors')
+
+    // The second production_jobs select is the payables read; the first is the
+    // open-job count, which is a different question with a different predicate.
+    const payableRead = selects(productionJobs)[1]
+    const { sql, params } = render(payableRead?.where)
+    expect(sql).toContain('"settlement_id" is null')
+    expect(sql).toContain(
+      '("production_jobs"."status" <> $2 or "production_jobs"."amount_actual" is not null)'
+    )
+    expect(params).toContain('cancelled')
+
+    // And the rows it hands to sumPayable carry status, or the JS half of the
+    // rule cannot be applied to them either.
+    expect(payableRead?.fields).toContain('status')
   })
 })
 

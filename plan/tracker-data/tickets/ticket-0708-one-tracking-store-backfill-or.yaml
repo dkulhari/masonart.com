@@ -1,0 +1,230 @@
+ticket_number: 708
+title: One Tracking Store - Backfill orders.shipping_details into order_shipments
+description: |-
+  ## Task
+  Every order whose tracking was entered through the old admin screen has its carrier and tracking number in `orders.shipping_details` and no `order_shipments` row. Those customers have been unable to track their parcels. Fixing the writer does not help them — the data has to move.
+
+  Write a migration that opens an `order_shipments` row for every order that has usable `shipping_details` and no live shipment.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 3 — One tracking store
+
+  `orders.shipping_details` is the SOURCE and is left intact. Not cleared, not dropped. That is what makes this re-runnable if the mapping turns out wrong, and it is why the column survives this pass.
+
+  Idempotent by construction: the insert is guarded by `NOT EXISTS` against a live shipment on the same order, so running it twice inserts nothing the second time. State that in the file — a migration that is only accidentally idempotent gets run twice by someone who does not know that.
+
+  `carrier` is NOT NULL. Unlike the interactive path, there is nobody to ask here, so a row with a tracking number and no carrier gets `'Unknown'` — the alternative is dropping a real tracking number on the floor. Rows with NO tracking handle at all are skipped: an empty shipment tells the customer nothing the order status does not.
+
+  The `shipping_details` shape is `OrderShippingDetails` in `packages/api/src/database/schema/orders.ts:61` — `carrier`, `trackingNumber`, `trackingUrl`, `awbNumber`, `shipmentId`, `estimatedDelivery`, `shippedAt`, `deliveredAt`. All optional.
+
+  This migration writes `status`, so it must NOT share a batch with `0026`, which adds enum values — keeping it to pre-existing values (`pending`, `shipped`, `delivered`) sidesteps #580 entirely. Do that rather than relying on batch ordering.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:24:02.705Z'
+last_updated: '2026-08-31T02:24:02.705Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 703
+    feature: order-dispatch-tracking
+    description: Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
+  - ticket: 707
+    feature: order-dispatch-tracking
+    description: One Tracking Store - PATCH /admin/orders/:id/shipping writes order_shipments, not the jsonb
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing test asserting the migration's shape and its safety properties
+    file: packages/api/tests/database/order-shipments-backfill.test.ts
+    command: cd packages/api && bunx vitest run tests/database/order-shipments-backfill.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      /**
+       * The customers who could never track their parcel.
+       *
+       * Every order whose tracking was typed into the old admin screen has it in
+       * `orders.shipping_details` and no `order_shipments` row, so
+       * `GET /api/tracking/*` answered `tracking: null`. Fixing the writer does not
+       * reach them — the data has to move.
+       *
+       * Asserted as TEXT, like every migration test here: the suite has no live
+       * database and a mocked one would be testing the mock.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { resolve } from 'node:path'
+
+      const MIGRATION = resolve(
+        __dirname,
+        '../../src/database/migrations/0028_backfill_order_shipments.sql'
+      )
+      const sql = readFileSync(MIGRATION, 'utf8')
+      const body = sql.replace(/^\s*--.*$/gm, '')
+
+      describe('the old tracking data reaches the store the customer reads', () => {
+        it('inserts into order_shipments from orders', () => {
+          expect(body).toMatch(/insert\s+into\s+"?order_shipments"?/i)
+          expect(body).toContain('shipping_details')
+        })
+
+        it('is idempotent by construction, not by luck', () => {
+          // A migration that is only accidentally idempotent gets run twice by
+          // someone who does not know that.
+          expect(body.toLowerCase()).toContain('not exists')
+        })
+
+        it('skips orders that already have a live shipment', () => {
+          expect(body.toLowerCase()).toMatch(/voided_at"?\s+is\s+null/)
+        })
+
+        it('carries a tracking handle or is not worth a row', () => {
+          // An empty shipment tells the customer nothing the order status does not,
+          // and it would occupy the live-shipment slot a real label needs.
+          expect(body).toMatch(/trackingNumber|awbNumber/)
+          expect(body.toLowerCase()).toContain('is not null')
+        })
+
+        it("defaults carrier to 'Unknown' rather than dropping a real tracking number", () => {
+          // NOT NULL, and there is nobody to ask in a migration. The interactive path
+          // refuses instead; here the alternative is losing the data.
+          expect(body).toContain("'Unknown'")
+        })
+
+        it('uses no enum value added by 0026 — so the batch order cannot matter', () => {
+          // #580: a value added by ALTER TYPE cannot be used in the same transaction,
+          // and on a fresh database every pending migration is one batch. Sticking to
+          // pre-existing values sidesteps it rather than depending on ordering.
+          for (const added of ['undelivered', 'rto_initiated', 'rto_delivered', "'lost'", "'cancelled'"]) {
+            expect(body, `${added} was added by 0026`).not.toContain(added)
+          }
+        })
+
+        it('leaves the source column alone', () => {
+          // Not cleared, not dropped. That is what makes this re-runnable if the
+          // mapping turns out wrong.
+          expect(body.toLowerCase()).not.toMatch(/drop\s+column/)
+          expect(body.toLowerCase()).not.toMatch(/set\s+shipping_details\s*=\s*null/)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — the migration does not exist
+    command: cd packages/api && bunx vitest run tests/database/order-shipments-backfill.test.ts
+    expected_result: FAIL - ENOENT 0028_backfill_order_shipments.sql
+    status: pending
+  - id: 3
+    action: implement
+    description: Hand-write the backfill migration and register it in the journal
+    file: packages/api/src/database/migrations/0028_backfill_order_shipments.sql
+    status: pending
+    code: |-
+      -- order-dispatch-tracking phase 3: move the tracking nobody could read.
+      --
+      -- `PATCH /admin/orders/:id/shipping` wrote `orders.shipping_details` for months
+      -- while `GET /api/tracking/*` read `order_shipments`, so every customer whose
+      -- tracking was typed into the admin screen saw `tracking: null`. Fixing the
+      -- writer does not reach them; the rows have to move.
+      --
+      -- IDEMPOTENT BY CONSTRUCTION. The NOT EXISTS below means a second run inserts
+      -- nothing. Say so out loud: a migration that is only accidentally idempotent
+      -- gets run twice by somebody who does not know that.
+      --
+      -- The SOURCE COLUMN IS NOT TOUCHED. `orders.shipping_details` keeps its data
+      -- and keeps its column. If this mapping turns out wrong, deleting the inserted
+      -- rows and re-running is the whole recovery; a migration that moved and then
+      -- destroyed would leave nothing to re-run against.
+      --
+      -- USES NO VALUE ADDED BY 0026. `pending`, `shipped` and `delivered` are all
+      -- pre-existing, so this cannot trip #580 whatever order the batch runs in.
+
+      INSERT INTO "order_shipments" (
+        "order_id",
+        "carrier",
+        "tracking_number",
+        "tracking_url",
+        "awb_number",
+        "external_shipment_id",
+        "status",
+        "shipped_at",
+        "delivered_at",
+        "estimated_delivery_at",
+        "notes"
+      )
+      SELECT
+        o."id",
+        -- NOT NULL, and there is nobody to ask inside a migration. The interactive
+        -- path refuses a missing carrier; here the alternative is dropping a real
+        -- tracking number on the floor.
+        COALESCE(NULLIF(o."shipping_details" ->> 'carrier', ''), 'Unknown'),
+        NULLIF(o."shipping_details" ->> 'trackingNumber', ''),
+        NULLIF(o."shipping_details" ->> 'trackingUrl', ''),
+        NULLIF(o."shipping_details" ->> 'awbNumber', ''),
+        NULLIF(o."shipping_details" ->> 'shipmentId', ''),
+        CASE
+          WHEN o."delivered_at" IS NOT NULL THEN 'delivered'
+          WHEN o."shipped_at" IS NOT NULL THEN 'shipped'
+          ELSE 'pending'
+        END::"public"."shipment_status",
+        o."shipped_at",
+        o."delivered_at",
+        (NULLIF(o."shipping_details" ->> 'estimatedDelivery', ''))::timestamp,
+        'Backfilled from orders.shipping_details by migration 0028'
+      FROM "orders" o
+      WHERE
+        o."shipping_details" IS NOT NULL
+        -- A row with no handle at all tells the customer nothing the order status
+        -- does not, and it would occupy the live-shipment slot a real label needs.
+        AND COALESCE(
+          NULLIF(o."shipping_details" ->> 'trackingNumber', ''),
+          NULLIF(o."shipping_details" ->> 'awbNumber', ''),
+          NULLIF(o."shipping_details" ->> 'shipmentId', '')
+        ) IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "order_shipments" s
+          WHERE s."order_id" = o."id"
+            AND s."voided_at" IS NULL
+        );
+  - id: 4
+    action: implement
+    description: Add the migration to the drizzle journal so db:migrate picks it up
+    file: packages/api/src/database/migrations/meta/_journal.json
+    status: pending
+    code: |-
+      // drizzle-kit generate will not produce a data migration — append the entry by
+      // hand, matching the shape of the existing entries (idx, version, when, tag,
+      // breakpoints). Read the last entry and copy its shape exactly; `tag` must be
+      // `0028_backfill_order_shipments` with no .sql suffix.
+  - id: 5
+    action: verify-pass
+    description: Confirm the suite passes and the migration applies to the dev database
+    command: cd packages/api && bunx vitest run tests/database/order-shipments-backfill.test.ts && bun run db:migrate
+    expected_result: PASS - and the migration applies
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Apply it a second time to prove idempotence rather than assuming it
+    command: cd packages/api && bun run db:migrate
+    expected_result: PASS - no error, no duplicate rows
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/database/migrations packages/api/tests/database/order-shipments-backfill.test.ts && git commit -m "fix(api): give the orders whose tracking nobody could read a shipment row"'
+    status: pending
+current_step: 1

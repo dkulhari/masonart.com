@@ -162,6 +162,27 @@
       "when": 1786406820000,
       "tag": "0022_audit_log_drop_actor_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786406880000,
+      "tag": "0023_production_pipeline_statuses",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788096128301,
+      "tag": "0024_production_job_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788097010096,
+      "tag": "0025_production_transfers",
+      "breakpoints": true
     }
   ]
 }

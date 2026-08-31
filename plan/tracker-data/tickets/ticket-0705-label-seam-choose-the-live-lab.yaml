@@ -1,0 +1,141 @@
+ticket_number: 705
+title: Label Seam - Choose the live label by voided_at, not by recency
+description: |-
+  ## Task
+  `getVendorJobLabelKey` picks `ORDER BY created_at desc, id desc LIMIT 1` over an order's labelled shipments. Its own doc block says why that is a placeholder and names this feature as the owner of the fix:
+
+  > `order_shipments` has no void marker at all — `shipment_status` runs pending → label_created → … → delivered/failed, and `failed` is a failed DELIVERY, not a voided label... **SEAM, owned by `order-dispatch-tracking`:** the day that feature lands a void / cancellation marker, the `ORDER BY` below must become a predicate on it.
+
+  The marker landed. Newest-labelled is now measurably wrong: void a label, buy a new one in the same second, and the tie-break is `id`, which is random. A vendor reloading their label page gets a different PDF.
+
+  ## Context
+  Part of feature: order-dispatch-tracking
+  Phase: Phase 2 — Close the label seam
+
+  The `ORDER BY` does not go away — it stays as a total-order tiebreak so the result is deterministic even if the partial unique index were ever dropped. The predicate is what makes the answer CORRECT; the ordering is what makes it STABLE. Belt and braces here is cheap and the failure it prevents is a customer's address in the wrong vendor's hands.
+
+  The database already refuses two live labelled shipments per order (`order_shipments_live_label_idx`), so in practice the predicate selects exactly one row. Assert that agreement — a predicate that disagreed with the index would be a bug neither could show alone.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T02:20:37.690Z'
+last_updated: '2026-08-31T02:20:37.690Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 704
+    feature: order-dispatch-tracking
+    description: Label Seam - Read the real column and delete the 42703 to 503 path
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write the failing test: a voided label never wins, and the predicate is in the WHERE'
+    file: packages/api/tests/lib/vendor-label-seam.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      describe('the LIVE label is chosen by the void marker, not by recency', () => {
+        it('puts voided_at is null in the WHERE, beside the other four conditions', async () => {
+          // Asserted as a QUERY: the recording db is blind to a WHERE, so a
+          // behavioural fixture would be testing the mock. Same reason the other
+          // four predicates are asserted this way.
+          recorder.reset()
+          recorder.queue([{ token: 'r7Kq2-_aZ9' }])
+
+          await app.request('/api/vendor/jobs/' + JOB_ID + '/label', {
+            headers: vendorSessionFor(VENDOR_ID),
+          })
+
+          const sql = recorder.queries.map((q) => q.sql).join('\n')
+          expect(sql).toContain('voided_at')
+          expect(sql.toLowerCase()).toMatch(/voided_at"?\s+is\s+null/)
+        })
+
+        it('keeps the ordering as a TIEBREAK, so the answer is stable as well as correct', () => {
+          // The predicate makes it correct; the ordering makes it deterministic even
+          // if the partial unique index were ever dropped. Removing the ORDER BY
+          // because "the index guarantees one row" trades a cheap guard for a bug
+          // that only appears on a database somebody built with db:push.
+          const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+          expect(src).toContain('orderShipments.createdAt')
+          expect(src).toContain('orderShipments.id')
+        })
+
+        it('agrees with the index the database enforces', () => {
+          // A predicate that disagreed with order_shipments_live_label_idx would be a
+          // bug neither could show alone: the query would return rows the index
+          // thinks cannot coexist, or refuse rows it happily stores.
+          const schema = readFileSync(resolve(API_SRC, 'database/schema/shipping.ts'), 'utf8')
+          expect(schema).toContain('order_shipments_live_label_idx')
+          expect(schema).toMatch(/voided_at|voidedAt/)
+          expect(schema).toMatch(/label_object_token|labelObjectToken/)
+        })
+
+        it('the doc block no longer defers the fix to a later feature', () => {
+          const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+          expect(
+            src,
+            'the SEAM note still says order-dispatch-tracking owns a fix that has landed'
+          ).not.toContain('SEAM, owned by `order-dispatch-tracking`')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — there is no voided_at predicate
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts
+    expected_result: FAIL - the recorded SQL contains no voided_at, and the SEAM note is still present
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the predicate and rewrite the doc block that deferred it
+    file: packages/api/src/lib/vendor-scope.ts
+    status: pending
+    code: |-
+      // In getVendorJobLabelKey's WHERE, add a fifth condition:
+
+              // ...AND a label actually exists...
+              isNotNull(orderShipments.labelObjectToken),
+              // ...AND it is the LIVE one. Not the newest: void a label and buy a
+              // replacement in the same second and the tie-break is `id`, which is
+              // random — a vendor who reloads gets a different PDF, and one of them
+              // is a label the courier will not honour.
+              isNull(orderShipments.voidedAt)
+
+      // The ORDER BY STAYS. The predicate makes the answer correct; the ordering
+      // makes it deterministic even on a database built with db:push, where
+      // order_shipments_live_label_idx may be absent.
+
+      // Rewrite the '## The fifth condition: WHICH shipment' doc block. What is now
+      // true: `order_shipments.order_id` is still not unique, because a voided label
+      // and its replacement both live on the order. The LIVE one is the one with no
+      // `voided_at`, and `order_shipments_live_label_idx` — a partial unique index on
+      // (order_id) where voided_at is null and label_object_token is not null — means
+      // the database itself holds that there is at most one. The ORDER BY survives as
+      // a tiebreak, not as the choice.
+      //
+      // DELETE the paragraph beginning 'SEAM, owned by `order-dispatch-tracking`' —
+      // this feature is that owner and this is the fix.
+  - id: 4
+    action: verify-pass
+    description: Confirm the suite passes
+    command: cd packages/api && bunx vitest run tests/lib/vendor-label-seam.test.ts tests/lib/vendor-scope.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/lib/vendor-scope.ts packages/api/tests/lib/vendor-label-seam.test.ts && git commit -m "fix(api): pick the label the courier will honour, not the newest one"'
+    status: pending
+current_step: 1
