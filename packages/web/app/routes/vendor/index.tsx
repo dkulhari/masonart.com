@@ -71,6 +71,7 @@ import { z } from 'zod'
 import { AlertCircle, RefreshCw } from 'lucide-react'
 import type { ProductionJobStatus } from '@chobii/shared'
 import { cn, getApiUrl } from '~/lib/utils'
+import { useLatestOnly } from '~/lib/latest-request'
 import { Button } from '~/components/ui/Button'
 import {
   VENDOR_JOBS_MAX_PAGE_SIZE,
@@ -844,8 +845,12 @@ export interface VendorDespatchPanelState {
   error: string | null
   onRetry: () => void
   onDespatch: (input: VendorDespatchInput) => void | Promise<void>
-  /** The bucket with a write in flight. Locks that form, not the panel. */
-  busyGroupId?: string | null
+  /**
+   * The buckets with a write in flight. A SET, not one key: a scalar meant
+   * submitting a second bucket cleared the first one's flag and re-enabled its
+   * button while its POST was still open, and one more click re-fired it (#714).
+   */
+  busyGroupIds?: ReadonlySet<string>
   /** A refused despatch, keyed by the bucket that caused it. */
   groupErrors?: Record<string, string>
 }
@@ -877,6 +882,116 @@ export async function despatchVendorTransfer(input: VendorDespatchInput): Promis
     // appear in your queue" is not a message this screen could improve on.
     const body = (await response.json().catch(() => ({}))) as { error?: string }
     throw new Error(body.error ?? 'Failed to despatch the parcel')
+  }
+}
+
+/**
+ * The state behind the despatch panel: what can be sent, and what is being sent.
+ *
+ * A hook rather than four `useState`s in the page, because both of the races
+ * #714 filed live HERE and neither is reachable through the presentational
+ * panel — a candidates response landing out of order, and a busy flag one send
+ * could clear while another was still open.
+ *
+ * `onDespatched` is what the page uses to re-read its parcel strip: a
+ * successful send puts a new outbound leg on it, and the strip is not this
+ * hook's business.
+ */
+export interface VendorDespatchController {
+  data: VendorTransferCandidateGroup[] | null
+  isLoading: boolean
+  error: string | null
+  reload: () => void
+  despatch: (input: VendorDespatchInput) => Promise<void>
+  busyGroupIds: ReadonlySet<string>
+  groupErrors: Record<string, string>
+}
+
+export function useVendorDespatch(onDespatched?: () => void): VendorDespatchController {
+  const [data, setData] = useState<VendorTransferCandidateGroup[] | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [busyGroupIds, setBusyGroupIds] = useState<ReadonlySet<string>>(new Set())
+  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({})
+
+  const claim = useLatestOnly()
+
+  /**
+   * Guarded, because this reload is fired by every send and every retry.
+   *
+   * Send bucket A, then bucket B: B's reload could answer first and A's stale
+   * answer land on top of it, putting B back on screen as sendable — where the
+   * only outcome is a 409 `JOB_ALREADY_ON_TRANSFER` for work already
+   * despatched. Repeated "Try again" clicks have the same shape.
+   */
+  const load = useCallback(async () => {
+    const isCurrent = claim()
+    setIsLoading(true)
+    // Cleared when the read STARTS, not when it succeeds: a retry whose error
+    // banner stays put and whose button stays enabled looks like it did
+    // nothing, and the operator clicks again (#715).
+    setError(null)
+    try {
+      const { groups } = await fetchVendorTransferCandidates()
+      if (!isCurrent()) return
+      setData(groups)
+    } catch (loadError) {
+      if (!isCurrent()) return
+      // Dropped with the error, like the queue and the strip: a half-read list
+      // of what can be sent under a failure banner is a parcel somebody packs.
+      setData(null)
+      setError((loadError as Error).message)
+    } finally {
+      if (isCurrent()) setIsLoading(false)
+    }
+  }, [claim])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const despatch = useCallback(
+    async (input: VendorDespatchInput) => {
+      const key = input.jobIds[0] ?? ''
+      // Added and removed, never assigned: two sends in flight are two locked
+      // buckets, and one settling must not unlock the other.
+      setBusyGroupIds((current) => new Set(current).add(key))
+      setGroupErrors((current) => {
+        const next = { ...current }
+        delete next[key]
+        return next
+      })
+
+      try {
+        await despatchVendorTransfer(input)
+        // The jobs leave the bucket list and the parcel appears on the strip as
+        // outbound. Re-read rather than patched — the server stamps
+        // `dispatched_at` from its own clock and picks the destination.
+        await load()
+        onDespatched?.()
+      } catch (despatchError) {
+        // On the BUCKET. Every refusal this route answers with is written for
+        // the vendor reading it, so it is shown whole.
+        setGroupErrors((current) => ({ ...current, [key]: (despatchError as Error).message }))
+      } finally {
+        setBusyGroupIds((current) => {
+          const next = new Set(current)
+          next.delete(key)
+          return next
+        })
+      }
+    },
+    [load, onDespatched]
+  )
+
+  return {
+    data,
+    isLoading,
+    error,
+    reload: () => void load(),
+    despatch,
+    busyGroupIds,
+    groupErrors,
   }
 }
 
@@ -931,6 +1046,22 @@ function DespatchGroup({
   const [reference, setReference] = useState('')
   const [pieces, setPieces] = useState(String(group.jobs.length))
   const [expectedBy, setExpectedBy] = useState('')
+
+  /**
+   * The default follows the bucket when the bucket changes size.
+   *
+   * The React key is the FIRST job's id, which is stable when a job is ADDED —
+   * so a bucket that gains a third job reuses this component, and a `pieces`
+   * seeded once by `useState` still read 2. The vendor sent a docket claiming
+   * two pieces for a three-job parcel (#714).
+   *
+   * Keyed on the count rather than on the jobs, so re-reading the same bucket
+   * does not overwrite a count the vendor typed.
+   */
+  const jobCount = group.jobs.length
+  useEffect(() => {
+    setPieces(String(jobCount))
+  }, [jobCount])
 
   const pieceCount = Number.parseInt(pieces, 10)
   // The API's own bounds, asked here so a doomed round trip is not spent. A
@@ -1063,10 +1194,16 @@ function DespatchGroup({
  * choosing one would be a vendor learning who else is working the order.
  */
 export function VendorDespatchPanel({ despatch }: { despatch: VendorDespatchPanelState }) {
-  const { data, isLoading, error, onRetry, onDespatch, busyGroupId, groupErrors } = despatch
+  const { data, isLoading, error, onRetry, onDespatch, busyGroupIds, groupErrors } = despatch
 
   return (
-    <div data-testid="vendor-despatch" className="space-y-3">
+    <div
+      data-testid="vendor-despatch"
+      className="space-y-3"
+      // The buckets stay on screen through a refetch, so this is the only thing
+      // left that says a read is in flight.
+      aria-busy={isLoading}
+    >
       {error ? (
         <div
           data-testid="vendor-despatch-error"
@@ -1087,9 +1224,13 @@ export function VendorDespatchPanel({ despatch }: { despatch: VendorDespatchPane
             Try again
           </Button>
         </div>
-      ) : isLoading ? (
+      ) : data === null ? (
+        // Only when there is nothing to show. Gating on `isLoading` meant every
+        // refetch — including the one a successful send triggers — replaced the
+        // list with a skeleton, unmounting every OTHER bucket and throwing away
+        // a docket somebody had typed into it (#714).
         <DespatchSkeleton />
-      ) : (data?.length ?? 0) === 0 ? (
+      ) : data.length === 0 ? (
         <p
           data-testid="vendor-despatch-empty"
           className="rounded-lg border border-dashed border-border px-6 py-8 text-center text-sm text-muted-foreground"
@@ -1098,14 +1239,14 @@ export function VendorDespatchPanel({ despatch }: { despatch: VendorDespatchPane
           inspection and the goods are due somewhere else.
         </p>
       ) : (
-        (data ?? []).map((group) => {
+        data.map((group) => {
           const key = despatchGroupKey(group)
           return (
             <DespatchGroup
               key={key}
               group={group}
               onDespatch={onDespatch}
-              busy={busyGroupId === key}
+              busy={busyGroupIds?.has(key) ?? false}
               error={groupErrors?.[key]}
             />
           )
@@ -1291,14 +1432,6 @@ function VendorJobsPage() {
   const [transferErrors, setTransferErrors] = useState<Record<string, string>>({})
   const [olderNotListed, setOlderNotListed] = useState(false)
 
-  // What can be SENT, read separately again and for the same reason: a bucket
-  // list that would not load must not blank the parcels that did.
-  const [candidates, setCandidates] = useState<VendorTransferCandidateGroup[] | null>(null)
-  const [candidatesLoading, setCandidatesLoading] = useState(true)
-  const [candidatesError, setCandidatesError] = useState<string | null>(null)
-  const [busyGroupId, setBusyGroupId] = useState<string | null>(null)
-  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({})
-
   const load = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -1356,45 +1489,10 @@ function VendorJobsPage() {
     }
   }, [])
 
-  const loadCandidates = useCallback(async () => {
-    setCandidatesLoading(true)
-    try {
-      const { groups } = await fetchVendorTransferCandidates()
-      setCandidates(groups)
-      setCandidatesError(null)
-    } catch (candidatesLoadError) {
-      // Dropped with the error, like the queue and the strip: a half-read list
-      // of what can be sent under a failure banner is a parcel somebody packs.
-      setCandidates(null)
-      setCandidatesError((candidatesLoadError as Error).message)
-    } finally {
-      setCandidatesLoading(false)
-    }
-  }, [])
-
-  const despatch = async (input: VendorDespatchInput) => {
-    const key = input.jobIds[0] ?? ''
-    setBusyGroupId(key)
-    setGroupErrors((current) => {
-      const next = { ...current }
-      delete next[key]
-      return next
-    })
-
-    try {
-      await despatchVendorTransfer(input)
-      // Both lists: the jobs leave the bucket list and the parcel appears on
-      // the strip as outbound. Re-read rather than patched — the server stamps
-      // `dispatched_at` from its own clock and picks the destination.
-      await Promise.all([loadCandidates(), loadTransfers()])
-    } catch (despatchError) {
-      // On the BUCKET. Every refusal this route answers with is written for the
-      // vendor reading it, so it is shown whole.
-      setGroupErrors((current) => ({ ...current, [key]: (despatchError as Error).message }))
-    } finally {
-      setBusyGroupId(null)
-    }
-  }
+  // What can be SENT. Its own hook, because both of #714's races live in the
+  // loading rather than in the markup; the strip is re-read on success because
+  // a despatch puts a new outbound leg on it.
+  const despatch = useVendorDespatch(useCallback(() => void loadTransfers(), [loadTransfers]))
 
   const confirmArrival = async (id: string) => {
     setBusyTransferId(id)
@@ -1424,10 +1522,6 @@ function VendorJobsPage() {
   useEffect(() => {
     void loadTransfers()
   }, [loadTransfers])
-
-  useEffect(() => {
-    void loadCandidates()
-  }, [loadCandidates])
 
   const updateSearch = (updates: Partial<VendorJobsSearch>) => {
     void navigate({
@@ -1507,13 +1601,13 @@ function VendorJobsPage() {
         <h2 className="text-lg font-medium">Ready to send</h2>
         <VendorDespatchPanel
           despatch={{
-            data: candidates,
-            isLoading: candidatesLoading,
-            error: candidatesError,
-            onRetry: () => void loadCandidates(),
-            onDespatch: despatch,
-            busyGroupId,
-            groupErrors,
+            data: despatch.data,
+            isLoading: despatch.isLoading,
+            error: despatch.error,
+            onRetry: despatch.reload,
+            onDespatch: despatch.despatch,
+            busyGroupIds: despatch.busyGroupIds,
+            groupErrors: despatch.groupErrors,
           }}
         />
       </section>

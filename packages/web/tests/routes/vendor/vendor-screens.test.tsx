@@ -34,7 +34,7 @@
  */
 
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor, renderHook, act } from '@testing-library/react'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -71,6 +71,7 @@ import {
   DueCell,
   VendorTransferStrip,
   VendorDespatchPanel,
+  useVendorDespatch,
   type VendorDespatchPanelState,
   type VendorTransferCandidateGroup,
   type VendorTransferCandidateJob,
@@ -2330,6 +2331,7 @@ describe('VendorDespatchPanel', () => {
     error: null,
     onRetry: () => {},
     onDespatch: () => {},
+    busyGroupIds: new Set<string>(),
     ...over,
   })
 
@@ -2469,10 +2471,84 @@ describe('VendorDespatchPanel', () => {
   })
 
   it('locks the bucket with a write in flight, and only that one', () => {
-    render(<VendorDespatchPanel despatch={despatchPanel({ busyGroupId: KEY_A })} />)
+    render(
+      <VendorDespatchPanel despatch={despatchPanel({ busyGroupIds: new Set([KEY_A]) })} />
+    )
 
     expect(screen.getByTestId(`vendor-despatch-submit-${KEY_A}`)).toBeDisabled()
     expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).not.toBeDisabled()
+  })
+
+  it('locks BOTH buckets when both have a write in flight', () => {
+    // #714 defect 3. A scalar `busyGroupId` meant the second send re-enabled
+    // the first while its POST was still open, and one more click re-fired it.
+    render(
+      <VendorDespatchPanel
+        despatch={despatchPanel({ busyGroupIds: new Set([KEY_A, KEY_B]) })}
+      />
+    )
+
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_A}`)).toBeDisabled()
+    expect(screen.getByTestId(`vendor-despatch-submit-${KEY_B}`)).toBeDisabled()
+  })
+
+  /**
+   * #714 defect 2. `loadCandidates` sets `isLoading` on every refetch, and the
+   * panel rendered the skeleton whenever it was true — so sending bucket A
+   * unmounted bucket B and threw away a docket somebody had typed.
+   */
+  it('keeps the buckets and their drafts on screen while a refetch is in flight', () => {
+    render(<VendorDespatchPanel despatch={despatchPanel({ isLoading: true })} />)
+
+    expect(screen.queryByTestId('vendor-despatch-skeleton')).toBeNull()
+    expect(screen.getByTestId(`vendor-despatch-group-${KEY_A}`)).toBeInTheDocument()
+    expect(screen.getByTestId(`vendor-despatch-group-${KEY_B}`)).toBeInTheDocument()
+  })
+
+  it('does not preserve a typed docket across a refetch by remounting it', () => {
+    const { rerender } = render(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    fireEvent.change(screen.getByTestId(`vendor-despatch-reference-${KEY_B}`), {
+      target: { value: 'DL-9911' },
+    })
+
+    // The refetch that a successful send of bucket A triggers.
+    rerender(<VendorDespatchPanel despatch={despatchPanel({ isLoading: true })} />)
+    rerender(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    expect(screen.getByTestId(`vendor-despatch-reference-${KEY_B}`)).toHaveValue('DL-9911')
+  })
+
+  /**
+   * #714 defect 4. The React key is the FIRST job's id, which is stable when a
+   * job is added — so the component was reused and `pieces`, seeded once by
+   * `useState`, kept the old count. The vendor sent a docket claiming two
+   * pieces for a three-job parcel.
+   */
+  it('re-syncs the piece count when a bucket gains a job', () => {
+    const grown: VendorTransferCandidateGroup = {
+      jobs: [...GROUP_A.jobs, candidateJob({ id: 'job-frame-2', stage: 'frame' })],
+    }
+
+    const { rerender } = render(
+      <VendorDespatchPanel despatch={despatchPanel({ data: [GROUP_A] })} />
+    )
+    expect(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`)).toHaveValue(2)
+
+    rerender(<VendorDespatchPanel despatch={despatchPanel({ data: [grown] })} />)
+
+    expect(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`)).toHaveValue(3)
+  })
+
+  it('leaves a piece count the vendor typed alone when nothing changed', () => {
+    const { rerender } = render(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    fireEvent.change(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`), {
+      target: { value: '7' },
+    })
+    rerender(<VendorDespatchPanel despatch={despatchPanel()} />)
+
+    expect(screen.getByTestId(`vendor-despatch-pieces-${KEY_A}`)).toHaveValue(7)
   })
 
   it('names no counterparty, because it is told none', () => {
@@ -2482,6 +2558,128 @@ describe('VendorDespatchPanel', () => {
     // The destination is DERIVED server-side. A vendor picking one would be a
     // vendor learning who else is working the order.
     expect(panel.textContent).not.toMatch(/vendor|consolidator|shop/i)
+  })
+})
+
+/**
+ * The state behind the despatch panel, extracted so the races are testable.
+ *
+ * #714's first and third defects both live in the LOADER rather than in the
+ * markup: a candidates response that lands out of order, and a busy flag that
+ * one send could clear while another was still open. Neither is reachable
+ * through the presentational panel, and both are exactly the kind of thing that
+ * only shows up under a second click.
+ */
+describe('useVendorDespatch', () => {
+  interface Deferred {
+    resolve: (value: unknown) => void
+    promise: Promise<unknown>
+  }
+
+  const defer = (): Deferred => {
+    let resolve!: (value: unknown) => void
+    const promise = new Promise<unknown>((r) => {
+      resolve = r
+    })
+    return { resolve, promise }
+  }
+
+  const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body })
+  const group = (id: string) => ({ jobs: [{ id, stage: 'print', dueAt: null }] })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  /**
+   * Defect 1. Send bucket A (its post-write reload starts), send bucket B; B's
+   * reload answers first, then A's stale answer lands and puts B back on screen
+   * as sendable — where "Send this group" can only 409 JOB_ALREADY_ON_TRANSFER
+   * for work already despatched.
+   */
+  it('ignores a candidates response that arrives after a newer one', async () => {
+    const first = defer()
+    const second = defer()
+    const responses = [first.promise, second.promise]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => responses.shift() ?? Promise.resolve(ok({ groups: [] })))
+    )
+
+    const { result } = renderHook(() => useVendorDespatch())
+
+    await act(async () => {
+      result.current.reload()
+    })
+
+    // The NEWER request settles first...
+    await act(async () => {
+      second.resolve(ok({ groups: [group('fresh')] }))
+      await second.promise
+    })
+    // ...and the older one lands afterwards carrying a bucket already sent.
+    await act(async () => {
+      first.resolve(ok({ groups: [group('stale')] }))
+      await first.promise
+    })
+
+    expect(result.current.data?.map((g) => g.jobs[0]?.id)).toEqual(['fresh'])
+  })
+
+  /**
+   * Defect 3. `busyGroupId` was a scalar: submitting B overwrote A's flag and
+   * re-enabled A's button while A's POST was still open, and A settling then
+   * cleared B's.
+   */
+  it('keeps each bucket busy until its OWN despatch settles', async () => {
+    const sendA = defer()
+    const sendB = defer()
+    const posts = [sendA.promise, sendB.promise]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) =>
+        (init?.method ?? 'GET') === 'POST'
+          ? (posts.shift() ?? Promise.resolve(ok({})))
+          : Promise.resolve(ok({ groups: [group('a'), group('b')] }))
+      )
+    )
+
+    const { result } = renderHook(() => useVendorDespatch())
+    await act(async () => {
+      result.current.reload()
+    })
+
+    act(() => {
+      void result.current.despatch({
+        jobIds: ['a'],
+        carrier: null,
+        reference: null,
+        pieceCount: 1,
+        expectedBy: null,
+      })
+      void result.current.despatch({
+        jobIds: ['b'],
+        carrier: null,
+        reference: null,
+        pieceCount: 1,
+        expectedBy: null,
+      })
+    })
+
+    expect([...result.current.busyGroupIds].sort()).toEqual(['a', 'b'])
+
+    // A settles. B is still in flight and must stay locked.
+    await act(async () => {
+      sendA.resolve(ok({}))
+      await sendA.promise
+    })
+
+    expect([...result.current.busyGroupIds]).toEqual(['b'])
+
+    await act(async () => {
+      sendB.resolve(ok({}))
+      await sendB.promise
+    })
+
+    expect([...result.current.busyGroupIds]).toEqual([])
   })
 })
 
