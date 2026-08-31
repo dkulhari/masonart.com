@@ -32,6 +32,7 @@
     "seed:admin": "bun run --env-file=../../.env src/database/seed-admin.ts",
     "seed:test-users": "bun run --env-file=../../.env src/database/seed-test-users.ts",
     "backfill:art-box": "bun run --env-file=../../.env src/database/backfill-art-box.ts",
+    "manifest:from-folder": "bun run src/database/generate-manifest.ts",
     "db:import-catalogue": "bun run --env-file=../../.env src/database/import-catalogue.ts",
     "mockups:rooms": "bun run src/database/generate-room-mockups.ts",
     "db:retire-sent-status": "bun run --env-file=../../.env src/database/retire-sent-status.ts"
