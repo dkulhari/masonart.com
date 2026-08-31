@@ -505,18 +505,25 @@ export const LABEL_ACCESS_STATUSES: readonly ProductionJobStatus[] = (
  * possibly the dead label, and possibly a different one on the next call, which
  * is the worse half: a vendor who reloads gets a different PDF.
  *
- * So the row is CHOSEN, explicitly: the newest LABELLED shipment, `id` breaking
- * a same-instant tie so the ordering is total rather than merely usually stable.
- * The `label_object_token is not null` predicate is what makes "labelled" part
- * of the choice — an unlabelled re-buy cannot shadow the live label.
+ * So the row is CHOSEN, explicitly, by what makes a label real: it names an
+ * object (`label_object_token is not null`) and it has not been killed
+ * (`voided_at is null`). Correct here means *the label the courier will
+ * actually honour*, and those two facts are that, rather than a proxy for it.
  *
- * **What "correct" means here, and the limit of it.** Correct is *the label the
- * courier will actually honour*, and newest-labelled is only an approximation
- * of that. `order_shipments.voided_at` now exists — `order-dispatch-tracking`
- * landed it — so the approximation is no longer the best available one.
- * **SEAM, owned by `order-dispatch-tracking`:** the `ORDER BY` below must
- * become a predicate on that marker. Until it does, a label voided and re-bought
- * in the same instant ties on `created_at` and breaks on `id`, which is random.
+ * **It used to be newest-labelled, and that was a proxy.** The table had no
+ * void marker when this was written, so "most recently bought" stood in for
+ * "still valid". It is wrong in the case that matters: void a label and buy its
+ * replacement inside the same clock tick and `created_at` ties, leaving the
+ * winner to `id` — random. A vendor who reloads gets a different PDF, and one
+ * of them is dead. `voided_at` landed in #703 and this predicate is #705.
+ *
+ * **The `ORDER BY` stays, demoted to a tiebreak.** `order_shipments_live_label_idx`
+ * — partial unique on `(order_id)` where the same two conditions hold — means
+ * the database itself allows at most one row through this predicate, so the
+ * ordering decides nothing on any database built by migration. It is kept for
+ * the one built by `db:push`, where a partial index can be absent (#663): there
+ * the predicate still returns the right SET, and the ordering makes the choice
+ * within it total instead of planner-dependent.
  *
  * ## What it returns
  *
@@ -551,16 +558,22 @@ export async function getVendorJobLabelKey(
         // ...AND the job is in a status where a label is legitimately needed,
         // which is derived from the matrix rather than listed here...
         inArray(productionJobs.status, [...LABEL_ACCESS_STATUSES]),
-        // ...AND a label actually exists. All four, or no row.
-        isNotNull(orderShipments.labelObjectToken)
+        // ...AND a label actually exists...
+        isNotNull(orderShipments.labelObjectToken),
+        // ...AND it is the LIVE one. All five, or no row.
+        //
+        // Not "the newest": void a label and buy its replacement inside the
+        // same clock tick and `created_at` ties, so the winner would be decided
+        // by `id` — random. A vendor who reloads gets a different PDF, and one
+        // of them is a label the courier will refuse.
+        isNull(orderShipments.voidedAt)
       )
     )
-    // The fifth condition, and the reason this is not a bare LIMIT 1. Several
-    // labelled shipments can hang off one order (voided and re-bought); without
-    // an ORDER BY the row is whichever one the planner reached first. Newest
-    // labelled shipment wins, `id` making the ordering total.
-    // SEAM (`order-dispatch-tracking`): replace with a predicate on the void
-    // marker the day one exists. See the doc block above.
+    // A TIEBREAK now, not the choice — the predicate above makes that. Kept
+    // for a database built with `db:push`, where the partial unique index that
+    // guarantees one live label per order can be absent (#663): there this
+    // makes the pick within the matching set total rather than planner-
+    // dependent. On a migrated database it decides nothing.
     .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
     .limit(1)
 

@@ -40,6 +40,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { buildRouteApp } from '../helpers/route-app'
 import { vendorSessionFor } from '../helpers/vendor-session'
@@ -101,6 +103,9 @@ const LABEL_KEY = `fulfilment/labels/${LABEL_TOKEN}.pdf`
 const labelPath = (jobId = JOB_ID) => `/api/vendor/jobs/${jobId}/label`
 
 const buildApp = () => buildRouteApp('/api/vendor', vendorApp)
+
+/** For the source assertions in section 4, which read the real files. */
+const API_SRC = resolve(__dirname, '../../src')
 
 /**
  * The error the APPLICATION actually sees for a column that does not exist.
@@ -392,5 +397,76 @@ describe('the label is bound to the statuses where it is legitimately needed', (
     for (const status of ['cancelled', 'received', 'dispatched', 'draft']) {
       expect(bound, `${status} is inside the label window`).not.toContain(status)
     }
+  })
+})
+
+// ============================================================================
+// 4. WHICH shipment — the live one, not the newest
+// ============================================================================
+
+/**
+ * An order carries more than one `order_shipments` row once a label has been
+ * voided and re-bought, and only one of them names a PDF the courier will
+ * still honour.
+ *
+ * This used to be answered by `ORDER BY created_at DESC, id DESC LIMIT 1` —
+ * newest-labelled — because the table had no way to say which label was dead.
+ * `voided_at` landed in #703, so the choice can be made by the fact rather than
+ * by a proxy for it. The failure the proxy allows is not theoretical: void a
+ * label and buy its replacement inside the same clock tick and `created_at`
+ * ties, so the winner is decided by `id`, which is random — a vendor who
+ * reloads the page gets a different PDF, and one of them is dead.
+ *
+ * Asserted as a QUERY. The recording db is blind to a WHERE, so a fixture that
+ * queued two rows and checked which came back would be testing the mock. The
+ * behavioural half — that Postgres itself refuses two live labelled shipments
+ * on one order — is `tests/database/order-shipments-live-label.test.ts`.
+ */
+describe('the LIVE label is chosen by the void marker, not by recency', () => {
+  it('puts voided_at IS NULL in the WHERE, beside the other four conditions', async () => {
+    queueRows({ 'select:production_jobs': [[{ token: LABEL_TOKEN }]] })
+
+    await getVendorJobLabelKey(VENDOR_ID, JOB_ID)
+
+    const reads = queries.filter((q) => q.op === 'select')
+    const where = render(reads[0]?.where).sql
+
+    expect(where, 'the void marker is not consulted at all').toContain('voided_at')
+    expect(where.toLowerCase().replace(/\s+/g, ' ')).toMatch(/voided_at"? is null/)
+  })
+
+  it('keeps the ordering as a TIEBREAK, so the answer is stable as well as correct', () => {
+    // The predicate makes it CORRECT; the ordering keeps it DETERMINISTIC even
+    // on a database built with `db:push`, where the partial unique index may be
+    // absent. Dropping the ORDER BY because "the index guarantees one row"
+    // trades a free guard for a bug that only appears where the index is not.
+    const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+
+    expect(src).toContain('orderShipments.createdAt')
+    expect(src).toContain('orderShipments.id')
+  })
+
+  it('agrees with the partial unique index the database enforces', () => {
+    // A predicate that disagreed with `order_shipments_live_label_idx` would be
+    // a defect neither could show alone: the query would either return rows the
+    // index thinks cannot coexist, or refuse rows it happily stores.
+    const schema = readFileSync(resolve(API_SRC, 'database/schema/shipping.ts'), 'utf8')
+
+    expect(schema).toContain('order_shipments_live_label_idx')
+    expect(schema).toMatch(/voidedAt.*IS NULL|IS NULL.*voidedAt/s)
+    expect(schema).toMatch(/labelObjectToken.*IS NOT NULL|IS NOT NULL.*labelObjectToken/s)
+  })
+
+  it('no longer defers the fix to a later feature', () => {
+    // The doc block carried a SEAM note naming order-dispatch-tracking as the
+    // owner of exactly this change. This feature IS that owner, and this ticket
+    // is that change — a note left standing would send the next reader looking
+    // for work that is already done.
+    const src = readFileSync(resolve(API_SRC, 'lib/vendor-scope.ts'), 'utf8')
+
+    expect(
+      src,
+      'the SEAM note still defers a fix that has landed'
+    ).not.toContain('SEAM, owned by `order-dispatch-tracking`')
   })
 })
