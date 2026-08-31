@@ -1,0 +1,47 @@
+ticket_number: 726
+title: Shiprocket Client - Create the order and assign an AWB
+description: |-
+  ## Task
+
+  `createOrder(payload)` against `POST {baseUrl}/orders/create/adhoc`, then `assignAwb({shipmentId, courierId})` against `POST {baseUrl}/courier/assign/awb`.
+
+  ## These are the first WRITES to a real courier
+
+  Everything in phase 6 so far has been readable and repeatable. These two are not: a created order is a real order in Shiprocket's dashboard, and an assigned AWB is a real waybill a courier expects to collect against.
+
+  - **Do not exercise these against the live account from a test.** Fixtures only. If a live probe is ever needed it is a deliberate, announced, one-off with a plan for cancelling what it creates.
+  - `pickup_location` in the payload is the **nickname** from `vendors.shiprocket_pickup_location` (#721). Ours is `warehouse`, lowercase — Shiprocket matches it exactly and rejects a mismatch at dispatch, well after the admin who typed it has gone.
+
+  ## Shape
+
+  - `createOrder` returns Shiprocket's `order_id` and `shipment_id`. Both belong in `order_shipments`: `external_order_id` and `external_shipment_id` already exist for them (#703).
+  - `assignAwb` returns the AWB and the courier actually assigned — which may not be the one requested. Store what came back, never what was asked for.
+  - Idempotency matters. A retry after a timeout must not create a second order for the same shipment. Check for an existing `external_order_id` before creating.
+
+  ## Done when
+
+  Tests over recorded fixtures cover: a successful create returning both ids; a create that times out then retries and does NOT duplicate; an AWB assignment returning a different courier than requested and the returned one being stored.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.573Z'
+last_updated: '2026-08-31T13:49:58.573Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - pass-2
+  - phase-6
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 724
+    feature: order-dispatch-tracking
+    description: Shiprocket Client - Auth with a cached token that refreshes before it expires
+blocks: []
+attachments: []

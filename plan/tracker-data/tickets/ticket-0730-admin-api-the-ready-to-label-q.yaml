@@ -1,0 +1,44 @@
+ticket_number: 730
+title: Admin API - The ready-to-label queue
+description: |-
+  ## Task
+
+  `GET /api/admin/shipments/ready` — the orders an admin could ship right now, and for those that are close, what is stopping them.
+
+  Built from `getOrderLabelReadiness`, not from a second opinion about what ready means. A parallel definition is exactly what `LABEL_READINESS_CONSUMERS` and its scan exist to prevent.
+
+  ## Shape
+
+  - Paginated, following the vendors list route's shape (`limit`/offset, rendered through the recording query builder in tests).
+  - Each row: the order, whether it is ready, and the blockers if not.
+  - Sort so the actionable ones are first. An admin opening this screen wants the work, not the backlog.
+
+  ## Gotcha
+
+  Readiness is computed per order and this endpoint is a list. Evaluating it row by row in a loop is an N+1 that will be slow before it is wrong. Decide how to batch it and say so in the file.
+
+  ## Done when
+
+  A test asserts the SQL — the LIMIT and the predicate — through `PgDialect`, the way `tests/routes/admin/vendors.test.ts` does, rather than restating the handler.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.749Z'
+last_updated: '2026-08-31T13:49:58.749Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - admin
+  - pass-2
+  - phase-8
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

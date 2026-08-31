@@ -1,0 +1,53 @@
+ticket_number: 725
+title: Shiprocket Client - Serviceability and choosing a courier
+description: |-
+  ## Task
+
+  `checkServiceability({ pickupPincode, deliveryPincode, weightKg, cod })` and a rate-selection function over what it returns.
+
+  ## Measured against the live account
+
+  `GET {baseUrl}/courier/serviceability/?pickup_postcode=&delivery_postcode=&weight=&cod=` returns `200` with `data.available_courier_companies[]`. Verified 2026-08-31:
+
+  ```
+  couriers offered: 1
+  sample: { courier_name: "Blue Dart Air", rate: 153.15, etd: "Sep 03, 2026", cod: 1, courier_company_id: 1 }
+  ```
+
+  Each record carries ~50 fields — `rate`, `etd`, `api_edd`, `cod`, `courier_company_id`, `charge_weight`, `blocked`, plus SLA metrics.
+
+  ## The constraint that shapes this ticket
+
+  **One courier came back, not a list.** A fresh, un-KYC'd account is offered almost nothing. So an empty or single-option list is the NORMAL case here, not an edge case, and a selector written against a rich list will fail its first real call.
+
+  - Zero couriers is an ordinary answer meaning "we cannot ship this route today". It must produce a refusal a human can read, naming the two pincodes — never an exception that reads as an outage.
+  - Respect `blocked`. A blocked courier in the list is not an option.
+  - Selection rule: cheapest `rate` that satisfies the COD requirement. Do not tie-break on the SLA fields — they are unstable and we have no evidence they mean what their names suggest.
+
+  ## Done when
+
+  Tests cover: zero couriers, one courier, several with the cheapest chosen, a cheaper-but-`blocked` one skipped, and a COD order refusing a courier with `cod: 0`. All against recorded fixtures, no network.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.515Z'
+last_updated: '2026-08-31T13:49:58.515Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - pass-2
+  - phase-6
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 724
+    feature: order-dispatch-tracking
+    description: Shiprocket Client - Auth with a cached token that refreshes before it expires
+blocks: []
+attachments: []

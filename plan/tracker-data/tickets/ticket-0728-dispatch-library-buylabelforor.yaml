@@ -1,0 +1,63 @@
+ticket_number: 728
+title: Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
+description: |-
+  ## Task
+
+  `packages/api/src/lib/shipment-dispatch.ts`, exporting `buyLabelForOrder(orderId)`.
+
+  ## The whole point is the transaction
+
+  One transaction, `FOR UPDATE` on the order's production job rows, and `isOrderReadyToLabel(orderId, tx)` evaluated **inside** it. Checking readiness outside the lock is the concurrency bug this ticket exists to prevent: two admins pressing Ship at once both read "ready" and both buy a label, and the second one costs money and confuses a courier.
+
+  `lib/shipment-*` is already admitted in `LABEL_READINESS_CONSUMERS` (`production-readiness.ts:858`) with exactly this reason recorded, so the seam scan will accept it. Do not widen the allow-list.
+
+  ## Shape
+
+  1. Open the transaction, `FOR UPDATE` the job rows.
+  2. `isOrderReadyToLabel(orderId, tx)` — refuse with the blockers if not.
+  3. Refuse if a live label already exists. The partial unique index from #703 enforces at most one live labelled shipment per order; do not rely on it alone for the message.
+  4. Buy through the phase 6 client: create order, assign AWB, fetch label.
+  5. Store the PDF via `lib/storage.ts` `uploadFile` at `fulfilment/labels/<token>.pdf`, set `label_object_token`.
+  6. Audit it.
+
+  ## Audit
+
+  `shipment.created` and `shipment.tracking_updated` are already declared. Buying a label needs its own action — **declare and emit it in this same ticket.** #671 fails the build on any declared action nothing emits, so a declaration landing a ticket ahead of its emitter breaks the build for everyone.
+
+  ## The network call is the hard part
+
+  A courier API call inside a database transaction holds locks across the network. Decide deliberately and write the reasoning into the file: either keep the transaction open (simple, but a slow Shiprocket holds row locks) or split it (lock, mark intent, commit, call, reconcile). The second is more correct and more work. Whichever you choose, the failure mode you must not ship is a bought label with no row recording it.
+
+  ## Done when
+
+  A concurrency test proves two simultaneous calls produce exactly one label. Removing `FOR UPDATE` must make it fail — verify that by actually removing it, the way `order-shipments-live-label.test.ts` proves its index.
+feature: order-dispatch-tracking
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.656Z'
+last_updated: '2026-08-31T13:49:58.656Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - pass-2
+  - phase-7
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 725
+    feature: order-dispatch-tracking
+    description: Shiprocket Client - Serviceability and choosing a courier
+  - ticket: 726
+    feature: order-dispatch-tracking
+    description: Shiprocket Client - Create the order and assign an AWB
+  - ticket: 727
+    feature: order-dispatch-tracking
+    description: Shiprocket Client - Fetch the label PDF and schedule a pickup
+blocks: []
+attachments: []

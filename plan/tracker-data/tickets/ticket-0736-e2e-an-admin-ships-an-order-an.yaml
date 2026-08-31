@@ -1,0 +1,55 @@
+ticket_number: 736
+title: E2E - An admin ships an order and the customer sees the AWB
+description: |-
+  ## Task
+
+  The pass-2 counterpart to #713: drive the dispatch screen, with Shiprocket stubbed at the network boundary, and prove the AWB reaches the public tracking page.
+
+  ## Stub the courier, mock nothing else
+
+  Shiprocket is stubbed because a real call buys a real label. **Everything on our side of that boundary is real** — the route, the transaction, the database, the tracking page. #713's lesson was that mocking our own API produces a spec that stays green through the bug it was written for.
+
+  ## Read #713's closing comment before starting
+
+  Two traps it paid for:
+
+  - **A skip is not a pass.** #713's spec read `body.orders` where the endpoint pages as `items`, so both tests skipped on every run and the file reported green. Check the `passed / skipped` split, and make a failed fixture lookup throw rather than skip.
+  - **The private server pair needs `VITE_API_URL`.** The browser auth client uses an absolute `getApiUrl()` and ignores `VITE_API_PROXY_TARGET`, so without it sign-in goes to whatever is on `:3000` and every admin spec fails for unrelated reasons. `CORS_ORIGIN` must match the web port too — it defaults to `:3001`, not to `FRONTEND_URL`.
+
+  ## Gotchas
+
+  - Playwright test titles must be static. A title built from a variable fails with "Test not found in the worker process".
+  - `*.admin.spec.ts` registers under `chromium-admin`, which supplies the stored admin session.
+  - Assert the customer leg from a clean context. A public page checked through an authenticated one proves something no customer experiences.
+
+  ## Done when
+
+  The spec runs — count the tests that executed, not the total — and fails if the AWB does not reach `/track`.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:59.074Z'
+last_updated: '2026-08-31T13:49:59.074Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - testing
+  - e2e
+  - pass-2
+  - phase-10
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 734
+    feature: order-dispatch-tracking
+    description: Admin UI - The dispatch queue, with blockers on the row
+  - ticket: 735
+    feature: order-dispatch-tracking
+    description: 'Admin UI - Shipment detail: pick a courier, download the label'
+blocks: []
+attachments: []

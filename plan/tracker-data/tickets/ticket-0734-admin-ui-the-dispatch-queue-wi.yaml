@@ -1,0 +1,53 @@
+ticket_number: 734
+title: Admin UI - The dispatch queue, with blockers on the row
+description: |-
+  ## Task
+
+  `packages/web/app/routes/admin/dispatch` — the screen an admin works from, plus its sidebar entry.
+
+  Reads the ready-to-label queue. Each row shows the order and, when it is not ready, **why** — inline, on the row. Making an admin click into an order to discover it is waiting on QC is the friction this screen exists to remove.
+
+  ## Shape
+
+  - Ready rows offer Ship. Blocked rows do not, and say what is missing.
+  - Buying a label is slow and costs money: the button disables on click and the screen must not let a double-click buy twice. Optimistic UI is wrong here — wait for the server.
+  - A `SHIPROCKET_NOT_CONFIGURED` response gets our words, naming the setup step. That is a state an admin can fix, and it should not read like an outage.
+  - Sidebar entry follows `admin-nav.ts`.
+
+  ## Gotchas
+
+  - Route search params are strings. `router.tsx` overrides TanStack's serialisation, so any `validateSearch` schema must coerce numbers and split comma-joined arrays or the route error-boundaries to a blank page.
+  - Scope selectors for mobile and desktop — the same test ids exist in both trees.
+  - `packages/web` tests are not typechecked (#720). If you rename a response shape, grep `tests/e2e` for it; no tool will catch it.
+
+  ## Done when
+
+  Verified by rendering, not only by unit test. A blocked row shows its blockers and offers no Ship button.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.984Z'
+last_updated: '2026-08-31T13:49:58.984Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - web
+  - admin
+  - pass-2
+  - phase-10
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 729
+    feature: order-dispatch-tracking
+    description: Admin API - POST /orders/:orderId/ship, gated on readiness
+  - ticket: 730
+    feature: order-dispatch-tracking
+    description: Admin API - The ready-to-label queue
+blocks: []
+attachments: []

@@ -1,0 +1,46 @@
+ticket_number: 727
+title: Shiprocket Client - Fetch the label PDF and schedule a pickup
+description: |-
+  ## Task
+
+  `generateLabel({shipmentId})` against `POST {baseUrl}/courier/generate/label` and `schedulePickup({shipmentId})` against `POST {baseUrl}/courier/generate/pickup`.
+
+  ## Shape
+
+  - `generateLabel` returns a **URL to a PDF**, not the bytes. Fetching that URL is a second request, and the URL is short-lived. Storing the URL instead of the file is the bug to avoid: `order_shipments.label_object_token` exists (#703) precisely so we hold our own copy.
+  - Storing the PDF is phase 7's job (`lib/shipment-dispatch.ts` writes it through `lib/storage.ts`). This ticket returns the bytes.
+  - A label is billable. Generating one twice for the same shipment charges twice, so this must be idempotent against `label_object_token` already being set.
+
+  ## Gotchas
+
+  - Do not exercise against the live account. Fixtures only — see the sibling create-order ticket for why.
+  - Never put a label URL in a response body or a log. It is a customer's name and address behind a link, which is exactly what `routes/vendor.ts` refuses to leak.
+  - Pickup scheduling can legitimately fail after a label exists. That is not a reason to void the label; it is a reason to surface a retryable state.
+
+  ## Done when
+
+  Tests over fixtures cover: a label URL fetched and returned as bytes; a second call short-circuiting when `label_object_token` is already set; a pickup failure leaving the label intact.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.614Z'
+last_updated: '2026-08-31T13:49:58.614Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - pass-2
+  - phase-6
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 726
+    feature: order-dispatch-tracking
+    description: Shiprocket Client - Create the order and assign an AWB
+blocks: []
+attachments: []

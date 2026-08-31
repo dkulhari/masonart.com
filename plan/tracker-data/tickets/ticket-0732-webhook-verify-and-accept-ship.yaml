@@ -1,0 +1,46 @@
+ticket_number: 732
+title: Webhook - Verify and accept Shiprocket status callbacks
+description: |-
+  ## Task
+
+  `packages/api/src/routes/webhooks/shiprocket.ts` — receive Shiprocket's status pushes.
+
+  ## Verification first, and it is the whole ticket
+
+  An unverified webhook is an open endpoint that lets anyone move any order to delivered. Verify before parsing, and reject before touching the database.
+
+  - Shiprocket sends an `x-api-key` header configured in their dashboard. Hold it in `SHIPROCKET_WEBHOOK_SECRET`, added to `SHIPROCKET_ENV_VARS` and to `.env.example` — the test in `tests/services/shiprocket-config.test.ts` holds the module and the example file to each other, so adding one without the other fails the suite.
+  - Compare in constant time. A plain `===` on a secret leaks its prefix through timing.
+  - Unverified → 401, no body detail, nothing written, nothing logged from the payload.
+
+  ## Gotchas
+
+  - The payload is **untrusted input**, including the AWB and order number in it. Look up our row by our own identifiers; never trust a field that says which order this is without checking it belongs to the shipment the AWB maps to.
+  - Webhooks retry. Handle the same event arriving twice without double-firing notifications.
+  - Answer fast. Do the minimum synchronously and let anything slow happen after the response.
+
+  ## Done when
+
+  Tests cover: a valid signature accepted, an invalid one rejected with 401 and no write, a replayed event not double-firing, and a payload naming an order that does not match its AWB being refused.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.853Z'
+last_updated: '2026-08-31T13:49:58.853Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - webhook
+  - pass-2
+  - phase-9
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

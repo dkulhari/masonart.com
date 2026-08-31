@@ -1,0 +1,54 @@
+ticket_number: 724
+title: Shiprocket Client - Auth with a cached token that refreshes before it expires
+description: |-
+  ## Task
+
+  Give `packages/api/src/services/shiprocket.ts` a `getAuthToken()` that logs in once and reuses the token until it is close to expiry.
+
+  ## Measured against the live account, not the docs
+
+  `POST {baseUrl}/auth/login` with `{email, password}` returns `200` and a JWT. Verified 2026-08-31 against the real account:
+
+  - token is ~400 chars, a JWT whose `exp` claim sits **10 days out**
+  - the response also carries `company_id` (ours is a single tenant, so treat it as informational)
+  - wrong credentials return **403** with `{"message": "Invalid email and password combination"}` — not 401
+
+  So per-request login is wrong: it burns a round trip on every call and Shiprocket rate-limits auth. Cache it.
+
+  ## Shape
+
+  - Module-level cache of `{token, expiresAt}`. Refresh when within a margin of `exp` — a day is generous and costs nothing.
+  - Parse `exp` from the JWT rather than assuming 10 days. The TTL is Shiprocket's to change and a hardcoded 10 would fail silently and late.
+  - Every entry point calls `assertShiprocketConfigured()` first (#722), so an unconfigured tree refuses before it reaches the network.
+  - A 403 from login must not be cached as a valid token, and must not retry in a loop.
+
+  ## Gotchas
+
+  - Keep this out of `lib/production-*`. `tests/lib/production-seam.test.ts` scans for any import named `shiprocket` there and it is a build failure.
+  - Never log the token or the password. `routes/vendor.ts:559` is the standard: refuse without naming what you hold.
+  - Tests must not hit the network. Mock `fetch`; the live probe is a one-off you run by hand.
+
+  ## Done when
+
+  A test proves: a second call inside the window does NOT re-login; a call past the margin does; a 403 surfaces as a typed error naming no credential.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.291Z'
+last_updated: '2026-08-31T13:49:58.291Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - pass-2
+  - phase-6
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

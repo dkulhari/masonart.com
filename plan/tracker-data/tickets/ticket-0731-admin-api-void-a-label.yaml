@@ -1,0 +1,45 @@
+ticket_number: 731
+title: Admin API - Void a label
+description: |-
+  ## Task
+
+  `POST /api/admin/shipments/:id/void` — cancel a label with the courier and mark the row voided.
+
+  ## Why the column already exists
+
+  `voided_at` and `voided_reason` landed in #703, and #705 made `getVendorJobLabelKey` choose the live label by `voided_at` rather than by recency. So the read side is already correct; this is the write that produces the state it reads.
+
+  ## Shape
+
+  - Call Shiprocket's cancellation, then set `voided_at` and `voided_reason`. If the courier call fails, do NOT mark it voided — a row claiming a void that did not happen is worse than no void, because the vendor stops seeing a label the courier still honours.
+  - A re-buy after a void must be accepted. The partial unique index from #703 was written for this: both halves of its predicate exist so that voiding does not permanently block buying another. `order-shipments-live-label.test.ts` already pins that property — this ticket must not break it.
+  - Require a reason. A void with no reason is unanswerable in a dispute.
+
+  ## Done when
+
+  Tests cover: a successful void; a failed courier call leaving the row un-voided; a re-buy after a void being accepted. Run `order-shipments-live-label.test.ts` and confirm it still passes — check the count, not the total.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.807Z'
+last_updated: '2026-08-31T13:49:58.807Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - admin
+  - pass-2
+  - phase-8
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 728
+    feature: order-dispatch-tracking
+    description: Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
+blocks: []
+attachments: []

@@ -1,0 +1,52 @@
+ticket_number: 733
+title: Webhook - Map Shiprocket statuses onto shipment_status, including RTO and NDR
+description: |-
+  ## Task
+
+  Translate Shiprocket's status vocabulary into our `shipment_status` enum and fire the notifications that follow.
+
+  `shipment_status` already carries the RTO, NDR and cancelled states — #702 added them for exactly this, before anything could produce them.
+
+  ## The mapping is the risk
+
+  Shiprocket's vocabulary is larger than ours and it changes. Two rules:
+
+  - An **unknown** status must not be silently dropped and must not crash the webhook. Record it, leave our status alone, and make it visible — a status we have never seen is information, and a mapping table that quietly ignores the unexpected is how a stuck order becomes invisible.
+  - The mapping must be a **data table**, not a chain of conditionals, so the unmapped set is inspectable and testable.
+
+  RTO and NDR are not failures of the webhook — they are ordinary courier outcomes with customer consequences. RTO means the parcel is coming back; NDR means delivery was attempted and failed and somebody must act.
+
+  ## Notifications
+
+  #710 pointed the shipped and delivered notifications at the shipment. This ticket adds the states that did not exist then. A customer whose parcel is in NDR needs to hear it; one whose parcel is in RTO needs to hear something different.
+
+  Any new audit action gets declared and emitted in this ticket — #671.
+
+  ## Done when
+
+  A test enumerates every value in `shipment_status` and asserts each is reachable from at least one Shiprocket status, and that an unrecognised status is recorded without changing ours. Notification tests cover RTO and NDR separately.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.909Z'
+last_updated: '2026-08-31T13:49:58.909Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - webhook
+  - pass-2
+  - phase-9
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 732
+    feature: order-dispatch-tracking
+    description: Webhook - Verify and accept Shiprocket status callbacks
+blocks: []
+attachments: []

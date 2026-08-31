@@ -1,0 +1,50 @@
+ticket_number: 735
+title: 'Admin UI - Shipment detail: pick a courier, download the label'
+description: |-
+  ## Task
+
+  The shipment detail screen: the courier options with their rates, the AWB once assigned, and the label.
+
+  ## Shape
+
+  - Courier options come from serviceability. **Expect one, or none.** The live account offers a single courier today, so a layout that assumes a rich comparison table will look broken in production. Design for one row and let it grow.
+  - No couriers is an ordinary state with its own copy, not an error card.
+  - The label downloads through our API, never from a Shiprocket URL in the DOM. `vendor/jobs/$id.tsx` is the pattern: hand the file to the OS in the same tick, never store the URL in state or an href, never inline it.
+  - Show the void action where a label exists, and require a reason.
+
+  ## Gotchas
+
+  - Hint text belongs OUTSIDE the `<label>`. A label wrapping its input contributes all its text to that input's accessible name — use `aria-describedby` (the pattern in `VendorForm.tsx` from #723).
+  - If this screen edits anything, hydrate every field it can save. A field shown empty and saved back as null silently wipes data — #707, and nearly again in #723.
+
+  ## Done when
+
+  Rendered and checked with one courier and with none. No signed URL appears in the DOM, and there is no iframe, embed or object.
+feature: order-dispatch-tracking
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:59.027Z'
+last_updated: '2026-08-31T13:49:59.027Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - web
+  - admin
+  - pass-2
+  - phase-10
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 729
+    feature: order-dispatch-tracking
+    description: Admin API - POST /orders/:orderId/ship, gated on readiness
+  - ticket: 731
+    feature: order-dispatch-tracking
+    description: Admin API - Void a label
+blocks: []
+attachments: []

@@ -1,0 +1,50 @@
+ticket_number: 729
+title: Admin API - POST /orders/:orderId/ship, gated on readiness
+description: |-
+  ## Task
+
+  `packages/api/src/routes/admin/shipments.ts` — already admitted in `LABEL_READINESS_CONSUMERS` (`production-readiness.ts:852`).
+
+  `POST /api/admin/orders/:orderId/ship` delegates to `buyLabelForOrder` and turns its refusal into a response.
+
+  ## Shape
+
+  - Not ready → **409** with the blockers named, one per unmet condition. A bare "not ready" makes an admin hunt through the production queue for the job that has not passed QC.
+  - Not configured → the `SHIPROCKET_NOT_CONFIGURED` refusal from #722, surfaced as a 503 with its message intact. It already names the missing variables and no values.
+  - Already labelled → 409, not 500, and say so.
+  - Success → the shipment row, including AWB and courier. Never the label URL.
+
+  ## Gotchas
+
+  - Admin-gated. Follow the `requireAuth`/`requireAdmin` pattern the vendors route uses, and test the gating with the real middleware rather than a mock — `tests/routes/admin/vendors.test.ts` explains why.
+  - The response must not carry `costPaise`, `labelObjectToken` or `pickupVendorId`. The e2e in `order-dispatch-tracking.admin.spec.ts` asserts exactly that allow-list for the customer side; the admin side has its own, but the internals stay internal.
+  - Any new audit action must be declared and emitted in this ticket — #671.
+
+  ## Done when
+
+  Tests cover each refusal path with its own status and message, and a success returning the shipment. The 409 body names blockers a human can act on.
+feature: order-dispatch-tracking
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-31T13:49:58.703Z'
+last_updated: '2026-08-31T13:49:58.703Z'
+time_spent_minutes: 0
+labels:
+  - shiprocket
+  - api
+  - admin
+  - pass-2
+  - phase-8
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 728
+    feature: order-dispatch-tracking
+    description: Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
+blocks: []
+attachments: []
