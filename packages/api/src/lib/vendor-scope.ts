@@ -396,132 +396,6 @@ export async function getVendorJobArtwork(
 // ============================================================================
 
 /**
- * `order_shipments.label_object_token`, referenced as a SEAM.
- *
- * **This column does not exist yet.** It belongs to `order-dispatch-tracking`,
- * which owns every `order_shipments` schema change; the production-pipeline
- * design declares it here and only here, as the join this feature consumes.
- * Written as a SQL fragment rather than a drizzle column for exactly that
- * reason — inventing the column in `schema/shipping.ts` would put this feature's
- * name on another sub-project's table and produce a migration nobody owns.
- * Until that column lands, this query throws — Postgres raises `42703`,
- * `column "label_object_token" does not exist`.
- *
- * **That throw is CAUGHT, and it is caught here.** It used to travel to
- * `routes/vendor.ts`'s catch-all and come back as a 500 whose body quoted the
- * database's own sentence — on the one route that exists to carry customer PII,
- * which is the last place to be narrating our schema to a supplier. The reasons
- * it must not be a 404 are unchanged and still right: "no label has been bought
- * for this order yet" and "the column this feature reads does not exist" are
- * different facts, and answering the second with the first hides a missing seam
- * behind an ordinary empty state. So it becomes a THIRD answer — a
- * `LabelSeamNotReady` throw, which the route turns into a fixed 503 that names
- * no column, no table and no driver. The vendor is told the label is not
- * available yet; nobody is told what our shipping table looks like.
- *
- * Nothing here becomes a FALLBACK. Substituting the order id, or any other
- * handle that names a person, would put it in the path of a signed URL where no
- * assertion about JSON keys can see it. Replace this fragment with
- * `orderShipments.labelObjectToken` the day it exists, and delete the catch
- * below with it — `tests/lib/vendor-label-seam.test.ts` goes red on the day the
- * column lands and says so, so this is noticed rather than discovered.
- *
- * A random token, following the `production_approvals.approval_token`
- * precedent, and NOT the order id. See `getVendorJobLabelKey`.
- */
-const LABEL_OBJECT_TOKEN = sql`"order_shipments"."label_object_token"`
-
-/** The column name, once, so the catch below and the doc above cannot drift. */
-const LABEL_OBJECT_TOKEN_COLUMN = 'label_object_token'
-
-/** Postgres `undefined_column`. The exact class of failure the seam produces. */
-const UNDEFINED_COLUMN = '42703'
-
-/**
- * The label seam has not landed yet, said as a TYPE rather than as a message.
- *
- * Carries no cause and no driver text on purpose: the route answers it with a
- * fixed body, and a class the route can `instanceof` cannot accidentally echo
- * what it wrapped. `Error.message` here is what an operator reads in a log, not
- * what a vendor reads in a response.
- */
-export class LabelSeamNotReady extends Error {
-  readonly code = 'LABEL_SEAM_NOT_READY' as const
-
-  constructor() {
-    super(
-      'vendor-scope: order_shipments has no label token column yet — the ' +
-        'order-dispatch-tracking seam has not landed'
-    )
-    this.name = 'LabelSeamNotReady'
-  }
-}
-
-/**
- * Every error in a `cause` chain, outermost first.
- *
- * Drizzle does not hand its callers the driver's error. It wraps it in a
- * `DrizzleQueryError` whose `message` is `Failed query: <sql>\nparams: <args>`
- * — the SQL and nothing else — and hangs the `postgres.js` error, which is
- * where `code` and Postgres's own sentence live, on `cause`. Neither half of
- * the test below can be answered from one link alone, so the chain is walked.
- *
- * Bounded and cycle-safe: an error whose `cause` points back at itself would
- * otherwise spin here, and a diagnostic helper must not be able to hang the
- * request it is diagnosing.
- */
-function causeChain(error: unknown): object[] {
-  const chain: object[] = []
-  const seen = new Set<unknown>()
-  let current = error
-
-  while (typeof current === 'object' && current !== null && !seen.has(current) && chain.length < 8) {
-    seen.add(current)
-    chain.push(current)
-    current = (current as { cause?: unknown }).cause
-  }
-
-  return chain
-}
-
-/**
- * Is this failure the MISSING SEAM, and not some other broken query?
- *
- * Both halves are required, and they are asked of the whole `cause` chain
- * rather than of one error. `42703` alone would swallow a genuine typo in a
- * column somewhere else in this select and report it to an operator as "the
- * label feature is not wired up yet", which is a bug that hides for months. The
- * column name alone would catch a permissions error that happened to quote it.
- * A driver that reports no `code` still gets recognised by the sentence
- * Postgres always renders, so this does not depend on one client library.
- *
- * **The chain walk is not defensive coding.** Reading only the top-level error
- * made the 503 below unreachable in every environment: the wrapper carries the
- * column name (it quotes the SQL) but neither the code nor the sentence, so the
- * test failed and every label request answered the generic 500 this seam exists
- * to prevent. `tests/lib/vendor-label-seam.test.ts` fabricated a bare `Error`
- * with both fields on it — a shape the driver does not produce — so the suite
- * guarding this could not fail. It now builds the wrapped shape, and #694's
- * end-to-end run is what found the difference.
- */
-function isMissingLabelSeam(error: unknown): boolean {
-  const chain = causeChain(error)
-  if (chain.length === 0) return false
-
-  const messages = chain.map((link) => {
-    const { message } = link as { message?: unknown }
-    return typeof message === 'string' ? message : ''
-  })
-
-  if (!messages.some((text) => text.includes(LABEL_OBJECT_TOKEN_COLUMN))) return false
-
-  return (
-    chain.some((link) => (link as { code?: unknown }).code === UNDEFINED_COLUMN) ||
-    messages.some((text) => /does not exist/i.test(text))
-  )
-}
-
-/**
  * A token is DATA, read from a table this feature does not write. It becomes a
  * path segment, so it is constrained to characters that cannot leave the
  * segment: no slash, no dot, no whitespace. `objectKeyForScope` would catch a
@@ -637,16 +511,12 @@ export const LABEL_ACCESS_STATUSES: readonly ProductionJobStatus[] = (
  * of the choice — an unlabelled re-buy cannot shadow the live label.
  *
  * **What "correct" means here, and the limit of it.** Correct is *the label the
- * courier will actually honour*. Newest-labelled is the closest approximation
- * `order_shipments` can currently express: the table has no void marker at all —
- * `shipment_status` runs pending → label_created → … → delivered/failed, and
- * `failed` is a failed DELIVERY, not a voided label — and inventing one here
- * would be this feature writing semantics onto another sub-project's table.
- * **SEAM, owned by `order-dispatch-tracking` (same owner as
- * `LABEL_OBJECT_TOKEN` above):** the day that feature lands a void /
- * cancellation marker, or makes the live label single-valued per order, the
- * `ORDER BY` below must become a predicate on it. Until then this is the safest
- * available choice and is deliberately not dressed up as more than that.
+ * courier will actually honour*, and newest-labelled is only an approximation
+ * of that. `order_shipments.voided_at` now exists — `order-dispatch-tracking`
+ * landed it — so the approximation is no longer the best available one.
+ * **SEAM, owned by `order-dispatch-tracking`:** the `ORDER BY` below must
+ * become a predicate on that marker. Until it does, a label voided and re-bought
+ * in the same instant ties on `created_at` and breaks on `id`, which is random.
  *
  * ## What it returns
  *
@@ -662,12 +532,12 @@ export async function getVendorJobLabelKey(
   assertVendorId(vendorId)
   if (!jobId) return null
 
-  const read = db
+  const rows = await db
     // Narrow on purpose, like every read above: the token and nothing else.
     // `orders`, `order_shipments` and `order_consolidation` all hold or point
     // at customer data, and a wholesale select of any of them would drag it
     // across a boundary R1 says it may never cross.
-    .select({ token: sql<string | null>`${LABEL_OBJECT_TOKEN}` })
+    .select({ token: orderShipments.labelObjectToken })
     .from(productionJobs)
     .innerJoin(orderConsolidation, eq(orderConsolidation.orderId, productionJobs.orderId))
     .innerJoin(orderShipments, eq(orderShipments.orderId, productionJobs.orderId))
@@ -682,7 +552,7 @@ export async function getVendorJobLabelKey(
         // which is derived from the matrix rather than listed here...
         inArray(productionJobs.status, [...LABEL_ACCESS_STATUSES]),
         // ...AND a label actually exists. All four, or no row.
-        sql`${LABEL_OBJECT_TOKEN} is not null`
+        isNotNull(orderShipments.labelObjectToken)
       )
     )
     // The fifth condition, and the reason this is not a bare LIMIT 1. Several
@@ -694,18 +564,9 @@ export async function getVendorJobLabelKey(
     .orderBy(desc(orderShipments.createdAt), desc(orderShipments.id))
     .limit(1)
 
-  // The SEAM's failure is caught at the seam. `label_object_token` does not
-  // exist yet, so this read raises `42703` in every environment; letting that
-  // travel to the route made a schema disclosure out of the one route that
-  // carries customer data. See `LABEL_OBJECT_TOKEN` above for the whole story
-  // and for what to delete the day the column lands.
-  let rows: { token: string | null }[] = []
-  try {
-    rows = await read
-  } catch (error) {
-    if (isMissingLabelSeam(error)) throw new LabelSeamNotReady()
-    throw error
-  }
+  // No try/catch. It existed only to convert Postgres `42703` on a column that
+  // did not exist into a deliberate refusal; the column exists now, so every
+  // failure this read can produce is a real one and must travel.
 
   const token = rows[0]?.token
   if (typeof token !== 'string' || !LABEL_TOKEN_PATTERN.test(token)) return null

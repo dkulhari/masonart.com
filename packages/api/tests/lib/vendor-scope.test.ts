@@ -66,14 +66,20 @@ describe('vendor-scope module contract', () => {
   /**
    * Exported ERROR TYPES. `typeof` a class is `'function'`, so they land in the
    * account below and have to be named — which is the right outcome: an error
-   * this module exports is part of its contract, and the route that catches it
+   * this module exports is part of its contract, and a route that catches it
    * behaves differently because of it.
    *
-   * `LabelSeamNotReady` says `order_shipments.label_object_token` has not landed
-   * yet. It reads no vendor data and takes no vendorId — it is thrown by
-   * `getVendorJobLabelKey`, which is enrolled above and refuses without one.
+   * Empty since #704. This module used to export `LabelSeamNotReady`, thrown by
+   * `getVendorJobLabelKey` when `order_shipments.label_object_token` did not
+   * exist, so `routes/vendor.ts` could answer a fixed 503 instead of echoing
+   * the driver. The column landed in #703 and both the class and the catch went
+   * with it — every failure that read produces is now real and travels.
+   *
+   * The array stays rather than being deleted: the next error type this module
+   * exports has a documented place to be declared, and the account below reads
+   * the same whether it is empty or not.
    */
-  const errorTypes = ['LabelSeamNotReady'] as const
+  const errorTypes = [] as const
 
   /** Every function this module actually exports, read off the module. */
   const exportedFunctions = (): string[] =>
