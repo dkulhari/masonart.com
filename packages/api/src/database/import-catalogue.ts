@@ -761,7 +761,15 @@ async function writeRow(
     // Reprocessing is ~400ms and one R2 write per image, and re-running a
     // manifest to fix a title should not cost that. --force-media is the way
     // to ask for it.
-    images = currentImages;
+    //
+    // `altText` is the exception, and it has to be. It lives on the image
+    // record rather than the product row, but it is a *manifest* column — so
+    // skipping media used to leave the old alt text in place while every
+    // visible field around it updated. A re-import that renames a product from
+    // "Incredible India No. 29" to "Crack and Bloom" would silently keep
+    // describing it to screen readers by the old name. Rewriting the string
+    // costs nothing: no upload, no reprocessing, same asset.
+    images = currentImages.map((image) => ({ ...image, altText: row.altText }));
     report.mediaSkipped++;
   } else {
     images = [];
