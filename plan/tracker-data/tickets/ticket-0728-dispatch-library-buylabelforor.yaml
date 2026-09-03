@@ -9,7 +9,7 @@ description: |-
 
   One transaction, `FOR UPDATE` on the order's production job rows, and `isOrderReadyToLabel(orderId, tx)` evaluated **inside** it. Checking readiness outside the lock is the concurrency bug this ticket exists to prevent: two admins pressing Ship at once both read "ready" and both buy a label, and the second one costs money and confuses a courier.
 
-  `lib/shipment-*` is already admitted in `LABEL_READINESS_CONSUMERS` (`production-readiness.ts:858`) with exactly this reason recorded, so the seam scan will accept it. Do not widen the allow-list.
+  `lib/shipment-*` is already admitted in `LABEL_READINESS_CONSUMERS` (`lib/production-readiness.ts`) with exactly this reason recorded, so the seam scan will accept it. Do not widen the allow-list.
 
   ## Shape
 

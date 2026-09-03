@@ -23,11 +23,11 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.749Z'
-last_updated: '2026-08-31T13:49:58.749Z'
+last_updated: '2026-09-03T14:04:41.506Z'
 time_spent_minutes: 0
 labels:
   - shiprocket
@@ -36,9 +36,48 @@ labels:
   - pass-2
   - phase-8
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T14:04:29.965Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T14:04:34.975Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T14:04:40.212Z'
+    text: |-
+      Committed as e05ccb20 (feat(shipments): ready-to-label queue, and the order follows its shipment status).
+
+      Found built in the working tree, untracked by the ticket: GET /api/admin/shipments/ready in routes/admin/shipments.ts, batched readiness through loadOrderProductionSnapshots in lib/production-readiness.ts (each production table read once per page, not once per order; a parity test asserts the batch reads every table and column the per-order seam reads), ranked fewest-blockers-first then longest-waiting, paginated on a scan cursor bounded by READY_QUEUE_SCAN_LIMIT. The done-when holds: tests/routes/admin/shipments-ready-queue.test.ts asserts the LIMIT and predicate through the query recorder.
+
+      Same commit carries the shipment-to-order status propagation (ORDER_STATUS_FOR_SHIPMENT_STATUS gated by ORDER_FOLLOWS_ITS_SHIPMENT) on PATCH and mark-delivered, transactional with the audit row, covered by tests/routes/admin/shipments-status-propagation.test.ts. That table is what #733's webhook mapping should land on rather than a second one.
+
+      Verified today: 484 tests across the 7 dispatch files, 66 across the 5 seam and shiprocket sibling suites, tsc clean on src and tsconfig.test.json.
+work_sessions:
+  - start: '2026-09-03T14:04:29.858Z'
+    agent: claude-code
+    summary: Verified the uncommitted ready queue (484 + 66 tests green, tsc clean) and committed it as e05ccb20.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T14:04:41.476Z'
+    duration: '00:00:11'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-09-03T14:04:29.858Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:00:00'
+      tokens: 0
+completed: '2026-09-03T14:04:34.975Z'

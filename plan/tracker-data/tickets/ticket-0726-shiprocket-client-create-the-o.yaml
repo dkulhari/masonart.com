@@ -24,11 +24,11 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.573Z'
-last_updated: '2026-08-31T13:49:58.573Z'
+last_updated: '2026-09-03T14:04:28.376Z'
 time_spent_minutes: 0
 labels:
   - shiprocket
@@ -36,8 +36,128 @@ labels:
   - pass-2
   - phase-6
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-01T04:26:50.047Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-09-01T04:27:09.055Z'
+    text: |-
+      TDD record, round 4 (the three earlier rounds left nothing in the tree, which is itself a finding — the failing-first evidence is only evidence if it survives).
+
+      RED, before any source change. Added the guards' tests first and ran them against the unchanged client:
+        cd packages/api && npx vitest run tests/services/shiprocket-courier-writes.test.ts
+        -> Tests  34 failed | 131 passed (165)
+      Every one of the 34 failed for the absence of the thing being asked for, not for a broken fixture:
+        - "does not read a TAKEN SKU as a taken ORDER" / "lets a TAKEN pickup location reach the refusal
+          that can be acted on" -> the bare `already ... been taken` regex classified both as
+          SHIPROCKET_WRITE_OUTCOME_UNKNOWN;
+        - the whole "order of the write clauses" block -> `COURIER_WRITE_CLAUSES` and `orderedClauses`
+          did not exist ("Cannot read properties of undefined");
+        - "make ONE waybill request, not two" -> assignAwb had no in-flight join;
+        - "omits it too when the id is not a real number" -> `courier_id: null` on the wire;
+        - "refuses a consignee with no pincode" -> SHIPROCKET_CONSIGNEE_INVALID did not exist.
+      Two of the new tests passed on the unchanged client and were kept as regression controls
+      ("the control: the ORDER ID being taken is still an unknown outcome", "reads the SUBJECT ...").
+
+      GREEN, after the source changes:
+        npx vitest run tests/services/shiprocket-courier-writes.test.ts -> Tests  168 passed (168)
+        npx vitest run tests/lib/payload-echo-scrub.test.ts            -> Tests   42 passed (42)
+        npx vitest run tests/services/shiprocket-serviceability.test.ts-> Tests   22 passed (22)
+        npx vitest run tests/services/shiprocket-config.test.ts        -> Tests   15 passed (15)
+        npx vitest run tests/services/shiprocket-auth.test.ts          -> Tests   13 passed (13)
+        npx vitest run tests/lib/production-seam.test.ts               -> Tests   16 passed (16)
+        npx vitest run tests/lib/audit-action-coverage.test.ts         -> Tests    6 passed (6)
+        npx tsc --noEmit && npx tsc -p tsconfig.test.json --noEmit     -> clean
+      No suite skipped. Nothing in any run addressed apiv2.shiprocket.in; the suite asserts that itself,
+      against a base URL pointed at a reserved .invalid host, with a block that drives the client and
+      then reads the URL recorder so the assertion cannot pass on an empty list.
+
+      Falsification (each guard broken, watched fail, restored byte-identical):
+        1. saysAlreadyExists back to the bare regex        -> 2 failed | 166 passed
+        2. a nothing-minted clause put in the OPEN array   -> module-load throw, whole file fails to collect
+        2b. the same without a cast                        -> tsc: '"nothing-minted"' is not assignable to
+                                                              '"may-have-minted" | "credential"'
+        3. type-legal reorder of two open clauses          -> 5 failed | 163 passed (incl. the behavioural
+                                                              boundary test, not just the order pin)
+        4. assignAwb in-flight join removed                -> 3 failed | 165 passed
+        5. courier_id back to a typeof check               -> 1 failed | 167 passed
+        6. the consignee check no longer called            -> 3 failed | 165 passed
+        7. createCourierOrder in-flight join removed       -> 2 failed | 166 passed
+  - author: mcp-client
+    timestamp: '2026-09-01T04:27:27.894Z'
+    text: |-
+      Design decisions written into packages/api/src/services/shiprocket.ts, and what they are answering.
+
+      1. The order of the write decisions is data, not prose. The file's correctness rested on branch
+         ORDER — move the token check, the already-exists check or the AWB attribution check by one
+         position and an unknown outcome becomes a definite refusal whose text is "safe to correct and
+         ask again", i.e. an instruction to mint a second real courier order or waybill. Nothing but a
+         numbered list in a 200-line header held that in place. There are now four ordered clause tables
+         (`COURIER_WRITE_CLAUSES`) assembled by `orderedClauses(open, definite)`: the two parameters have
+         different element types, so a definite refusal cannot be written among the open clauses without
+         a typecheck failure, and the concatenation happens in exactly one place. The order INSIDE each
+         group is pinned by name, every clause has a scenario driving the real client, every adjacency is
+         either driven with a body that satisfies BOTH clauses or listed as mutually exclusive with a
+         reason, and the verdict a clause declares is checked against the HTTP status
+         SHIPROCKET_REFUSAL_STATUS gives its error.
+
+      2. The two writes now share their first three refusal clauses through one factory
+         (`sharedRefusalClauses`). Every defect found in this file across four rounds was one argument
+         applied to one write and dropped on its sibling; a shared factory makes that drift something you
+         have to work at.
+
+      3. `saysAlreadyExists` reads the SUBJECT of the sentence, not the words. Laravel's
+         `The :attribute has already been taken.` is decided on the attribute against a closed list of
+         things this client MAKES, so "The order items.0.sku has already been taken." and
+         "The pickup location has already been taken." no longer come back as a 409 about the order — and
+         the pickup-location refusal is reachable for that wording again. The residual (a subjectless
+         "already exists" now reads as a definite refusal) is stated on the function.
+
+      4. `assignAwb` coalesces on the Shiprocket shipment id, the same mechanism the create has. The
+         absence used to be defended by a claim about what Shiprocket does with a repeated `shipment_id`
+         — a fourth unverified premise in a file whose header asserts there are exactly three. The
+         premise is retired rather than documented.
+
+      5. The in-flight maps are described as covering OVERLAP only. The entry is released in a `finally`,
+         before the caller has written the ids, so the lookup-vs-write window is the caller's lock and
+         nothing else; the header used to claim otherwise.
+
+      6. A consignee with a blank pincode/phone/email is refused before the network
+         (SHIPROCKET_CONSIGNEE_INVALID, 422), which is what makes clause 0 of the header true. The
+         message names the fields and never the customer's values.
+
+      7. `courier_id` goes through `finiteNumber`, so a NaN no longer reaches the wire as
+         `"courier_id": null`.
+
+      Ticket's three named properties, all covered:
+        - a successful create returns both ids  -> "returns both ids Shiprocket answers with, as strings"
+        - a timed-out create then retried does not duplicate -> "a create that times out and is then
+          retried does not make a second order", with the paired control that an unreconciled retry DOES
+          create a second order (so the test is not vacuous)
+        - an AWB answer naming a different courier stores the one that came back -> "returns the courier
+          that ANSWERED, not the one requested", asserted in both directions
+      `pickup_location` is the vendor nickname, trimmed but never case-folded, and a Shiprocket rejection
+      of it is classified into a refusal that names OUR value and tells the admin which column to fix.
+  - author: system
+    timestamp: '2026-09-03T14:04:26.070Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T14:04:28.376Z'
+    text: 'Committed as 3a45ac83 (feat(shiprocket): create the courier order and assign an AWB, with ordered refusal clauses). Re-verified today before committing: tests/services/shiprocket-courier-writes.test.ts and the six sibling suites green (484 + 66 tests across 12 files), tsc clean on src and tsconfig.test.json. The builder''s work had sat uncommitted in the tree since 2026-09-01.'
+work_sessions:
+  - start: '2026-09-01T04:27:32.808Z'
+    agent: claude-opus-5-builder
+    summary: 'Done and green. RED first (34 failed | 131 passed), then the source. Final: 168 passed in tests/services/shiprocket-courier-writes.test.ts, 42 in tests/lib/payload-echo-scrub.test.ts, 22/15/13 in the three sibling shiprocket suites, 16 in production-seam, 6 in audit-action-coverage; tsc clean on src and on tsconfig.test.json. Seven guards broken one at a time and watched fail, then restored byte-identical (diff -q). No call reached apiv2.shiprocket.in — fetch stubbed, base URL on a reserved .invalid host, and an in-suite recorder assertion that is proved non-vacuous by driving the client itself.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-01T04:27:38.741Z'
+    duration: '00:00:05'
 related_tickets: []
 blocked_by:
   - ticket: 724
@@ -45,3 +165,14 @@ blocked_by:
     description: Shiprocket Client - Auth with a cached token that refreshes before it expires
 blocks: []
 attachments: []
+started: '2026-09-01T04:26:50.047Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents:
+    claude-opus-5-builder:
+      sessions: 1
+      duration: '00:00:00'
+      tokens: 0
+completed: '2026-09-03T14:04:26.070Z'

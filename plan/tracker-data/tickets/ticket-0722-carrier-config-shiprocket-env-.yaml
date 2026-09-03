@@ -15,7 +15,7 @@ description: |-
 
   ## The seam constraint — read before choosing a filename
 
-  `PRODUCTION_LIB_FORBIDDEN_IMPORT = 'shiprocket'` at `packages/api/src/lib/production-readiness.ts:910`, and `tests/lib/production-seam.test.ts` scans for it: **no `lib/production-*` module may import anything named `shiprocket`.** That guard is deliberate and this ticket must not weaken it. Put the module under `services/`, and if a production-* lib turns out to need a fact from it, the fact crosses as a parameter, never as an import.
+  `PRODUCTION_LIB_FORBIDDEN_IMPORT = 'shiprocket'` in `packages/api/src/lib/production-readiness.ts`, and `tests/lib/production-seam.test.ts` scans for it: **no `lib/production-*` module may import anything named `shiprocket`.** That guard is deliberate and this ticket must not weaken it. Put the module under `services/`, and if a production-* lib turns out to need a fact from it, the fact crosses as a parameter, never as an import.
 
   ## Refusal wording
 
@@ -63,7 +63,7 @@ comments:
 
       **No client, by design.** Auth, serviceability, AWB assignment, label PDFs and pickup scheduling are phase 6 and every one is gated on credentials nobody has. What phase 5 can deliver is the refusal, and it is worth delivering first.
 
-      **The seam held.** Under `services/`, not `lib/` — `production-readiness.ts:910` declares `PRODUCTION_LIB_FORBIDDEN_IMPORT = 'shiprocket'` and the reverse scan names `../services/shiprocket` in its own fixtures. Ran `production-seam.test.ts` with `--reporter=verbose` rather than reading a total: all 16 named tests executed, including `finds no carrier import under lib/production-*` (28ms — it really walked the tree) and all six CAN-fail cases.
+      **The seam held.** Under `services/`, not `lib/` — `lib/production-readiness.ts` declares `PRODUCTION_LIB_FORBIDDEN_IMPORT = 'shiprocket'` and the reverse scan names `../services/shiprocket` in its own fixtures. Ran `production-seam.test.ts` with `--reporter=verbose` rather than reading a total: all 16 named tests executed, including `finds no carrier import under lib/production-*` (28ms — it really walked the tree) and all six CAN-fail cases.
 
       **Env is read per call, and that is a deliberate departure from `lib/razorpay.ts`.** Razorpay reads credentials into module-level `const`s at import time, which freezes configuration before any test can set it — which is why `isRazorpayConfigured` has no test that observes it returning both values. The unconfigured path is the only path that exists today, so it had to be the reachable one. `isShiprocketConfigured()` is now asserted false, true, and false-on-half-set within a single run.
 

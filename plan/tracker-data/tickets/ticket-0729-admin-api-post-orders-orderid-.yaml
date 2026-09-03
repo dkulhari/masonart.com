@@ -3,7 +3,7 @@ title: Admin API - POST /orders/:orderId/ship, gated on readiness
 description: |-
   ## Task
 
-  `packages/api/src/routes/admin/shipments.ts` — already admitted in `LABEL_READINESS_CONSUMERS` (`production-readiness.ts:852`).
+  `packages/api/src/routes/admin/shipments.ts` — already admitted in `LABEL_READINESS_CONSUMERS` (`lib/production-readiness.ts`).
 
   `POST /api/admin/orders/:orderId/ship` delegates to `buyLabelForOrder` and turns its refusal into a response.
 
