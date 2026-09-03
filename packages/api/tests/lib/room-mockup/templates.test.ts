@@ -1,137 +1,37 @@
 /**
- * Room template validation.
+ * Frame-render validation.
  *
- * The template file is measured and typed by a human, so every error here is a
- * typo. The requirement is that each one FAILS LOUDLY and names the offending
- * template id. A silent fallback would render a wrong image that looks
- * plausible, which is the expensive failure.
+ * The frame file is typed by a human, so every error here is a typo. The
+ * requirement is that each one FAILS LOUDLY and names the offending slug. A
+ * silent fallback would render a wrong image that looks plausible, which is
+ * the expensive failure.
  */
 
 import { describe, it, expect } from 'vitest';
-import { loadFrames, loadTemplates } from '../../../src/lib/room-mockup/templates';
+import { loadFrames } from '../../../src/lib/room-mockup/templates';
 
-const FRAMES = {
-  oak: { widthRatio: 0.032, color: [178, 141, 94], depthRatio: 0.024, widthCm: 3.2, depthCm: 3 },
-  frameless: { widthRatio: 0, color: [0, 0, 0], depthRatio: 0.03, widthCm: 0, depthCm: 3.8 },
+const black = {
+  widthRatio: 0.028,
+  color: [26, 26, 28],
+  depthRatio: 0.022,
+  widthCm: 1.8,
+  depthCm: 3,
 };
 
-const template = (over: Record<string, unknown> = {}) => ({
-  id: 'living-room-warm',
-  file: 'living-room-warm.jpg',
-  placement: { x: 0.286, y: 0.047, w: 0.483, h: 0.622 },
-  light: 'left',
-  frame: 'oak',
-  label: 'Living room',
-  ...over,
-});
-
-const allExist = () => true;
-
-describe('loadTemplates', () => {
-  it('accepts a well-formed template set', () => {
-    const { templates, frames } = loadTemplates([template()], FRAMES, allExist);
-
-    expect(templates).toHaveLength(1);
-    expect(templates[0].id).toBe('living-room-warm');
-    expect(templates[0].placement.w).toBe(0.483);
-    expect(frames.oak.depthRatio).toBe(0.024);
-  });
-
-  it('rejects a placement outside 0..1, naming the template', () => {
-    expect(() => loadTemplates([template({ placement: { x: -0.1, y: 0, w: 0.5, h: 0.5 } })], FRAMES, allExist))
-      .toThrow(/living-room-warm/);
-  });
-
-  it('rejects a placement that runs off the right edge', () => {
-    expect(() => loadTemplates([template({ placement: { x: 0.7, y: 0, w: 0.5, h: 0.5 } })], FRAMES, allExist))
-      .toThrow(/living-room-warm/);
-  });
-
-  it('rejects a placement that runs off the bottom edge', () => {
-    expect(() => loadTemplates([template({ placement: { x: 0, y: 0.7, w: 0.5, h: 0.5 } })], FRAMES, allExist))
-      .toThrow(/living-room-warm/);
-  });
-
-  it('rejects a zero-width placement', () => {
-    expect(() => loadTemplates([template({ placement: { x: 0, y: 0, w: 0, h: 0.5 } })], FRAMES, allExist))
-      .toThrow(/living-room-warm/);
-  });
-
-  it('rejects an unknown light direction', () => {
-    expect(() => loadTemplates([template({ light: 'above' })], FRAMES, allExist))
-      .toThrow(/living-room-warm/);
-  });
-
-  it('rejects a template id containing a slash, naming the offending id', () => {
-    // The driver writes `room-${id}.jpg`; a slash here (a plausible typo
-    // next to hyphenated ids like "living-room") would throw ENOENT
-    // partway through a poster instead of failing at load time.
-    expect(() => loadTemplates([template({ id: 'living/room' })], FRAMES, allExist))
-      .toThrow(/living\/room/);
-  });
-
-  it('rejects a template id containing a ".." segment', () => {
-    // Unchecked, this would let a template write its room-<id>.jpg outside
-    // the intended output folder entirely.
-    expect(() => loadTemplates([template({ id: '../escape' })], FRAMES, allExist))
-      .toThrow(/\.\.\/escape/);
-  });
-
-  it('rejects a template id with uppercase letters', () => {
-    expect(() => loadTemplates([template({ id: 'Living-Room' })], FRAMES, allExist))
-      .toThrow(/Living-Room/);
-  });
-
-  it('accepts a well-formed hyphenated id', () => {
-    const { templates } = loadTemplates([template({ id: 'living-room-warm' })], FRAMES, allExist);
-
-    expect(templates[0].id).toBe('living-room-warm');
-  });
-
-  it('rejects a frame slug with no render spec, naming both the template and the slug', () => {
-    expect(() => loadTemplates([template({ frame: 'walnut' })], FRAMES, allExist))
-      .toThrow(/living-room-warm.*walnut|walnut.*living-room-warm/);
-  });
-
-  it('rejects a template whose image file is missing, naming the file', () => {
-    expect(() => loadTemplates([template()], FRAMES, () => false))
-      .toThrow(/living-room-warm\.jpg/);
-  });
-
-  it('rejects duplicate template ids', () => {
-    expect(() => loadTemplates([template(), template()], FRAMES, allExist))
-      .toThrow(/living-room-warm/);
-  });
-
-  it('rejects an empty template set rather than rendering nothing silently', () => {
-    expect(() => loadTemplates([], FRAMES, allExist)).toThrow(/no room templates/i);
-  });
-
-  it('accepts a frameless spec with widthRatio 0', () => {
-    const { templates } = loadTemplates([template({ frame: 'frameless' })], FRAMES, allExist);
-
-    expect(templates[0].frame).toBe('frameless');
-  });
-
-  it('rejects a frame render whose colour channel is out of range', () => {
-    const bad = { oak: { widthRatio: 0.03, color: [300, 0, 0], depthRatio: 0.02, widthCm: 3, depthCm: 3 } };
-
-    expect(() => loadTemplates([template()], bad, allExist)).toThrow(/oak/);
-  });
-
-  it('rejects a frame render with zero depth — every hung object stands off the wall', () => {
-    const bad = { oak: { widthRatio: 0.03, color: [1, 2, 3], depthRatio: 0, widthCm: 3, depthCm: 3 } };
-
-    expect(() => loadTemplates([template()], bad, allExist)).toThrow(/oak/);
-  });
-});
-
 describe('loadFrames', () => {
-  const black = { widthRatio: 0.028, color: [26, 26, 28], depthRatio: 0.022, widthCm: 1.8, depthCm: 3 };
-
   it('accepts a frame with physical dimensions', () => {
-    expect(loadFrames({ black }).black.depthCm).toBe(3);
-    expect(loadFrames({ black }).black.widthCm).toBe(1.8);
+    const frames = loadFrames({ black });
+
+    expect(frames.black.depthCm).toBe(3);
+    expect(frames.black.widthCm).toBe(1.8);
+    expect(frames.black.color).toEqual([26, 26, 28]);
+  });
+
+  it('accepts several frames and keeps each by slug', () => {
+    const frames = loadFrames({ black, white: { ...black, color: [242, 240, 236] } });
+
+    expect(Object.keys(frames).sort()).toEqual(['black', 'white']);
+    expect(frames.white.color[0]).toBe(242);
   });
 
   it('rejects a frame without widthCm, naming the slug', () => {
@@ -144,6 +44,10 @@ describe('loadFrames', () => {
     expect(() => loadFrames({ black: { ...black, depthCm: 0 } })).toThrow(/depthCm/);
   });
 
+  it('rejects a zero depth ratio for the same reason', () => {
+    expect(() => loadFrames({ black: { ...black, depthRatio: 0 } })).toThrow(/depthRatio/);
+  });
+
   it('allows widthCm 0 for gallery-wrap', () => {
     const frames = loadFrames({ frameless: { ...black, widthRatio: 0, widthCm: 0 } });
 
@@ -152,5 +56,13 @@ describe('loadFrames', () => {
 
   it('rejects an absurd face width', () => {
     expect(() => loadFrames({ black: { ...black, widthCm: 40 } })).toThrow(/widthCm/);
+  });
+
+  it('rejects a colour channel out of range, naming the slug', () => {
+    expect(() => loadFrames({ oak: { ...black, color: [300, 0, 0] } })).toThrow(/"oak"/);
+  });
+
+  it('rejects a non-object frame file', () => {
+    expect(() => loadFrames([])).toThrow();
   });
 });

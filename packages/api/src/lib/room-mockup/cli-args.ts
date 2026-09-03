@@ -6,14 +6,13 @@
  * otherwise silently render against the default directory.
  */
 
-import type { RoomTemplate } from './templates';
-
 /**
- * The single source of truth for the `--templates` default. Exported so the
- * driver can resolve the "flag omitted" case (see `RunOptions.templates`
+ * The single source of truth for the `--templates` default: the checked-in
+ * scene folder, holding `room-<id>.json` and `room-<id>.png` pairs. Exported
+ * so the driver can resolve the "flag omitted" case (see `RunOptions.templates`
  * below) without duplicating the literal.
  */
-export const DEFAULT_TEMPLATES_DIR = '.cache/room-templates';
+export const DEFAULT_TEMPLATES_DIR = 'packages/api/src/database/room-templates';
 
 export interface RunOptions {
   posters: string;
@@ -29,10 +28,16 @@ export interface RunOptions {
   out: string;
   only: string[] | null;
   frame: string | null;
+  /**
+   * Physical poster size as typed, e.g. `60x80`. Parsed by `parsePosterCm`
+   * in sizing.ts, where the format is validated; `null` means the middle of
+   * the ladder for each poster's orientation.
+   */
+  posterCm: string | null;
   dryRun: boolean;
 }
 
-const VALUE_FLAGS = ['--posters', '--templates', '--out', '--only', '--frame'] as const;
+const VALUE_FLAGS = ['--posters', '--templates', '--out', '--only', '--frame', '--poster-cm'] as const;
 const BOOL_FLAGS = ['--dry-run'] as const;
 
 export function parseArgs(argv: string[]): RunOptions {
@@ -86,18 +91,17 @@ export function parseArgs(argv: string[]): RunOptions {
     out: values.get('--out') ?? './out',
     only: only ? only.split(',').map((s) => s.trim()).filter(Boolean) : null,
     frame: values.get('--frame') ?? null,
+    posterCm: values.get('--poster-cm') ?? null,
     dryRun,
   };
 }
 
 /**
- * Narrow the template set to the requested ids, preserving template file order
- * so the contact sheet's numbering is stable across runs.
+ * Narrow the scene set to the requested ids, preserving file order so the
+ * contact sheet's numbering is stable across runs. Generic over anything
+ * with an id so it needs no knowledge of the scene shape.
  */
-export function selectTemplates(
-  all: RoomTemplate[],
-  only: string[] | null
-): RoomTemplate[] {
+export function selectTemplates<T extends { id: string }>(all: T[], only: string[] | null): T[] {
   if (!only) return all;
 
   const known = new Set(all.map((t) => t.id));

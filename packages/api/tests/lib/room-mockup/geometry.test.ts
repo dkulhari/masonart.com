@@ -1,20 +1,16 @@
 /**
  * Room mockup geometry.
  *
- * Two pure functions carry the design decisions that matter most:
+ * One pure function carries the design decision that matters most:
  *
  *   fitIntoBox   — a template's placement rect is a BOUNDING BOX, not a
  *                  stretch target. A poster keeps its own aspect ratio and is
  *                  centred in the box. Stretching would misrepresent the
  *                  product, which is worse than an empty margin.
- *
- *   shadowParams — a single shadow always reads as a sticker pasted onto a
- *                  photo. A tight dark contact shadow plus a wide faint
- *                  ambient one reads as an object with thickness.
- */
+ * */
 
 import { describe, it, expect } from 'vitest';
-import { fitIntoBox, shadowParams } from '../../../src/lib/room-mockup/geometry';
+import { fitIntoBox } from '../../../src/lib/room-mockup/geometry';
 
 const FULL = { x: 0, y: 0, w: 1, h: 1 };
 
@@ -74,48 +70,3 @@ describe('fitIntoBox', () => {
   });
 });
 
-describe('shadowParams', () => {
-  it('throws the shadow right when the light comes from the left', () => {
-    const { contact, ambient } = shadowParams(1000, 0.024, 'left');
-
-    expect(contact.offsetX).toBeGreaterThan(0);
-    expect(ambient.offsetX).toBeGreaterThan(0);
-  });
-
-  it('throws the shadow left when the light comes from the right', () => {
-    const { contact, ambient } = shadowParams(1000, 0.024, 'right');
-
-    expect(contact.offsetX).toBeLessThan(0);
-    expect(ambient.offsetX).toBeLessThan(0);
-  });
-
-  it('always drops the shadow downward, whichever way the light falls', () => {
-    expect(shadowParams(1000, 0.024, 'left').contact.offsetY).toBeGreaterThan(0);
-    expect(shadowParams(1000, 0.024, 'right').contact.offsetY).toBeGreaterThan(0);
-  });
-
-  it('makes the ambient shadow wider and fainter than the contact shadow', () => {
-    const { contact, ambient } = shadowParams(1000, 0.024, 'left');
-
-    expect(ambient.blurSigma).toBeGreaterThan(contact.blurSigma);
-    expect(ambient.opacity).toBeLessThan(contact.opacity);
-  });
-
-  it('scales blur and offset linearly with depth', () => {
-    const thin = shadowParams(1000, 0.02, 'left');
-    const thick = shadowParams(1000, 0.04, 'left');
-
-    expect(thick.contact.blurSigma).toBeCloseTo(thin.contact.blurSigma * 2, 5);
-    expect(thick.ambient.offsetY).toBeCloseTo(thin.ambient.offsetY * 2, 5);
-  });
-
-  it('does not change opacity with depth — depth is a size cue, not a darkness cue', () => {
-    expect(shadowParams(1000, 0.02, 'left').contact.opacity).toBe(
-      shadowParams(1000, 0.06, 'left').contact.opacity
-    );
-  });
-
-  it('keeps blur above the floor sharp requires, even for a hairline frame', () => {
-    expect(shadowParams(10, 0.001, 'left').contact.blurSigma).toBeGreaterThanOrEqual(0.4);
-  });
-});

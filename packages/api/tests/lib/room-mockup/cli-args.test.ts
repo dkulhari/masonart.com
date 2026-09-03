@@ -7,18 +7,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_TEMPLATES_DIR, parseArgs, selectTemplates } from '../../../src/lib/room-mockup/cli-args';
-import type { RoomTemplate } from '../../../src/lib/room-mockup/templates';
 
 const argv = (...args: string[]) => ['bun', 'generate-room-mockups.ts', ...args];
 
-const t = (id: string): RoomTemplate => ({
-  id,
-  file: `${id}.jpg`,
-  placement: { x: 0.1, y: 0.1, w: 0.5, h: 0.5 },
-  light: 'left',
-  frame: 'oak',
-  label: id,
-});
+/** selectTemplates only needs an id; the driver passes RoomScene[] but any {id} list works. */
+const t = (id: string) => ({ id });
 
 describe('parseArgs', () => {
   it('requires --posters', () => {
@@ -108,5 +101,26 @@ describe('selectTemplates', () => {
 
   it('throws on an id that matches no template, naming it', () => {
     expect(() => selectTemplates([t('a')], ['nope'])).toThrow(/nope/);
+  });
+});
+
+describe('--poster-cm and the scene folder default', () => {
+  it('accepts --poster-cm and passes it through unparsed', () => {
+    expect(parseArgs(argv('--posters', './art', '--poster-cm', '60x80')).posterCm).toBe('60x80');
+  });
+
+  it('defaults posterCm to null', () => {
+    expect(parseArgs(argv('--posters', './art')).posterCm).toBeNull();
+  });
+
+  it('the default templates dir is the checked-in scene folder', () => {
+    expect(DEFAULT_TEMPLATES_DIR).toBe('packages/api/src/database/room-templates');
+  });
+
+  it('selectTemplates works on any {id} list, preserving input order', () => {
+    expect(selectTemplates([{ id: 'a' }, { id: 'b' }, { id: 'c' }], ['c', 'a'])).toEqual([
+      { id: 'a' },
+      { id: 'c' },
+    ]);
   });
 });

@@ -1,70 +1,75 @@
 /**
  * Room mockup rendering.
  *
- * Composites framed artwork into a straight-on room photograph at the
- * template's declared rectangle, under a two-layer shadow.
+ * Composites a framed poster into a bare-wall room scene at a physical size
+ * on a measured wall, then makes it belong to the photograph: the wall's own
+ * light, an extruded side face, a cast shadow, a contact shadow, and the
+ * room's grain. Stages 3–5 of docs/ROOM-MOCKUP-PIPELINE.md, in order.
  *
- * Straight-on only, deliberately. An angled wall would need a four-point
- * perspective warp; sharp offers affine() but no homography, so perspective is
- * a different design rather than an extension of this one.
+ * Two placement paths share everything else:
+ *
+ *   Quad — an angled wall. The flat panel is projected through the wall's
+ *          homography by `warpPanelIntoQuad`.
+ *   Box  — a straight-on wall, where the projection is a screen-aligned
+ *          rectangle. `fitIntoBox` and a plain resize are exact there and
+ *          resample better than a bilinear warp, so they are kept.
+ *
+ * Nothing here touches the artwork's pixels except by uniform tone, and the
+ * only stochastic step (grain) is seeded, so a re-render is byte-identical.
  */
 
 import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
-import { fitIntoBox, shadowParams, type Placed, type ShadowSpec } from './geometry';
-import type { FrameRender, RoomTemplate } from './templates';
+import { fitIntoBox } from './geometry';
+import { assertUsableQuad, quadPixelBounds, type Quad } from './homography';
+import {
+  addGrain,
+  applyLuminance,
+  quadMask,
+  readRaw,
+  seedFromKey,
+  shadowLayer,
+  unionBounds,
+  wallGrainAmplitude,
+  wallLuminanceField,
+  type Bounds,
+} from './lighting';
+import { orientBuffer, orientFile } from './orient';
+import { buildFramedPanel } from './panel';
+import type { RoomScene } from './scene';
+import { posterSizeForAspect } from './sizing';
+import type { FrameRender } from './templates';
+import { panelSizeForQuad, warpPanelIntoQuad } from './warp';
+import {
+  assertRectWithinMargin,
+  centredRectCm,
+  fitPosterCm,
+  isAxisAligned,
+  normaliseQuad,
+  projectRectCm,
+  pxPerCmAt,
+  shadowOffsetCm,
+  sideFaceRectCm,
+  translateRect,
+  wallHomography,
+  type RectCm,
+  type SizeCm,
+} from './wall';
 
-/**
- * Correct EXIF orientation, but only when there is something to correct, and
- * losslessly when there is.
- *
- * `sharp(x).autoOrient().toBuffer()` with no format call re-encodes JPEG/WebP
- * input at sharp's own default quality — unconditionally, even for the
- * overwhelming majority of images that carry no orientation tag and need no
- * rotation at all. That silent re-encode happens before the pipeline's one
- * deliberate lossy step (`.jpeg({ quality: 92 })` at the very end of
- * `renderRoomMockup`), so the quality it throws away can never be recovered
- * downstream — and EXIF/ICC/density metadata goes with it. It also
- * contradicts this module's own "never clamp, default, or skip quietly"
- * philosophy by introducing exactly such a silent default.
- *
- * So: read the metadata first. No `orientation` tag, or `orientation: 1`
- * ("already displayed correctly"), means nothing to correct — the input is
- * returned unchanged, with no sharp round trip at all. An orientation that
- * genuinely needs correcting is materialised as PNG, not re-encoded to a
- * lossy format at an unspecified quality — the pipeline's only deliberate
- * lossy encode stays the only one.
- */
-export async function orientBuffer(input: Buffer): Promise<Buffer> {
-  const meta = await sharp(input).metadata();
-  if (meta.orientation === undefined || meta.orientation === 1) return input;
-  return sharp(input).autoOrient().png().toBuffer();
-}
-
-/**
- * Same correction as `orientBuffer`, for a file on disk. When no correction
- * is needed the file's own bytes are read back unchanged (`readFileSync`)
- * rather than round-tripped through sharp, for the same reason: no sharp call
- * at all means no chance of an accidental re-encode.
- */
-export async function orientFile(path: string): Promise<Buffer> {
-  const meta = await sharp(path).metadata();
-  if (meta.orientation === undefined || meta.orientation === 1) return readFileSync(path);
-  return sharp(path).autoOrient().png().toBuffer();
-}
+export { orientBuffer, orientFile } from './orient';
 
 /**
  * Wrap artwork in a frame face, with a thin dark bevel hairline between the
  * two. The bevel is not decoration: without it the face reads as a flat colour
  * band pasted round the art rather than as a moulding with an inner edge.
  *
+ * This is the framed MAIN image path (outputs.ts), sized off the art's short
+ * edge because there is no wall to give it a physical scale. The room path
+ * draws its own face in centimetres in panel.ts.
+ *
  * Auto-orients first: `sharp(x).metadata()` reports the INPUT's stored
  * dimensions, EXIF tag and all, so a phone photo shot in portrait but stored
  * with an orientation tag (landscape pixels + "rotate me") would size the
- * frame face off the wrong short edge if read before rotation. Materialising
- * the oriented buffer once, up front, means every metadata read and every
- * extend() below sees the pixels as they will actually display — see
- * `orientBuffer` above for why that materialisation is conditional.
+ * frame face off the wrong short edge if read before rotation.
  */
 export async function frameArtwork(art: Buffer, frame: FrameRender): Promise<Buffer> {
   const oriented = await orientBuffer(art);
@@ -98,109 +103,196 @@ export async function frameArtwork(art: Buffer, frame: FrameRender): Promise<Buf
     .toBuffer();
 }
 
-/**
- * One blurred, offset, semi-transparent black layer the size of the room.
- *
- * Two sharp constraints shape this, both found the hard way:
- *
- *   1. sharp({create}) only makes 3- or 4-channel images, so the mask cannot be
- *      built as a single greyscale channel directly. It is built in RGB and
- *      squeezed down with toColourspace('b-w').
- *   2. Opacity is applied with linear() on the mask BEFORE it becomes an alpha
- *      channel, because sharp has no "composite this layer at 40%" operation.
- */
-export async function shadowLayer(
-  canvasW: number,
-  canvasH: number,
-  rect: Placed,
-  shadow: ShadowSpec
-): Promise<Buffer> {
-  const block = await sharp({
-    create: {
-      width: Math.max(1, Math.round(rect.width)),
-      height: Math.max(1, Math.round(rect.height)),
-      channels: 3,
-      background: { r: 255, g: 255, b: 255 },
-    },
-  })
-    .png()
-    .toBuffer();
+export interface SceneRenderOptions {
+  /** Physical poster size; defaults to the middle rung of the art's ladder. */
+  posterCm?: SizeCm;
+  /** Seeds the grain, together with the scene id. Use the product slug or SKU. */
+  seedKey: string;
+}
 
-  const mask = await sharp({
-    create: { width: canvasW, height: canvasH, channels: 3, background: { r: 0, g: 0, b: 0 } },
-  })
-    .composite([
-      {
-        input: block,
-        left: Math.round(rect.left + shadow.offsetX),
-        top: Math.round(rect.top + shadow.offsetY),
-      },
-    ])
-    .blur(shadow.blurSigma)
-    .linear(shadow.opacity, 0)
-    .toColourspace('b-w')
-    .raw()
-    .toBuffer();
+const CAST_OPACITY = 0.42;
+const CONTACT_OPACITY = 0.5;
+const CONTACT_BLUR_PX = 1.5;
+/** Side face shade: facing the light, or away from it. */
+const SIDE_LIT = 1.06;
+const SIDE_SHADED = 0.75;
+
+const RAW_RGBA = (W: number, H: number) => ({ raw: { width: W, height: H, channels: 4 as const } });
+
+/**
+ * The Box path: the panel resized into the axis-aligned box the quad
+ * describes, returned as a full-canvas RGBA layer so the stages after it
+ * cannot tell which path produced it.
+ */
+async function placeFlat(
+  panel: Buffer,
+  panelW: number,
+  panelH: number,
+  quadN: Quad,
+  W: number,
+  H: number
+): Promise<Buffer> {
+  const b = quadPixelBounds(quadN, W, H);
+  const placed = fitIntoBox(
+    panelW,
+    panelH,
+    { x: b.left / W, y: b.top / H, w: (b.right - b.left) / W, h: (b.bottom - b.top) / H },
+    W,
+    H
+  );
+  const resized = await sharp(panel).resize(placed.width, placed.height).png().toBuffer();
 
   return sharp({
-    create: { width: canvasW, height: canvasH, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
-    .joinChannel(mask, { raw: { width: canvasW, height: canvasH, channels: 1 } })
-    .png()
+    .composite([{ input: resized, left: placed.left, top: placed.top }])
+    .raw()
     .toBuffer();
 }
 
-/**
- * Frame the artwork, fit it into the template's rectangle, and composite it
- * over the room under its two shadows.
- */
-export async function renderRoomMockup(
+/** A solid colour warped into a quad: the side face. */
+async function solidLayer(
+  color: [number, number, number],
+  quadN: Quad,
+  W: number,
+  H: number
+): Promise<Buffer> {
+  const [r, g, b] = color;
+  const swatch = await sharp({
+    create: { width: 2, height: 2, channels: 3, background: { r, g, b } },
+  })
+    .png()
+    .toBuffer();
+
+  return warpPanelIntoQuad(swatch, 2, 2, quadN, W, H);
+}
+
+const scaled = (c: [number, number, number], f: number): [number, number, number] => [
+  Math.min(255, Math.round(c[0] * f)),
+  Math.min(255, Math.round(c[1] * f)),
+  Math.min(255, Math.round(c[2] * f)),
+];
+
+export async function renderSceneMockup(
   art: Buffer,
   roomPath: string,
-  template: RoomTemplate,
-  frame: FrameRender
+  scene: RoomScene,
+  frame: FrameRender,
+  options: SceneRenderOptions
 ): Promise<Buffer> {
-  const framed = await frameArtwork(art, frame);
-  const fmeta = await sharp(framed).metadata();
+  const oriented = await orientBuffer(art);
+  const ameta = await sharp(oriented).metadata();
+  const requested =
+    options.posterCm ?? posterSizeForAspect(ameta.width ?? 1, ameta.height ?? 1);
 
-  // Auto-orient the room photo the same way, and for the same reason: an
-  // operator measures the placement rectangle against the DISPLAYED image
-  // (a phone shoots portrait but stores it rotated with an EXIF tag), while
-  // a plain metadata() read reports the stored, unrotated dimensions. Doing
-  // this later in the chain would not help — sharp(roomPath).metadata() has
-  // already reported the wrong numbers by then — so the oriented buffer is
-  // materialised here and used for every dimension read and for the
-  // composite base below. Conditional and lossless for the same reason as
-  // `orientFile` above.
+  // Orient the room the same way, for the same reason as the art: the quad
+  // was measured against the DISPLAYED image, and a plain metadata() read
+  // reports the stored, unrotated dimensions.
   const roomBuf = await orientFile(roomPath);
   const rmeta = await sharp(roomBuf).metadata();
-  const canvasW = rmeta.width ?? 0;
-  const canvasH = rmeta.height ?? 0;
+  const W = rmeta.width ?? 0;
+  const H = rmeta.height ?? 0;
 
-  const placed = fitIntoBox(
-    fmeta.width ?? 1,
-    fmeta.height ?? 1,
-    template.placement,
-    canvasW,
-    canvasH
+  if (W !== scene.imageSize[0] || H !== scene.imageSize[1]) {
+    throw new Error(
+      `Room scene "${scene.id}" declares imageSize ${scene.imageSize.join('×')} but ${scene.image} is ${W}×${H}; the quad was measured on a different image.`
+    );
+  }
+
+  // Wall plane → pixels, and the poster's rectangle on that plane.
+  const wall = { widthCm: scene.wall.widthCm, heightCm: scene.wall.heightCm };
+  const h = wallHomography(scene.wall.quad, wall.widthCm, wall.heightCm, W, H);
+  const { poster, outer } = fitPosterCm(requested, frame.widthCm, scene.allowable);
+  const centre = { x: scene.anchor.x * wall.widthCm, y: scene.anchor.y * wall.heightCm };
+  const rect = centredRectCm(centre, outer);
+  assertRectWithinMargin(rect, wall, scene.allowable.minMarginCm, scene.id);
+
+  const frontPx = projectRectCm(h, rect);
+  const frontN = normaliseQuad(frontPx, W, H);
+  assertUsableQuad(frontN, scene.id);
+
+  // Stage 3: the flat panel, at 2× its projected extent so the warp downsamples.
+  const ext = panelSizeForQuad(frontN, W, H);
+  const panel = await buildFramedPanel(
+    oriented,
+    poster,
+    frame,
+    ext.width * 2,
+    ext.height * 2,
+    scene.light
   );
 
-  const resized = await sharp(framed).resize(placed.width, placed.height).png().toBuffer();
+  // Stage 4a: the front face. Box path when the projection is a rectangle.
+  const front = isAxisAligned(frontPx)
+    ? await placeFlat(panel.png, panel.width, panel.height, frontN, W, H)
+    : await warpPanelIntoQuad(panel.png, panel.width, panel.height, frontN, W, H);
 
-  const { contact, ambient } = shadowParams(
-    Math.min(placed.width, placed.height),
-    frame.depthRatio,
-    template.light
+  // Stage 4b: the side face, extruded on the near side. Nothing straight-on.
+  const sideRect = sideFaceRectCm(rect, frame.depthCm, scene.view.yawDeg, scene.view.nearSide);
+  let side: Buffer | null = null;
+  let sideN: Quad | null = null;
+
+  if (sideRect) {
+    sideN = normaliseQuad(projectRectCm(h, sideRect), W, H);
+    assertUsableQuad(sideN, scene.id);
+    const lit = scene.view.nearSide === scene.light.direction;
+    side = await solidLayer(scaled(frame.color, lit ? SIDE_LIT : SIDE_SHADED), sideN, W, H);
+  }
+
+  // Stage 5.1: inherit the wall's own light, sampled before anything lands on it.
+  const room = await readRaw(roomBuf, 3);
+  const bounds: Bounds = unionBounds(
+    quadPixelBounds(frontN, W, H),
+    sideN ? quadPixelBounds(sideN, W, H) : null
+  );
+  const field = await wallLuminanceField(
+    room,
+    bounds,
+    Math.max(2, (bounds.right - bounds.left) * 0.02)
+  );
+  applyLuminance(front, W, H, field, bounds, scene.light.strength);
+  if (side) applyLuminance(side, W, H, field, bounds, scene.light.strength);
+
+  // Stages 5.3 and 5.4: cast and contact shadows. The frame's footprint —
+  // front and side — is offset in wall cm, then projected, so the shadow
+  // foreshortens with the wall like everything else does.
+  const pxPerCm = pxPerCmAt(h, centre);
+  const shadowFor = async (kind: 'cast' | 'contact'): Promise<Buffer> => {
+    const { dx, dy } = shadowOffsetCm(frame.depthCm, scene.light, kind);
+    const rects: RectCm[] = [translateRect(rect, dx, dy)];
+    if (sideRect) rects.push(translateRect(sideRect, dx, dy));
+
+    const mask = await quadMask(
+      rects.map((r) => normaliseQuad(projectRectCm(h, r), W, H)),
+      W,
+      H
+    );
+    const blur =
+      kind === 'cast'
+        ? Math.max(1, scene.light.softness * frame.depthCm * pxPerCm)
+        : CONTACT_BLUR_PX;
+
+    return shadowLayer(mask, W, H, blur, kind === 'cast' ? CAST_OPACITY : CONTACT_OPACITY);
+  };
+  const cast = await shadowFor('cast');
+  const contact = await shadowFor('contact');
+
+  // Stage 5.6: match the room's grain over the panel, seeded per product and scene.
+  addGrain(
+    front,
+    W,
+    H,
+    wallGrainAmplitude(room, bounds),
+    seedFromKey(`${options.seedKey}:${scene.id}`)
   );
 
-  // Ambient first, contact over it, art on top: the wide faint layer must sit
-  // UNDER the tight dark one or the contact edge is washed out.
-  return sharp(roomBuf)
-    .composite([
-      { input: await shadowLayer(canvasW, canvasH, placed, ambient), blend: 'over' },
-      { input: await shadowLayer(canvasW, canvasH, placed, contact), blend: 'over' },
-      { input: resized, left: placed.left, top: placed.top, blend: 'over' },
-    ])
-    .jpeg({ quality: 92 })
-    .toBuffer();
+  // Shadows first so the frame occludes its own shadow; side under front.
+  const layers: sharp.OverlayOptions[] = [
+    { input: cast, blend: 'over' },
+    { input: contact, blend: 'over' },
+  ];
+  if (side) layers.push({ input: side, ...RAW_RGBA(W, H), blend: 'over' });
+  layers.push({ input: front, ...RAW_RGBA(W, H), blend: 'over' });
+
+  return sharp(roomBuf).composite(layers).jpeg({ quality: 92 }).toBuffer();
 }

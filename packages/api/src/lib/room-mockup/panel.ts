@@ -17,7 +17,7 @@
 
 import sharp from 'sharp';
 import { MAT_COLOR } from '@chobii/shared';
-import { orientBuffer } from './render';
+import { orientBuffer } from './orient';
 import type { FrameRender } from './templates';
 import { buildPanel } from './warp';
 import type { SizeCm } from './wall';
