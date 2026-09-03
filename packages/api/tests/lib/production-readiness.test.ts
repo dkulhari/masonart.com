@@ -41,6 +41,8 @@ import {
   getOrderLabelReadiness,
   isOrderReadyToLabel,
   loadOrderProductionSnapshot,
+  loadOrderProductionSnapshots,
+  NON_PRODUCIBLE_ORDER_TYPES,
   proposeConsolidator,
   consolidatorOverrideAllowed,
   canOverrideConsolidator,
@@ -788,6 +790,202 @@ describe('getOrderLabelReadiness and its boolean', () => {
 
     expect(readiness.consolidatorVendorId).toBeNull()
     expect(codes(readiness)).toContain('no_consolidator')
+  })
+})
+
+// ============================================================================
+// The batched loader, tested where it lives
+// ============================================================================
+//
+// `loadOrderProductionSnapshots` and `NON_PRODUCIBLE_ORDER_TYPES` are exports of
+// THIS module, and for one round every test of them lived in
+// `tests/routes/admin/shipments-ready-queue.test.ts` — so deleting the route
+// that happens to be their first consumer would have taken the seam loader's
+// only coverage with it, silently, leaving an untested export on the module the
+// gate is built from. A module's own exports are its own suite's business; what
+// belongs over in the route suite is the parity between the two loaders and the
+// route's use of this one, which is what stayed there.
+
+describe('NON_PRODUCIBLE_ORDER_TYPES', () => {
+  it('is the list producibleItems actually short-circuits on', () => {
+    // Not a restatement: this drives `evaluateLabelReadiness` with a real
+    // producible line on an order of each listed type, and asserts the line is
+    // dropped anyway. A constant that had drifted away from the branch would
+    // leave the order blocked on `item_uncovered` here.
+    expect(NON_PRODUCIBLE_ORDER_TYPES.length).toBeGreaterThan(0)
+
+    for (const orderType of NON_PRODUCIBLE_ORDER_TYPES) {
+      const readiness = evaluateLabelReadiness(
+        snapshot({ orderType, items: [item({ id: 'item-1', frameId: null })], jobs: [] })
+      )
+
+      expect(readiness.ready, `${orderType} is no longer short-circuited`).toBe(true)
+      expect(readiness.blockers).toEqual([])
+    }
+  })
+
+  it('does not short-circuit an ordinary order carrying the same line', () => {
+    // The positive control: the exemption is the ORDER TYPE's and not the
+    // line's, so the same line on a `regular` order still has to be made.
+    const readiness = evaluateLabelReadiness(
+      snapshot({ orderType: 'regular', items: [item({ id: 'item-1', frameId: null })], jobs: [] })
+    )
+
+    expect(readiness.ready).toBe(false)
+    expect(codes(readiness)).toContain('no_jobs')
+  })
+})
+
+describe('loadOrderProductionSnapshots — the batched twin', () => {
+  const readerSelect = vi.fn()
+  const reader = { select: readerSelect } as unknown as Parameters<
+    typeof loadOrderProductionSnapshot
+  >[1]
+  const queue = createSelectQueue(readerSelect)
+
+  beforeEach(() => {
+    queue.reset()
+    readerSelect.mockReset()
+    dbSelect.mockReset()
+  })
+
+  /** The five reads, in the fixed order the loader issues them. */
+  function queueBatch(over: {
+    orders?: unknown[]
+    items?: unknown[]
+    jobs?: unknown[]
+    consolidation?: unknown[]
+    transfers?: unknown[]
+  }) {
+    queue.queueSelects(
+      over.orders ?? [],
+      over.items ?? [],
+      over.jobs ?? [],
+      over.consolidation ?? [],
+      over.transfers ?? []
+    )
+  }
+
+  it('puts every row back on the order it came from', async () => {
+    // The property the whole batching design rests on. One read per table for
+    // two orders, so a loader that failed to group would hand each order the
+    // other's jobs and both would read the same verdict.
+    queueBatch({
+      orders: [
+        { id: 'order-a', orderType: 'regular' },
+        { id: 'order-b', orderType: 'regular' },
+      ],
+      items: [
+        { orderId: 'order-a', id: 'item-a', frameId: null, giftCardPurchase: null },
+        { orderId: 'order-b', id: 'item-b', frameId: null, giftCardPurchase: null },
+      ],
+      jobs: [
+        {
+          orderId: 'order-a',
+          id: 'job-a',
+          stage: 'print',
+          status: 'qc_passed',
+          vendorId: A,
+          assignedAt: ASSIGNED,
+          replacesJobId: null,
+          orderItemId: 'item-a',
+        },
+      ],
+      consolidation: [{ orderId: 'order-a', vendorId: A }],
+      transfers: [],
+    })
+
+    const snapshots = await loadOrderProductionSnapshots(['order-a', 'order-b'], reader)
+
+    expect(queue.selects, 'five reads for the page, not five per order').toHaveLength(5)
+    expect(snapshots.get('order-a')?.jobs.map((job) => job.id)).toEqual(['job-a'])
+    expect(snapshots.get('order-b')?.jobs).toEqual([])
+    expect(snapshots.get('order-a')?.items.map((row) => row.id)).toEqual(['item-a'])
+    expect(snapshots.get('order-b')?.items.map((row) => row.id)).toEqual(['item-b'])
+    expect(snapshots.get('order-a')?.consolidatorVendorId).toBe(A)
+    expect(snapshots.get('order-b')?.consolidatorVendorId).toBeNull()
+
+    // ...and the verdicts differ, which is the fact a caller actually consumes.
+    expect(evaluateLabelReadiness(snapshots.get('order-a')!).ready).toBe(true)
+    expect(codes(evaluateLabelReadiness(snapshots.get('order-b')!))).toContain('no_jobs')
+  })
+
+  it('collapses a fanned-out job into one job carrying every covered line', async () => {
+    // The join to `production_job_items` fans one job into a row per covered
+    // line. Calling the module-private `collapseJobRows` rather than rebuilding
+    // it is the reason this loader lives in this file, so the collapse is
+    // asserted here and not only through a route.
+    queueBatch({
+      orders: [{ id: 'order-a', orderType: 'regular' }],
+      items: [
+        { orderId: 'order-a', id: 'item-1', frameId: null, giftCardPurchase: null },
+        { orderId: 'order-a', id: 'item-2', frameId: null, giftCardPurchase: null },
+      ],
+      jobs: [
+        {
+          orderId: 'order-a',
+          id: 'job-1',
+          stage: 'print',
+          status: 'qc_passed',
+          vendorId: A,
+          assignedAt: ASSIGNED,
+          replacesJobId: null,
+          orderItemId: 'item-1',
+        },
+        {
+          orderId: 'order-a',
+          id: 'job-1',
+          stage: 'print',
+          status: 'qc_passed',
+          vendorId: A,
+          assignedAt: ASSIGNED,
+          replacesJobId: null,
+          orderItemId: 'item-2',
+        },
+      ],
+      consolidation: [{ orderId: 'order-a', vendorId: A }],
+    })
+
+    const snapshot = (await loadOrderProductionSnapshots(['order-a'], reader)).get('order-a')!
+
+    expect(snapshot.jobs).toHaveLength(1)
+    expect([...(snapshot.jobs[0]?.orderItemIds ?? [])].sort()).toEqual(['item-1', 'item-2'])
+  })
+
+  it('gives an id no order row came back for an entry that BLOCKS', async () => {
+    // A missing map entry would be a TypeError in the caller; an entry with
+    // `orderExists: false` is the seam's own "no such order", which
+    // `evaluateLabelReadiness` answers first and alone. The safe direction, and
+    // it is the direction a deleted order has to fail in.
+    queueBatch({ orders: [{ id: 'order-a', orderType: 'regular' }] })
+
+    const snapshots = await loadOrderProductionSnapshots(['order-a', 'order-gone'], reader)
+
+    expect(snapshots.get('order-gone')?.orderExists).toBe(false)
+    expect(codes(evaluateLabelReadiness(snapshots.get('order-gone')!))).toEqual(['order_not_found'])
+    expect(snapshots.get('order-a')?.orderExists).toBe(true)
+  })
+
+  it('issues no read at all when asked about nothing', async () => {
+    // `inArray(col, [])` renders `false`, so these would be five correct
+    // queries that cannot return anything. Correct is not worth issuing.
+    const snapshots = await loadOrderProductionSnapshots([], reader)
+
+    expect(snapshots.size).toBe(0)
+    expect(queue.selects).toHaveLength(0)
+    expect(dbSelect, 'the empty case fell through to the module default').not.toHaveBeenCalled()
+  })
+
+  it('falls back to db when no reader is given', async () => {
+    // The same both-directions check `getOrderLabelReadiness` gets: a default
+    // that ignored its argument would pass every test above.
+    const dbQueue = createSelectQueue(dbSelect)
+    dbQueue.queueSelects([{ id: 'order-a', orderType: 'regular' }], [], [], [], [])
+
+    const snapshots = await loadOrderProductionSnapshots(['order-a'])
+
+    expect(dbSelect).toHaveBeenCalled()
+    expect(snapshots.get('order-a')?.orderExists).toBe(true)
   })
 })
 

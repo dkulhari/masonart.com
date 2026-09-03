@@ -99,7 +99,7 @@
  * wrote down.
  */
 
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
 import { db } from '../database'
 import { orders, orderItems, type OrderType } from '../database/schema/orders'
@@ -252,9 +252,27 @@ function liveJobs(snapshot: OrderProductionSnapshot): readonly ReadinessJob[] {
   return snapshot.jobs.filter((job) => job.status !== 'cancelled')
 }
 
+/**
+ * Order types that produce nothing, whatever their lines happen to say.
+ *
+ * Exported because it is not only this module's question. The ready-to-label
+ * queue in `routes/admin/shipments.ts` has to keep the same orders out of a
+ * screen no label is ever bought from, and it used to do that with a second
+ * hard-coded `['gift_card']` tuple of its own — two literals of one rule, with
+ * nothing holding them together, so a fourth non-shipping order type would have
+ * landed in that queue and stuck at the top of it forever.
+ *
+ * Fails closed in the direction that matters HERE and open in the direction
+ * that matters there, which is why the consumer asserts it is non-empty:
+ * derive this to `[]` and `producibleItems` stops short-circuiting (safe — the
+ * line filter still runs), while the queue's `notInArray(order_type, [])`
+ * renders `true` and excludes nothing.
+ */
+export const NON_PRODUCIBLE_ORDER_TYPES: readonly OrderType[] = ['gift_card']
+
 /** The lines that have to be made before anything can be shipped. */
 function producibleItems(snapshot: OrderProductionSnapshot): readonly ReadinessItem[] {
-  if (snapshot.orderType === 'gift_card') return []
+  if (NON_PRODUCIBLE_ORDER_TYPES.includes(snapshot.orderType)) return []
   return snapshot.items.filter((item) => requiredStagesFor(item).length > 0)
 }
 
@@ -585,6 +603,199 @@ function collapseTransferRows(rows: readonly TransferRow[]): ReadinessTransfer[]
   return [...transfers.values()]
 }
 
+// ============================================================================
+// The same five reads, for a whole page of orders at once
+// ============================================================================
+
+/**
+ * The batched twin of `loadOrderProductionSnapshot`.
+ *
+ * ## Why it exists
+ *
+ * Readiness is per order, and `GET /api/admin/shipments/ready` (#730) is a
+ * LIST that ranks by it — so every candidate has to be evaluated before a page
+ * can be cut. Calling `getOrderLabelReadiness` in a loop is five sequential
+ * round trips per order, two hundred orders deep at that route's scan cap: a
+ * thousand queries inside one request. Slow long before it is wrong.
+ *
+ * So the READS are batched and the PREDICATE is not. What comes back is a
+ * snapshot per order — rows, no verdict. `evaluateLabelReadiness` still decides,
+ * once per snapshot, and there is still exactly one place that knows what ready
+ * means.
+ *
+ * ## Why it lives HERE and not in the route that needs it
+ *
+ * It was in `routes/admin/shipments.ts` for one round of #730, and it hand-
+ * copied `collapseJobRows` and `collapseTransferRows` — module-private, right
+ * below this. Nothing compared the two copies. The route's parity scan reads
+ * tables and projection aliases; its regrouping test compared the route against
+ * a snapshot constant written by hand in the test file, which cannot move when
+ * this module moves. Change a collapse rule here — let a replacement job
+ * inherit its original's `orderItemIds`, say — and the order-detail readiness
+ * panel picks the change up while the ready queue does not: two admin screens
+ * disagreeing about one order, with every test green.
+ *
+ * A guard would not have fixed that; deleting the duplicate does. This calls
+ * the same two collapse functions the per-order loader calls, so there is no
+ * second implementation left to drift. `tests/routes/admin/shipments-ready-queue.test.ts`
+ * (`one loader, one set of collapse rules`) drives both loaders over one set of
+ * rows and asserts the snapshots are equal; `the collapse rules have exactly
+ * one implementation` scans the route for a rebuilt `orderItemIds`/`jobIds`
+ * literal so the duplicate cannot quietly come back.
+ *
+ * Adding it here does not widen the seam. `LABEL_READINESS_CONSUMERS` polices
+ * the GATE — `tests/lib/production-seam.test.ts` scans for the token
+ * `isOrderReadyToLabel(` — and this is a loader, on the same side of the line
+ * as `loadOrderProductionSnapshot` itself.
+ *
+ * ## What is deliberately the same, and the one thing that is not
+ *
+ * Same five tables, same projections plus `order_id` (without it rows cannot be
+ * put back on the order they belong to, and one order's jobs would decide
+ * another's verdict), same left joins for the same reason, and sequential in
+ * the same fixed order — a fixed order is what lets the suite assert what was
+ * read. The difference is `eq` becomes `inArray`, and the result is a map.
+ *
+ * Every id asked about gets an entry, including one no `orders` row came back
+ * for: that entry is `orderExists: false`, which `evaluateLabelReadiness`
+ * answers first and alone with `order_not_found`. A missing map entry would be
+ * a `TypeError` in the caller; a present one that blocks is the safe direction.
+ *
+ * ## No LIMIT on any of the five, and that is the decision
+ *
+ * The id list is the bound. Nothing else can be: every row these reads return
+ * is an input to a VERDICT, so a cap that truncated would not shorten an answer
+ * — it would change one, and change it silently and in the unsafe direction. An
+ * order whose last uncovered item fell off the end of a capped `order_items`
+ * read comes back READY, and the next thing that happens is a label bought for
+ * goods nobody has made.
+ *
+ * That is the opposite of the queue's own report read, which is capped
+ * precisely because it can be capped exactly (`DISTINCT ON` makes one row per
+ * order a fact, so `LIMIT` cannot cut anything). A cap that can only ever be
+ * approximate is worse than none where the rows decide a verdict.
+ *
+ * The caller is what bounds the ids: `READY_QUEUE_SCAN_LIMIT` in
+ * `routes/admin/shipments.ts` is 200, and the per-order fan-out is the order's
+ * own items, jobs and transfers — small by construction, since an order has as
+ * many jobs as it has things to make.
+ */
+export async function loadOrderProductionSnapshots(
+  orderIds: readonly string[],
+  reader: ProductionReader = db
+): Promise<Map<string, OrderProductionSnapshot>> {
+  const snapshots = new Map<string, OrderProductionSnapshot>()
+
+  // `inArray(col, [])` renders `false`, so these would be five correct queries
+  // that cannot return anything. Correct is not the same as worth issuing.
+  if (orderIds.length === 0) return snapshots
+
+  const ids = [...orderIds]
+
+  const orderRows = await reader
+    .select({ id: orders.id, orderType: orders.orderType })
+    .from(orders)
+    .where(inArray(orders.id, ids))
+
+  const itemRows = await reader
+    .select({
+      orderId: orderItems.orderId,
+      id: orderItems.id,
+      frameId: orderItems.frameId,
+      giftCardPurchase: orderItems.giftCardPurchase,
+    })
+    .from(orderItems)
+    .where(inArray(orderItems.orderId, ids))
+
+  const jobRows = await reader
+    .select({
+      orderId: productionJobs.orderId,
+      id: productionJobs.id,
+      stage: productionJobs.stage,
+      status: productionJobs.status,
+      vendorId: productionJobs.vendorId,
+      assignedAt: productionJobs.assignedAt,
+      replacesJobId: productionJobs.replacesJobId,
+      orderItemId: productionJobItems.orderItemId,
+    })
+    .from(productionJobs)
+    .leftJoin(productionJobItems, eq(productionJobItems.jobId, productionJobs.id))
+    .where(inArray(productionJobs.orderId, ids))
+
+  const consolidationRows = await reader
+    .select({
+      orderId: orderConsolidation.orderId,
+      vendorId: orderConsolidation.vendorId,
+    })
+    .from(orderConsolidation)
+    .where(inArray(orderConsolidation.orderId, ids))
+
+  const transferRows = await reader
+    .select({
+      orderId: productionTransfers.orderId,
+      id: productionTransfers.id,
+      toVendorId: productionTransfers.toVendorId,
+      dispatchedAt: productionTransfers.dispatchedAt,
+      receivedAt: productionTransfers.receivedAt,
+      lostAt: productionTransfers.lostAt,
+      jobId: productionTransferJobs.jobId,
+    })
+    .from(productionTransfers)
+    .leftJoin(
+      productionTransferJobs,
+      eq(productionTransferJobs.transferId, productionTransfers.id)
+    )
+    .where(inArray(productionTransfers.orderId, ids))
+
+  const orderTypes = new Map(orderRows.map((row) => [row.id, row.orderType]))
+  const items = groupByOrder(itemRows)
+  const jobs = groupByOrder(jobRows)
+  const consolidators = new Map(consolidationRows.map((row) => [row.orderId, row.vendorId]))
+  const transfers = groupByOrder(transferRows)
+
+  for (const orderId of ids) {
+    snapshots.set(orderId, {
+      orderId,
+      // The row itself, not its contents — the same distinction the per-order
+      // loader draws. `orderTypes.has` rather than a truthiness test on the
+      // type, because a default for a column is exactly how a missing order
+      // used to pass.
+      orderExists: orderTypes.has(orderId),
+      orderType: orderTypes.get(orderId) ?? 'regular',
+      items: (items.get(orderId) ?? []).map((row) => ({
+        id: row.id,
+        frameId: row.frameId,
+        isGiftCard: row.giftCardPurchase != null,
+      })),
+      // The two collapse functions, called rather than copied. This is the
+      // whole reason this loader lives in this file.
+      jobs: collapseJobRows(jobs.get(orderId) ?? []),
+      transfers: collapseTransferRows(transfers.get(orderId) ?? []),
+      consolidatorVendorId: consolidators.get(orderId) ?? null,
+    })
+  }
+
+  return snapshots
+}
+
+/**
+ * Rows carrying an `order_id` into one list per order.
+ *
+ * Generic over the row so the four call sites above share one implementation
+ * and cannot each grow their own idea of what an empty group is. A `Map` and
+ * not a plain object: an order id is caller data, and `{}` would resolve
+ * `'constructor'` up the prototype chain to a function.
+ */
+function groupByOrder<T extends { orderId: string }>(rows: readonly T[]): Map<string, T[]> {
+  const grouped = new Map<string, T[]>()
+  for (const row of rows) {
+    const list = grouped.get(row.orderId)
+    if (list) list.push(row)
+    else grouped.set(row.orderId, [row])
+  }
+  return grouped
+}
+
 /** The readiness of one order, with every reason it is not ready. */
 export async function getOrderLabelReadiness(
   orderId: string,
@@ -851,8 +1062,21 @@ export const LABEL_READINESS_CONSUMERS: readonly LabelReadinessConsumer[] = [
   {
     path: 'routes/admin/shipments.ts',
     owner: 'order-dispatch-tracking',
+    // Corrected in #730 alongside the change that made it wrong to leave. The
+    // entry used to read "The gate itself: refuses to create a shipment for an
+    // order whose goods are not assembled at the consolidator." No route in
+    // that file refuses anything on production grounds — `POST
+    // /orders/:orderId/ship` tests an order status and an open shipment and
+    // asks production nothing — and the ready-to-label queue it now hosts is a
+    // reader that explains, exactly like `routes/admin/production-jobs.ts`.
+    //
+    // An allow-list entry is read by whoever is deciding whether a new caller
+    // belongs, so an entry describing a gate that does not exist yet is the
+    // worst kind of stale: it tells them this file already refuses on their
+    // behalf. Where the gate BELONGS is still here — it is the `lib/shipment-*`
+    // entry below, which nothing matches yet.
     reason:
-      'The gate itself: refuses to create a shipment for an order whose goods are not assembled at the consolidator.',
+      'Readers, not the gate: the ready-to-label queue renders each order’s blockers, and no route in the file refuses a shipment on production grounds today.',
   },
   {
     path: 'lib/shipment-*',

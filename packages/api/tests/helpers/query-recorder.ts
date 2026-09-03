@@ -39,6 +39,18 @@ export interface RecordedQuery {
   table: string | null
   where?: unknown
   orderBy?: unknown
+  /** Every `ORDER BY` term, in order. `orderBy` is the first of them. */
+  orderByTerms?: unknown[]
+  /**
+   * The expressions a `DISTINCT ON (...)` read collapses by, as
+   * `<table>.<column>`, or `undefined` for a plain `select`.
+   *
+   * Recorded as NAMES rather than as the raw drizzle columns because that is
+   * what a suite can assert: "this read returns one row per order" is a claim
+   * about which column the database groups by, and the objects themselves would
+   * only let a test compare identity with the same import it already has.
+   */
+  distinctOn?: string[]
   limit?: number
   offset?: number
   values?: unknown
@@ -147,6 +159,7 @@ export interface QueryRecorder {
 
 export interface RecorderDb {
   select: (fields?: unknown) => unknown
+  selectDistinctOn: (on: unknown, fields?: unknown) => unknown
   insert: (table: unknown) => unknown
   update: (table: unknown) => unknown
   delete: (table: unknown) => unknown
@@ -170,6 +183,20 @@ export function createQueryRecorder(options: QueryRecorderOptions = {}): QueryRe
   /** 1-based transaction ids. */
   let txSeq = 0
   let commitFailures = 0
+
+  /**
+   * A drizzle column as `<table>.<column>`, or `'?'` when it is not one.
+   *
+   * `'?'` rather than a throw: the recorder's job is to report what a handler
+   * asked for, and a `DISTINCT ON` over an expression is a legitimate thing to
+   * ask for even though no test needs one today. A throw here would turn an
+   * unusual query into a suite that cannot run.
+   */
+  function columnName(column: unknown): string {
+    const col = column as { name?: unknown; table?: unknown }
+    if (!col || typeof col.name !== 'string' || col.table === undefined) return '?'
+    return `${tableName(col.table)}.${col.name}`
+  }
 
   function tableName(table: unknown): string {
     try {
@@ -226,8 +253,14 @@ export function createQueryRecorder(options: QueryRecorderOptions = {}): QueryRe
        * `tests/routes/admin/transfers.test.ts`).
        */
       for: () => chain,
-      orderBy(o: unknown) {
-        rec.orderBy = o
+      orderBy(...terms: unknown[]) {
+        // `orderBy` keeps meaning "the first term", because every suite that
+        // reads it was written when a read had one. `orderByTerms` is the whole
+        // list, which a multi-key read (`DISTINCT ON` needs one) has to be
+        // asserted through: rendering the first term alone would report
+        // `order_id asc` about a read whose point is the two keys after it.
+        rec.orderBy = terms[0]
+        rec.orderByTerms = terms
         return chain
       },
       where(w: unknown) {
@@ -304,6 +337,19 @@ export function createQueryRecorder(options: QueryRecorderOptions = {}): QueryRe
   function makeDb(writerTx = 0): RecorderDb {
     return {
       select: (fields?: unknown) => builder(writerTx, 'select', undefined, fields),
+      /**
+       * `DISTINCT ON (...)`. Recorded and then identical to `select`: the mock
+       * resolves whatever rows a test queued and cannot de-duplicate anything
+       * itself, so what is decidable here is the ON list, not the effect.
+       */
+      selectDistinctOn: (on: unknown, fields?: unknown) => {
+        const chain = builder(writerTx, 'select', undefined, fields)
+        // `builder` pushes its record last, which is the only handle on it a
+        // caller of this shape has.
+        const rec = queries[queries.length - 1] as RecordedQuery
+        rec.distinctOn = (Array.isArray(on) ? on : [on]).map(columnName)
+        return chain
+      },
       insert: (t: unknown) => builder(writerTx, 'insert', t),
       update: (t: unknown) => builder(writerTx, 'update', t),
       delete: (t: unknown) => builder(writerTx, 'delete', t),
