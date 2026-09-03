@@ -291,6 +291,11 @@ interface ShipmentRow {
   externalShipmentId: string | null
   costPaise: number | null
   pickupVendorId: string | null
+  /** The parcel the claim recorded. What a resume quotes and creates with. */
+  shippedWeightGrams: number | null
+  lengthCm: number | null
+  widthCm: number | null
+  heightCm: number | null
   updatedAt: Date
 }
 
@@ -306,8 +311,29 @@ const SHIPMENT_COLUMNS = {
   externalShipmentId: orderShipments.externalShipmentId,
   costPaise: orderShipments.costPaise,
   pickupVendorId: orderShipments.pickupVendorId,
+  shippedWeightGrams: orderShipments.shippedWeightGrams,
+  lengthCm: orderShipments.lengthCm,
+  widthCm: orderShipments.widthCm,
+  heightCm: orderShipments.heightCm,
   updatedAt: orderShipments.updatedAt,
 } as const
+
+/**
+ * The parcel as the claim recorded it on the row.
+ *
+ * A resume quotes and creates with THIS, never with the caller's parcel: the
+ * claim wrote these dimensions, a courier order may already exist for them,
+ * and a second admin resuming with a different guess at the weight must not
+ * book a rate against one parcel while the row describes another.
+ */
+function parcelOf(row: ShipmentRow): DispatchParcel {
+  return {
+    weightGrams: row.shippedWeightGrams ?? 0,
+    lengthCm: row.lengthCm ?? 0,
+    widthCm: row.widthCm ?? 0,
+    heightCm: row.heightCm ?? 0,
+  }
+}
 
 /** Everything the courier order is built from, read once under the lock. */
 interface OrderFacts {
@@ -590,7 +616,8 @@ async function claimLabel(
         token: unfinished.labelObjectToken!,
         order,
         vendor,
-        parcel: input.parcel,
+        // The claim's parcel, not this caller's — see `parcelOf`.
+        parcel: parcelOf(unfinished),
         courierCompanyId: input.courierCompanyId,
         resumed: true,
       }
@@ -670,6 +697,10 @@ function emptyRow(id: string, orderId: string): ShipmentRow {
     externalShipmentId: null,
     costPaise: null,
     pickupVendorId: null,
+    shippedWeightGrams: null,
+    lengthCm: null,
+    widthCm: null,
+    heightCm: null,
     updatedAt: new Date(0),
   }
 }
@@ -1008,9 +1039,7 @@ export async function reconcileLabelPurchase(
         token: row.labelObjectToken!,
         order,
         vendor,
-        // The parcel was recorded at claim time and is only needed for a
-        // fresh quote, which a resume with a waybill never makes.
-        parcel: await recordedParcel(shipmentId),
+        parcel: parcelOf(row),
         courierCompanyId: undefined,
         resumed: true,
       },
@@ -1023,25 +1052,6 @@ export async function reconcileLabelPurchase(
     return await run
   } finally {
     reconcilesInFlight.delete(shipmentId)
-  }
-}
-
-async function recordedParcel(shipmentId: string): Promise<DispatchParcel> {
-  const [row] = await db
-    .select({
-      weightGrams: orderShipments.shippedWeightGrams,
-      lengthCm: orderShipments.lengthCm,
-      widthCm: orderShipments.widthCm,
-      heightCm: orderShipments.heightCm,
-    })
-    .from(orderShipments)
-    .where(eq(orderShipments.id, shipmentId))
-    .limit(1)
-  return {
-    weightGrams: row?.weightGrams ?? 0,
-    lengthCm: row?.lengthCm ?? 0,
-    widthCm: row?.widthCm ?? 0,
-    heightCm: row?.heightCm ?? 0,
   }
 }
 

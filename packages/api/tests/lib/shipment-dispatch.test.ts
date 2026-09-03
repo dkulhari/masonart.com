@@ -205,6 +205,10 @@ function crashedRow(over: Record<string, unknown> = {}) {
     courierName: 'Delhivery Surface',
     costPaise: 15315,
     pickupVendorId: VENDOR_ID,
+    shippedWeightGrams: PARCEL.weightGrams,
+    lengthCm: PARCEL.lengthCm,
+    widthCm: PARCEL.widthCm,
+    heightCm: PARCEL.heightCm,
     updatedAt: new Date(Date.now() - STALE_LABEL_CLAIM_MS - 60_000),
     ...over,
   })
@@ -923,6 +927,30 @@ describe('resuming a purchase the process died in the middle of', () => {
     expect(courier.generateLabel).toHaveBeenCalledTimes(1)
   })
 
+  it('a resume quotes and creates with the parcel the CLAIM recorded, never the caller’s new one', async () => {
+    // The claim wrote the parcel to the row; a courier order may already exist
+    // for it. A second admin resuming with a different guess at the weight
+    // must not re-quote the parcel at their number — the row would then carry
+    // one set of dimensions and a cost booked against another.
+    queueHappyPath({
+      shipments: [crashedRow({ awbNumber: null, courierName: null, costPaise: null, externalOrderId: null, externalShipmentId: null })],
+      lookup: [crashedRow({ externalOrderId: null, externalShipmentId: null })],
+    })
+
+    await buyLabelForOrder(
+      ORDER_ID,
+      input({ parcel: { weightGrams: 5000, lengthCm: 90, widthCm: 90, heightCm: 90 } }),
+      actor()
+    )
+
+    expect(courier.selectCourierFor.mock.calls[0]![0]).toMatchObject({ weightKg: 0.85 })
+    expect((courier.createCourierOrder.mock.calls[0]![0] as CreateCourierOrderInput).parcel).toEqual(PARCEL)
+    // ...and the row's recorded dimensions were not overwritten by the resume.
+    expect(
+      recorder.survivors('update', orderShipments).some((u) => 'shippedWeightGrams' in (u.values as object))
+    ).toBe(false)
+  })
+
   it('a stale claim does not re-quote when the waybill is already recorded', async () => {
     queueHappyPath({ shipments: [crashedRow()], lookup: [crashedRow()] })
     storage.fileExists.mockResolvedValue(true)
@@ -946,8 +974,8 @@ describe('resuming a purchase the process died in the middle of', () => {
 
   it('reconcileLabelPurchase resumes by shipment id regardless of the claim’s age', async () => {
     recorder.queueRows({
-      // The row by id, then the parcel it recorded, then the courier's lookup.
-      'select:order_shipments': [[crashedRow({ updatedAt: new Date() })], [PARCEL], [crashedRow()]],
+      // The row by id (carrying the parcel it recorded), then the courier's lookup.
+      'select:order_shipments': [[crashedRow({ updatedAt: new Date() })], [crashedRow()]],
       'select:orders': [[orderRow()]],
       'select:order_items': [ITEM_ROWS],
       'select:vendors': [[vendorRow()]],
