@@ -12,8 +12,9 @@
  * ## Reads are repeatable. Writes are not.
  *
  * Login and serviceability can be called a hundred times and cost nothing.
- * `createCourierOrder` puts a real order in Shiprocket's dashboard and
- * `assignAwb` mints a real waybill a courier expects to collect against, so
+ * `createCourierOrder` puts a real order in Shiprocket's dashboard,
+ * `assignAwb` mints a real waybill a courier expects to collect against and
+ * `generateLabel` bills a label (#727), so
  * everything below the "writes" banner is built around one question a read
  * never has to ask: *if this call did not answer, did it happen?* The answers
  * are typed — `ShiprocketWriteOutcomeUnknownError` is not a failure, it is a
@@ -52,7 +53,7 @@
  * an instruction to mint a second real courier order or a second real waybill.
  * No type, no structure and no test could see that.
  *
- * So the four decision sequences are now ordered tables assembled by
+ * So the six decision sequences are now ordered tables assembled by
  * `orderedClauses`, which takes the clauses that leave a mint OPEN and the
  * ones that RULE IT OUT as two separately-typed arrays. A definite refusal
  * cannot be written among the open ones without a typecheck failure; the order
@@ -131,14 +132,15 @@
  * Shiprocket runs Laravel and a 422 puts the half that names a field in an
  * `errors` bag — see `refusalReason`.
  *
- * ## Three premises this module asserts and has not verified
+ * ## Five premises this module asserts and has not verified
  *
- * This section used to say "one", and there were three. Each is a claim about
- * a third party that nothing in this repository establishes, and two of them
- * decide money or a waybill — so they are named together here rather than left
- * to be discovered one at a time. The list claims to be COMPLETE, which is the
- * only thing that makes it worth writing: a premise a reader has to find for
- * themselves is not covered by a section promising there are three.
+ * This section used to say "one", and there were three; #727 brought two more.
+ * Each is a claim about a third party that nothing in this repository
+ * establishes, and three of them decide money or a waybill — so they are named
+ * together here rather than left to be discovered one at a time. The list
+ * claims to be COMPLETE, which is the only thing that makes it worth writing: a
+ * premise a reader has to find for themselves is not covered by a section
+ * promising there are five.
  *
  * There was a fourth, and it guarded a waybill. `assignAwb` had no in-flight
  * coalescing, defended on the ground that "assignment is keyed on Shiprocket's
@@ -174,6 +176,21 @@
  *    in its own header. Reading both is the safe direction, so being wrong
  *    about this costs nothing; being wrong the other way classified a body
  *    naming a real waybill as "no waybill exists".
+ * 4. **A second `courier/generate/label` for a shipment that already has one
+ *    is billed again.** The ticket states it and this client is built on it:
+ *    it is why `generateLabel` takes the caller's `label_object_token` as a
+ *    REQUIRED argument and sends nothing when one is held, and why every
+ *    label failure short of a positive "no" from Shiprocket says the label may
+ *    exist rather than inviting a retry. If the premise is wrong the cost is
+ *    a dashboard visit that was not needed; if it is right and ignored, the
+ *    cost is a second invoice line per retry.
+ * 5. **`courier/generate/pickup` answers a repeated request with a sentence
+ *    containing "already in pickup queue" (or "already scheduled").** That
+ *    wording is read as SUCCESS, which is what makes a pickup retry converge
+ *    and what lets `SHIPROCKET_PICKUP_NOT_SCHEDULED` be the module's one
+ *    retryable refusal. If the wording differs, a retry after a queued pickup
+ *    is refused as "not scheduled" — safe, since it schedules nothing twice,
+ *    but an operator would be told to retry something that is already done.
  *
  * ## Why the environment is read per call
  *
@@ -328,6 +345,26 @@ export const SHIPROCKET_REFUSAL_CODES = [
   'SHIPROCKET_SHIPMENT_ID_MISSING',
   /** Shiprocket answered the AWB request and minted nothing. */
   'SHIPROCKET_AWB_REFUSED',
+  /** Shiprocket decided against rendering the label, and said so. */
+  'SHIPROCKET_LABEL_REFUSED',
+  /**
+   * The label EXISTS at Shiprocket and its file could not be fetched.
+   *
+   * Its own code, and not a variant of the unknown outcome, because the two
+   * send an operator to different places: the unknown outcome says "look
+   * before you ask again", this one says "the label is there — get the file".
+   * A caller that folded it into "no label" would buy a second one.
+   */
+  'SHIPROCKET_LABEL_FETCH_FAILED',
+  /**
+   * A courier was asked to collect and nothing was scheduled.
+   *
+   * The one refusal in this module that is safe to retry as it stands: a
+   * pickup request mints nothing, and a repeated one is answered "already in
+   * the queue" — which `schedulePickup` reads as success. It is NOT a reason
+   * to void the label the pickup was for; see `ShiprocketPickupNotScheduledError`.
+   */
+  'SHIPROCKET_PICKUP_NOT_SCHEDULED',
   /** The write may have happened. Reconcile before retrying — see the class. */
   'SHIPROCKET_WRITE_OUTCOME_UNKNOWN',
 ] as const;
@@ -391,6 +428,13 @@ export const SHIPROCKET_REFUSAL_STATUS: Record<ShiprocketRefusalCode, number> = 
   SHIPROCKET_ORDER_LOOKUP_FAILED: 500,
   SHIPROCKET_SHIPMENT_ID_MISSING: 500,
   SHIPROCKET_AWB_REFUSED: 422,
+  SHIPROCKET_LABEL_REFUSED: 422,
+  // 502, not 422: nothing about the shipment is wrong and nothing an admin
+  // corrects will change the answer — a file host did not hand over a file.
+  SHIPROCKET_LABEL_FETCH_FAILED: 502,
+  // 503 for 503's own meaning, as with the expired token: the remedy is
+  // literally "ask again in a moment", and asking again mints nothing.
+  SHIPROCKET_PICKUP_NOT_SCHEDULED: 503,
   SHIPROCKET_WRITE_OUTCOME_UNKNOWN: 409,
 };
 
@@ -559,6 +603,62 @@ export class ShiprocketOrderTotalMismatchError extends ShiprocketError {
   constructor(message: string) {
     super(message, 'SHIPROCKET_ORDER_TOTAL_MISMATCH');
     this.name = 'ShiprocketOrderTotalMismatchError';
+  }
+}
+
+/**
+ * Thrown when Shiprocket decided against rendering the label and said so.
+ *
+ * The label twin of `ShiprocketAwbRefusedError`: a definite refusal, reached
+ * only on a POSITIVE signal from Shiprocket, and the one label failure where
+ * "correct the shipment and ask again" is safe advice. Every other way a label
+ * request can go wrong leaves open that a label was generated and BILLED, and
+ * comes out as the unknown outcome or as `ShiprocketLabelFetchFailedError`.
+ */
+export class ShiprocketLabelRefusedError extends ShiprocketError {
+  constructor(message: string) {
+    super(message, 'SHIPROCKET_LABEL_REFUSED');
+    this.name = 'ShiprocketLabelRefusedError';
+  }
+}
+
+/**
+ * Thrown when the label EXISTS at Shiprocket and its file did not arrive.
+ *
+ * A class of its own because phase 7 has to catch it by identity: the
+ * purchase happened and the download did not, so the right response is to get
+ * the file — from the dashboard, or by asking again knowing it may be billed
+ * twice — and the wrong response is to read this as "no label" and buy one.
+ * The message says the label exists, every time, for the same reason.
+ */
+export class ShiprocketLabelFetchFailedError extends ShiprocketError {
+  constructor(message: string) {
+    super(message, 'SHIPROCKET_LABEL_FETCH_FAILED');
+    this.name = 'ShiprocketLabelFetchFailedError';
+  }
+}
+
+/**
+ * Thrown when a courier was asked to collect and nothing was scheduled.
+ *
+ * `retryable` is a field rather than a sentence because a route branches on
+ * it: this is the ONE refusal in the module that may be retried as it stands.
+ * A pickup request mints nothing and bills nothing, and a repeated one is
+ * answered "already in the pickup queue", which `schedulePickup` reads as
+ * success — so the retry converges rather than duplicating.
+ *
+ * It is not a reason to void the label. A label with no pickup is a parcel
+ * waiting for a courier; a voided label is a parcel with nothing to hand to
+ * one, and a second label to buy. The ticket (#727) says this in as many
+ * words, and the message carries it so an operator reading a screen does not
+ * reach for the void button.
+ */
+export class ShiprocketPickupNotScheduledError extends ShiprocketError {
+  readonly retryable = true as const;
+
+  constructor(message: string) {
+    super(message, 'SHIPROCKET_PICKUP_NOT_SCHEDULED');
+    this.name = 'ShiprocketPickupNotScheduledError';
   }
 }
 
@@ -1384,9 +1484,11 @@ export interface AssignAwbRequest {
  * `getShippedTemplate` reaches for (`services/email-templates.ts:329-336`), so
  * the absence is worth naming rather than leaving to be discovered. Neither is
  * here because neither comes out of `courier/assign/awb`: the label is a
- * separate call that renders a PDF, and the tracking URL is per-courier. Phase
- * 7 gets the AWB and the courier — enough to build a tracking link once a
- * courier-to-URL mapping exists — and this type widens when that call lands,
+ * separate call (`generateLabel`, #727) that renders a PDF and hands back the
+ * BYTES — a label URL is a customer's address behind a link, and it never
+ * leaves that function — and the tracking URL is per-courier. Phase 7 gets the
+ * AWB and the courier — enough to build a tracking link once a courier-to-URL
+ * mapping exists — and this type widens if that mapping ever lands here,
  * rather than carrying an empty string that reads like an answer.
  */
 export interface AwbAssignment {
@@ -2154,6 +2256,10 @@ const ALREADY_EXISTS_SUBJECTS: readonly string[] = [
   'awb code',
   'awb number',
   'waybill',
+  // The third thing this client makes, since #727. A label is billable, so
+  // "label already generated" is the one 4xx on that write where asking again
+  // costs money rather than nothing.
+  'label',
 ];
 
 /** Their spelling of a field name, reduced to the one this list is written in. */
@@ -2210,7 +2316,7 @@ function laravelTakenSubjects(message: string): string[] {
  */
 const SHIPROCKET_ALREADY = new RegExp(
   `\\b(?:${ALREADY_EXISTS_SUBJECTS.map((subject) => subject.replace(/ /g, '[\\s_.]*')).join('|')})\\b` +
-    `(?:\\s+\\w+){0,2}\\s+already\\s+(?:exists?|assigned|in\\s+use)|` +
+    `(?:\\s+\\w+){0,2}\\s+already\\s+(?:exists?|assigned|generated|in\\s+use)|` +
     `\\bduplicate\\s+(?:order|awb|shipment|waybill|entry|record)\\b`,
   'i'
 );
@@ -3057,30 +3163,6 @@ const AWB_ANSWER_CLAUSES = orderedClauses<AssignedAnswer>(
 );
 
 /**
- * Every ordered decision this client makes about a courier write.
- *
- * Exported for one reason: `tests/services/shiprocket-courier-writes.test.ts`
- * holds these sequences to a named order, proves each adjacency decides
- * something with a body that satisfies both clauses, and checks that the
- * verdict a clause declares and the HTTP status `SHIPROCKET_REFUSAL_STATUS`
- * gives its error are two statements of the same fact. Without the export
- * those properties are assertable only through prose.
- *
- * Typed as a PROJECTION — the code and the verdict, not `when` or `refuse` —
- * so reading this export cannot become a way for another module to re-run this
- * client's decisions on a body of its own. The values are the real tables; the
- * type is what a reader is allowed to do with them.
- */
-export const COURIER_WRITE_CLAUSES: Readonly<
-  Record<string, ReadonlyArray<{ readonly code: string; readonly verdict: MintVerdict }>>
-> = {
-  'create: a refused answer': CREATE_REFUSAL_CLAUSES,
-  'create: an accepted answer': CREATE_ACCEPTED_CLAUSES,
-  'assign: a refused answer': ASSIGN_REFUSAL_CLAUSES,
-  'assign: an accepted answer': AWB_ANSWER_CLAUSES,
-};
-
-/**
  * The waybill requests this process currently has in flight, keyed by
  * Shiprocket's shipment id.
  *
@@ -3274,3 +3356,655 @@ async function assignAwbOnce(
     requestedCourierCompanyId: requestedCourierId,
   };
 }
+
+// ============================================================================
+// The label (#727) — billable, so it is a write, and the URL never leaves here
+// ============================================================================
+
+/**
+ * The most a label file is allowed to be.
+ *
+ * A shipping label is one A4 or 4x6 page of vector text and a barcode — tens
+ * of kilobytes. The cap is generous by two orders of magnitude and exists so a
+ * host answering with something that is not a label (a login page, an error
+ * document, a whole manifest) is refused before it is buffered, not after.
+ * Checked on `Content-Length` when the host sends one, and again on the bytes
+ * when it does not.
+ */
+export const LABEL_PDF_MAX_BYTES = 5 * 1024 * 1024;
+
+/** `%PDF-`: the five bytes every PDF starts with. */
+const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46, 0x2d] as const;
+
+export interface GenerateLabelRequest {
+  /** SHIPROCKET's shipment id — `external_shipment_id`. See `AssignAwbRequest`. */
+  shipmentId: string;
+  /**
+   * `order_shipments.label_object_token` as the caller holds it, under its
+   * lock.
+   *
+   * REQUIRED, and `null` means "I looked and there is none" rather than "I did
+   * not look" — the argument `CourierOrderLookup` makes for being a required
+   * parameter, applied to the one write that is billed per call. A non-blank
+   * token here means NOTHING is sent: not the label request, not the file
+   * fetch, not even the login. The token is the only record this side has that
+   * a label was bought, and premise 4 in the module header is why buying it
+   * again is not free.
+   */
+  heldLabelObjectToken: string | null;
+}
+
+/**
+ * What `generateLabel` hands back.
+ *
+ * The bytes, never the URL. The URL Shiprocket answers with is a customer's
+ * name and address behind a link that anyone holding it can open, and it is
+ * short-lived — storing it is the bug `order_shipments.label_object_token`
+ * exists to prevent (#703). Phase 7 writes the bytes to
+ * `fulfilment/labels/<token>.pdf` through `lib/storage.ts`; this function does
+ * not know storage exists, for the same reason it has no database import.
+ */
+export type LabelOutcome =
+  | { readonly generated: true; readonly pdf: Uint8Array }
+  /** The token the caller already held. Nothing was sent; nothing was billed. */
+  | { readonly generated: false; readonly labelObjectToken: string };
+
+/**
+ * A shipment id as Shiprocket's label and pickup endpoints take it.
+ *
+ * Both are documented as taking an ARRAY of numeric ids — `{"shipment_id":
+ * [123]}` — even for one. The AWB endpoint takes a bare string and this
+ * client sends it one; here the id is sent as a number when it reads as one,
+ * because a transcribed shape is the only shape there is (the test file says
+ * why nothing here is measured). A non-numeric id goes as the string it is
+ * rather than being dropped: an id we cannot parse is still the id we hold.
+ */
+function shipmentIdOnTheWire(shipmentId: string): number | string {
+  return finiteNumber(shipmentId) ?? shipmentId;
+}
+
+/** Everything a refused label request's clauses read. */
+interface RefusedLabel extends RefusedWrite {
+  readonly shipmentId: string;
+}
+
+/**
+ * How a refused `courier/generate/label` is classified, in the order it is
+ * asked.
+ *
+ * The same three shared clauses as the other two writes, for the reason
+ * `sharedRefusalClauses` gives; the floor is a definite refusal, exactly as
+ * `awb-refused` and `create-rejected` are. What is different is what the
+ * "may already exist" sentence advises: a label that exists is not something
+ * to record and move on from — it is a file to go and download, because
+ * asking for it again is billed (premise 4).
+ */
+const LABEL_REFUSAL_CLAUSES = orderedClauses<RefusedLabel>(
+  sharedRefusalClauses<RefusedLabel>({
+    incomplete: (answer) =>
+      `Shiprocket did not complete the label request for shipment ${answer.shipmentId} ` +
+      `(HTTP ${answer.status}). A label may have been generated and billed — check the ` +
+      'shipment in the Shiprocket dashboard for one before asking again.',
+    whileDoing: 'generating the label',
+    existsCode: 'label-may-already-exist',
+    existsSentence: (answer) =>
+      `Shiprocket says shipment ${answer.shipmentId} already has a label ` +
+      `(HTTP ${answer.status}). Download it from the shipment in the Shiprocket dashboard and ` +
+      'attach it to this shipment — do not ask for another; a second one is billed.',
+  }),
+  [
+    {
+      code: 'label-refused',
+      verdict: 'nothing-minted',
+      when: () => true,
+      refuse: (answer) =>
+        new ShiprocketLabelRefusedError(
+          `Shiprocket would not generate a label for shipment ${answer.shipmentId} ` +
+            `(HTTP ${answer.status}). The reason is in the API logs. No label exists, so it is ` +
+            'safe to correct the shipment and ask again.'
+        ),
+    },
+  ]
+);
+
+type LabelRead =
+  | { kind: 'generated'; url: string }
+  /** Their flag says a label was made and no address for it came with it. */
+  | { kind: 'generated-without-url' }
+  | { kind: 'declined' }
+  | { kind: 'unreadable' };
+
+/**
+ * Read a label answer, and never mistake "we could not read it" for "no".
+ *
+ * The same rule `readAwbAssignment` states, on a body that is flat rather than
+ * enveloped: `label_created`, `label_url`, `not_created`, transcribed from the
+ * documented shape. `declined` is only ever returned on a POSITIVE signal —
+ * their flag at 0, our shipment named in `not_created`, or a `label_url` they
+ * named and left blank — because "declined" is the one answer whose advice is
+ * to ask again, and asking again is billed.
+ */
+function readLabelAnswer(json: unknown, shipmentId: string): LabelRead {
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+    return { kind: 'unreadable' };
+  }
+  const body = json as Record<string, unknown>;
+
+  const url = asText(body.label_url);
+  if (url !== '') return { kind: 'generated', url };
+
+  // Through `finiteNumber`, so a missing flag is neither 0 nor 1.
+  const flag = finiteNumber(body.label_created);
+  if (flag === 1) return { kind: 'generated-without-url' };
+  if (flag === 0) return { kind: 'declined' };
+
+  const notCreated = Array.isArray(body.not_created) ? body.not_created.map(asText) : [];
+  if (notCreated.includes(shipmentId)) return { kind: 'declined' };
+
+  if (Object.prototype.hasOwnProperty.call(body, 'label_url')) return { kind: 'declined' };
+
+  return { kind: 'unreadable' };
+}
+
+/**
+ * An accepted label answer, reduced to what the clauses read.
+ *
+ * `url` is here because ONE clause has to look at it, and it is the last time
+ * the URL is anything but an argument to `fetch`: no clause puts it in a
+ * message, `logCourierAnswer` never sees it, and the outcome carries bytes.
+ */
+interface LabelAnswer {
+  readonly shipmentId: string;
+  readonly kind: LabelRead['kind'];
+  readonly url: string;
+}
+
+/**
+ * Only an https address is fetched. The URL is a signed link to a file on a
+ * host Shiprocket chooses; a plain-http one would carry that signature — and
+ * the customer's address behind it — in the clear.
+ */
+function isFetchableLabelUrl(url: string): boolean {
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * How an ACCEPTED `courier/generate/label` answer is classified.
+ *
+ * Every open clause here means the same thing: a label may exist and may have
+ * been billed, and the operator's job is to go and get it rather than ask for
+ * another. The one definite refusal is reached only on a positive "no" from
+ * Shiprocket. The three open kinds are mutually exclusive on `kind`, so the
+ * order inside the open group decides only which sentence is read — and it is
+ * still pinned, because a sentence is what an operator acts on.
+ */
+const LABEL_ANSWER_CLAUSES = orderedClauses<LabelAnswer>(
+  [
+    {
+      code: 'answer-unreadable',
+      verdict: 'may-have-minted',
+      when: (answer) => answer.kind === 'unreadable',
+      log: () => ({ what: 'label request answered with something we cannot read' }),
+      refuse: (answer) =>
+        new ShiprocketWriteOutcomeUnknownError(
+          `Shiprocket accepted the label request for shipment ${answer.shipmentId} and answered ` +
+            'with something this client cannot read, so it is not known whether a label was ' +
+            'generated and billed. Look the shipment up in the Shiprocket dashboard and download ' +
+            'any label it has — do not ask for another until you have looked.'
+        ),
+    },
+    {
+      code: 'label-without-url',
+      verdict: 'may-have-minted',
+      when: (answer) => answer.kind === 'generated-without-url',
+      log: () => ({ what: 'label request answered created, with no file to fetch' }),
+      refuse: (answer) =>
+        new ShiprocketWriteOutcomeUnknownError(
+          `Shiprocket says it generated a label for shipment ${answer.shipmentId} but gave no ` +
+            'file for it. The label may exist and be billed — download it from the shipment in ' +
+            'the Shiprocket dashboard and attach it; do not ask for another until you have looked.'
+        ),
+    },
+    {
+      // The URL itself goes nowhere: not into the message, not into the log.
+      code: 'label-url-unusable',
+      verdict: 'may-have-minted',
+      when: (answer) => answer.kind === 'generated' && !isFetchableLabelUrl(answer.url),
+      log: () => ({ what: 'label file is not at an https address this client will fetch from' }),
+      refuse: (answer) =>
+        new ShiprocketWriteOutcomeUnknownError(
+          `Shiprocket generated a label for shipment ${answer.shipmentId} at an address this ` +
+            'client will not fetch from. The label EXISTS and is billed — download it from the ' +
+            'shipment in the Shiprocket dashboard and attach it; do not ask for another.'
+        ),
+    },
+  ],
+  [
+    {
+      code: 'label-declined',
+      verdict: 'nothing-minted',
+      when: (answer) => answer.kind === 'declined',
+      log: () => ({ what: 'courier generated no label' }),
+      refuse: (answer) =>
+        new ShiprocketLabelRefusedError(
+          `Shiprocket generated no label for shipment ${answer.shipmentId}. The reason is in the ` +
+            'API logs. No label exists, so it is safe to correct the shipment and ask again.'
+        ),
+    },
+  ]
+);
+
+function labelNotFetched(shipmentId: string, reason: string): ShiprocketLabelFetchFailedError {
+  return new ShiprocketLabelFetchFailedError(
+    `Shiprocket generated a label for shipment ${shipmentId} but ${reason}. The label EXISTS at ` +
+      'Shiprocket — download it from the shipment in the dashboard and attach it, or ask again ' +
+      'knowing that Shiprocket may bill a second label.'
+  );
+}
+
+function looksLikePdf(bytes: Uint8Array): boolean {
+  return PDF_SIGNATURE.every((byte, i) => bytes[i] === byte);
+}
+
+/**
+ * Fetch the file the label URL points at, and hand back its bytes.
+ *
+ * Three things this GET deliberately does not do:
+ *
+ * - **It does not send the bearer token.** The file is on a third-party host
+ *   Shiprocket chose; our token there is a credential handed to whoever runs
+ *   it, and it buys nothing — the URL is already signed.
+ * - **It does not log the URL, or the driver's error.** A fetch error's text
+ *   can quote the URL it was given (`Invalid URL: https://…`), and the URL is
+ *   the customer's address behind a link. The error's NAME is logged; nothing
+ *   else of it.
+ * - **It does not buffer first and check later.** The cap is checked on
+ *   `Content-Length` before the body is read, and a host that sends no length
+ *   is checked on the bytes it sent.
+ *
+ * Every failure is `ShiprocketLabelFetchFailedError`, and every message says
+ * the label exists — the purchase happened, the download did not, and a caller
+ * that read this as "no label" would buy a second one.
+ */
+async function fetchLabelPdf(url: string, shipmentId: string): Promise<Uint8Array> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+    });
+  } catch (error) {
+    logger.error(
+      { shipmentId, errorName: error instanceof Error ? error.name : typeof error },
+      'shiprocket: label file host did not answer'
+    );
+    throw labelNotFetched(shipmentId, 'the label file host did not answer');
+  }
+
+  if (!response.ok) {
+    logger.error({ shipmentId, status: response.status }, 'shiprocket: label file host refused');
+    throw labelNotFetched(shipmentId, `the label file host answered HTTP ${response.status}`);
+  }
+
+  const declared = finiteNumber(response.headers?.get?.('content-length'));
+  if (declared !== null && declared > LABEL_PDF_MAX_BYTES) {
+    logger.error({ shipmentId, declaredBytes: declared }, 'shiprocket: label file too large');
+    throw labelNotFetched(
+      shipmentId,
+      `the file is ${declared} bytes, more than the ${LABEL_PDF_MAX_BYTES} this client will store`
+    );
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await response.arrayBuffer());
+  } catch (error) {
+    logger.error(
+      { shipmentId, errorName: error instanceof Error ? error.name : typeof error },
+      'shiprocket: label file did not finish arriving'
+    );
+    throw labelNotFetched(shipmentId, 'the label file did not finish arriving');
+  }
+
+  if (bytes.byteLength > LABEL_PDF_MAX_BYTES) {
+    logger.error({ shipmentId, receivedBytes: bytes.byteLength }, 'shiprocket: label file too large');
+    throw labelNotFetched(
+      shipmentId,
+      `the file is ${bytes.byteLength} bytes, more than the ${LABEL_PDF_MAX_BYTES} this client will store`
+    );
+  }
+
+  if (!looksLikePdf(bytes)) {
+    // What an expired signed URL answers with on some hosts: HTTP 200 and an
+    // XML error document. Stored under `<token>.pdf`, that is a label nobody
+    // can print and a token that says one exists.
+    logger.error({ shipmentId, receivedBytes: bytes.byteLength }, 'shiprocket: label file is not a PDF');
+    throw labelNotFetched(shipmentId, 'the file it pointed at is not a PDF');
+  }
+
+  return bytes;
+}
+
+/**
+ * The label requests this process currently has in flight, keyed by
+ * Shiprocket's shipment id. Overlap only, released in a `finally` — see
+ * `assignsInFlight`, whose argument applies here with more force: a second
+ * concurrent label is a second invoice line, not just a second waybill.
+ */
+const labelsInFlight = new Map<string, Promise<LabelOutcome>>();
+
+/**
+ * Render the shipping label for a shipment and return the PDF's bytes.
+ *
+ * ## The ordering, which is the design and not an accident
+ *
+ * 1. **The held token first**, before the join, before configuration, before
+ *    the login. A caller holding a token has a label; nothing about this call
+ *    should happen, and nothing does — not even a network round trip to find
+ *    out we are configured.
+ * 2. **Then the write**, whose every non-answer is
+ *    `ShiprocketWriteOutcomeUnknownError`, decided by `LABEL_REFUSAL_CLAUSES`
+ *    and `LABEL_ANSWER_CLAUSES` on the same terms as the other two writes.
+ * 3. **Then the fetch**, which is a READ of a file that already exists, and
+ *    whose failures therefore say so: `ShiprocketLabelFetchFailedError`,
+ *    never a refusal that invites a second purchase.
+ *
+ * The URL is an argument to `fetch` and nothing else. It is not in the
+ * outcome, not in any message, and not in any log line — see `fetchLabelPdf`.
+ */
+export async function generateLabel(request: GenerateLabelRequest): Promise<LabelOutcome> {
+  const shipmentId = request.shipmentId.trim();
+  if (shipmentId === '') {
+    throw new ShiprocketError(
+      'No Shiprocket shipment id was supplied, so there is nothing to generate a label for. ' +
+        'The id comes back from the courier-order create and belongs in ' +
+        '`order_shipments.external_shipment_id`; recover it there before dispatching.',
+      'SHIPROCKET_SHIPMENT_ID_MISSING'
+    );
+  }
+
+  // Trimmed, so a token with a stray space is still a token: the safe reading
+  // of a value that is almost a token is that a label was bought.
+  const held = (request.heldLabelObjectToken ?? '').trim();
+  if (held !== '') return { generated: false, labelObjectToken: held };
+
+  const joined = labelsInFlight.get(shipmentId);
+  if (joined) return joined;
+
+  const run = generateLabelOnce(shipmentId);
+  labelsInFlight.set(shipmentId, run);
+
+  try {
+    return await run;
+  } finally {
+    labelsInFlight.delete(shipmentId);
+  }
+}
+
+async function generateLabelOnce(shipmentId: string): Promise<LabelOutcome> {
+  const body: Record<string, unknown> = { shipment_id: [shipmentIdOnTheWire(shipmentId)] };
+
+  const outcome = await postCourierWrite('/courier/generate/label', body, {
+    context: { shipmentId },
+    message:
+      `Shiprocket did not answer the request to generate a label for shipment ${shipmentId}. ` +
+      'A label may have been generated and billed — check the shipment in the Shiprocket ' +
+      'dashboard for one before asking again.',
+  });
+
+  const logAnswer = (what: string, extra: Record<string, unknown> = {}) =>
+    logCourierAnswer(
+      what,
+      { status: outcome.status, shipmentId, ...extra },
+      outcome,
+      payloadEchoes(body)
+    );
+
+  if (!outcome.ok) {
+    logAnswer(refusedWriteLabel(outcome.status));
+
+    const answer: RefusedLabel = {
+      status: outcome.status,
+      said: refusalReason(outcome.json),
+      shipmentId,
+    };
+    throw firstClause(LABEL_REFUSAL_CLAUSES, answer)!.refuse(answer);
+  }
+
+  const read = readLabelAnswer(outcome.json, shipmentId);
+  const answer: LabelAnswer = {
+    shipmentId,
+    kind: read.kind,
+    url: read.kind === 'generated' ? read.url : '',
+  };
+
+  const clause = firstClause(LABEL_ANSWER_CLAUSES, answer);
+  if (clause) {
+    const line = clause.log?.(answer);
+    if (line) logAnswer(line.what, line.extra);
+    throw clause.refuse(answer);
+  }
+
+  return { generated: true, pdf: await fetchLabelPdf(answer.url, shipmentId) };
+}
+
+// ============================================================================
+// The pickup (#727) — the one write that mints nothing, so it may be retried
+// ============================================================================
+
+export interface SchedulePickupRequest {
+  /** SHIPROCKET's shipment id — `external_shipment_id`. See `AssignAwbRequest`. */
+  shipmentId: string;
+}
+
+export interface PickupSchedule {
+  /** Their `pickup_scheduled_date`, as they wrote it. Null when they gave none. */
+  readonly scheduledFor: string | null;
+  readonly tokenNumber: string | null;
+  /**
+   * True when Shiprocket answered that a pickup was ALREADY in the queue.
+   *
+   * Reported rather than folded into plain success, because a caller retrying
+   * after an unanswered request wants to know the first request landed — and
+   * because the audit row for "we asked for a pickup" is owed once.
+   */
+  readonly alreadyScheduled: boolean;
+}
+
+/**
+ * Their wording for "you already asked" — premise 5 in the module header.
+ * Read as success, which is what lets a pickup retry converge.
+ */
+const PICKUP_ALREADY_QUEUED = /\balready\s+(?:in\s+(?:the\s+)?pickup\s+queue|scheduled|requested)\b/i;
+
+/** A date inside a sentence, in the shape their queue message carries one. */
+const DATE_IN_SENTENCE = /(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)/;
+
+function dateIn(sentence: string): string | null {
+  return sentence.match(DATE_IN_SENTENCE)?.[1] ?? null;
+}
+
+function pickupNotScheduled(shipmentId: string, reason: string): ShiprocketPickupNotScheduledError {
+  return new ShiprocketPickupNotScheduledError(
+    `${reason} for shipment ${shipmentId}. Nothing was scheduled and nothing was billed. The ` +
+      'label for this shipment is unaffected — keep it, and ask for the pickup again; a pickup ' +
+      'already in the queue is reported as scheduled.'
+  );
+}
+
+type PickupRead =
+  | { kind: 'scheduled'; scheduledFor: string | null; tokenNumber: string | null }
+  | { kind: 'already'; scheduledFor: string | null }
+  | { kind: 'nothing' };
+
+/**
+ * Read a pickup answer. Transcribed shape: `pickup_status` at the root, and a
+ * `response` envelope carrying `pickup_scheduled_date` and
+ * `pickup_token_number`. A date or a token is taken as scheduled even without
+ * the flag — they are the two facts a courier acts on — and their "already"
+ * sentence on a 200 is read the same way it is on a 400.
+ */
+function readPickupAnswer(json: unknown): PickupRead {
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) return { kind: 'nothing' };
+  const body = json as Record<string, unknown>;
+
+  const node = body.response;
+  const envelope =
+    typeof node === 'object' && node !== null && !Array.isArray(node)
+      ? (node as Record<string, unknown>)
+      : {};
+
+  const scheduledFor = asText(envelope.pickup_scheduled_date) || null;
+  const tokenNumber = asText(envelope.pickup_token_number) || null;
+  if (finiteNumber(body.pickup_status) === 1 || scheduledFor !== null || tokenNumber !== null) {
+    return { kind: 'scheduled', scheduledFor, tokenNumber };
+  }
+
+  const said = refusalReason(json);
+  if (PICKUP_ALREADY_QUEUED.test(said)) return { kind: 'already', scheduledFor: dateIn(said) };
+
+  return { kind: 'nothing' };
+}
+
+/** Overlap only, as with the other maps. A pickup asked for twice is harmless; asked for twice at once is still one request. */
+const pickupsInFlight = new Map<string, Promise<PickupSchedule>>();
+
+/**
+ * Ask the courier to collect this shipment.
+ *
+ * ## Why this write is not decided by `COURIER_WRITE_CLAUSES`
+ *
+ * Every table there answers "was something minted?", and the safety property
+ * they encode is that an unknown answer must not become "ask again". A pickup
+ * request mints nothing: a second one for a queued shipment is answered
+ * "already in pickup queue" (premise 5), which this function reads as
+ * success. So the question those tables exist to keep in order does not
+ * arise, and every refusal here — a non-answer included — is
+ * `ShiprocketPickupNotScheduledError`, retryable as it stands. The two
+ * exceptions are the ones every authenticated call shares: configuration and
+ * the credential, which pass through untouched.
+ *
+ * ## What a failed pickup is not
+ *
+ * Not a reason to void the label. The ticket says so, the error's message
+ * says so, and this function makes no request that could do so.
+ */
+export async function schedulePickup(request: SchedulePickupRequest): Promise<PickupSchedule> {
+  const shipmentId = request.shipmentId.trim();
+  if (shipmentId === '') {
+    throw new ShiprocketError(
+      'No Shiprocket shipment id was supplied, so there is nothing to schedule a pickup for. ' +
+        'The id comes back from the courier-order create and belongs in ' +
+        '`order_shipments.external_shipment_id`; recover it there before dispatching.',
+      'SHIPROCKET_SHIPMENT_ID_MISSING'
+    );
+  }
+
+  const joined = pickupsInFlight.get(shipmentId);
+  if (joined) return joined;
+
+  const run = schedulePickupOnce(shipmentId);
+  pickupsInFlight.set(shipmentId, run);
+
+  try {
+    return await run;
+  } finally {
+    pickupsInFlight.delete(shipmentId);
+  }
+}
+
+async function schedulePickupOnce(shipmentId: string): Promise<PickupSchedule> {
+  const body: Record<string, unknown> = { shipment_id: [shipmentIdOnTheWire(shipmentId)] };
+
+  let outcome: CourierWriteOutcome;
+  try {
+    outcome = await postCourierWrite('/courier/generate/pickup', body, {
+      context: { shipmentId },
+      message: `Shiprocket did not answer the pickup request for shipment ${shipmentId}.`,
+    });
+  } catch (error) {
+    // The one write where a non-answer is NOT an unknown outcome — see the
+    // function's doc block. Configuration and credential failures are not
+    // this type and pass through.
+    if (error instanceof ShiprocketWriteOutcomeUnknownError) {
+      throw pickupNotScheduled(shipmentId, 'Shiprocket did not answer the pickup request');
+    }
+    throw error;
+  }
+
+  const logAnswer = (what: string, extra: Record<string, unknown> = {}) =>
+    logCourierAnswer(
+      what,
+      { status: outcome.status, shipmentId, ...extra },
+      outcome,
+      payloadEchoes(body)
+    );
+
+  if (!outcome.ok) {
+    // The credential before their sentence, for the reason the shared clauses
+    // give: on a 401 their sentence is about the token.
+    if (tokenWasRejected(outcome.status)) {
+      logAnswer(refusedWriteLabel(outcome.status));
+      forgetTokenAfter(outcome.status);
+      throw tokenWentStale('scheduling the pickup');
+    }
+
+    const said = refusalReason(outcome.json);
+    if (PICKUP_ALREADY_QUEUED.test(said)) {
+      return { scheduledFor: dateIn(said), tokenNumber: null, alreadyScheduled: true };
+    }
+
+    logAnswer(refusedWriteLabel(outcome.status));
+    throw pickupNotScheduled(
+      shipmentId,
+      `Shiprocket would not schedule the pickup (HTTP ${outcome.status}; the reason is in the API logs)`
+    );
+  }
+
+  const read = readPickupAnswer(outcome.json);
+  if (read.kind === 'scheduled') {
+    return { scheduledFor: read.scheduledFor, tokenNumber: read.tokenNumber, alreadyScheduled: false };
+  }
+  if (read.kind === 'already') {
+    return { scheduledFor: read.scheduledFor, tokenNumber: null, alreadyScheduled: true };
+  }
+
+  logAnswer('pickup request answered with no schedule');
+  throw pickupNotScheduled(
+    shipmentId,
+    'Shiprocket accepted the pickup request and scheduled nothing'
+  );
+}
+
+/**
+ * Every ordered decision this client makes about a courier write.
+ *
+ * Exported for one reason: `tests/services/shiprocket-courier-writes.test.ts`
+ * holds these sequences to a named order, proves each adjacency decides
+ * something with a body that satisfies both clauses, and checks that the
+ * verdict a clause declares and the HTTP status `SHIPROCKET_REFUSAL_STATUS`
+ * gives its error are two statements of the same fact. Without the export
+ * those properties are assertable only through prose.
+ *
+ * Typed as a PROJECTION — the code and the verdict, not `when` or `refuse` —
+ * so reading this export cannot become a way for another module to re-run this
+ * client's decisions on a body of its own. The values are the real tables; the
+ * type is what a reader is allowed to do with them.
+ *
+ * The pickup is absent on purpose: it mints nothing, so it has no mint
+ * question to keep in order. `schedulePickup`'s doc block says why.
+ */
+export const COURIER_WRITE_CLAUSES: Readonly<
+  Record<string, ReadonlyArray<{ readonly code: string; readonly verdict: MintVerdict }>>
+> = {
+  'create: a refused answer': CREATE_REFUSAL_CLAUSES,
+  'create: an accepted answer': CREATE_ACCEPTED_CLAUSES,
+  'assign: a refused answer': ASSIGN_REFUSAL_CLAUSES,
+  'assign: an accepted answer': AWB_ANSWER_CLAUSES,
+  'label: a refused answer': LABEL_REFUSAL_CLAUSES,
+  'label: an accepted answer': LABEL_ANSWER_CLAUSES,
+};

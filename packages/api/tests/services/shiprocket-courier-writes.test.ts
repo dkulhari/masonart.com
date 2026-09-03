@@ -87,6 +87,8 @@ import * as shiprocket from '../../src/services/shiprocket';
 import {
   createCourierOrder,
   assignAwb,
+  generateLabel,
+  schedulePickup,
   checkServiceability,
   selectCourierFor,
   courierOrderReference,
@@ -100,6 +102,7 @@ import {
   WRITE_TIMEOUT_MS,
   ShiprocketAwbRefusedError,
   ShiprocketError,
+  ShiprocketLabelRefusedError,
   ShiprocketOrderTotalMismatchError,
   ShiprocketPickupLocationError,
   ShiprocketWriteOutcomeUnknownError,
@@ -308,6 +311,28 @@ function refusedResponse(status: number, body: Record<string, unknown>) {
     ok: false,
     status,
     text: async () => JSON.stringify(body),
+  } as unknown as Response;
+}
+
+/**
+ * A generated label (#727), on a `.invalid` file host so the recorder stays
+ * clean. The label's own suite is `shiprocket-label-pickup.test.ts`; it is
+ * here because the clause account and the refusal vocabulary are total over
+ * the module, and the label's clauses have to be enrolled where the account
+ * lives.
+ */
+function labelGeneratedResponse(over: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    status: 200,
+    text: async () =>
+      JSON.stringify({
+        label_created: 1,
+        label_url: 'https://labels.shiprocket.invalid/label/912345678.pdf',
+        response: 'Label generated successfully',
+        not_created: [],
+        ...over,
+      }),
   } as unknown as Response;
 }
 
@@ -2872,6 +2897,32 @@ describe('every refusal this client can produce is declared and reachable', () =
       },
     },
     {
+      code: 'SHIPROCKET_LABEL_REFUSED',
+      produce: async () => {
+        stubFetch(async () => refusedResponse(400, { message: 'Bad Request' }));
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      code: 'SHIPROCKET_LABEL_FETCH_FAILED',
+      produce: async () => {
+        // The label request is accepted; the file host behind the URL is not
+        // answering. The label EXISTS — this code is what says so.
+        stubFetch(async (url) => {
+          if (url.includes('courier/generate/label')) return labelGeneratedResponse();
+          throw new Error('socket hang up');
+        });
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      code: 'SHIPROCKET_PICKUP_NOT_SCHEDULED',
+      produce: async () => {
+        stubFetch(async () => refusedResponse(400, { message: 'No pickup slots available today' }));
+        return schedulePickup({ shipmentId: String(SR_SHIPMENT_ID) });
+      },
+    },
+    {
       code: 'SHIPROCKET_WRITE_OUTCOME_UNKNOWN',
       produce: async () => {
         stubFetch(async () => {
@@ -2909,6 +2960,9 @@ describe('every refusal this client can produce is declared and reachable', () =
       SHIPROCKET_ORDER_LOOKUP_FAILED: 500,
       SHIPROCKET_SHIPMENT_ID_MISSING: 500,
       SHIPROCKET_AWB_REFUSED: 422,
+      SHIPROCKET_LABEL_REFUSED: 422,
+      SHIPROCKET_LABEL_FETCH_FAILED: 502,
+      SHIPROCKET_PICKUP_NOT_SCHEDULED: 503,
       SHIPROCKET_WRITE_OUTCOME_UNKNOWN: 409,
     });
   });
@@ -3017,6 +3071,18 @@ describe('the order of the write clauses is a mechanism, not a comment', () => {
         'may-have-minted waybill-without-courier',
         'may-have-minted waybill-too-long',
         'nothing-minted awb-declined',
+      ],
+      'label: a refused answer': [
+        'may-have-minted write-incomplete',
+        'credential token-rejected',
+        'may-have-minted label-may-already-exist',
+        'nothing-minted label-refused',
+      ],
+      'label: an accepted answer': [
+        'may-have-minted answer-unreadable',
+        'may-have-minted label-without-url',
+        'may-have-minted label-url-unusable',
+        'nothing-minted label-declined',
       ],
     });
   });
@@ -3195,6 +3261,74 @@ describe('the order of the write clauses is a mechanism, not a comment', () => {
       produce: async () => {
         stubFetch(async () => awbAssignedResponse({ awb_code: '' }));
         return assignAwb({ shipmentId: String(SR_SHIPMENT_ID) });
+      },
+    },
+    {
+      table: 'label: a refused answer',
+      clause: 'write-incomplete',
+      produce: async () => {
+        stubFetch(async () => refusedResponse(503, { message: 'Service Unavailable' }));
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: a refused answer',
+      clause: 'token-rejected',
+      produce: async () => {
+        stubFetch(async () => refusedResponse(401, { message: 'Unauthorized' }));
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: a refused answer',
+      clause: 'label-may-already-exist',
+      produce: async () => {
+        stubFetch(async () =>
+          refusedResponse(422, { message: 'Label already generated for this shipment' })
+        );
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: a refused answer',
+      clause: 'label-refused',
+      produce: async () => {
+        stubFetch(async () => refusedResponse(400, { message: 'Bad Request' }));
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: an accepted answer',
+      clause: 'answer-unreadable',
+      produce: async () => {
+        stubFetch(async () => unreadable200());
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: an accepted answer',
+      clause: 'label-without-url',
+      produce: async () => {
+        stubFetch(async () => labelGeneratedResponse({ label_url: '' }));
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: an accepted answer',
+      clause: 'label-url-unusable',
+      produce: async () => {
+        stubFetch(async () =>
+          labelGeneratedResponse({ label_url: 'http://labels.shiprocket.invalid/plain.pdf' })
+        );
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+    },
+    {
+      table: 'label: an accepted answer',
+      clause: 'label-declined',
+      produce: async () => {
+        stubFetch(async () => labelGeneratedResponse({ label_created: 0, label_url: '' }));
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
       },
     },
   ];
@@ -3389,6 +3523,41 @@ describe('the order of the write clauses is a mechanism, not a comment', () => {
         expect(error.message).toContain('named no courier');
       },
     },
+    {
+      table: 'label: a refused answer',
+      earlier: 'token-rejected',
+      later: 'label-may-already-exist',
+      // The third write's twin of the same boundary. A 401 whose body also
+      // says a label exists is about the credential, not the label.
+      produce: async () => {
+        stubFetch(async () =>
+          refusedResponse(401, { message: 'Label already generated for this shipment' })
+        );
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+      assert: (error) => {
+        expect((error as ShiprocketError).code).toBe('SHIPROCKET_AUTH_EXPIRED');
+      },
+    },
+    {
+      table: 'label: a refused answer',
+      earlier: 'label-may-already-exist',
+      later: 'label-refused',
+      // The boundary that costs money if it is crossed the wrong way: the
+      // floor's sentence is "no label exists, ask again", and a label that
+      // exists is billed again on the asking.
+      produce: async () => {
+        stubFetch(async () =>
+          refusedResponse(422, { message: 'Label already generated for this shipment' })
+        );
+        return generateLabel({ shipmentId: String(SR_SHIPMENT_ID), heldLabelObjectToken: null });
+      },
+      assert: (error) => {
+        expect(error).toBeInstanceOf(ShiprocketWriteOutcomeUnknownError);
+        expect(error).not.toBeInstanceOf(ShiprocketLabelRefusedError);
+        expect(error.message).toContain('billed');
+      },
+    },
   ];
 
   /**
@@ -3421,6 +3590,26 @@ describe('the order of the write clauses is a mechanism, not a comment', () => {
       at: 'assign: an accepted answer :: waybill-too-long -> awb-declined',
       reason:
         'One needs an assigned waybill, the other needs Shiprocket to have said it minted none.',
+    },
+    {
+      at: 'label: a refused answer :: write-incomplete -> token-rejected',
+      reason:
+        '401 sits inside the 4xx range write-incomplete excludes, so no status satisfies both.',
+    },
+    {
+      at: 'label: an accepted answer :: answer-unreadable -> label-without-url',
+      reason:
+        'An unreadable body has no label_created flag to read; the other needs that flag at 1.',
+    },
+    {
+      at: 'label: an accepted answer :: label-without-url -> label-url-unusable',
+      reason:
+        'One needs the label_url blank, the other needs it present and not https; one field, two values.',
+    },
+    {
+      at: 'label: an accepted answer :: label-url-unusable -> label-declined',
+      reason:
+        'One needs a label_url to judge, the other is only reached when the URL is blank and they said no.',
     },
   ];
 
@@ -3513,8 +3702,11 @@ describe('the order of the write clauses is a mechanism, not a comment', () => {
 // ============================================================================
 
 describe('the shiprocket module contract', () => {
-  /** The three calls that cost money or make something real at a courier. */
-  const writes = ['createCourierOrder', 'assignAwb'] as const;
+  /**
+   * The calls that make something real at a courier. Three of them cost
+   * money; the pickup does not, and is the one whose refusal may be retried.
+   */
+  const writes = ['createCourierOrder', 'assignAwb', 'generateLabel', 'schedulePickup'] as const;
 
   /** Repeatable reads and pure selection over their answers. */
   const reads = ['checkServiceability', 'selectCourier', 'selectCourierFor'] as const;
@@ -3546,6 +3738,9 @@ describe('the shiprocket module contract', () => {
     'ShiprocketPickupLocationError',
     'ShiprocketAwbRefusedError',
     'ShiprocketOrderTotalMismatchError',
+    'ShiprocketLabelRefusedError',
+    'ShiprocketLabelFetchFailedError',
+    'ShiprocketPickupNotScheduledError',
   ] as const;
 
   /** Constants and vocabularies other files read. */
@@ -3558,6 +3753,7 @@ describe('the shiprocket module contract', () => {
     'EXTERNAL_ID_MAX_LENGTH',
     'READ_TIMEOUT_MS',
     'WRITE_TIMEOUT_MS',
+    'LABEL_PDF_MAX_BYTES',
   ] as const;
 
   const exportedNames = (): string[] => Object.keys(shiprocket);
