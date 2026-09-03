@@ -79,7 +79,6 @@ vi.mock('../../../src/auth', () => ({
 
 import {
   ADMIN_SHIPMENT_REFUSAL_CODES,
-  adminOrderShipmentsApp,
   adminShipmentsApp,
   CLOSED_SHIPMENT_STATUSES,
   READY_QUEUE_SCAN_LIMIT,
@@ -2069,306 +2068,17 @@ describe('the open shipment a candidate already has', () => {
 // The other half: the write refuses the second shipment
 // ============================================================================
 //
-// The queue reports the open row; this refuses to create another. Both halves
-// are needed and neither is sufficient. Without the refusal, the queue's report
-// is advice a client can ignore and the double row still happens. Without the
-// report, an admin is offered work the write turns down, which is the failure
-// `readyQueueSchema`'s own doc calls a queue that lies.
+// ============================================================================
 //
-// The database will not do it for us: `order_shipments_live_label_idx` is
-// PARTIAL on `label_object_token IS NOT NULL` (migration 0027), and both halves
-// of that predicate are load-bearing there — dropping the token half would
-// refuse the second UNLABELLED row, which is what `POST /orders/:orderId/ship`
-// opens routinely and legitimately after a void.
-
-const buildShipApp = () => buildRouteApp('/api/admin', adminOrderShipmentsApp)
-
-const SHIP_PATH = `/api/admin/orders/${ORDER_A}/ship`
-
-const shipRequest = () =>
-  buildShipApp().request(SHIP_PATH, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ carrier: 'Shiprocket' }),
-  })
-
-/** The order row the ship route locks before it decides anything. */
-const shippableOrder = () => [
-  { id: ORDER_A, orderNumber: 'CA-2026-000001', status: 'confirmed' },
-]
-
-describe('POST /api/admin/orders/:orderId/ship refuses a second live shipment', () => {
-  it('answers 409 with a named code rather than writing a second row', async () => {
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-    })
-
-    const res = await shipRequest()
-    expect(res.status).toBe(409)
-
-    const body = (await readJson(res)) as Record<string, unknown>
-    expect(body.code).toBe('ORDER_ALREADY_HAS_SHIPMENT')
-
-    // 409 and not 400: nothing about the request is malformed, and the caller
-    // does not fix it by changing this request. Answering 400 teaches a client
-    // to retry with a different body, which cannot work.
-    expect(recorder.inserts(orderShipments), 'a second shipment row was written').toHaveLength(0)
-    expect(recorder.updates(orders), 'the order was moved for a refused request').toHaveLength(0)
-  })
-
-  it('says which row is in the way and what to do about it', async () => {
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-    })
-
-    const body = (await readJson(await shipRequest())) as Record<string, string>
-
-    // The remedy has to be performable, which is the whole lesson of round 3:
-    // its doc led with a `voided_at` remedy nothing in this repo writes. This
-    // one names a route that exists and a status `CLOSED_SHIPMENT_STATUSES`
-    // really does release on.
-    expect(body.error).toContain(OPEN_SHIPMENT_ID)
-    expect(body.error).toContain('pending')
-    expect(body.error.toLowerCase()).toContain('cancel')
-
-    // The admin's own order, so naming the shipment id leaks nothing. What must
-    // not be in it is the rest of the row.
-    for (const leak of ['label_object_token', 'labelObjectToken', 'cost_paise', 'costPaise']) {
-      expect(body.error, `${leak} was narrated in the refusal`).not.toContain(leak)
-    }
-  })
-
-  it('rolls the transaction back rather than committing the reads it made', async () => {
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-    })
-
-    await shipRequest()
-
-    // The refusal is raised INSIDE the transaction on purpose. A `return` there
-    // commits, which is harmless on this path and is not on the ones that
-    // refuse after a write.
-    expect(recorder.tx.rollbacks).toBe(1)
-    expect(recorder.tx.commits).toBe(0)
-  })
-
-  it('asks the same question the queue asks, and the SQL says so', async () => {
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[]],
-      'insert:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-      'update:orders': [[{ id: ORDER_A }]],
-    })
-
-    await shipRequest()
-
-    const read = selects(orderShipments)[0]
-    const { sql, params } = render(read?.where)
-    expect(sql).toContain('"order_shipments"."order_id"')
-    expect(sql).toContain('"order_shipments"."voided_at"')
-    expect(sql).toContain('"order_shipments"."status"')
-    for (const status of CLOSED_SHIPMENT_STATUSES) {
-      expect(params, `${status} does not release the order`).toContain(status)
-    }
-  })
-
-  it('names the row the queue reports, because it reads them in the same order', async () => {
-    // The WHERE was already shared through `openShipmentsOf`; the ORDER BY was
-    // not, and the refusal is about a specific row rather than about a count.
-    //
-    // With two open rows on one order — legacy data, which is the only thing
-    // that produces them — `LIMIT 1` with no ORDER BY lets the planner pick
-    // either. The queue reports the NEWEST, deliberately, and said so; this
-    // read took whichever row came back first. An admin who reads the queue,
-    // follows the 409's own remedy and cancels the row it names is then refused
-    // again, naming a different shipment, with nothing on either screen
-    // explaining why. Two rows, two remedies, one of them invisible.
-    //
-    // Asserted on the rendered ORDER BY rather than on which row comes back:
-    // the recorder answers with whatever the fixture queued regardless of the
-    // ordering, so a behavioural version of this test would be testing the
-    // mock. Term by term and in sequence, because `created_at desc` alone is
-    // not a total order — two rows written in the same clock tick tie on it and
-    // fall back to the planner again, which is the same defect one step down.
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[]],
-      'insert:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-      'update:orders': [[{ id: ORDER_A }]],
-    })
-
-    await shipRequest()
-
-    const read = selects(orderShipments)[0]
-    const ordering = (read?.orderByTerms ?? []).map((term) => render(term).sql.toLowerCase())
-
-    expect(ordering[0], 'the newest open row is not the one this refuses on').toBe(
-      '"order_shipments"."created_at" desc'
-    )
-    expect(ordering[1], 'a same-tick tie falls back to the planner').toBe(
-      '"order_shipments"."id" desc'
-    )
-    expect(read?.limit, 'the refusal read stopped being a single-row read').toBe(1)
-  })
-
-  it('reads them in the SAME order the queue does, and both come from one place', async () => {
-    // The property is agreement, so it is asserted by rendering both reads and
-    // comparing them — not by reading the constant, which would pass with the
-    // two handlers spelling their own.
-    //
-    // The queue's read leads with `order_id`, which is not an opinion about
-    // which row wins: Postgres requires a `DISTINCT ON` expression to lead the
-    // `ORDER BY`. The decisive keys are the ones after it, and those are what
-    // must match a read already scoped to one order.
-    recorder.reset()
-    queueRows({
-      'select:orders': [[orderRow()]],
-      'select:order_items': [[]],
-      'select:production_jobs': [[]],
-      'select:order_consolidation': [[]],
-      'select:production_transfers': [[]],
-      'select:order_shipments': [[openShipmentRow()]],
-    })
-
-    await buildApp().request('/api/admin/shipments/ready')
-
-    const queueOrdering = (selects(orderShipments)[0]?.orderByTerms ?? []).map(
-      (term) => render(term).sql.toLowerCase()
-    )
-
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[]],
-      'insert:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-      'update:orders': [[{ id: ORDER_A }]],
-    })
-
-    await shipRequest()
-
-    const writeOrdering = (selects(orderShipments)[0]?.orderByTerms ?? []).map(
-      (term) => render(term).sql.toLowerCase()
-    )
-
-    expect(queueOrdering[0], 'the collapse column does not lead the queue read').toBe(
-      '"order_shipments"."order_id" asc'
-    )
-    expect(
-      writeOrdering,
-      'the screen and the write rank the same rows differently'
-    ).toEqual(queueOrdering.slice(1))
-  })
-
-  it('clears an order with no live shipment, so it is a check and not a refusal', async () => {
-    // The positive control. Without it this guard is satisfied by a route that
-    // refuses everything, which would take the whole feature offline.
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[]],
-      'insert:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-      'update:orders': [[{ id: ORDER_A }]],
-    })
-
-    const res = await shipRequest()
-    expect(res.status).toBe(201)
-    expect(recorder.inserts(orderShipments)).toHaveLength(1)
-    expect(recorder.tx.commits).toBe(1)
-  })
-
-  it('lets a CANCELLED shipment release its order, and the SQL says which way', async () => {
-    // `CLOSED_SHIPMENT_STATUSES` is what makes this refusal recoverable without
-    // a `voided_at` write — cancel the row the 409 names, ship again — so the
-    // release is the half of the predicate an admin's only remedy runs through.
-    //
-    // **This test used to be its own setup and nothing else.** It queued
-    // `'select:order_shipments': [[]]` — byte-identical to the positive control
-    // above it — and asserted a 201. The recorder is blind to the WHERE and
-    // answers with whatever was queued, so an empty result proves the fixture
-    // is empty and nothing at all about `CLOSED_SHIPMENT_STATUSES`: delete the
-    // `notInArray` from `openShipmentsOf` and this stayed green, over the exact
-    // clause it names in its own title.
-    //
-    // So it asserts the rendered predicate, which is where the property is
-    // decidable. Two halves, and the second is the one the neighbouring SQL
-    // test cannot see: `not in` is a DIRECTION. A predicate that bound
-    // `status in ('cancelled')` would carry the column and bind every closed
-    // status — passing `asks the same question the queue asks` in full — while
-    // meaning the opposite, refusing on the cancelled row and clearing every
-    // live one.
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[]],
-      'insert:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-      'update:orders': [[{ id: ORDER_A }]],
-    })
-
-    expect((await shipRequest()).status).toBe(201)
-
-    const { sql, params } = render(selects(orderShipments)[0]?.where)
-
-    // The clause exists, and it EXCLUDES rather than requires.
-    expect(
-      sql.toLowerCase(),
-      'the status clause does not release a closed shipment, it selects for one'
-    ).toContain('"order_shipments"."status" not in')
-
-    for (const status of CLOSED_SHIPMENT_STATUSES) {
-      expect(params, `${status} does not release the order`).toContain(status)
-    }
-
-    // ...and it releases ONLY those. Derived from the enum rather than listed,
-    // so a status added to `schema/shipping.ts` and quietly added here too is a
-    // failure rather than a silent widening: every one of these leaves a parcel
-    // in a courier's hands, and a second shipment is not the remedy for any of
-    // them.
-    const stillOpen = shipmentStatusEnum.enumValues.filter(
-      (status) => !CLOSED_SHIPMENT_STATUSES.includes(status)
-    )
-    expect(stillOpen.length, 'every shipment status closes a shipment').toBeGreaterThan(0)
-    for (const status of stillOpen) {
-      expect(params, `${status} silently releases its order`).not.toContain(status)
-    }
-  })
-
-  it('answers the shipment through an allow-list, not the whole row', async () => {
-    recorder.reset()
-    queueRows({
-      'select:orders': [shippableOrder()],
-      'select:order_shipments': [[]],
-      'insert:order_shipments': [[{ id: OPEN_SHIPMENT_ID, status: 'pending' }]],
-      'update:orders': [[{ id: ORDER_A }]],
-    })
-
-    await shipRequest()
-
-    // Asserted on the recorded `.returning({...})` projection rather than on
-    // the response body, because the body's keys are the keys of the test's own
-    // fixture row. This is the only place the property is decidable.
-    const written = recorder.inserts(orderShipments)[0]
-    expect(written?.returning, 'the whole row was returned').not.toBeNull()
-    for (const forbidden of [
-      'labelObjectToken',
-      'costPaise',
-      'pickupVendorId',
-      'externalShipmentId',
-      'externalOrderId',
-      'voidedAt',
-      'voidedReason',
-    ]) {
-      expect(written?.returning, `${forbidden} is returned to the caller`).not.toContain(forbidden)
-    }
-  })
-})
+// `POST /orders/:orderId/ship` no longer opens a row here: since #729 it
+// delegates to `lib/shipment-dispatch.ts`, which refuses a second live label
+// (`ORDER_HAS_LIVE_LABEL`) or an in-flight claim (`LABEL_PURCHASE_IN_PROGRESS`)
+// under the same lock it takes readiness through, and claims the newest open
+// unlabelled row rather than opening another. The queue still reports the
+// open row on `ReadyQueueItem.openShipment`; the write's half of the pairing
+// is proved in `tests/lib/shipment-dispatch.test.ts` (which pins the claim's
+// read to the queue's ordering) and `tests/routes/admin/shipments-ship.test.ts`.
+//
 
 // ============================================================================
 // The rows go back on the order they came from
@@ -3601,13 +3311,15 @@ function atomicWritePairs(source: string): string[] {
 }
 
 /**
- * The three handlers that write both tables, spelled out so the count below is
+ * The two handlers that write both tables, spelled out so the count below is
  * a claim rather than a count of whatever happens to be there.
  */
 const PAIRED_WRITE_HANDLERS = [
   'PATCH /:id',
   'POST /:id/mark-delivered',
-  'POST /orders/:orderId/ship',
+  // `POST /orders/:orderId/ship` left this list in #729: it writes neither
+  // table itself any more, and the paired writes it used to make are the
+  // dispatch library's, proved atomic in its own suites.
 ]
 
 describe('every handler that writes both tables does it in one transaction', () => {
@@ -3632,11 +3344,11 @@ describe('every handler that writes both tables does it in one transaction', () 
     ).toEqual([])
   })
 
-  it('is not vacuous: all three paired-write handlers are accounted for', () => {
+  it('is not vacuous: both paired-write handlers are accounted for', () => {
     // `nonAtomicWritePairs` over a corpus it could not slice returns `[]`,
     // which is what a clean file returns. These two facts are different and
     // only one of them is the property, so the positive half is asserted too:
-    // the three handlers are found, and found to be atomic.
+    // the two handlers are found, and found to be atomic.
     expect(atomicWritePairs(readSource('routes/admin/shipments.ts'))).toEqual(
       PAIRED_WRITE_HANDLERS
     )

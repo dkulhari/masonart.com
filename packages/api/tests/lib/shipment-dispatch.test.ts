@@ -384,6 +384,25 @@ describe('the claim', () => {
     expect(readiness.getOrderLabelReadiness).toHaveBeenCalledWith(ORDER_ID, expect.anything())
   })
 
+  it('reads the order’s live rows newest first — the order the ready queue reports them in', async () => {
+    // The queue (`routes/admin/shipments.ts`, `NEWEST_OPEN_SHIPMENT_FIRST`)
+    // reports the newest open row; this claim picks the newest open unlabelled
+    // row and refuses on the newest labelled one. Both read `created_at desc,
+    // id desc`, so the row the queue shows is the row the write acts on — and
+    // a same-tick tie does not fall back to the planner.
+    queueHappyPath()
+
+    await buyLabelForOrder(ORDER_ID, input(), actor())
+
+    const liveRead = recorder.selects(orderShipments)[0]!
+    expect(liveRead.txId).toBe(1)
+    const ordering = (liveRead.orderByTerms ?? []).map((term) => recorder.render(term).sql.toLowerCase())
+    expect(ordering).toEqual(['"order_shipments"."created_at" desc', '"order_shipments"."id" desc'])
+    const { sql } = recorder.render(liveRead.where)
+    expect(sql).toContain('"order_id" = $')
+    expect(sql).toContain('"voided_at" is null')
+  })
+
   it('refuses with the blockers when the order is not ready, and writes nothing', async () => {
     queueHappyPath()
     readiness.getOrderLabelReadiness.mockResolvedValue({
@@ -502,6 +521,16 @@ describe('the claim', () => {
     // path whether the row was found or made.
     const claim = recorder.survivors('update', orderShipments)[0]!
     expect(recorder.params(claim.where)).toContain(SHIPMENT_ROW_ID)
+
+    // ...and the opening is audited, in the claim transaction, the way an
+    // admin opening one by hand always was.
+    const opened_audit = audit.recordAudit.mock.calls.find(
+      (call) => (call[1] as { action: string }).action === 'shipment.created'
+    )
+    expect(opened_audit, 'the opened row was not audited').toBeDefined()
+    expect((opened_audit![1] as { entityId: string }).entityId).toBe(SHIPMENT_ROW_ID)
+    expect(opened_audit![2]).toBeDefined()
+    expect(opened_audit![2]).not.toBe(recorder.db)
   })
 
   it('refuses before the network when the consolidator has no pickup postcode to quote from', async () => {

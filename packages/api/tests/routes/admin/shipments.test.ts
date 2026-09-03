@@ -89,7 +89,7 @@ describe("Admin Shipments Route Module Exports", () => {
   it("should export validation schemas", async () => {
     const adminShipmentsModule = await import("../../../src/routes/admin/shipments");
     expect(adminShipmentsModule).toHaveProperty("listShipmentsSchema");
-    expect(adminShipmentsModule).toHaveProperty("createShipmentSchema");
+    expect(adminShipmentsModule).toHaveProperty("buyLabelSchema");
     expect(adminShipmentsModule).toHaveProperty("updateShipmentSchema");
   });
 
@@ -156,78 +156,30 @@ describe("Admin Shipments Validation Schemas", () => {
     });
   });
 
-  describe("createShipmentSchema", () => {
-    it("should validate required carrier field", async () => {
-      const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
+  describe("buyLabelSchema", () => {
+    it("should require a parcel of four positive integers", async () => {
+      const { buyLabelSchema } = await import("../../../src/routes/admin/shipments");
 
       expect(
-        createShipmentSchema.safeParse({ carrier: "USPS" }).success
-      ).toBe(true);
-      expect(
-        createShipmentSchema.safeParse({}).success
-      ).toBe(false);
-    });
-
-    it("should validate carrier max length", async () => {
-      const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
-
-      expect(
-        createShipmentSchema.safeParse({ carrier: "a".repeat(101) }).success
-      ).toBe(false);
-      expect(
-        createShipmentSchema.safeParse({ carrier: "a".repeat(100) }).success
-      ).toBe(true);
-    });
-
-    it("should allow optional shippingOptionId as UUID", async () => {
-      const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
-
-      expect(
-        createShipmentSchema.safeParse({
-          carrier: "USPS",
-          shippingOptionId: VALID_UUID,
+        buyLabelSchema.safeParse({
+          parcel: { weightGrams: 850, lengthCm: 40, widthCm: 30, heightCm: 6 },
         }).success
       ).toBe(true);
+      expect(buyLabelSchema.safeParse({}).success).toBe(false);
       expect(
-        createShipmentSchema.safeParse({
-          carrier: "USPS",
-          shippingOptionId: INVALID_UUID,
+        buyLabelSchema.safeParse({
+          parcel: { weightGrams: 0, lengthCm: 40, widthCm: 30, heightCm: 6 },
         }).success
       ).toBe(false);
     });
 
-    it("should allow optional trackingNumber with max length", async () => {
-      const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
+    it("should allow an optional positive integer courierCompanyId", async () => {
+      const { buyLabelSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        createShipmentSchema.safeParse({
-          carrier: "USPS",
-          trackingNumber: "1234567890",
-        }).success
-      ).toBe(true);
-      expect(
-        createShipmentSchema.safeParse({
-          carrier: "USPS",
-          trackingNumber: "a".repeat(101),
-        }).success
-      ).toBe(false);
-    });
-
-    it("should validate estimatedDeliveryAt as datetime", async () => {
-      const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
-
-      expect(
-        createShipmentSchema.safeParse({
-          carrier: "USPS",
-          estimatedDeliveryAt: "2024-01-15T10:00:00Z",
-        }).success
-      ).toBe(true);
-      expect(
-        createShipmentSchema.safeParse({
-          carrier: "USPS",
-          estimatedDeliveryAt: "not-a-date",
-        }).success
-      ).toBe(false);
+      const parcel = { weightGrams: 850, lengthCm: 40, widthCm: 30, heightCm: 6 };
+      expect(buyLabelSchema.safeParse({ parcel, courierCompanyId: 51 }).success).toBe(true);
+      expect(buyLabelSchema.safeParse({ parcel, courierCompanyId: 0 }).success).toBe(false);
+      expect(buyLabelSchema.safeParse({ parcel, courierCompanyId: "51" }).success).toBe(false);
     });
   });
 

@@ -329,7 +329,8 @@ describe('two simultaneous dispatches of one order', () => {
     expect(ledger.assignCalls).toBe(1);
     expect(ledger.labelCalls).toBe(1);
     expect([...ledger.objects.keys()]).toEqual([`fulfilment/labels/${winner.labelObjectToken}.pdf`]);
-    expect(ledger.auditRows).toEqual(['shipment.label_issued']);
+    // The winner opened the row (the fixture has none) and then bought the label.
+    expect(ledger.auditRows).toEqual(['shipment.created', 'shipment.label_issued']);
 
     // Both claimants asked readiness, and both asked it through a transaction.
     expect(ledger.readinessCalls).toHaveLength(2);
@@ -383,7 +384,8 @@ describe('a purchase that died between the waybill and the label', () => {
     expect(rows[0]).toMatchObject({ status: 'pending', awb_number: '141123221084922' });
     expect(rows[0]!.label_object_token).toBeTruthy();
     const token = rows[0]!.label_object_token as string;
-    expect(ledger.auditRows).toEqual([]);
+    // The row was opened and audited; the label was never recorded as issued.
+    expect(ledger.auditRows).toEqual(['shipment.created']);
 
     const next = await freshProcess();
 
@@ -411,7 +413,7 @@ describe('a purchase that died between the waybill and the label', () => {
     expect(ledger.createCalls).toBe(before.create + 1); // ...but was asked, through the client
     expect(ledger.assignCalls).toBe(before.assign); // the waybill was on the row
     expect(ledger.objects.has(`fulfilment/labels/${token}.pdf`)).toBe(true);
-    expect(ledger.auditRows).toEqual(['shipment.label_issued']);
+    expect(ledger.auditRows).toEqual(['shipment.created', 'shipment.label_issued']);
 
     rows = await shipmentRows(fixture.orderId);
     expect(rows).toHaveLength(1);

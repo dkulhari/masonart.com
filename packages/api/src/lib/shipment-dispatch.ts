@@ -503,7 +503,8 @@ function inProgress(row: ShipmentRow): ShipmentDispatchError {
 async function claimLabel(
   orderId: string,
   input: BuyLabelInput,
-  now: number
+  now: number,
+  actor: DispatchActor
 ): Promise<Claim> {
   return db.transaction(async (tx) => {
     // 1. The lock. Every job row on the order, so a QC pass, a despatch or a
@@ -593,7 +594,7 @@ async function claimLabel(
     // locked read established, so a claim that somehow raced past the lock
     // matches nothing rather than overwriting a token.
     const target = live.find((row) => row.status === 'pending' && row.labelObjectToken === null)
-    const rowId = target?.id ?? (await openShipmentRow(tx, orderId))
+    const rowId = target?.id ?? (await openShipmentRow(tx, orderId, actor))
     const token = mintLabelToken()
 
     let claimed: { id: string }[]
@@ -666,13 +667,35 @@ function emptyRow(id: string, orderId: string): ShipmentRow {
   }
 }
 
-/** The row `POST /orders/:orderId/ship` would have opened, opened here instead. */
-async function openShipmentRow(tx: { insert: typeof db.insert }, orderId: string): Promise<string> {
+/**
+ * The row an admin would once have opened by hand, opened here instead —
+ * and audited as `shipment.created` in the same transaction, because that
+ * row is the one the tracking page will read from and a row nobody recorded
+ * opening is a row nobody can explain in a dispute.
+ */
+async function openShipmentRow(
+  tx: { insert: typeof db.insert },
+  orderId: string,
+  actor: DispatchActor
+): Promise<string> {
   const [opened] = await tx
     .insert(orderShipments)
     .values({ orderId, carrier: LABEL_CARRIER, status: 'pending' })
     .returning({ id: orderShipments.id })
   if (!opened) throw new Error('insert into order_shipments returned no row')
+
+  await recordAudit(
+    actor,
+    {
+      action: 'shipment.created',
+      entityType: 'order_shipment',
+      entityId: opened.id,
+      summary: `Shipment opened for order ${orderId} by the label purchase`,
+      after: { carrier: LABEL_CARRIER, status: 'pending' },
+      metadata: { orderId, source: 'buy_label' },
+    },
+    tx
+  )
   return opened.id
 }
 
@@ -913,7 +936,7 @@ export async function buyLabelForOrder(
   if (joined) return joined
 
   const run = (async () => {
-    const claim = await claimLabel(orderId, input, Date.now())
+    const claim = await claimLabel(orderId, input, Date.now(), actor)
     return purchase(claim, actor)
   })()
   purchasesInFlight.set(orderId, run)

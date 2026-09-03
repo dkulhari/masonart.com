@@ -3,7 +3,7 @@
  *
  *   GET   /api/admin/shipments                     list, filtered and paged
  *   GET   /api/admin/shipments/ready               the ready-to-label queue
- *   POST  /api/admin/orders/:orderId/ship          open a shipment
+ *   POST  /api/admin/orders/:orderId/ship          buy the label (#729)
  *   GET   /api/admin/shipments/:id                 one shipment and its order
  *   PATCH /api/admin/shipments/:id                 status, tracking, carrier
  *   POST  /api/admin/shipments/:id/mark-delivered  close it out
@@ -49,12 +49,14 @@
  *
  * There is a wrong answer in each direction: a queue looking only for a label
  * re-offers work an admin has already actioned, because
- * `POST /orders/:orderId/ship` opens a row with no label bought and every
- * column `ORDER_HAS_LIVE_LABEL` coalesces NULL; and excluding those orders
+ * `PATCH /admin/orders/:id/shipping` (and the legacy data #708 backfilled)
+ * leaves rows with no label bought, on which every column
+ * `ORDER_HAS_LIVE_LABEL` coalesces NULL; and excluding those orders
  * instead deletes ready-to-LABEL work from the endpoint whose purpose is to
- * surface it. So the WRITE refuses the second row
- * (`ORDER_ALREADY_HAS_SHIPMENT`, 409, with a remedy naming a route that
- * exists) and the QUEUE reports the open row on `ReadyQueueItem.openShipment`.
+ * surface it. So the WRITE — `lib/shipment-dispatch.ts` since #729 — refuses
+ * a second live label (`ORDER_HAS_LIVE_LABEL`) or an in-flight claim
+ * (`LABEL_PURCHASE_IN_PROGRESS`) under its lock, and the QUEUE reports the
+ * open row on `ReadyQueueItem.openShipment`.
  *
  * `openShipmentsOf` is the file's only spelling of "still open" and
  * `NEWEST_OPEN_SHIPMENT_FIRST` the only answer to WHICH open row is meant —
@@ -198,6 +200,13 @@ import {
   ORDER_STATUS_FOR_SHIPMENT_STATUS,
   orderShouldMoveTo,
 } from "../../lib/shipment-status";
+import {
+  buyLabelForOrder,
+  DISPATCH_REFUSAL_STATUS,
+  ShipmentDispatchError,
+} from "../../lib/shipment-dispatch";
+import { ShiprocketError, SHIPROCKET_REFUSAL_STATUS } from "../../services/shiprocket";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { logger } from "../../lib/logger";
 import {
   evaluateLabelReadiness,
@@ -818,19 +827,12 @@ const ADMIN_SHIPMENT_REFUSAL_CODES = [
   /** No shipment with that id. Not "not yours" — every caller here is an admin. */
   "SHIPMENT_NOT_FOUND",
   "ORDER_NOT_FOUND",
-  "SHIPPING_OPTION_NOT_FOUND",
   /** The order is outside `SHIPPABLE_ORDER_STATUSES`, and the message says which. */
   "ORDER_NOT_SHIPPABLE",
   /** A PATCH body with no fields in it: nothing to do, and saying so beats a no-op 200. */
   "SHIPMENT_UPDATE_EMPTY",
   /** Already delivered. Re-stamping would move the delivery date, and the return window with it. */
   "SHIPMENT_ALREADY_DELIVERED",
-  /**
-   * A live shipment is already open on this order — see the refusal site.
-   * 409, because nothing about the request is malformed and the caller fixes it
-   * by acting on the OTHER row, not by editing this one.
-   */
-  "ORDER_ALREADY_HAS_SHIPMENT",
   /**
    * The row moved between the locked read and the write inside the same
    * transaction. 409, and the whole transaction rolls back with it.
@@ -1092,6 +1094,46 @@ const SHIPMENT_BODY_HELP =
   "as a uuid, and `status` as one of the shipment statuses. Send only the " +
   "fields you are changing.";
 
+const BUY_LABEL_BODY_HELP =
+  "Buying a label takes `parcel` — `weightGrams`, `lengthCm`, `widthCm` and " +
+  "`heightCm`, each a positive integer — and optionally `courierCompanyId`, a " +
+  "positive integer naming a courier from the serviceability quote. The " +
+  "consignee, the money and the pickup location come from the order.";
+
+/**
+ * A refusal the label purchase raised, as the response it maps to.
+ *
+ * Two vocabularies pass through here unchanged: the dispatch library's
+ * (`ShipmentDispatchError`, statuses from `DISPATCH_REFUSAL_STATUS`) and the
+ * courier client's (`ShiprocketError`, statuses from
+ * `SHIPROCKET_REFUSAL_STATUS`). Each names its code, and `ORDER_NOT_READY`
+ * carries every blocker so an admin is told which job has not passed QC
+ * rather than sent to hunt for it. Anything else is a fault and gets the
+ * fixed string.
+ */
+function dispatchRefusalOf(
+  error: unknown
+): { status: ContentfulStatusCode; body: Record<string, unknown> } | null {
+  if (error instanceof ShipmentDispatchError) {
+    return {
+      status: DISPATCH_REFUSAL_STATUS[error.code] as ContentfulStatusCode,
+      body: {
+        error: error.message,
+        code: error.code,
+        ...(error.blockers ? { blockers: error.blockers } : {}),
+        ...(error.shipmentId ? { shipmentId: error.shipmentId } : {}),
+      },
+    };
+  }
+  if (error instanceof ShiprocketError) {
+    return {
+      status: SHIPROCKET_REFUSAL_STATUS[error.code] as ContentfulStatusCode,
+      body: { error: error.message, code: error.code },
+    };
+  }
+  return null;
+}
+
 /**
  * What a caller is told when the shipments-list query string does not parse.
  *
@@ -1160,12 +1202,22 @@ const readyQueueSchema = z.object({
 /**
  * Schema for creating a shipment
  */
-const createShipmentSchema = z.object({
-  shippingOptionId: z.string().uuid().optional(),
-  trackingNumber: z.string().max(100).optional(),
-  carrier: z.string().min(1).max(100),
-  estimatedDeliveryAt: z.string().datetime().optional(),
-  notes: z.string().max(1000).optional(),
+/**
+ * What buying a label needs from the admin: the parcel, and at most a
+ * courier preference. Everything else — the consignee, the money, the pickup
+ * location — is the order's and the consolidator's, read by the library
+ * under its lock. Integer grams and centimetres, matching the columns they
+ * are stored in; the caps are a sanity bound on a fat-fingered field, not a
+ * carrier's limits.
+ */
+const buyLabelSchema = z.object({
+  parcel: z.object({
+    weightGrams: z.number().int().positive().max(50_000),
+    lengthCm: z.number().int().positive().max(300),
+    widthCm: z.number().int().positive().max(300),
+    heightCm: z.number().int().positive().max(300),
+  }),
+  courierCompanyId: z.number().int().positive().optional(),
 });
 
 /**
@@ -1799,12 +1851,12 @@ adminShipmentsApp.get("/:id", async (c) => {
 
 adminOrderShipmentsApp.post(
   "/orders/:orderId/ship",
-  zValidator("json", createShipmentSchema, (result, c) => {
+  zValidator("json", buyLabelSchema, (result, c) => {
     if (result.success) return;
 
     return c.json(
       {
-        error: SHIPMENT_BODY_HELP,
+        error: BUY_LABEL_BODY_HELP,
         code: "SHIPMENT_BODY_INVALID" satisfies AdminShipmentRefusalCode,
       },
       400
@@ -1819,221 +1871,73 @@ adminOrderShipmentsApp.post(
     }
 
     try {
-      // ONE transaction around the whole decision. As two independent
-      // statements, the insert and the order's status move let a throw between
-      // them leave an `order_shipments` row against an order still `confirmed`.
-      // See the header section on atomicity, and
-      // `every handler that writes both tables does it in one transaction`,
-      // which fails in both directions.
-      const created = await db.transaction(async (tx) => {
-        // Locked, because the status this reads is the status the write below
-        // repeats in its predicate. Without the lock two admins both read
-        // `confirmed`, both insert, and one order has two shipment rows — the
-        // partial unique index deliberately permits any number of UNLABELLED
-        // ones, so the database does not stop it.
-        const [order] = await tx
-          .select({
-            id: orders.id,
-            orderNumber: orders.orderNumber,
-            status: orders.status,
-          })
-          .from(orders)
-          .where(eq(orders.id, orderId))
-          .limit(1)
-          .for("update");
+      // The order-status gate stays HERE, ahead of the library, and reads the
+      // same list the ready queue filters on (`SHIPPABLE_ORDER_STATUSES`).
+      // Production readiness is the library's question, asked under its lock;
+      // whether this order is one that ships at all is this route's, and a
+      // cancelled order is refused before any lock is taken or any courier
+      // asked.
+      const [order] = await db
+        .select({
+          id: orders.id,
+          orderNumber: orders.orderNumber,
+          status: orders.status,
+        })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
 
-        if (!order) {
-          refuse(404, {
-            error: "Order not found",
-            code: "ORDER_NOT_FOUND",
-          });
-        }
-
-        // The list is the module constant, shared with the ready-to-label queue
-        // so the screen that offers an admin this work and the route that
-        // refuses it cannot disagree (#730).
-        if (!SHIPPABLE_ORDER_STATUSES.includes(order.status as OrderStatus)) {
-          refuse(400, {
-            // The status is named because the remedy depends on it, and it is
-            // the ADMIN's own order status — nothing here a caller does not
-            // already have from the orders list.
-            error: `Cannot create shipment for order with status '${order.status}'`,
-            code: "ORDER_NOT_SHIPPABLE",
-          });
-        }
-
-        // One live shipment per order, refused here rather than left to the
-        // database, which does not enforce it: `order_shipments_live_label_idx`
-        // is partial on `label_object_token IS NOT NULL`, so the SECOND
-        // unlabelled row is legal SQL (migration 0027). Refused HERE and not by
-        // hiding the order from the ready queue (#730): hiding it makes
-        // ready-to-label work vanish from the ready-to-label queue, and the
-        // only way back such an exclusion can name is a `voided_at` nothing in
-        // this repo writes. The exclusion belongs on the WRITE; the queue
-        // reports the row instead.
-        //
-        // What it costs if it is wrong: a second row means
-        // `services/notifications.ts` and `routes/tracking.ts` both resolve
-        // `created_at DESC, id DESC` and follow the NEWEST, so an AWB written
-        // onto the first shipment is invisible to the customer.
-        //
-        // ORDERED, and under `LIMIT 1` that is what makes the refusal name a
-        // row rather than a row the planner liked. It used to have no `ORDER
-        // BY`: on the legacy data that carries two open rows, the queue
-        // reported the newest and this refused over whichever came back first,
-        // so cancelling the row the screen named could be answered by a second
-        // refusal naming a row it never showed. `NEWEST_OPEN_SHIPMENT_FIRST` is
-        // the queue's own ranking, which is why the two now agree by
-        // construction instead of by coincidence.
-        const [openShipment] = await tx
-          .select({
-            id: orderShipments.id,
-            status: orderShipments.status,
-          })
-          .from(orderShipments)
-          .where(openShipmentsOf(eq(orderShipments.orderId, orderId)))
-          .orderBy(...NEWEST_OPEN_SHIPMENT_FIRST)
-          .limit(1)
-          .for("update");
-
-        if (openShipment) {
-          refuse(409, {
-            // The remedy travels with the refusal, and both halves of it are
-            // routes that exist: cancelling the open row is
-            // `PATCH /api/admin/shipments/:id {"status":"cancelled"}`, which is
-            // what `CLOSED_SHIPMENT_STATUSES` releases on. The open shipment's
-            // id is named because the caller is an admin acting on their own
-            // order and cannot act on a row they cannot address.
-            error: `This order already has an open shipment (${openShipment.id}, status '${openShipment.status}'). Update that one, or cancel it with PATCH /api/admin/shipments/${openShipment.id} before opening another.`,
-            code: "ORDER_ALREADY_HAS_SHIPMENT",
-          });
-        }
-
-        // Validate shipping option if provided
-        if (data.shippingOptionId) {
-          const optionResult = await tx
-            .select({ id: shippingOptions.id })
-            .from(shippingOptions)
-            .where(eq(shippingOptions.id, data.shippingOptionId))
-            .limit(1);
-
-          if (!optionResult.length) {
-            refuse(404, {
-              error: "Shipping option not found",
-              code: "SHIPPING_OPTION_NOT_FOUND",
-            });
-          }
-        }
-
-        // Generate tracking URL if tracking number provided
-        const trackingUrl = data.trackingNumber
-          ? generateTrackingUrl(data.carrier, data.trackingNumber)
-          : null;
-
-        const [newShipment] = await tx
-          .insert(orderShipments)
-          .values({
-            orderId,
-            shippingOptionId: data.shippingOptionId || null,
-            trackingNumber: data.trackingNumber || null,
-            carrier: data.carrier,
-            trackingUrl,
-            status: "pending",
-            estimatedDeliveryAt: data.estimatedDeliveryAt
-              ? new Date(data.estimatedDeliveryAt)
-              : null,
-            notes: data.notes || null,
-          })
-          .returning(SHIPMENT_RESPONSE_COLUMNS);
-
-        // Not a refusal: an INSERT ... RETURNING that inserted a row and
-        // returned none is a broken driver, not a race, and answering 409 would
-        // tell a client to retry something that cannot succeed. It throws, the
-        // transaction rolls back, and the catch answers a fixed 500.
-        if (!newShipment) {
-          throw new Error("insert into order_shipments returned no row");
-        }
-
-        // Predicate REPEATED, and the row count checked. The read above holds
-        // the lock, so the only way this matches nothing is that the row moved
-        // in a way the lock cannot cover — and a silent zero-row update is how
-        // a response says `orderStatusChanged: true` about a write that did not
-        // happen.
-        let orderStatusChanged = false;
-        if (order.status === "confirmed") {
-          const moved = await tx
-            .update(orders)
-            .set({
-              status: "processing",
-              updatedAt: new Date(),
-            })
-            .where(and(eq(orders.id, orderId), eq(orders.status, "confirmed")))
-            .returning({ id: orders.id });
-
-          if (moved.length !== 1) {
-            refuse(409, {
-              error: CONCURRENT_MODIFICATION_MESSAGE,
-              code: "CONCURRENT_MODIFICATION",
-            });
-          }
-
-          orderStatusChanged = true;
-        }
-
-        // Opening a shipment is what starts a customer being told their parcel
-        // is moving, and `order_shipments` is the store the tracking page
-        // reads. The floor `admin.request` row records that a POST happened; it
-        // does not record which carrier was chosen for whose order, which is
-        // the fact a support call or a carrier dispute actually turns on.
-        //
-        // WITH the `tx`, which is the rule `lib/audit.ts` states: share the
-        // transaction when the audit row would be a LIE if the business write
-        // rolled back. This row asserts a shipment exists. Writing it outside is
-        // only correct while the insert commits on its own; with the insert
-        // inside a transaction, a row written outside lets a rolled-back
-        // request keep an audit trail claiming it happened.
-        await recordAudit(
-          c,
-          {
-            action: "shipment.created",
-            entityType: "order_shipment",
-            entityId: newShipment.id,
-            summary: `Shipment opened for order ${order.orderNumber} with ${data.carrier}`,
-            after: {
-              carrier: data.carrier,
-              trackingNumber: newShipment.trackingNumber,
-              status: newShipment.status,
-            },
-            metadata: { orderId },
-          },
-          tx
+      if (!order) {
+        return c.json(
+          { error: "Order not found", code: "ORDER_NOT_FOUND" satisfies AdminShipmentRefusalCode },
+          404
         );
+      }
 
-        return { shipment: newShipment, orderStatusChanged };
-      });
+      if (!SHIPPABLE_ORDER_STATUSES.includes(order.status as OrderStatus)) {
+        return c.json(
+          {
+            error:
+              `Cannot ship order ${order.orderNumber} while it is '${order.status}'. Only an order that ` +
+              `is ${SHIPPABLE_ORDER_STATUSES.map((s) => `'${s}'`).join(" or ")} can be shipped.`,
+            code: "ORDER_NOT_SHIPPABLE" satisfies AdminShipmentRefusalCode,
+          },
+          400
+        );
+      }
+
+      // Everything from here is the library's: the lock, readiness under it,
+      // the claim, the courier, the label, the audit rows. This route turns
+      // its refusals into responses and never sees a label URL.
+      const purchase = await buyLabelForOrder(
+        orderId,
+        { parcel: data.parcel, ...(data.courierCompanyId ? { courierCompanyId: data.courierCompanyId } : {}) },
+        c
+      );
+
+      // Re-read through the response allow-list: the purchase result carries
+      // the token, the cost and the pickup vendor, and none of them leave.
+      const [shipment] = await db
+        .select(SHIPMENT_RESPONSE_COLUMNS)
+        .from(orderShipments)
+        .where(eq(orderShipments.id, purchase.shipmentId))
+        .limit(1);
 
       return c.json(
         {
-          message: "Shipment created successfully",
-          shipment: created.shipment,
-          // Stated rather than inferred, matching the other two write handlers:
-          // the order moves only from `confirmed`, and a screen that assumed it
-          // always moved would show `processing` beside an order still reading
-          // `confirmed`.
-          orderStatusChanged: created.orderStatusChanged,
+          message: purchase.resumed ? "Label purchase resumed" : "Label bought",
+          shipment: shipment ?? null,
+          pickup: purchase.pickup,
+          resumed: purchase.resumed,
         },
         201
       );
     } catch (error) {
-      // A typed refusal is an answer, not a fault: it was raised deliberately
-      // inside the transaction so the transaction would roll back, and the
-      // status and code it carries are the contract. Anything else is a fault
-      // and gets the fixed string.
-      const refusal = refusalOf(error);
+      const refusal = dispatchRefusalOf(error);
       if (refusal) return c.json(refusal.body, refusal.status);
 
-      logger.error({ err: error }, "admin shipments: failed to create shipment");
-      return c.json({ error: "Failed to create shipment" }, 500);
+      logger.error({ err: error, orderId }, "admin shipments: failed to buy label");
+      return c.json({ error: "Failed to buy the label" }, 500);
     }
   }
 );
@@ -2480,7 +2384,7 @@ export {
   adminShipmentsApp,
   adminOrderShipmentsApp,
   listShipmentsSchema,
-  createShipmentSchema,
+  buyLabelSchema,
   updateShipmentSchema,
   readyQueueSchema,
   SHIPPABLE_ORDER_STATUSES,
