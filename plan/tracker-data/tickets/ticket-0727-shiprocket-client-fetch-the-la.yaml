@@ -23,20 +23,72 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.614Z'
-last_updated: '2026-08-31T13:49:58.614Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T14:41:03.544Z'
+time_spent_minutes: 16
 labels:
   - shiprocket
   - api
   - pass-2
   - phase-6
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T14:25:14.909Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T14:40:43.214Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T14:41:01.308Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `56446831` - feat(shiprocket): fetch the label PDF as bytes and schedule the pickup
+
+      **Files Changed**:
+      - `packages/api/src/services/shiprocket.ts` - generateLabel, schedulePickup, LABEL_PDF_MAX_BYTES, three new refusal codes with classes (ShiprocketLabelRefusedError, ShiprocketLabelFetchFailedError, ShiprocketPickupNotScheduledError), LABEL_REFUSAL_CLAUSES and LABEL_ANSWER_CLAUSES enrolled in COURIER_WRITE_CLAUSES, "label" added to the already-exists subjects, header premises three → five
+      - `packages/api/tests/services/shiprocket-label-pickup.test.ts` - new, 36 tests
+      - `packages/api/tests/services/shiprocket-courier-writes.test.ts` - the module's total accounts (refusal producers, status pin, clause order, clause scenarios, adjacency proofs, export account) enrol the label's clauses and the three codes
+
+      **Design decisions, and what they answer**:
+      1. The label write goes through the same ordered clause tables as the create and the assign, because it is billed per request and so asks the same question ("was something minted?"). The pickup does NOT: it mints nothing, a repeated request is answered "already in pickup queue" (read as success), so its one refusal `SHIPROCKET_PICKUP_NOT_SCHEDULED` carries `retryable: true` and a non-answer is retryable too. Its message says the label is unaffected and never says void.
+      2. `heldLabelObjectToken` is a REQUIRED argument on generateLabel, the way the idempotency lookup is on the create: `null` means "I looked and there is none". A non-blank token sends nothing — not the label request, not the file fetch, not the login.
+      3. The URL never leaves the function: not in the outcome (bytes only), not in an error, not in a log. The PDF fetch sends NO bearer token to the third-party file host, refuses non-https, checks Content-Length against LABEL_PDF_MAX_BYTES before reading and the bytes after, and checks the %PDF- signature.
+      4. A label that exists but whose file did not arrive is `SHIPROCKET_LABEL_FETCH_FAILED` (502), its own class so phase 7 catches it by identity; every message says the label EXISTS so nobody buys a second one.
+      5. Two premises added to the header's list (now five): a second generate/label is billed again; the pickup's "already in pickup queue" wording.
+
+      **Ticket's three properties**:
+      - a label URL fetched and returned as bytes → "returns the PDF as bytes, fetched from the URL Shiprocket answered with"
+      - a second call short-circuiting on a held label_object_token → "sends NOTHING when the caller already holds a label token" with the paired control that no token DOES request
+      - a pickup failure leaving the label intact → "a failed pickup after a generated label makes no cancelling request and asks for a retry"
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/services/shiprocket-label-pickup.test.ts tests/services/shiprocket-courier-writes.test.ts`
+      - Result: PASS (217 tests: 36 + 181)
+      - Siblings: shiprocket-config, shiprocket-auth, shiprocket-serviceability, production-seam, audit-action-coverage, payload-echo-scrub → 114 passed
+      - `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → clean
+      - RED first: 34 failed | 0 passed against the unchanged client ("generateLabel is not a function")
+      - Falsification, each restored byte-identical (diff -q): held-token short-circuit removed → 1 failed | 35 passed; bearer token sent to the label host → 1 failed | 35 passed; already-exists clause blinded to label bodies → 2 failed in courier-writes
+      - No call reached apiv2.shiprocket.in: fetch stubbed, base URL and label host on reserved .invalid hosts, in-suite recorder assertion driven by the client itself
+
+      **For #728**: `generateLabel({ shipmentId, heldLabelObjectToken })` returns `{ generated: true, pdf }` or `{ generated: false, labelObjectToken }`; `schedulePickup({ shipmentId })` returns `{ scheduledFor, tokenNumber, alreadyScheduled }`. Catch `ShiprocketLabelFetchFailedError` as "label exists, file missing", and `ShiprocketPickupNotScheduledError.retryable` as "keep the label, retry the pickup".
+work_sessions:
+  - start: '2026-09-03T14:25:16.407Z'
+    agent: claude-code
+    summary: 'Built generateLabel and schedulePickup inline (subagent dispatch was failing on API 529s). RED 34 failed first, then GREEN: 217 tests across the two write suites, 114 across six siblings, tsc clean. Three guards falsified and restored byte-identical. Committed as 56446831.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T14:41:03.542Z'
+    duration: '00:15:47'
 related_tickets: []
 blocked_by:
   - ticket: 726
@@ -44,3 +96,14 @@ blocked_by:
     description: Shiprocket Client - Create the order and assign an AWB
 blocks: []
 attachments: []
+started: '2026-09-03T14:25:14.908Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:16:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:16:00'
+      tokens: 0
+completed: '2026-09-03T14:40:43.214Z'
