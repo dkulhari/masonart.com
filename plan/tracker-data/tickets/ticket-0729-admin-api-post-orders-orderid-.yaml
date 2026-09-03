@@ -26,12 +26,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.703Z'
-last_updated: '2026-08-31T13:49:58.703Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T15:36:35.586Z'
+time_spent_minutes: 9
 labels:
   - shiprocket
   - api
@@ -39,8 +39,48 @@ labels:
   - pass-2
   - phase-8
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T15:27:26.060Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T15:36:18.974Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T15:36:33.263Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a60e2549` - feat(shipments): POST /orders/:orderId/ship buys the label, gated on readiness
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/shipments.ts` - the ship handler now delegates to `buyLabelForOrder`; `buyLabelSchema` (parcel + optional courierCompanyId) replaces `createShipmentSchema`; `dispatchRefusalOf` maps `ShipmentDispatchError` through `DISPATCH_REFUSAL_STATUS` (blockers and shipmentId travel with the body) and `ShiprocketError` through `SHIPROCKET_REFUSAL_STATUS` (message intact); success re-reads the row through `SHIPMENT_RESPONSE_COLUMNS`; `ORDER_ALREADY_HAS_SHIPMENT` and `SHIPPING_OPTION_NOT_FOUND` pruned from the vocabulary (nothing emits them now); header prose corrected
+      - `packages/api/src/lib/shipment-dispatch.ts` - the actor is threaded into the claim so a row the purchase opens is audited `shipment.created` in the claim transaction (an admin opening one by hand always was)
+      - `packages/api/tests/routes/admin/shipments-ship.test.ts` - new, 24 tests: real `requireAuth`/`requireAdmin` with a mocked session (401/403), both id and body refusals, 404, ORDER_NOT_SHIPPABLE before the library, every refusal path with its own status/code/message, and a 201 that never carries the token, the cost, the pickup vendor or a URL
+      - `packages/api/tests/routes/admin/shipments.test.ts` - schema tests moved onto `buyLabelSchema`
+      - `packages/api/tests/routes/admin/shipments-ready-queue.test.ts` - the block over the old open-a-row handler removed (it drove the real library with no courier mock and pinned a refusal that no longer exists here); `PAIRED_WRITE_HANDLERS` is now the two handlers that still write both tables
+      - `packages/api/tests/lib/shipment-dispatch.test.ts` - pins the claim's read to the queue's ordering (`created_at desc, id desc`) so the row the queue shows is the row the write acts on; asserts the opened-row audit
+      - `packages/api/tests/database/shipment-dispatch-concurrency.test.ts` - audit expectations carry `shipment.created`
+
+      **One divergence from the ticket text, on purpose**: `SHIPROCKET_NOT_CONFIGURED` answers **422**, not 503. The courier client's `SHIPROCKET_REFUSAL_STATUS` (#726) is the single table for what a route answers each courier refusal with, argues 422 for configuration ("the caller can fix this and ask again"; 503 is reserved for "ask again in a moment"), and its suite pins the value. The message is the client's own and names the variables. If 503 is wanted, the change belongs in that table, once.
+
+      **Verification**:
+      - `bunx vitest run tests/routes/admin/shipments-ship.test.ts tests/routes/admin/shipments.test.ts tests/routes/admin/shipments-ready-queue.test.ts tests/routes/admin/shipments-audit.test.ts tests/routes/admin/shipments-status-propagation.test.ts tests/lib/shipment-dispatch.test.ts` → 265 passed
+      - `bunx vitest run tests/database/shipment-dispatch-concurrency.test.ts tests/lib/audit-action-coverage.test.ts` → 11 passed (live DB)
+      - `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → clean; pre-commit turbo typecheck 4/4
+work_sessions:
+  - start: '2026-09-03T15:27:27.615Z'
+    agent: claude-code
+    summary: Rewired POST /orders/:orderId/ship onto buyLabelForOrder with both refusal vocabularies mapped to statuses and blockers named; 24 route tests, 265 across the shipments suites, tsc clean. Committed as a60e2549.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T15:36:35.585Z'
+    duration: '00:09:07'
 related_tickets: []
 blocked_by:
   - ticket: 728
@@ -48,3 +88,14 @@ blocked_by:
     description: Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
 blocks: []
 attachments: []
+started: '2026-09-03T15:27:26.060Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:09:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:09:00'
+      tokens: 0
+completed: '2026-09-03T15:36:18.974Z'

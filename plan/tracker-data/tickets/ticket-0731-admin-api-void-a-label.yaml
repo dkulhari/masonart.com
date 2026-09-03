@@ -21,12 +21,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.807Z'
-last_updated: '2026-08-31T13:49:58.807Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T15:44:02.776Z'
+time_spent_minutes: 7
 labels:
   - shiprocket
   - api
@@ -34,8 +34,48 @@ labels:
   - pass-2
   - phase-8
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T15:36:36.280Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T15:43:44.730Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T15:44:01.237Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e5ef8a9c` - feat(shipments): void a label — cancel with the courier first, then mark the row
+
+      **Files Changed**:
+      - `packages/api/src/services/shiprocket.ts` - `cancelCourierShipment({ awb })` → POST /orders/cancel/shipment/awbs; `SHIPROCKET_CANCEL_REFUSED` (422) with `ShiprocketCancelRefusedError`. Not one of `COURIER_WRITE_CLAUSES`: a cancel is the write that unmints, so "already cancelled" is the goal met and reads as success, while a non-answer, a 5xx and an unreadable 200 are `ShiprocketWriteOutcomeUnknownError` (the caller must not void on a guess). The courier's reason travels in the refusal message — the one place in the client — scrubbed and capped, because a cancel payload is one AWB and cannot echo a customer.
+      - `packages/api/src/lib/shipment-dispatch.ts` - `voidLabel(shipmentId, reason, actor)`: refuses SHIPMENT_NOT_FOUND (404) / NOTHING_TO_VOID (409: already voided, never bought, or a claim with no waybill → "reconcile it"); asks the courier FIRST outside any transaction; then, in one transaction, sets voided_at/voided_reason/status cancelled guarded on `voided_at IS NULL` (0 rows → NOTHING_TO_VOID, courier not re-asked) and records `shipment.voided`. The order is not touched. The label object is not deleted (dispute evidence; the live-label predicate no longer picks it).
+      - `packages/api/src/routes/admin/shipments.ts` - POST /:id/void with `voidLabelSchema` (reason 3–500 chars, trimmed), refusals through `dispatchRefusalOf`, success re-read through the allow-list; listed in the header
+      - `packages/shared/src/schemas/audit-log.ts` - `shipment.voided` (fulfilment), emitted in the same change
+      - Tests: `tests/services/shiprocket-cancel.test.ts` (new, 10), `tests/routes/admin/shipments-void.test.ts` (new, 12), `voidLabel` cases in `tests/lib/shipment-dispatch.test.ts` (+9), the courier-writes accounts enrol the write/class/code, the queue suite's route accounts include `POST /:id/void`, and the live suite gains "a re-buy after a void is accepted"
+
+      **Ticket's three properties**: a successful void → "cancels with the courier by AWB, THEN marks the row voided, in one transaction with its audit row" (the cancel is observed with zero updates issued); a failed courier call leaving the row un-voided → both the refusal and the non-answer cases assert no update and no audit; a re-buy after a void accepted → the live-DB test buys, voids, buys again: two rows, one `cancelled` with `voided_at`, one `label_created`, `createdFresh` 2, the partial unique index allowing it. `tests/database/order-shipments-live-label.test.ts` → **5 tests, 5 passed** (the count, as asked).
+
+      **Verification**:
+      - `bunx vitest run tests/services/shiprocket-cancel.test.ts tests/routes/admin/shipments-void.test.ts tests/lib/shipment-dispatch.test.ts` → 69 passed (RED first: `voidLabel is not a function`, `cancelCourierShipment` not exported)
+      - `bunx vitest run tests/services/shiprocket-courier-writes.test.ts tests/services/shiprocket-label-pickup.test.ts tests/lib/audit-action-coverage.test.ts tests/routes/admin/shipments-ready-queue.test.ts tests/lib/audit-record.test.ts` → 383 passed
+      - `bunx vitest run tests/database/shipment-dispatch-concurrency.test.ts tests/database/order-shipments-live-label.test.ts` → 11 passed (live DB on :5440)
+      - `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → clean; pre-commit turbo typecheck 4/4
+      - Falsification, restored byte-identical: the row written BEFORE the courier is asked → 5 void tests fail (both "row is NOT marked voided" cases among them)
+work_sessions:
+  - start: '2026-09-03T15:36:37.110Z'
+    agent: claude-code
+    summary: Built cancelCourierShipment (client), voidLabel (library, courier-first), and POST /shipments/:id/void; 69 + 383 + 11 tests green incl. re-buy after void on the live DB; falsified the ordering. Committed as e5ef8a9c.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T15:44:02.775Z'
+    duration: '00:07:25'
 related_tickets: []
 blocked_by:
   - ticket: 728
@@ -43,3 +83,14 @@ blocked_by:
     description: Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
 blocks: []
 attachments: []
+started: '2026-09-03T15:36:36.280Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:07:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
+completed: '2026-09-03T15:43:44.730Z'
