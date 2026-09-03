@@ -3360,6 +3360,7 @@ describe('every handler that writes both tables does it in one transaction', () 
     expect(slices.map((slice) => slice.label).sort()).toEqual([
       'GET /',
       'GET /:id',
+      'GET /:id/label',
       'GET /ready',
       'PATCH /:id',
       'POST /:id/mark-delivered',
@@ -3961,6 +3962,10 @@ describe('the router', () => {
       'PATCH /:id',
       'POST /:id/mark-delivered',
       'POST /:id/void',
+      // Registered last, after every write: it is the one route here that
+      // answers bytes rather than JSON, and it sits at a depth `/:id` cannot
+      // shadow (#735).
+      'GET /:id/label',
     ])
   })
 })

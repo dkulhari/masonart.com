@@ -8,6 +8,7 @@
  *   PATCH /api/admin/shipments/:id                 status, tracking, carrier
  *   POST  /api/admin/shipments/:id/mark-delivered  close it out
  *   POST  /api/admin/shipments/:id/void            void the label (#731)
+ *   GET   /api/admin/shipments/:id/label           the label PDF, as bytes (#735)
  *
  * Every route requires an admin session; patterns from
  * docs/poster-app-tech-stack.md.
@@ -205,8 +206,10 @@ import {
   buyLabelForOrder,
   voidLabel,
   DISPATCH_REFUSAL_STATUS,
+  LABEL_OBJECT_PREFIX,
   ShipmentDispatchError,
 } from "../../lib/shipment-dispatch";
+import { getFile } from "../../lib/storage";
 import { ShiprocketError, SHIPROCKET_REFUSAL_STATUS } from "../../services/shiprocket";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { logger } from "../../lib/logger";
@@ -2449,6 +2452,115 @@ adminShipmentsApp.post(
     }
   }
 );
+
+// ============================================================================
+// GET /api/admin/shipments/:id/label - The label PDF, as bytes (#735)
+// ============================================================================
+
+/**
+ * The alphabet a label object token is minted in — base64url, nothing else.
+ * `lib/vendor-scope.ts` refuses to sign a token outside it for the same
+ * reason this route refuses to build a key from one: a stored value that
+ * somehow escaped the alphabet must never name a path.
+ */
+const LABEL_TOKEN_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/** What may follow `label-` in the download's filename; anything else is dropped. */
+const LABEL_FILENAME_HANDLE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * The label the courier will honour, as bytes, for the admin about to print
+ * it.
+ *
+ * Bytes and not a signed URL, and that is the whole design. The vendor portal's
+ * `GET /api/vendor/jobs/:id/label` answers a signature because a vendor's
+ * browser must fetch from storage directly; an admin's browser already holds
+ * a session this router trusts, so the bytes come through here with the cookie
+ * and nothing naming the object — no token, no key, no URL — ever reaches the
+ * screen. `packages/web/app/routes/admin/dispatch/$shipmentId.tsx` fetches it
+ * on a click and hands the file to the operating system in the same tick.
+ *
+ * ## The read comes first, and decides
+ *
+ * One narrow read — the token, the void mark and the AWB, never the row — and
+ * every miss ends the request BEFORE storage is asked. No such shipment is the
+ * file's own `SHIPMENT_NOT_FOUND`. No token, a voided label or a token outside
+ * its alphabet is a 404 that says there is no LIVE label: the two conditions
+ * are `getVendorJobLabelKey`'s, and a voided label is kept for disputes and
+ * not served, because the courier would refuse it at pickup.
+ *
+ * ## Not audited, on purpose
+ *
+ * The vendor route writes `production_job.label_issued` because the label is
+ * the ONE customer document that crosses to a supplier. An admin already sees
+ * the address on `GET /:id`; recording every print would be a row saying
+ * nothing that `shipment.label_issued` (the purchase) did not already say.
+ */
+adminShipmentsApp.get("/:id/label", async (c) => {
+  const shipmentId = c.req.param("id");
+
+  if (!shipmentId || !UUID_PATTERN.test(shipmentId)) {
+    return c.json(
+      { error: "Invalid shipment ID", code: "SHIPMENT_ID_INVALID" satisfies AdminShipmentRefusalCode },
+      400
+    );
+  }
+
+  try {
+    const [row] = await db
+      .select({
+        token: orderShipments.labelObjectToken,
+        voidedAt: orderShipments.voidedAt,
+        awbNumber: orderShipments.awbNumber,
+      })
+      .from(orderShipments)
+      .where(eq(orderShipments.id, shipmentId))
+      .limit(1);
+
+    if (!row) {
+      return c.json(
+        { error: "Shipment not found", code: "SHIPMENT_NOT_FOUND" satisfies AdminShipmentRefusalCode },
+        404
+      );
+    }
+
+    // Live, or nothing. A voided label and a never-bought one answer the same
+    // sentence because the remedy is the same: buy one.
+    if (row.token === null || row.voidedAt !== null || !LABEL_TOKEN_PATTERN.test(row.token)) {
+      return c.json(
+        {
+          error:
+            "This shipment has no live label. Either none was bought yet, or the " +
+            "label was voided — buy a new one from the dispatch queue.",
+        },
+        404
+      );
+    }
+
+    // Only now. Nothing above this line touched storage.
+    const bytes = await getFile(`${LABEL_OBJECT_PREFIX}${row.token}.pdf`);
+    if (!bytes) {
+      // The row says a label exists and storage has no bytes for it: ours to
+      // fix, and the fixed string is all the caller is told.
+      logger.error({ shipmentId }, "admin shipments: label object missing for a labelled row");
+      return c.json({ error: "Failed to read the label" }, 500);
+    }
+
+    const handle =
+      row.awbNumber && LABEL_FILENAME_HANDLE.test(row.awbNumber)
+        ? row.awbNumber
+        : shipmentId.slice(0, 8);
+
+    return c.body(new Uint8Array(bytes), 200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="label-${handle}.pdf"`,
+      "Cache-Control": "no-store",
+    });
+  } catch (error) {
+    logger.error({ err: error, shipmentId }, "admin shipments: failed to read label");
+    return c.json({ error: "Failed to read the label" }, 500);
+  }
+});
 
 export {
   adminShipmentsApp,
