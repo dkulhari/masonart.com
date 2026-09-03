@@ -1,0 +1,15 @@
+{
+  "id": "drawing-01",
+  "image": "room-drawing-01.webp",
+  "imageSize": [2816, 1536],
+  "wall": {
+    "quad": { "tl": [0.33, 0.055], "tr": [0.875, 0.15], "br": [0.875, 0.725], "bl": [0.33, 0.735] },
+    "widthCm": 375,
+    "heightCm": 250
+  },
+  "anchor": { "x": 0.52, "y": 0.37 },
+  "allowable": { "maxWidthCm": 110, "maxHeightCm": 130, "minMarginCm": 20 },
+  "view": { "yawDeg": -15 },
+  "light": { "direction": "left", "elevationDeg": 30, "softness": 0.6, "strength": 0.45 },
+  "label": "Drawing room, bare wall"
+}
