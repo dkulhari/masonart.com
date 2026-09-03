@@ -26,12 +26,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.984Z'
-last_updated: '2026-08-31T13:49:58.984Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T16:05:02.001Z'
+time_spent_minutes: 18
 labels:
   - shiprocket
   - web
@@ -39,8 +39,52 @@ labels:
   - pass-2
   - phase-10
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T15:46:39.593Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T16:04:45.535Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T16:05:02.001Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `6bc6b7c9` - feat(admin): dispatch queue with blockers on the row and a server-gated Ship
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/dispatch/index.tsx` - new: the /admin/dispatch screen. `dispatchSearchSchema` (coerced, caught, clamped; a malformed `scanAfter` is dropped rather than forwarded), `fetchDispatchQueue` over GET /api/admin/shipments/ready, `buyLabel` over POST /orders/:orderId/ship (never throws), `describeShipRefusal` (our sentence per refusal code), `DispatchQueueBody` (skeleton / error / empty / list, mutually exclusive, digit-free on error), rows with every blocker inline (a blocker naming a job links to /admin/production/$id) and Ship offered on `ready` only, a two-step parcel form whose Buy label disables on click and is ref-guarded so a double click posts once, page-level `DispatchReceipts` (AWB, courier, pointer to the shipment) that survive the reload dropping the row, and both pagination axes (`page` and `scanAfter`) in the URL
+      - `packages/web/app/lib/admin-nav.ts` - `DISPATCH_PAGE_SIZE`, `ADMIN_DISPATCH_SEARCH`; deliberately not in `CONTENT_MANAGER_ALLOWED_PREFIXES`
+      - `packages/web/app/components/admin/AdminSidebar.tsx` - "Dispatch" entry directly under Production (PackageCheck icon)
+      - `packages/web/app/routeTree.gen.ts` - registers `/admin/dispatch/`. It ALSO registers `/admin/dispatch/$shipmentId`, whose file is #735's in-flight work in the same working tree: the pre-commit typecheck needs the one generated tree to carry both routes, so #735's commit completes the pair
+      - `packages/web/tests/routes/admin/dispatch-queue.test.tsx` - new, 53 tests
+
+      **Summary**:
+      Ready rows offer Ship; blocked rows show every blocker the readiness seam named and offer no button. `SHIPROCKET_NOT_CONFIGURED` renders as a setup step in our words — names SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD, says nothing was charged, never the word outage — with the API's own sentence (which names exactly which variable is missing, no values) quoted beneath. Other codes: ORDER_NOT_READY renders the fresh blockers the purchase saw under its lock; ORDER_HAS_LIVE_LABEL / LABEL_PURCHASE_IN_PROGRESS point at the shipment; a request that never got an answer says whether money was spent is not known and why a retry is safe (the API refuses a second live label). An already-open shipment is reported on the row with a link to `/admin/dispatch/$shipmentId`.
+
+      **Verification**:
+      - `cd packages/web && bunx vitest run tests/routes/admin/dispatch-queue.test.tsx` → 53 passed (RED first: "Failed to resolve import ~/routes/admin/dispatch/index", 0 tests)
+      - `bunx vitest run tests/components/admin/AdminSidebar.test.tsx tests/lib/admin-nav-vendor-role.test.ts` → 29 passed (the nav href resolves against the generated tree, #603)
+      - `bunx tsc --noEmit` → clean; pre-commit turbo typecheck 4/4
+      - Rendered in the real app: a private pair (API :3734 on Postgres :5440, web :4734, both stopped afterwards), signed in as the seeded admin, /admin/dispatch — "70 orders in this view, 0 ready to ship"; each of page 1's 20 rows shows both blockers (`no_jobs`, `no_consolidator`) inline and no Ship button; sidebar entry present; "Page 1 of 4"; 0 console errors. The dev DB holds no ready order, so Ship, the double-click guard and the not-configured wording are verified by the route test rendering the page against a mocked fetch.
+
+      **Not done, deliberately**: a purchase that crashed between claim and finish (token + `status = 'pending'`) leaves this queue through the API's live-label predicate, as #728 warned. Surfacing those needs a route over `findUnfinishedLabelPurchases` / `reconcileLabelPurchase`, which this ticket does not add; the file header names the gap and where the section would go.
+
+      **For #735**: the three links to `/admin/dispatch/$shipmentId` in this file are plain anchors, because the route was not in the tree when this was written. Each becomes a typed `Link` in one line once the detail screen lands.
+work_sessions:
+  - start: '2026-09-03T15:46:40.660Z'
+    agent: claude-code
+    summary: Built /admin/dispatch (queue with blockers inline, Ship only on ready rows, two-step parcel form with a ref-guarded Buy label, page-level receipts, refusals in our words incl. SHIPROCKET_NOT_CONFIGURED as a setup step, both pagination axes in the URL), sidebar entry and admin-nav defaults, regenerated the route tree. 53 route tests + 29 nav tests green, tsc clean, rendered against the real API in a private browser session. Committed as 6bc6b7c9.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T16:04:44.824Z'
+    duration: '00:18:04'
 related_tickets: []
 blocked_by:
   - ticket: 729
@@ -51,3 +95,21 @@ blocked_by:
     description: Admin API - The ready-to-label queue
 blocks: []
 attachments: []
+started: '2026-09-03T15:46:39.593Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:18:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:18:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run tests/routes/admin/dispatch-queue.test.tsx; bunx vitest run tests/components/admin/AdminSidebar.test.tsx tests/lib/admin-nav-vendor-role.test.ts
+  test_output: '53 passed (dispatch-queue.test.tsx); 29 passed (AdminSidebar + admin-nav-vendor-role). Rendered in the real app on a private api/web pair: /admin/dispatch shows 70 orders, 0 ready, blockers inline on every row, no Ship button on blocked rows, 0 console errors.'
+  build_passed: true
+  build_command: cd packages/web && bunx tsc --noEmit (clean); pre-commit turbo typecheck 4/4
+  verified_at: '2026-09-03T16:04:41.830Z'
+completed: '2026-09-03T16:04:45.535Z'

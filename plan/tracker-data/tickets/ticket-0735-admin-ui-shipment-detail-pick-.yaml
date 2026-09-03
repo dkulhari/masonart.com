@@ -23,12 +23,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:59.027Z'
-last_updated: '2026-08-31T13:49:59.027Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T16:03:47.757Z'
+time_spent_minutes: 18
 labels:
   - shiprocket
   - web
@@ -36,8 +36,52 @@ labels:
   - pass-2
   - phase-10
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T15:45:41.319Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T16:03:15.636Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T16:03:47.757Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2ada6b86` - feat(admin): shipment detail — the courier as bought, the label as bytes, void with a reason
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/dispatch/$shipmentId.tsx` - new. The screen at `/admin/dispatch/$shipmentId`: three mutually exclusive states (error with retry / skeleton / loaded); `CourierPanel` is a one-row table (courier name, AWB, ETA) or a `role="status"` sentence for none; a "Going to" section from the order's `shippingAddress` (both shapes read defensively) plus the customer; `LabelPanel` shows the download BUTTON and `VoidLabelForm` only where `hasLiveLabel` (AWB present, status not `cancelled`), a "voided" status after a void, and a "no label yet" status before one. Exported pure halves: `hasLiveLabel`, `courierOf`, `addressLines`, `statusLabel`, `voidRefusalMessage`, `downloadShipmentLabel`.
+      - `packages/web/tests/routes/admin/dispatch-shipment.test.tsx` - new, 34 tests. Rendered with ONE courier and with NONE (body-level and full page against a mocked fetch); a fixture polluted with a signed `https://…?X-Amz-Signature=` tracking URL, and every state checked for `https://`, `X-Amz-Signature`, `blob:` and any `iframe, embed, object`, before and after the label click; the label fetches nothing on render, fetches `GET /api/admin/shipments/:id/label` with `credentials: 'include'` on the click, hands a `blob:` URL to a detached anchor with `download=label-<awb>.pdf`, and leaves no `a[href^="blob:"]` behind; a 404 offers no link fallback; the void form's hint is outside the `<label>` and reachable through `aria-describedby` (`getByLabelText('Reason')` resolves on the word alone), submit is disabled below the 3-char floor, the whole form disables in flight, the trimmed reason is POSTed with the session, and each refusal (422 courier reason kept verbatim, 409 unknown outcome "NOT marked void… check the dashboard", 409 nothing-to-void "reload") is rendered.
+      - `packages/api/src/routes/admin/shipments.ts` - the ONE api change, appended after the void handler and listed in the header: `GET /:id/label`. UUID guard as every `:id` route here; one narrow read (`labelObjectToken`, `voidedAt`, `awbNumber`) for the row; 404 `SHIPMENT_NOT_FOUND` for no row, an uncoded 404 "no live label" for never-bought / voided / a token outside `[A-Za-z0-9_-]`; only THEN `getFile(\`${LABEL_OBJECT_PREFIX}${token}.pdf\`)`; answers the bytes as `application/pdf`, `Content-Disposition: attachment; filename="label-<awb|id8>.pdf"`, `Cache-Control: no-store`; storage miss and any throw are the fixed `500 Failed to read the label`, no code. Not audited on purpose (argued in the doc comment: an admin already sees the address on `GET /:id`; a new audit action would be a shared-schema change).
+      - `packages/api/tests/routes/admin/shipments-label.test.ts` - new, 12 tests with the query recorder: real `requireAuth`/`requireAdmin` (401/403 with no read and no fetch), 400 before any query, every 404 path proving `getFile` was never asked, the read's exact projection and bound id, the bytes verbatim with the three headers, the key handed to storage, no token/key/URL in the headers, the filename fallback, the two 500s.
+      - `packages/api/tests/routes/admin/shipments-ready-queue.test.ts` - `GET /:id/label` added to the sorted handler-slice list and to the router's registration account (last, after every write).
+
+      **Design notes, and two things to know**:
+      - **There is no courier picker, by design.** The ticket title says "pick a courier", but no admin route lists serviceability options today — `checkServiceability` is called inside `buyLabelForOrder`, and the live account offers exactly one courier anyway (#725). The screen is built around the row AS BOUGHT (courier, AWB, status). If a picker before buying is ever wanted, it needs a read-only quote route first (e.g. `GET /api/admin/orders/:orderId/courier-options`), and the panel here is a table already shaped to take more than one row.
+      - **The pickup outcome from the purchase response is not shown here**: the purchase happens from the queue (#734), and the detail read carries no pickup fields. It belongs on the queue's post-buy message.
+      - **The courier's `trackingUrl` is not rendered** (link or text): the done-when asks for no `https://` in the DOM, the AWB is the handle an admin chases with, and the customer tracking page carries the link.
+      - **The uncoded 404**: `LABEL_NOT_FOUND` belongs in `ADMIN_SHIPMENT_REFUSAL_CODES`, but adding it means touching the vocabulary block mid-file, which this ticket was scoped away from. One-line follow-up if wanted; the screen does not key on the code.
+      - **Back link to the queue is a plain `<a href="/admin/dispatch">`**, not a typed `Link`: #734's route was landing concurrently and a `Link` to a path the tree did not yet know does not compile. Now that `6bc6b7c9` has landed, swapping it for `<Link to="/admin/dispatch">` is a one-liner.
+      - `packages/web/app/routeTree.gen.ts` was regenerated with the plugin's own generator version (1.167.21); #734's commit `6bc6b7c9` carried it (both dispatch routes), so it has no diff in this commit. HEAD's tree imports `./routes/admin/dispatch/$shipmentId`.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/admin/dispatch-shipment.test.tsx` → PASS, **34 passed** (RED first: "Failed to resolve import ~/routes/admin/dispatch/$shipmentId")
+      - Command: `cd packages/api && bunx vitest run tests/routes/admin/shipments-label.test.ts tests/routes/admin/shipments-ready-queue.test.ts tests/routes/route-shadowing.test.ts tests/routes/admin/shipments.test.ts` → PASS, **4 files, 184 passed** (RED first: 9 of 12 label tests failing on 404s where the route did not exist)
+      - `cd packages/web && bunx tsc --noEmit` → exit 0; `cd packages/api && bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → exit 0; pre-commit turbo typecheck 4/4.
+work_sessions:
+  - start: '2026-09-03T15:45:42.822Z'
+    agent: claude-code
+    summary: Built /admin/dispatch/$shipmentId (courier as bought — one row or none, address, label download as bytes through our API, void with a required reason) plus the read-only GET /api/admin/shipments/:id/label route and its query-recorder suite. web 34 tests, api 184 tests across the touched suites, both typechecks clean. Commit 2ada6b86.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T16:03:15.327Z'
+    duration: '00:17:32'
 related_tickets: []
 blocked_by:
   - ticket: 729
@@ -48,3 +92,21 @@ blocked_by:
     description: Admin API - Void a label
 blocks: []
 attachments: []
+started: '2026-09-03T15:45:41.319Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:18:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:18:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run tests/routes/admin/dispatch-shipment.test.tsx; cd packages/api && bunx vitest run tests/routes/admin/shipments-label.test.ts tests/routes/admin/shipments-ready-queue.test.ts tests/routes/route-shadowing.test.ts tests/routes/admin/shipments.test.ts
+  test_output: 'web: 34 passed (34); api: 4 files, 184 passed (184)'
+  build_passed: true
+  build_command: 'packages/web: bunx tsc --noEmit (exit 0); packages/api: bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit (exit 0)'
+  verified_at: '2026-09-03T16:01:58.728Z'
+completed: '2026-09-03T16:03:15.636Z'
