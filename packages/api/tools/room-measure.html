@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room measure</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font: 13px/1.4 system-ui, sans-serif; background: #111; color: #ddd; }
+  body { display: flex; }
+  #stage { flex: 1; overflow: auto; background: #222; padding: 8px; position: relative; }
+  #hint { position: absolute; top: 12px; left: 12px; color: #888; }
+  canvas { display: block; cursor: crosshair; }
+  #panel { width: 320px; flex: none; overflow-y: auto; background: #1a1a1a; border-left: 1px solid #333; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  h1 { font-size: 15px; margin: 0; }
+  label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  input, select, textarea, button { font: inherit; }
+  input[type=number], input[type=text], select { width: 140px; background: #0d0d0d; color: #eee; border: 1px solid #444; padding: 3px 5px; }
+  input[type=file] { width: 190px; color: #aaa; }
+  textarea { width: 100%; height: 240px; font: 11px/1.3 ui-monospace, Menlo, Consolas, monospace; background: #0d0d0d; color: #cfc; border: 1px solid #444; resize: vertical; }
+  button { background: #333; color: #eee; border: 1px solid #555; padding: 5px 8px; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  fieldset { border: 1px solid #333; padding: 6px 8px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  legend { color: #999; padding: 0 4px; }
+  #checks { list-style: none; margin: 0; padding: 0; }
+  #checks li.ok { color: #6c6; }
+  #checks li.bad { color: #e66; }
+  .row { display: flex; gap: 8px; }
+  .step { font-weight: 600; color: #ffd166; min-height: 1.4em; }
+  .muted { color: #888; }
+  .warn { color: #f90; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main id="stage">
+  <div id="hint">Load a room photo from the panel on the right.</div>
+  <canvas id="c" width="0" height="0"></canvas>
+</main>
+<aside id="panel">
+  <h1>Room measure</h1>
+  <label>Image <input type="file" id="imgFile" accept="image/*"></label>
+  <div id="imgInfo" class="muted">no image loaded</div>
+  <div id="step" class="step"></div>
+  <div class="row"><button id="resetBtn" type="button">Reset corners</button></div>
+  <fieldset><legend>Scene</legend>
+    <label>id <input id="f-id" type="text" value="01" pattern="[a-z0-9-]+"></label>
+    <label>label <input id="f-label" type="text" value="" placeholder="Living room"></label>
+  </fieldset>
+  <fieldset><legend>Wall (cm)</legend>
+    <label>widthCm <input id="f-widthCm" type="number" value="320" step="1"></label>
+    <label>heightCm <input id="f-heightCm" type="number" value="260" step="1"></label>
+  </fieldset>
+  <fieldset><legend>Anchor (0..1 across the wall)</legend>
+    <label>anchor.x <input id="f-anchorX" type="number" value="0.5" step="0.01" min="0" max="1"></label>
+    <label>anchor.y <input id="f-anchorY" type="number" value="0.42" step="0.01" min="0" max="1"></label>
+  </fieldset>
+  <fieldset><legend>Allowable (cm)</legend>
+    <label>maxWidthCm <input id="f-maxWidthCm" type="number" value="120" step="1"></label>
+    <label>maxHeightCm <input id="f-maxHeightCm" type="number" value="150" step="1"></label>
+    <label>minMarginCm <input id="f-minMarginCm" type="number" value="25" step="1"></label>
+  </fieldset>
+  <fieldset><legend>View</legend>
+    <label>yawDeg <input id="f-yawDeg" type="number" value="-25" step="1"></label>
+  </fieldset>
+  <fieldset><legend>Light</legend>
+    <label>direction <select id="f-lightDir"><option value="left" selected>left</option><option value="right">right</option></select></label>
+    <label>elevationDeg <input id="f-elevationDeg" type="number" value="35" step="1"></label>
+    <label>softness <input id="f-softness" type="number" value="0.6" step="0.05" min="0" max="1"></label>
+    <label>strength <input id="f-strength" type="number" value="0.45" step="0.05" min="0" max="1"></label>
+  </fieldset>
+  <ul id="checks"></ul>
+  <div class="row"><button id="copyBtn" type="button">Copy JSON</button><button id="dlBtn" type="button" disabled>Download room-01.json</button></div>
+  <textarea id="out" readonly spellcheck="false"></textarea>
+  <label>Load JSON <input type="file" id="jsonFile" accept=".json,application/json"></label>
+  <div id="warn" class="warn"></div>
+</aside>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+const NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+const KEYS = ['tl', 'tr', 'br', 'bl'];
+const F = {};
+document.querySelectorAll('[id^="f-"]').forEach(el => {
+  F[el.id.slice(2)] = el;
+  el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', update);
+});
+
+let img = null, imgName = '', natW = 0, natH = 0, scale = 1, dpr = 1;
+let corners = [];            // [[nx, ny], ...] normalised 0..1 against the natural image size
+let dragging = -1, selected = -1;
+let jsonImage = null;        // { name, size } from a loaded scene JSON
+let note = '';
+
+const clamp = v => Math.min(1, Math.max(0, v));
+const num = k => { const v = parseFloat(F[k].value); return Number.isFinite(v) ? v : 0; };
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+function fields() {
+  return {
+    id: F.id.value.trim(), label: F.label.value, widthCm: num('widthCm'), heightCm: num('heightCm'),
+    anchorX: num('anchorX'), anchorY: num('anchorY'),
+    maxWidthCm: num('maxWidthCm'), maxHeightCm: num('maxHeightCm'), minMarginCm: num('minMarginCm'),
+    yawDeg: num('yawDeg'), lightDir: F.lightDir.value, elevationDeg: num('elevationDeg'),
+    softness: num('softness'), strength: num('strength'),
+  };
+}
+
+// ---- homography: 4 src points -> 4 dst points, DLT solved by Gaussian elimination with partial pivoting
+function homography(src, dst) {
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const [sx, sy] = src[i], [dx, dy] = dst[i];
+    A.push([sx, sy, 1, 0, 0, 0, -sx * dx, -sy * dx]); b.push(dx);
+    A.push([0, 0, 0, sx, sy, 1, -sx * dy, -sy * dy]); b.push(dy);
+  }
+  const n = 8;
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    if (Math.abs(A[p][c]) < 1e-9) return null;               // degenerate quad
+    [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+    for (let r = c + 1; r < n; r++) {
+      const f = A[r][c] / A[c][c];
+      for (let k = c; k < n; k++) A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  const h = new Array(9);
+  for (let r = n - 1; r >= 0; r--) {
+    let s = b[r];
+    for (let k = r + 1; k < n; k++) s -= A[r][k] * h[k];
+    h[r] = s / A[r][r];
+  }
+  h[8] = 1;
+  return h;
+}
+function applyH(h, x, y) {
+  const w = h[6] * x + h[7] * y + h[8];
+  return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w];
+}
+
+function imageSize() { return img ? [natW, natH] : jsonImage ? jsonImage.size : [0, 0]; }
+function imageName() { return img ? imgName : jsonImage ? jsonImage.name : ''; }
+
+// wall cm (0,0),(W,0),(W,H),(0,H) -> corner positions in natural image pixels
+function wallHomography(f) {
+  const [W, H] = imageSize();
+  if (corners.length < 4 || !W || !H) return null;
+  const src = [[0, 0], [f.widthCm, 0], [f.widthCm, f.heightCm], [0, f.heightCm]];
+  return homography(src, corners.map(c => [c[0] * W, c[1] * H]));
+}
+
+// ---- checks (mirror the renderer's rules)
+function runChecks(f) {
+  const out = [];
+  out.push({ ok: /^[a-z0-9-]+$/.test(f.id), text: 'id matches ^[a-z0-9-]+$' });
+  if (corners.length < 4) { out.push({ ok: false, text: 'four corners placed' }); return out; }
+  // winding: cross products of consecutive edges must all be > 0 (same turn as the unit square, y down)
+  const e = corners.map((p, i) => { const n = corners[(i + 1) % 4]; return [n[0] - p[0], n[1] - p[1]]; });
+  const cs = e.map((v, i) => { const n = e[(i + 1) % 4]; return v[0] * n[1] - v[1] * n[0]; });
+  const collinear = cs.some(c => Math.abs(c) < 1e-9);
+  const pos = cs.filter(c => c > 0).length, neg = cs.filter(c => c < 0).length;
+  let wt = 'winding tl→tr→br→bl';
+  if (collinear) wt += ' — collinear corners';
+  else if (pos && neg) wt += ' — self-intersecting';
+  else if (neg === 4) wt += ' — reversed (wrong direction)';
+  out.push({ ok: !collinear && pos === 4, text: wt });
+  // yaw vs quad
+  const [tl, tr, br, bl] = corners;
+  const left = dist(tl, bl), right = dist(tr, br);
+  const diff = (left - right) / Math.max(left, right);
+  let yawOk, yt;
+  if (Math.abs(f.yawDeg) < 0.5) {
+    yawOk = Math.abs(diff) <= 0.01 && Math.abs(tl[1] - tr[1]) <= 0.005 && Math.abs(bl[1] - br[1]) <= 0.005
+      && Math.abs(tl[0] - bl[0]) <= 0.005 && Math.abs(tr[0] - br[0]) <= 0.005;
+    yt = 'yaw ≈ 0: quad is a rectangle';
+  } else if (f.yawDeg < 0) { yawOk = diff >= 0.01; yt = 'yaw < 0: left edge longer'; }
+  else { yawOk = -diff >= 0.01; yt = 'yaw > 0: right edge longer'; }
+  out.push({ ok: yawOk, text: `${yt} (diff ${diff.toFixed(3)})` });
+  // margin
+  const m = f.minMarginCm, cx = f.anchorX * f.widthCm, cy = f.anchorY * f.heightCm;
+  const rx = cx - f.maxWidthCm / 2, ry = cy - f.maxHeightCm / 2;
+  const marginOk = rx >= m && ry >= m && rx + f.maxWidthCm <= f.widthCm - m && ry + f.maxHeightCm <= f.heightCm - m;
+  out.push({ ok: marginOk, text: `allowable box inside ${m} cm margin` });
+  // pixel floor: longer of the max rect's top/bottom edge in natural pixels
+  const H = wallHomography(f);
+  if (!H) { out.push({ ok: false, text: 'homography: degenerate quad (pivot < 1e-9)' }); return out; }
+  const p = [[rx, ry], [rx + f.maxWidthCm, ry], [rx + f.maxWidthCm, ry + f.maxHeightCm], [rx, ry + f.maxHeightCm]]
+    .map(q => applyH(H, q[0], q[1]));
+  const px = Math.max(dist(p[0], p[1]), dist(p[3], p[2]));
+  out.push({ ok: px >= 400, text: `max rect edge ≥ 400 px (${px.toFixed(0)} px)` });
+  return out;
+}
+
+// ---- JSON
+function buildJson(f) {
+  const r4 = v => Math.round(v * 1e4) / 1e4;
+  const quad = {};
+  KEYS.forEach((k, i) => { if (corners[i]) quad[k] = [r4(corners[i][0]), r4(corners[i][1])]; });
+  const yaw = f.yawDeg;
+  const scene = {
+    id: f.id, image: imageName(), imageSize: imageSize().map(Math.round),
+    wall: { quad, widthCm: f.widthCm, heightCm: f.heightCm },
+    anchor: { x: f.anchorX, y: f.anchorY },
+    allowable: { maxWidthCm: f.maxWidthCm, maxHeightCm: f.maxHeightCm, minMarginCm: f.minMarginCm },
+    view: { yawDeg: yaw, nearSide: yaw < -0.5 ? 'left' : yaw > 0.5 ? 'right' : 'none' },
+    light: { direction: f.lightDir, elevationDeg: f.elevationDeg, softness: f.softness, strength: f.strength },
+  };
+  if (f.label.trim()) scene.label = f.label.trim();
+  return JSON.stringify(scene, null, 2);
+}
+
+function sizeWarning() {
+  if (!img || !jsonImage) return '';
+  const [w, h] = jsonImage.size;
+  return (w !== natW || h !== natH)
+    ? `Warning: loaded JSON says imageSize ${w}×${h} but the image is ${natW}×${natH}. Output uses the image.` : '';
+}
+
+// ---- drawing
+const toScreen = c => [c[0] * natW * scale, c[1] * natH * scale];
+function poly(pts, close) {
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  if (close) ctx.closePath();
+  ctx.stroke();
+}
+function draw(f) {
+  if (!img) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, natW * scale, natH * scale);
+  const H = corners.length === 4 ? wallHomography(f) : null;
+  if (H) {
+    const P = (x, y) => { const p = applyH(H, x, y); return [p[0] * scale, p[1] * scale]; };
+    const W = f.widthCm, Hc = f.heightCm;
+    ctx.lineWidth = 1; ctx.setLineDash([]); ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    if ((W + Hc) / 10 < 4000) {                                  // 10 cm grid in wall space
+      for (let x = 0; x <= W; x += 10) poly([P(x, 0), P(x, Hc)]);
+      for (let y = 0; y <= Hc; y += 10) poly([P(0, y), P(W, y)]);
+    }
+    const m = f.minMarginCm;                                     // margin inset, dashed grey
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(200,200,200,0.9)';
+    poly([P(m, m), P(W - m, m), P(W - m, Hc - m), P(m, Hc - m)], true);
+    const cx = f.anchorX * W, cy = f.anchorY * Hc, hw = f.maxWidthCm / 2, hh = f.maxHeightCm / 2;
+    ctx.strokeStyle = '#ff9f1c'; ctx.lineWidth = 1.5;            // allowable box, dashed orange
+    poly([P(cx - hw, cy - hh), P(cx + hw, cy - hh), P(cx + hw, cy + hh), P(cx - hw, cy + hh)], true);
+    ctx.setLineDash([]);                                         // anchor cross
+    const a = P(cx, cy);
+    poly([[a[0] - 8, a[1]], [a[0] + 8, a[1]]]); poly([[a[0], a[1] - 8], [a[0], a[1] + 8]]);
+  }
+  const S = corners.map(toScreen);
+  if (S.length) {
+    ctx.setLineDash([]); ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = 2;
+    poly(S, S.length === 4);
+    ctx.font = 'bold 12px sans-serif';
+    S.forEach((p, i) => {
+      ctx.beginPath(); ctx.arc(p[0], p[1], 6, 0, Math.PI * 2);
+      ctx.fillStyle = i === selected ? '#ffd166' : '#3ddc84'; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(String(i + 1), p[0] + 9, p[1] - 9);
+    });
+  }
+}
+
+function fit() {
+  if (!img) return;
+  dpr = window.devicePixelRatio || 1;
+  const avail = Math.max(200, window.innerWidth - 320 - 16);
+  scale = avail / natW;
+  const w = Math.round(natW * scale), h = Math.round(natH * scale);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+}
+
+function update() {
+  const f = fields();
+  const ready = corners.length === 4;
+  $('step').textContent = !img ? (jsonImage ? 'Load the image to see the overlay' : 'Load an image to begin')
+    : ready ? 'Drag a corner to adjust · arrow keys nudge the selected corner (shift ×10)'
+    : `Click ${NAMES[corners.length]} corner …`;
+  $('checks').innerHTML = runChecks(f).map(c => `<li class="${c.ok ? 'ok' : 'bad'}">${c.ok ? '✓' : '✗'} ${c.text}</li>`).join('');
+  $('out').value = buildJson(f);
+  $('dlBtn').disabled = !ready;
+  $('dlBtn').textContent = `Download room-${f.id}.json`;
+  $('warn').textContent = [note, sizeWarning()].filter(Boolean).join('\n');
+  draw(f);
+}
+
+// ---- image / JSON loading
+$('imgFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    img = im; imgName = file.name; natW = im.naturalWidth; natH = im.naturalHeight;
+    $('imgInfo').textContent = `${file.name} — natural size ${natW} × ${natH} px`;
+    $('hint').hidden = true;
+    fit(); update(); URL.revokeObjectURL(url);
+  };
+  im.onerror = () => { $('imgInfo').textContent = 'Could not decode that image.'; URL.revokeObjectURL(url); };
+  im.src = url;
+});
+
+$('jsonFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  file.text().then(text => {
+    let d;
+    try { d = JSON.parse(text); } catch (err) { note = 'Load JSON failed: ' + err.message; update(); return; }
+    const set = (k, v) => { if (v !== undefined && v !== null) F[k].value = v; };
+    set('id', d.id); set('label', d.label || '');
+    if (d.wall) {
+      set('widthCm', d.wall.widthCm); set('heightCm', d.wall.heightCm);
+      const q = d.wall.quad;
+      if (q && KEYS.every(k => Array.isArray(q[k]))) corners = KEYS.map(k => [clamp(+q[k][0]), clamp(+q[k][1])]);
+    }
+    if (d.anchor) { set('anchorX', d.anchor.x); set('anchorY', d.anchor.y); }
+    if (d.allowable) { set('maxWidthCm', d.allowable.maxWidthCm); set('maxHeightCm', d.allowable.maxHeightCm); set('minMarginCm', d.allowable.minMarginCm); }
+    if (d.view) set('yawDeg', d.view.yawDeg);
+    if (d.light) { set('lightDir', d.light.direction); set('elevationDeg', d.light.elevationDeg); set('softness', d.light.softness); set('strength', d.light.strength); }
+    jsonImage = { name: d.image || '', size: Array.isArray(d.imageSize) ? d.imageSize.map(Number) : [0, 0] };
+    note = `Loaded ${file.name}`; selected = -1; dragging = -1; update();
+  });
+});
+
+// ---- mouse: click to place (until 4), then mousedown within 12 px of a corner drags it
+function evPos(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function toNorm(p) { return [clamp(p[0] / (natW * scale)), clamp(p[1] / (natH * scale))]; }
+function nearCorner(p) {
+  let best = -1, bd = 12;
+  corners.forEach((c, i) => { const d = dist(toScreen(c), p); if (d <= bd) { bd = d; best = i; } });
+  return best;
+}
+canvas.addEventListener('mousedown', e => {
+  if (!img || corners.length < 4) return;
+  const i = nearCorner(evPos(e));
+  if (i >= 0) { dragging = selected = i; e.preventDefault(); update(); }
+});
+window.addEventListener('mousemove', e => {
+  if (dragging < 0) return;
+  corners[dragging] = toNorm(evPos(e)); update();
+});
+window.addEventListener('mouseup', () => { dragging = -1; });
+canvas.addEventListener('click', e => {
+  if (!img || corners.length >= 4) return;
+  corners.push(toNorm(evPos(e))); selected = corners.length - 1; update();
+});
+
+// ---- keyboard: Escape resets an in-progress click sequence; arrows nudge the selected corner by 1 natural px (shift = 10)
+window.addEventListener('keydown', e => {
+  const t = document.activeElement, typing = t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+  if (e.key === 'Escape') {
+    if (typing) t.blur();
+    else if (corners.length > 0 && corners.length < 4) { corners = []; selected = -1; update(); }
+    return;
+  }
+  if (typing || selected < 0 || !corners[selected]) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (!d) return;
+  e.preventDefault();
+  const step = e.shiftKey ? 10 : 1, [W, H] = imageSize(), c = corners[selected];
+  corners[selected] = [clamp(c[0] + d[0] * step / W), clamp(c[1] + d[1] * step / H)];
+  update();
+});
+
+// ---- buttons
+$('resetBtn').addEventListener('click', () => { corners = []; selected = -1; dragging = -1; update(); });
+$('copyBtn').addEventListener('click', () => {
+  const out = $('out');
+  const fallback = () => { out.focus(); out.select(); document.execCommand('copy'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(out.value).catch(fallback);
+  else fallback();
+});
+$('dlBtn').addEventListener('click', () => {
+  const blob = new Blob([$('out').value], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `room-${fields().id}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+window.addEventListener('resize', () => { fit(); update(); });
+update();
+</script>
+</body>
+</html>
