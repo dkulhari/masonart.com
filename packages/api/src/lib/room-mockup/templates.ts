@@ -64,19 +64,30 @@ export const frameRenderSchema = z.object({
    * is the ONLY cue for depth, and a zero here would flatten it completely.
    */
   depthRatio: z.number().gt(0).max(0.2),
+  /**
+   * Front face width in centimetres. The room scene is measured in cm, so
+   * the face is drawn at its real size on the wall — 18 mm black, 32 mm oak —
+   * rather than as a fraction of the art. 0 = gallery-wrap: no face, no mat,
+   * art to the edge.
+   */
+  widthCm: z.number().min(0).max(12),
+  /**
+   * How far the piece stands off the wall, in centimetres. Drives the width
+   * of the extruded side face and how far the shadow falls. Must be greater
+   * than zero for the same reason as depthRatio.
+   */
+  depthCm: z.number().gt(0).max(12),
 });
 
 export interface FrameRender {
   widthRatio: number;
   color: [number, number, number];
   depthRatio: number;
+  widthCm: number;
+  depthCm: number;
 }
 
-export function loadTemplates(
-  rawTemplates: unknown,
-  rawFrames: unknown,
-  fileExists: (file: string) => boolean
-): { templates: RoomTemplate[]; frames: Record<string, FrameRender> } {
+export function loadFrames(rawFrames: unknown): Record<string, FrameRender> {
   const frameEntries = z.record(z.string(), z.unknown()).parse(rawFrames);
   const frames: Record<string, FrameRender> = {};
 
@@ -89,6 +100,16 @@ export function loadTemplates(
     }
     frames[slug] = parsed.data as FrameRender;
   }
+
+  return frames;
+}
+
+export function loadTemplates(
+  rawTemplates: unknown,
+  rawFrames: unknown,
+  fileExists: (file: string) => boolean
+): { templates: RoomTemplate[]; frames: Record<string, FrameRender> } {
+  const frames = loadFrames(rawFrames);
 
   const list = z.array(z.unknown()).parse(rawTemplates);
   if (list.length === 0) {

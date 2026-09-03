@@ -8,11 +8,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { loadTemplates } from '../../../src/lib/room-mockup/templates';
+import { loadFrames, loadTemplates } from '../../../src/lib/room-mockup/templates';
 
 const FRAMES = {
-  oak: { widthRatio: 0.032, color: [178, 141, 94], depthRatio: 0.024 },
-  frameless: { widthRatio: 0, color: [0, 0, 0], depthRatio: 0.03 },
+  oak: { widthRatio: 0.032, color: [178, 141, 94], depthRatio: 0.024, widthCm: 3.2, depthCm: 3 },
+  frameless: { widthRatio: 0, color: [0, 0, 0], depthRatio: 0.03, widthCm: 0, depthCm: 3.8 },
 };
 
 const template = (over: Record<string, unknown> = {}) => ({
@@ -114,14 +114,43 @@ describe('loadTemplates', () => {
   });
 
   it('rejects a frame render whose colour channel is out of range', () => {
-    const bad = { oak: { widthRatio: 0.03, color: [300, 0, 0], depthRatio: 0.02 } };
+    const bad = { oak: { widthRatio: 0.03, color: [300, 0, 0], depthRatio: 0.02, widthCm: 3, depthCm: 3 } };
 
     expect(() => loadTemplates([template()], bad, allExist)).toThrow(/oak/);
   });
 
   it('rejects a frame render with zero depth — every hung object stands off the wall', () => {
-    const bad = { oak: { widthRatio: 0.03, color: [1, 2, 3], depthRatio: 0 } };
+    const bad = { oak: { widthRatio: 0.03, color: [1, 2, 3], depthRatio: 0, widthCm: 3, depthCm: 3 } };
 
     expect(() => loadTemplates([template()], bad, allExist)).toThrow(/oak/);
+  });
+});
+
+describe('loadFrames', () => {
+  const black = { widthRatio: 0.028, color: [26, 26, 28], depthRatio: 0.022, widthCm: 1.8, depthCm: 3 };
+
+  it('accepts a frame with physical dimensions', () => {
+    expect(loadFrames({ black }).black.depthCm).toBe(3);
+    expect(loadFrames({ black }).black.widthCm).toBe(1.8);
+  });
+
+  it('rejects a frame without widthCm, naming the slug', () => {
+    const { widthCm: _w, ...noWidth } = black;
+
+    expect(() => loadFrames({ black: noWidth })).toThrow(/"black".*widthCm/);
+  });
+
+  it('rejects a zero depth in cm: even a canvas stands off the wall', () => {
+    expect(() => loadFrames({ black: { ...black, depthCm: 0 } })).toThrow(/depthCm/);
+  });
+
+  it('allows widthCm 0 for gallery-wrap', () => {
+    const frames = loadFrames({ frameless: { ...black, widthRatio: 0, widthCm: 0 } });
+
+    expect(frames.frameless.widthCm).toBe(0);
+  });
+
+  it('rejects an absurd face width', () => {
+    expect(() => loadFrames({ black: { ...black, widthCm: 40 } })).toThrow(/widthCm/);
   });
 });

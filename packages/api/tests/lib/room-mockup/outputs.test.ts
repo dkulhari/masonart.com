@@ -22,7 +22,7 @@ import {
 } from '../../../src/lib/room-mockup/outputs';
 import type { FrameRender } from '../../../src/lib/room-mockup/templates';
 
-const OAK: FrameRender = { widthRatio: 0.05, color: [178, 141, 94], depthRatio: 0.024 };
+const OAK: FrameRender = { widthRatio: 0.05, color: [178, 141, 94], depthRatio: 0.024, widthCm: 3.2, depthCm: 3 };
 
 const art = (w: number, h: number) =>
   sharp({ create: { width: w, height: h, channels: 3, background: { r: 10, g: 20, b: 200 } } })

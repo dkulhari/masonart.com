@@ -22,8 +22,8 @@ import {
 } from '../../../src/lib/room-mockup/render';
 import type { FrameRender, RoomTemplate } from '../../../src/lib/room-mockup/templates';
 
-const OAK: FrameRender = { widthRatio: 0.05, color: [178, 141, 94], depthRatio: 0.024 };
-const FRAMELESS: FrameRender = { widthRatio: 0, color: [0, 0, 0], depthRatio: 0.03 };
+const OAK: FrameRender = { widthRatio: 0.05, color: [178, 141, 94], depthRatio: 0.024, widthCm: 3.2, depthCm: 3 };
+const FRAMELESS: FrameRender = { widthRatio: 0, color: [0, 0, 0], depthRatio: 0.03, widthCm: 0, depthCm: 3.8 };
 
 /** Solid-colour artwork, clearly distinct from any frame colour. */
 const art = (w: number, h: number) =>
