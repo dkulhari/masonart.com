@@ -28,12 +28,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.909Z'
-last_updated: '2026-08-31T13:49:58.909Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T15:27:00.689Z'
+time_spent_minutes: 13
 labels:
   - shiprocket
   - api
@@ -41,8 +41,57 @@ labels:
   - pass-2
   - phase-9
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T15:14:12.009Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T15:26:36.485Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T15:26:58.537Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `ab5ec972` - feat(webhooks): map Shiprocket statuses onto shipment_status, with RTO and NDR
+
+      **Files Changed**:
+      - `packages/api/src/lib/shipment-status.ts` - new: SHIPROCKET_STATUSES (data table, by id with text fallback, `ours: null` for known-and-ignored), mapShiprocketStatus (with `{ detail: true }` telling known-ignored from unknown), shipmentMayMoveTo + TERMINAL_SHIPMENT_STATUSES, and ORDER_STATUS_FOR_SHIPMENT_STATUS / ORDER_FOLLOWS_ITS_SHIPMENT / orderShouldMoveTo moved here from the admin route
+      - `packages/api/src/routes/admin/shipments.ts` - imports the tables from the lib and still re-exports them (the propagation test's import path is unchanged); 180 lines of local definitions gone
+      - `packages/api/src/services/shiprocket-webhook.ts` - applyStatusPush(push, actor) fills the #732 seam
+      - `packages/api/src/database/schema/notifications.ts` + `migrations/0030_notification_shipment_events.sql` (+ journal, snapshot via drizzle-kit generate) - `delivery_attempt_failed`, `returning_to_sender` appended to notification_type, ADD VALUE only
+      - `packages/api/src/services/email-templates.ts` - getDeliveryAttemptFailedTemplate, getReturningToSenderTemplate
+      - `packages/api/src/services/notifications.ts` - both types under the shipped preference (no new preference columns), their templates and SMS lines
+      - `packages/shared/src/schemas/audit-log.ts` - `shipment.status_unmapped` (fulfilment), emitted here
+      - Tests: `tests/lib/shipment-status.test.ts` (new, 19), `tests/services/shiprocket-webhook-apply.test.ts` (new, 16), and additions to the receiver, notifications, email-templates and database enum suites
+
+      **The mapping is data.** One row per Shiprocket status (transcribed from their documented list): id → text → ours. Every value of `shipment_status` is reachable from at least one of theirs (the ticket's done-when, with a CAN-fail control). An UNKNOWN status is recorded as an audit row `shipment.status_unmapped` with outcome `failure` so it stands out in the viewer, changes nothing, and does not crash the webhook; a KNOWN-but-ignored one (partial delivery, warehouse states, cancellation *requested*) is acknowledged in silence — the two are different facts.
+
+      **Idempotent by table, not by Redis.** shipmentMayMoveTo: forward along pending → label_created → shipped → in_transit → out_for_delivery → delivered; trouble (undelivered, RTO, lost, cancelled, failed) from anywhere not terminal; from undelivered out again or back; from rto_initiated only back or gone; never out of delivered / rto_delivered / cancelled / lost / failed. Same-status and backwards pushes are no-ops with no write and no audit — which is what makes at-least-once delivery safe when Redis is down (#732).
+
+      **One transaction**: FOR UPDATE on the row, shipment status + shipped_at/delivered_at stamps exactly as the PATCH route does, the order moved through the SAME `ORDER_STATUS_FOR_SHIPMENT_STATUS` / `orderShouldMoveTo` (an order off the fulfilment track is not driven; an order moved concurrently is left and reported, the shipment fact still lands), and `shipment.tracking_updated` with `source: 'shiprocket_webhook'` and the courier's words in metadata. Notifications fire AFTER the commit, not awaited, failures logged — a slow mail does not delay the 200 the courier is waiting for.
+
+      **RTO and NDR**: `undelivered` → `delivery_attempt_failed` ("couldn't deliver today, will try again, keep your phone reachable"); `rto_initiated` → `returning_to_sender` ("on its way back, we'll contact you about re-delivery or refund"). Different subject, different body, different SMS; notification tests cover each separately and assert the other template was not used.
+
+      **Verification**:
+      - `bunx vitest run tests/lib/shipment-status.test.ts tests/services/shiprocket-webhook-apply.test.ts tests/routes/webhooks/shiprocket.test.ts tests/routes/admin/shipments-status-propagation.test.ts` → 89 passed (RED first: 16 failed against the #732 stub, module missing for the lib)
+      - `bunx vitest run tests/services/notifications.test.ts tests/lib/audit-action-coverage.test.ts tests/database/notifications.test.ts tests/database/migration-enum-literals.test.ts tests/routes/admin/shipments-ready-queue.test.ts tests/routes/admin/shipments-audit.test.ts` → 227 passed; email-templates + shipped-notification-tracking → 62 passed
+      - `bun run db:migrate` applied 0030 to :5440; `pg_enum` reads the six values in order
+      - `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → clean; pre-commit turbo typecheck 4/4
+      - Falsification, each restored byte-identical: the `undelivered` rows dropped from the table → 3 failed ("no Shiprocket status maps onto: undelivered"); the terminal guard removed from shipmentMayMoveTo → 1 failed; the notification fired before the commit → 5 failed in the apply suite
+work_sessions:
+  - start: '2026-09-03T15:14:13.554Z'
+    agent: claude-code
+    summary: Built the Shiprocket status mapping (data table), shared status tables in lib/shipment-status.ts, applyStatusPush with lock/stamps/order move/audit, two new notification types by migration 0030 with templates. 89 + 227 + 62 tests green, tsc clean, three falsifications. Committed as ab5ec972.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T15:27:00.687Z'
+    duration: '00:12:47'
 related_tickets: []
 blocked_by:
   - ticket: 732
@@ -50,3 +99,14 @@ blocked_by:
     description: Webhook - Verify and accept Shiprocket status callbacks
 blocks: []
 attachments: []
+started: '2026-09-03T15:14:12.009Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:13:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:13:00'
+      tokens: 0
+completed: '2026-09-03T15:26:36.485Z'

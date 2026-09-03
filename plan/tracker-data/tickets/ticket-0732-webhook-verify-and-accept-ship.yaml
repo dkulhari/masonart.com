@@ -25,12 +25,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.853Z'
-last_updated: '2026-08-31T13:49:58.853Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T15:14:11.463Z'
+time_spent_minutes: 7
 labels:
   - shiprocket
   - api
@@ -38,9 +38,64 @@ labels:
   - pass-2
   - phase-9
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-09-03T15:07:39.296Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T15:13:50.950Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T15:14:09.065Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `cdd77d11` - feat(webhooks): receive Shiprocket status pushes — verify, attribute, dedupe
+
+      **Files Changed**:
+      - `packages/api/src/routes/webhooks/shiprocket.ts` - new: POST /api/webhooks/shiprocket
+      - `packages/api/src/services/shiprocket-webhook.ts` - new: secret reader, constant-time key check, push parser, event id, row attribution check, and `applyStatusPush` (the seam #733 fills; today it records nothing and says so)
+      - `packages/api/src/index.ts` - mounted at /api/webhooks/shiprocket beside razorpay and wallet
+      - `packages/api/src/services/shiprocket.ts` - `SHIPROCKET_WEBHOOK_SECRET` added to SHIPROCKET_ENV_VARS (read by the webhook module, listed here because .env.example is held to this list)
+      - `.env.example` - documents the variable and both refusals
+      - `packages/api/tests/routes/webhooks/shiprocket.test.ts` - new, 25 tests
+      - `packages/api/tests/server.test.ts` - mount check
+
+      **The order is the ticket**: (0) unconfigured → 503 SHIPROCKET_WEBHOOK_NOT_CONFIGURED naming the variable, before any comparison so an empty header never matches an empty secret; (1) `x-api-key` compared over sha256 digests with `timingSafeEqual` — hashing first is what makes a length mismatch neither throw nor short-circuit; unverified → 401 `{ error: 'Unauthorized' }`, no query, nothing of the payload logged; (2) parse → 400, still no query; (3) the AWB finds the live row (`awb_number = ? AND voided_at IS NULL`, joined to orders for the number); `sr_order_id` and `order_id` (our `courierOrderReference`) are checked AGAINST that row and never used to find one — a mismatch is 409 SHIPROCKET_WEBHOOK_MISMATCH with nothing applied; an unknown AWB is acknowledged 200 so Shiprocket stops retrying; (4) `SET NX EX 7d` on `webhook:shiprocket:<sha256(awb|statusId|status|timestamp)>` — never the order — then apply; a replay is 200 `duplicate: true` and not applied; a failed apply releases the mark and answers 500 so the retry applies; Redis down → applied anyway with a warning (at-least-once; #733's mapping must be idempotent, and the PATCH route's table already is).
+
+      **Ticket's four properties**: valid key accepted → "accepts a valid push, looks the row up by OUR awb column"; invalid key 401 + no write → "rejects a missing key… touches nothing" and the same-length wrong key; replay not double-fired → "applies a first-seen event and acknowledges a replay without applying it"; order not matching its AWB refused → the `sr_order_id` and both `order_id` reference cases.
+
+      **Verification**:
+      - `bunx vitest run tests/routes/webhooks/shiprocket.test.ts tests/services/shiprocket-config.test.ts tests/services/shiprocket-courier-writes.test.ts tests/services/shiprocket-label-pickup.test.ts` → 257 passed (RED first: module missing)
+      - `bunx vitest run tests/server.test.ts -t 'shiprocket'` → mounted (503 from the named refusal, not a 404). The suite's other failures are `ECONNREFUSED :6380` — the redis container is stopped on this box; pre-existing and environmental.
+      - `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → clean; pre-commit turbo typecheck 4/4
+
+      **For #733**: implement `applyStatusPush(push: AttributedStatusPush): Promise<ApplyOutcome>` in services/shiprocket-webhook.ts. It receives `{ shipmentId, orderId, awb, status, statusId, srOrderId, reference, at, courierName }` already verified, attributed and first-seen. Map `status`/`statusId` onto `shipment_status` with a data table, land on the `ORDER_STATUS_FOR_SHIPMENT_STATUS` / `ORDER_FOLLOWS_ITS_SHIPMENT` tables in routes/admin/shipments.ts rather than a second one, record an unknown status without changing ours, and fire the notifications after the response.
+work_sessions:
+  - start: '2026-09-03T15:07:40.835Z'
+    agent: claude-code
+    summary: 'Built the Shiprocket webhook receiver inline: constant-time key check over digests, AWB-keyed lookup with order attribution check, SET NX dedupe with release on failure. 25 tests + 232 sibling tests green, tsc clean. Committed as cdd77d11.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T15:14:11.463Z'
+    duration: '00:06:30'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-09-03T15:07:39.296Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:07:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
+completed: '2026-09-03T15:13:50.950Z'

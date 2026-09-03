@@ -141,13 +141,13 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 13
-  total_duration: '01:34:00'
+  total_sessions: 16
+  total_duration: '02:16:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 12
-      duration: '01:34:00'
+      sessions: 15
+      duration: '02:16:00'
       tokens: 0
     claude-opus-5-builder:
       sessions: 1
@@ -155,15 +155,12 @@ work_session_summary:
       tokens: 0
 tickets:
   todo:
-    '728': Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
-    '729': Admin API - POST /orders/:orderId/ship, gated on readiness
     '731': Admin API - Void a label
-    '732': Webhook - Verify and accept Shiprocket status callbacks
-    '733': Webhook - Map Shiprocket statuses onto shipment_status, including RTO and NDR
     '734': Admin UI - The dispatch queue, with blockers on the row
     '735': 'Admin UI - Shipment detail: pick a courier, download the label'
     '736': E2E - An admin ships an order and the customer sees the AWB
-  in_progress: {}
+  in_progress:
+    '729': Admin API - POST /orders/:orderId/ship, gated on readiness
   done:
     '702': Database Schema - Extend shipment_status with the RTO, NDR and cancelled states
     '703': Database Schema - Add the dispatch columns to order_shipments, including label_object_token and the void marker
@@ -184,9 +181,12 @@ tickets:
     '725': Shiprocket Client - Serviceability and choosing a courier
     '726': Shiprocket Client - Create the order and assign an AWB
     '727': Shiprocket Client - Fetch the label PDF and schedule a pickup
+    '728': Dispatch Library - buyLabelForOrder in one transaction, readiness checked inside it
     '730': Admin API - The ready-to-label queue
+    '732': Webhook - Verify and accept Shiprocket status callbacks
+    '733': Webhook - Map Shiprocket statuses onto shipment_status, including RTO and NDR
 total_tickets: 28
-completion_percentage: 71
+completion_percentage: 82
 is_completed: false
 plan:
   phases:
@@ -222,5 +222,5 @@ worktree:
   branch: feature/order-dispatch-tracking
   path: /Users/dhruv/work/masonart.com/.claude/worktrees/order-dispatch-tracking
   created_at: '2026-08-31T03:16:41.504Z'
-last_activity: '2026-09-03T14:41:03.624Z'
+last_activity: '2026-09-03T15:27:27.685Z'
 started: '2026-08-31T03:57:31.133Z'

@@ -34,12 +34,12 @@ description: |-
 feature: order-dispatch-tracking
 type: task
 priority: critical
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-31T13:49:58.656Z'
-last_updated: '2026-08-31T14:50:23.503Z'
-time_spent_minutes: 0
+last_updated: '2026-09-03T15:07:37.833Z'
+time_spent_minutes: 22
 labels:
   - shiprocket
   - api
@@ -82,7 +82,58 @@ comments:
       This matters more under the split-transaction shape decided above: the quote happens before the commit and the purchase happens after, so if anything can change the order's COD status in between, the reconcile step has to notice that the rate it booked no longer matches the shipment it bought.
 
       `selectCourierFor` already refuses with `SHIPROCKET_NOT_SERVICEABLE` when a COD order has only non-COD couriers, so that path is handled — the risk here is the quieter one of quoting the wrong flag and getting a valid answer.
-work_sessions: []
+  - author: system
+    timestamp: '2026-09-03T14:45:17.523Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-09-03T15:07:11.465Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-09-03T15:07:36.341Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4ef2103a` - feat(dispatch): buyLabelForOrder — lock, claim, commit, then buy
+
+      **Files Changed**:
+      - `packages/api/src/lib/shipment-dispatch.ts` - new: buyLabelForOrder, reconcileLabelPurchase, findUnfinishedLabelPurchases, ShipmentDispatchError + DISPATCH_REFUSAL_STATUS, labelObjectKey, STALE_LABEL_CLAIM_MS
+      - `packages/api/tests/lib/shipment-dispatch.test.ts` - new, 37 tests against the query recorder (order of operations, predicates, money mapping, resume paths)
+      - `packages/api/tests/database/shipment-dispatch-concurrency.test.ts` - new, 5 tests against the live database from two fresh module instances
+      - `packages/shared/src/schemas/audit-log.ts` - declares `shipment.label_issued` (category `money`: what we paid a carrier), emitted by the library in the same change
+
+      **Shape, per the decision on this ticket**: lock → claim → COMMIT → call → reconcile. The claim transaction takes FOR UPDATE on the order's production_jobs rows and its live order_shipments rows, asks `getOrderLabelReadiness(orderId, tx)` THROUGH that handle (the blockers travel with the 409; the verdict is the same `blockers.length === 0` the gate function is), refuses a finished label (ORDER_HAS_LIVE_LABEL) or a young unfinished claim (LABEL_PURCHASE_IN_PROGRESS), reads the order/items/vendor facts under the lock, writes the claim, commits. No courier call ever holds a lock.
+
+      **The claim IS the token.** `label_object_token` is minted before the purchase and written with the predicate repeated (`id = ? AND label_object_token IS NULL AND voided_at IS NULL`), backed by `order_shipments_live_label_idx`. Three states a row can be in: null token = never started; token + `status = 'pending'` = started, not finished ("we may have bought this — check"); token + `label_created` = done, written last. On a resume nothing that already has an answer is asked again: ids present → the client's own lookup returns them; awb present → no assign and no re-quote; the object present in storage → the label is HELD and the client sends nothing. The one crash that can cost money is between the label answer and the upload (the file never landed; fetching again is billed — premise 4 in the client). Stated in the module header.
+
+      **Money**: quoted with the order's real cod status (`payment_details.method === 'cod'`; nothing writes that today and it is still the right place to read), every term in paise, gift-card tender folded into the courier's discount so a COD collectible is what is still owed. The PDF is stored at `fulfilment/labels/<token>.pdf`, `cache-control: private, no-store`, no order id or name in key or metadata. Finish + audit row in one transaction after the upload. A failed pickup is reported (`pickup.scheduled: false, retryable`), never thrown and never a void.
+
+      **Verification**:
+      - `bunx vitest run tests/lib/shipment-dispatch.test.ts` → 37 passed (RED first: module missing, 0 passed)
+      - `bunx vitest run tests/database/shipment-dispatch-concurrency.test.ts` → 5 passed against Postgres on :5440 (container had been stopped 2 days; started it). Two fresh module instances (`vi.resetModules` + import, sequential — a concurrent pair of resets hands both one instance and the in-process join hides the race) dispatch one order at once: one label, one refusal naming the WINNER's row; the crash case leaves a listed row, refused while young, resumed once stale with createdFresh/assign unchanged and one upload.
+      - Siblings: production-seam, audit-action-coverage, audit-record, vendor-label-seam, production-readiness, order-shipments-dispatch → 146 passed
+      - `bunx tsc --noEmit && bunx tsc -p tsconfig.test.json --noEmit` → clean; pre-commit turbo typecheck 4/4
+
+      **Falsification, as the ticket asks, each restored byte-identical (diff -q)**:
+      1. Both FOR UPDATE locks removed → the concurrency test FAILS: still exactly one label (the index refuses the second token), but the loser's refusal names its OWN rolled-back row rather than the row being bought — `expected 'a68efaf0…' to be '9f7b3ce7…'`. The lock is what makes the refusal addressable; the index is what makes it safe.
+      2. Locks removed + in-progress pre-check removed + claim predicate unguarded → FAILS the same way.
+      3. The index's own proof is `tests/database/order-shipments-live-label.test.ts`; dropping it in the shared dev DB was not done (the container's superuser is not `postgres`, and the outer two layers already fail on their own).
+
+      **For #729 (the route)**: `buyLabelForOrder(orderId, { parcel, courierCompanyId? }, c)` → map `ShipmentDispatchError.code` through `DISPATCH_REFUSAL_STATUS` (ORDER_NOT_READY carries `.blockers`; LABEL_PURCHASE_IN_PROGRESS and ORDER_HAS_LIVE_LABEL carry `.shipmentId`), and the courier client's own `ShiprocketError.code` through `SHIPROCKET_REFUSAL_STATUS`. The parcel is the route's input; nothing in the order knows the shipped weight.
+
+      **For #734 (the queue)**: rows with a token and `status = 'pending'` are purchases in flight or crashed; `findUnfinishedLabelPurchases()` lists them oldest-first and `reconcileLabelPurchase(shipmentId, c)` is the remedy. The queue's `ORDER_HAS_LIVE_LABEL` predicate treats them as labelled, so they vanish from the ready list — surface them.
+work_sessions:
+  - start: '2026-09-03T14:45:18.909Z'
+    agent: claude-code
+    summary: Built lib/shipment-dispatch.ts inline (split transaction, token-as-claim, resume path). 37 recorder tests + 5 live-DB concurrency tests green, 146 sibling tests green, tsc clean. Locks removed → concurrency test fails (refusal names the wrong row). Committed as 4ef2103a.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-09-03T15:07:37.831Z'
+    duration: '00:22:18'
 related_tickets: []
 blocked_by:
   - ticket: 725
@@ -96,3 +147,14 @@ blocked_by:
     description: Shiprocket Client - Fetch the label PDF and schedule a pickup
 blocks: []
 attachments: []
+started: '2026-09-03T14:45:17.523Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:22:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:22:00'
+      tokens: 0
+completed: '2026-09-03T15:07:11.465Z'
