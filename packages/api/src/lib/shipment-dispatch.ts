@@ -104,6 +104,7 @@ import { toPaise, toRupees } from './razorpay'
 import { fileExists, uploadFile } from './storage'
 import {
   assignAwb,
+  cancelCourierShipment,
   createCourierOrder,
   generateLabel,
   schedulePickup,
@@ -150,6 +151,10 @@ export const DISPATCH_REFUSAL_CODES = [
   'PICKUP_VENDOR_UNQUOTABLE',
   /** `reconcileLabelPurchase` was pointed at a row that is not an unfinished claim. */
   'NOTHING_TO_RECONCILE',
+  /** No `order_shipments` row for that id. */
+  'SHIPMENT_NOT_FOUND',
+  /** No live label on the row: never bought, already voided, or claimed with no waybill. */
+  'NOTHING_TO_VOID',
 ] as const
 
 export type DispatchRefusalCode = (typeof DISPATCH_REFUSAL_CODES)[number]
@@ -168,6 +173,8 @@ export const DISPATCH_REFUSAL_STATUS: Record<DispatchRefusalCode, number> = {
   LABEL_PURCHASE_IN_PROGRESS: 409,
   PICKUP_VENDOR_UNQUOTABLE: 422,
   NOTHING_TO_RECONCILE: 409,
+  SHIPMENT_NOT_FOUND: 404,
+  NOTHING_TO_VOID: 409,
 }
 
 export class ShipmentDispatchError extends Error {
@@ -1069,4 +1076,127 @@ export async function findUnfinishedLabelPurchases(): Promise<UnfinishedLabelPur
     claimedAt: row.claimedAt,
     awbNumber: row.awbNumber,
   }))
+}
+
+// ============================================================================
+// Voiding a label (#731) — courier first, row second, never the row on a guess
+// ============================================================================
+
+export interface LabelVoid {
+  readonly shipmentId: string
+  readonly orderId: string
+  readonly awbNumber: string
+  readonly voidedAt: Date
+  /** Shiprocket had already cancelled it when we asked. The void still stands. */
+  readonly alreadyCancelledAtCourier: boolean
+}
+
+/**
+ * Cancel a label with the courier, then mark the row voided.
+ *
+ * ## The order is the ticket
+ *
+ * The courier is asked FIRST, outside any transaction, and the row is written
+ * only once the courier has said yes (or "already"). A row claiming a void
+ * that did not happen is worse than no void: `getVendorJobLabelKey` chooses
+ * the live label by `voided_at`, so the vendor would stop seeing a label the
+ * courier still honours. A refusal, and a non-answer, both leave the row
+ * exactly as it was and pass the courier client's own error up.
+ *
+ * ## What a void is not
+ *
+ * Not a change to the order. RTO, re-ship, refund — what happens to the
+ * order after its label is voided is an admin's decision, made on the order,
+ * not a side effect of a courier call. And not a deletion: the label object
+ * stays under its token, which is what a dispute is argued from; it is
+ * simply no longer the live one, and `order_shipments_live_label_idx` lets a
+ * fresh label be bought beside it.
+ */
+export async function voidLabel(
+  shipmentId: string,
+  reason: string,
+  actor: DispatchActor
+): Promise<LabelVoid> {
+  const [row] = (await db
+    .select(SHIPMENT_COLUMNS)
+    .from(orderShipments)
+    .where(eq(orderShipments.id, shipmentId))
+    .limit(1)) as ShipmentRow[]
+
+  if (!row) {
+    throw new ShipmentDispatchError(`No shipment ${shipmentId} exists.`, 'SHIPMENT_NOT_FOUND', {
+      shipmentId,
+    })
+  }
+  if (row.voidedAt !== null) {
+    throw new ShipmentDispatchError(
+      `Shipment ${shipmentId} was already voided at ${row.voidedAt.toISOString()}. Nothing was ` +
+        'sent to the courier and nothing was written.',
+      'NOTHING_TO_VOID',
+      { shipmentId }
+    )
+  }
+  if (row.labelObjectToken === null) {
+    throw new ShipmentDispatchError(
+      `Shipment ${shipmentId} has no label to void: none was ever bought for it.`,
+      'NOTHING_TO_VOID',
+      { shipmentId }
+    )
+  }
+  if (row.awbNumber === null) {
+    throw new ShipmentDispatchError(
+      `Shipment ${shipmentId} holds a label claim but no waybill, so there is nothing at the ` +
+        'courier to cancel. It is an unfinished purchase: reconcile it (or wait for it to ' +
+        'finish), then void the label it produces.',
+      'NOTHING_TO_VOID',
+      { shipmentId }
+    )
+  }
+
+  // The courier. Any failure here — refusal or silence — leaves the row alone.
+  const cancellation = await cancelCourierShipment({ awb: row.awbNumber })
+
+  const voidedAt = new Date()
+  await db.transaction(async (tx) => {
+    const written = await tx
+      .update(orderShipments)
+      .set({ voidedAt, voidedReason: reason, status: 'cancelled', updatedAt: voidedAt })
+      .where(and(eq(orderShipments.id, row.id), isNull(orderShipments.voidedAt)))
+      .returning({ id: orderShipments.id })
+
+    if (written.length !== 1) {
+      throw new ShipmentDispatchError(
+        `Shipment ${shipmentId} was voided by somebody else while the courier was being asked. ` +
+          'The courier has cancelled it; nothing further was written.',
+        'NOTHING_TO_VOID',
+        { shipmentId }
+      )
+    }
+
+    await recordAudit(
+      actor,
+      {
+        action: 'shipment.voided',
+        entityType: 'order_shipment',
+        entityId: row.id,
+        summary: `Label voided for AWB ${row.awbNumber}: ${reason}`,
+        before: { status: row.status },
+        after: { status: 'cancelled', voidedAt, voidedReason: reason },
+        metadata: {
+          orderId: row.orderId,
+          awb: row.awbNumber,
+          alreadyCancelledAtCourier: cancellation.alreadyCancelled,
+        },
+      },
+      tx
+    )
+  })
+
+  return {
+    shipmentId: row.id,
+    orderId: row.orderId,
+    awbNumber: row.awbNumber,
+    voidedAt,
+    alreadyCancelledAtCourier: cancellation.alreadyCancelled,
+  }
 }

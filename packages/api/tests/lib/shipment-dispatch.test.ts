@@ -48,6 +48,7 @@ const courier = vi.hoisted(() => ({
   assignAwb: vi.fn(),
   generateLabel: vi.fn(),
   schedulePickup: vi.fn(),
+  cancelCourierShipment: vi.fn(),
 }))
 
 const storage = vi.hoisted(() => ({
@@ -88,6 +89,7 @@ import {
   buyLabelForOrder,
   reconcileLabelPurchase,
   findUnfinishedLabelPurchases,
+  voidLabel,
   labelObjectKey,
   DISPATCH_REFUSAL_STATUS,
   STALE_LABEL_CLAIM_MS,
@@ -996,6 +998,156 @@ describe('resuming a purchase the process died in the middle of', () => {
     expect(sql).toContain('"status" = $')
     expect(recorder.params(read.where)).toContain('pending')
     expect(recorder.render(read.orderBy).sql).toContain('"updated_at" asc')
+  })
+})
+
+// ============================================================================
+// Voiding — courier first, row second, never the row on a courier failure
+// ============================================================================
+
+describe('voidLabel', () => {
+  const liveRow = (over: Record<string, unknown> = {}) =>
+    crashedRow({ status: 'label_created', updatedAt: new Date(), ...over })
+
+  const REASON = 'Customer changed the delivery address after the label was bought'
+
+  beforeEach(() => {
+    courier.cancelCourierShipment.mockResolvedValue({ cancelled: true, alreadyCancelled: false })
+  })
+
+  it('cancels with the courier by AWB, THEN marks the row voided, in one transaction with its audit row', async () => {
+    recorder.queueRows({
+      'select:order_shipments': [[liveRow()]],
+      'update:order_shipments': [[{ id: SHIPMENT_ROW_ID }]],
+    })
+    let updatesWhenCancelled = -1
+    courier.cancelCourierShipment.mockImplementation(async () => {
+      updatesWhenCancelled = recorder.updates(orderShipments).length
+      return { cancelled: true, alreadyCancelled: false }
+    })
+
+    const result = await voidLabel(SHIPMENT_ROW_ID, REASON, actor())
+
+    expect(courier.cancelCourierShipment).toHaveBeenCalledWith({ awb: AWB })
+    expect(updatesWhenCancelled).toBe(0)
+
+    const write = recorder.survivors('update', orderShipments)[0]!
+    expect(write.inTx).toBe(true)
+    expect(write.values).toMatchObject({
+      voidedAt: expect.any(Date),
+      voidedReason: REASON,
+      status: 'cancelled',
+    })
+    const { sql, params } = recorder.render(write.where)
+    expect(sql).toContain('"voided_at" is null')
+    expect(params).toContain(SHIPMENT_ROW_ID)
+
+    expect(audit.recordAudit).toHaveBeenCalledTimes(1)
+    const [, entry, tx] = audit.recordAudit.mock.calls[0] as [unknown, Record<string, unknown>, unknown]
+    expect(entry.action).toBe('shipment.voided')
+    expect(entry.entityId).toBe(SHIPMENT_ROW_ID)
+    expect(entry.after).toMatchObject({ status: 'cancelled', voidedReason: REASON })
+    expect(entry.metadata).toMatchObject({ orderId: ORDER_ID, awb: AWB })
+    expect(tx).toBeDefined()
+    expect(tx).not.toBe(recorder.db)
+
+    expect(result).toMatchObject({
+      shipmentId: SHIPMENT_ROW_ID,
+      orderId: ORDER_ID,
+      awbNumber: AWB,
+      alreadyCancelledAtCourier: false,
+    })
+    expect(result.voidedAt).toBeInstanceOf(Date)
+  })
+
+  it('when the courier refuses, the row is NOT marked voided and the refusal passes up', async () => {
+    recorder.queueRows({ 'select:order_shipments': [[liveRow()]] })
+    courier.cancelCourierShipment.mockRejectedValue(new Error('SHIPROCKET says already picked up'))
+
+    await expect(voidLabel(SHIPMENT_ROW_ID, REASON, actor())).rejects.toThrow('already picked up')
+
+    expect(recorder.survivors('update', orderShipments)).toEqual([])
+    expect(audit.recordAudit).not.toHaveBeenCalled()
+  })
+
+  it('when the courier did not answer, the row is NOT marked voided either', async () => {
+    recorder.queueRows({ 'select:order_shipments': [[liveRow()]] })
+    courier.cancelCourierShipment.mockRejectedValue(new Error('unknown outcome'))
+
+    await expect(voidLabel(SHIPMENT_ROW_ID, REASON, actor())).rejects.toThrow('unknown outcome')
+
+    expect(recorder.updates(orderShipments)).toEqual([])
+  })
+
+  it('reports a cancellation the courier had already made, and still voids the row', async () => {
+    recorder.queueRows({
+      'select:order_shipments': [[liveRow()]],
+      'update:order_shipments': [[{ id: SHIPMENT_ROW_ID }]],
+    })
+    courier.cancelCourierShipment.mockResolvedValue({ cancelled: true, alreadyCancelled: true })
+
+    const result = await voidLabel(SHIPMENT_ROW_ID, REASON, actor())
+
+    expect(result.alreadyCancelledAtCourier).toBe(true)
+    expect(recorder.survivors('update', orderShipments)).toHaveLength(1)
+  })
+
+  it('refuses an unknown shipment', async () => {
+    recorder.queueRows({ 'select:order_shipments': [[]] })
+
+    const error = await failureOf(() => voidLabel(SHIPMENT_ROW_ID, REASON, actor()))
+
+    expect(error.code).toBe('SHIPMENT_NOT_FOUND')
+    expect(DISPATCH_REFUSAL_STATUS.SHIPMENT_NOT_FOUND).toBe(404)
+    expect(courier.cancelCourierShipment).not.toHaveBeenCalled()
+  })
+
+  it('refuses a row with no live label — no token, or already voided', async () => {
+    recorder.queueRows({ 'select:order_shipments': [[openRow()]] })
+    const noLabel = await failureOf(() => voidLabel(SHIPMENT_ROW_ID, REASON, actor()))
+    expect(noLabel.code).toBe('NOTHING_TO_VOID')
+    expect(DISPATCH_REFUSAL_STATUS.NOTHING_TO_VOID).toBe(409)
+
+    recorder.reset()
+    recorder.queueRows({ 'select:order_shipments': [[liveRow({ voidedAt: new Date() })]] })
+    const already = await failureOf(() => voidLabel(SHIPMENT_ROW_ID, REASON, actor()))
+    expect(already.code).toBe('NOTHING_TO_VOID')
+    expect(already.message.toLowerCase()).toContain('already')
+
+    expect(courier.cancelCourierShipment).not.toHaveBeenCalled()
+  })
+
+  it('refuses a claim with no waybill: there is nothing at the courier to cancel, reconcile it instead', async () => {
+    recorder.queueRows({ 'select:order_shipments': [[liveRow({ awbNumber: null, status: 'pending' })]] })
+
+    const error = await failureOf(() => voidLabel(SHIPMENT_ROW_ID, REASON, actor()))
+
+    expect(error.code).toBe('NOTHING_TO_VOID')
+    expect(error.message.toLowerCase()).toContain('reconcile')
+    expect(courier.cancelCourierShipment).not.toHaveBeenCalled()
+  })
+
+  it('a row voided between the courier call and the write is reported, not overwritten', async () => {
+    recorder.queueRows({
+      'select:order_shipments': [[liveRow()]],
+      'update:order_shipments': [[]],
+    })
+
+    const error = await failureOf(() => voidLabel(SHIPMENT_ROW_ID, REASON, actor()))
+
+    expect(error.code).toBe('NOTHING_TO_VOID')
+    expect(audit.recordAudit).not.toHaveBeenCalled()
+  })
+
+  it('leaves the order alone: what happens to it after a void is an admin’s decision', async () => {
+    recorder.queueRows({
+      'select:order_shipments': [[liveRow()]],
+      'update:order_shipments': [[{ id: SHIPMENT_ROW_ID }]],
+    })
+
+    await voidLabel(SHIPMENT_ROW_ID, REASON, actor())
+
+    expect(recorder.updates(orders)).toEqual([])
   })
 })
 

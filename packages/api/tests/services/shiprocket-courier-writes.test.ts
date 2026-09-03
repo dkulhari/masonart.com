@@ -89,6 +89,7 @@ import {
   assignAwb,
   generateLabel,
   schedulePickup,
+  cancelCourierShipment,
   checkServiceability,
   selectCourierFor,
   courierOrderReference,
@@ -2923,6 +2924,13 @@ describe('every refusal this client can produce is declared and reachable', () =
       },
     },
     {
+      code: 'SHIPROCKET_CANCEL_REFUSED',
+      produce: async () => {
+        stubFetch(async () => refusedResponse(400, { message: 'Shipment already picked up' }));
+        return cancelCourierShipment({ awb: ASSIGNED_AWB });
+      },
+    },
+    {
       code: 'SHIPROCKET_WRITE_OUTCOME_UNKNOWN',
       produce: async () => {
         stubFetch(async () => {
@@ -2963,6 +2971,7 @@ describe('every refusal this client can produce is declared and reachable', () =
       SHIPROCKET_LABEL_REFUSED: 422,
       SHIPROCKET_LABEL_FETCH_FAILED: 502,
       SHIPROCKET_PICKUP_NOT_SCHEDULED: 503,
+      SHIPROCKET_CANCEL_REFUSED: 422,
       SHIPROCKET_WRITE_OUTCOME_UNKNOWN: 409,
     });
   });
@@ -3706,7 +3715,13 @@ describe('the shiprocket module contract', () => {
    * The calls that make something real at a courier. Three of them cost
    * money; the pickup does not, and is the one whose refusal may be retried.
    */
-  const writes = ['createCourierOrder', 'assignAwb', 'generateLabel', 'schedulePickup'] as const;
+  const writes = [
+    'createCourierOrder',
+    'assignAwb',
+    'generateLabel',
+    'schedulePickup',
+    'cancelCourierShipment',
+  ] as const;
 
   /** Repeatable reads and pure selection over their answers. */
   const reads = ['checkServiceability', 'selectCourier', 'selectCourierFor'] as const;
@@ -3741,6 +3756,7 @@ describe('the shiprocket module contract', () => {
     'ShiprocketLabelRefusedError',
     'ShiprocketLabelFetchFailedError',
     'ShiprocketPickupNotScheduledError',
+    'ShiprocketCancelRefusedError',
   ] as const;
 
   /** Constants and vocabularies other files read. */

@@ -3363,6 +3363,7 @@ describe('every handler that writes both tables does it in one transaction', () 
       'GET /ready',
       'PATCH /:id',
       'POST /:id/mark-delivered',
+      'POST /:id/void',
       'POST /orders/:orderId/ship',
     ])
     expect(
@@ -3959,6 +3960,7 @@ describe('the router', () => {
       'GET /:id',
       'PATCH /:id',
       'POST /:id/mark-delivered',
+      'POST /:id/void',
     ])
   })
 })

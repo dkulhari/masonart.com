@@ -368,6 +368,11 @@ export const SHIPROCKET_REFUSAL_CODES = [
    * to void the label the pickup was for; see `ShiprocketPickupNotScheduledError`.
    */
   'SHIPROCKET_PICKUP_NOT_SCHEDULED',
+  /**
+   * Shiprocket answered the cancellation and declined it — the parcel has
+   * been picked up, or the courier will not release it. The label stands.
+   */
+  'SHIPROCKET_CANCEL_REFUSED',
   /** The write may have happened. Reconcile before retrying — see the class. */
   'SHIPROCKET_WRITE_OUTCOME_UNKNOWN',
 ] as const;
@@ -438,6 +443,10 @@ export const SHIPROCKET_REFUSAL_STATUS: Record<ShiprocketRefusalCode, number> = 
   // 503 for 503's own meaning, as with the expired token: the remedy is
   // literally "ask again in a moment", and asking again mints nothing.
   SHIPROCKET_PICKUP_NOT_SCHEDULED: 503,
+  // 422: the courier said no about THIS parcel, and the admin decides what
+  // next (wait for delivery, or take it up with the courier). Re-sending the
+  // same request changes nothing, but nothing was minted and nothing is owed.
+  SHIPROCKET_CANCEL_REFUSED: 422,
   SHIPROCKET_WRITE_OUTCOME_UNKNOWN: 409,
 };
 
@@ -662,6 +671,23 @@ export class ShiprocketPickupNotScheduledError extends ShiprocketError {
   constructor(message: string) {
     super(message, 'SHIPROCKET_PICKUP_NOT_SCHEDULED');
     this.name = 'ShiprocketPickupNotScheduledError';
+  }
+}
+
+/**
+ * Thrown when Shiprocket answered the cancellation and declined it.
+ *
+ * A class of its own because the void route catches it by identity: the
+ * label STANDS, the row must not be marked void, and the courier's reason is
+ * what the admin acts on — which is why, alone in this module, the courier's
+ * sentence travels in the message. The cancel payload is one AWB, so the
+ * echo the module's log rule guards against (a customer's address quoted
+ * back) cannot occur here; the sentence is still scrubbed and capped.
+ */
+export class ShiprocketCancelRefusedError extends ShiprocketError {
+  constructor(message: string) {
+    super(message, 'SHIPROCKET_CANCEL_REFUSED');
+    this.name = 'ShiprocketCancelRefusedError';
   }
 }
 
@@ -3981,6 +4007,130 @@ async function schedulePickupOnce(shipmentId: string): Promise<PickupSchedule> {
     shipmentId,
     'Shiprocket accepted the pickup request and scheduled nothing'
   );
+}
+
+// ============================================================================
+// The cancellation (#731) — the write that unmints, so "already" is success
+// ============================================================================
+
+export interface CancelCourierShipmentRequest {
+  /** The waybill on `order_shipments.awb_number`. Shiprocket cancels by AWB. */
+  awb: string;
+}
+
+export interface CourierCancellation {
+  readonly cancelled: true;
+  /** Shiprocket had already cancelled it. The goal was met before we asked. */
+  readonly alreadyCancelled: boolean;
+}
+
+/** Their wording for a cancellation that has already happened. Read as success. */
+const CANCEL_ALREADY_DONE = /\balready\s+(?:cancell?ed|canceled)\b/i;
+
+/** Their wording, on an HTTP 200, for a cancellation that did not happen. */
+const CANCEL_DID_NOT_HAPPEN = /\b(?:fail(?:ed|ure)?|could\s+not|cannot|can't|unable|not\s+allowed)\b/i;
+
+const CANCEL_REASON_MAX_CHARS = 200;
+
+/**
+ * Ask Shiprocket to cancel a shipment, by AWB.
+ *
+ * ## Not one of `COURIER_WRITE_CLAUSES`, and why
+ *
+ * Those tables keep one question in order — *was something minted, and is it
+ * safe to ask again?* — and the answer that must never be reached wrongly is
+ * "safe to ask again". A cancellation inverts it: asking a courier to cancel
+ * something already cancelled is the goal already met, so their "already
+ * cancelled" is read as SUCCESS rather than as a duplicate to reconcile.
+ *
+ * What does not invert is the direction of doubt. A cancellation that did
+ * not ANSWER may or may not have happened, and a caller that marked the
+ * label void on a guess would have the vendor stop seeing a label the
+ * courier still honours — the exact harm #731 names. So a non-answer, a 5xx
+ * and an unreadable 200 are all `ShiprocketWriteOutcomeUnknownError`, and
+ * the caller leaves the row alone. A refusal is its own code.
+ */
+export async function cancelCourierShipment(
+  request: CancelCourierShipmentRequest
+): Promise<CourierCancellation> {
+  const awb = request.awb.trim();
+  if (awb === '') {
+    throw new ShiprocketError(
+      'No AWB was supplied, so there is nothing to cancel. The waybill belongs in ' +
+        '`order_shipments.awb_number`; a claim with no waybill is reconciled, not voided.',
+      'SHIPROCKET_SHIPMENT_ID_MISSING'
+    );
+  }
+
+  const body: Record<string, unknown> = { awbs: [awb] };
+  const outcome = await postCourierWrite('/orders/cancel/shipment/awbs', body, {
+    context: { awb },
+    message:
+      `Shiprocket did not answer the request to cancel AWB ${awb}. The cancellation may or may ` +
+      'not have happened — check the shipment in the Shiprocket dashboard before marking the ' +
+      'label void, and do not void it on a guess.',
+  });
+
+  const echoes = payloadEchoes(body);
+  const logAnswer = (what: string) =>
+    logCourierAnswer(what, { status: outcome.status, awb }, outcome, echoes);
+  const said = refusalReason(outcome.json);
+
+  if (!outcome.ok) {
+    if (tokenWasRejected(outcome.status)) {
+      logAnswer(refusedWriteLabel(outcome.status));
+      forgetTokenAfter(outcome.status);
+      throw tokenWentStale('cancelling the shipment');
+    }
+
+    if (outcome.status < 400 || outcome.status >= 500) {
+      logAnswer('cancellation did not complete');
+      throw new ShiprocketWriteOutcomeUnknownError(
+        `Shiprocket did not complete the cancellation of AWB ${awb} (HTTP ${outcome.status}). ` +
+          'Check the shipment in the Shiprocket dashboard before marking the label void.'
+      );
+    }
+
+    if (CANCEL_ALREADY_DONE.test(said)) {
+      return { cancelled: true, alreadyCancelled: true };
+    }
+
+    logAnswer(refusedWriteLabel(outcome.status));
+    throw new ShiprocketCancelRefusedError(
+      `Shiprocket would not cancel AWB ${awb} (HTTP ${outcome.status})${courierReason(said, echoes)}. ` +
+        'The label stands and the row was not voided.'
+    );
+  }
+
+  if (typeof outcome.json !== 'object' || outcome.json === null || Array.isArray(outcome.json)) {
+    logAnswer('cancellation answered with something we cannot read');
+    throw new ShiprocketWriteOutcomeUnknownError(
+      `Shiprocket accepted the cancellation of AWB ${awb} and answered with something this ` +
+        'client cannot read, so it is not known whether the shipment was cancelled. Check the ' +
+        'Shiprocket dashboard before marking the label void.'
+    );
+  }
+
+  const envelope = outcome.json as Record<string, unknown>;
+  if (finiteNumber(envelope.status) === 0 || CANCEL_DID_NOT_HAPPEN.test(said)) {
+    logAnswer('courier did not cancel');
+    throw new ShiprocketCancelRefusedError(
+      `Shiprocket did not cancel AWB ${awb}${courierReason(said, echoes)}. The label stands and ` +
+        'the row was not voided.'
+    );
+  }
+
+  return { cancelled: true, alreadyCancelled: CANCEL_ALREADY_DONE.test(said) };
+}
+
+/**
+ * The courier's sentence for the void route's message — scrubbed against the
+ * one value we sent, capped, and withheld entirely if a sent value survived.
+ */
+function courierReason(said: string, echoes: readonly EchoedField[]): string {
+  const scrubbed = scrubEchoedValues(said, echoes);
+  if (scrubbed.withheld.length > 0 || scrubbed.text.trim() === '') return '';
+  return `: ${scrubbed.text.trim().slice(0, CANCEL_REASON_MAX_CHARS)}`;
 }
 
 /**

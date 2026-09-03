@@ -173,11 +173,11 @@ export const AUDIT_ACTIONS = [
   // Fulfilment — the courier leg (order-dispatch-tracking). A parcel changing
   // hands is not a money event; what we PAID a carrier is, and that action
   // arrived with the code that writes the cost (`lib/shipment-dispatch.ts`,
-  // #728). `shipment.voided` belongs to the void route and is deliberately
-  // NOT declared here ahead of its emitter.
+  // #728); `shipment.voided` with the void (#731).
   'shipment.created',
   'shipment.tracking_updated',
   'shipment.label_issued',
+  'shipment.voided',
   // A courier status this codebase has no mapping for. Recorded rather than
   // dropped, because a status nobody has seen is information and a stuck
   // order should be visible somewhere an admin looks (#733).
@@ -268,6 +268,7 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   // What we paid a carrier: the one shipment event that is money.
   'shipment.label_issued': 'money',
   'shipment.status_unmapped': 'fulfilment',
+  'shipment.voided': 'fulfilment',
 }
 
 /** A filterless page must not be able to dump the whole table. */

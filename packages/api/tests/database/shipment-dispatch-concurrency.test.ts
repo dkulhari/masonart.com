@@ -59,6 +59,7 @@ const ledger = vi.hoisted(() => ({
   assignCalls: 0,
   labelCalls: 0,
   pickupCalls: 0,
+  cancelCalls: 0,
   readinessCalls: [] as { orderId: string; throughTx: boolean }[],
   auditRows: [] as string[],
   objects: new Map<string, number>(),
@@ -132,6 +133,10 @@ vi.mock('../../src/services/shiprocket', () => {
     schedulePickup: async () => {
       ledger.pickupCalls += 1;
       return { scheduledFor: '2026-09-04 14:00:00', tokenNumber: 'PKP-1', alreadyScheduled: false };
+    },
+    cancelCourierShipment: async () => {
+      ledger.cancelCalls += 1;
+      return { cancelled: true, alreadyCancelled: false };
     },
   };
 });
@@ -252,6 +257,7 @@ function resetLedger() {
   ledger.assignCalls = 0;
   ledger.labelCalls = 0;
   ledger.pickupCalls = 0;
+  ledger.cancelCalls = 0;
   ledger.readinessCalls = [];
   ledger.auditRows = [];
   ledger.objects.clear();
@@ -439,5 +445,41 @@ describe('a purchase that died between the waybill and the label', () => {
     expect(after).toMatchObject({ status: 'label_created' });
     // Readiness is not re-asked on a reconcile.
     expect(ledger.readinessCalls.filter((c) => c.orderId === fixture!.orderId)).toHaveLength(1);
+  });
+});
+
+describe('a voided label is not the live one', () => {
+  it('a re-buy after a void is accepted: two rows, one voided, one live — the index allows it', async () => {
+    if (!reachable) return;
+    fixture = await seedOrder();
+    resetLedger();
+
+    const first = await freshProcess();
+    const bought = await first.buyLabelForOrder(fixture.orderId, { parcel: PARCEL }, actor());
+
+    const voided = await first.voidLabel(bought.shipmentId, 'Customer changed the delivery address', actor());
+    expect(voided.awbNumber).toBe('141123221084922');
+    expect(ledger.cancelCalls).toBe(1);
+
+    // Refused as nothing-to-void the second time, courier not asked again.
+    const again = await outcomeOf(first.voidLabel(bought.shipmentId, 'twice', actor()));
+    expect((again as { error: { code?: string } }).error.code).toBe('NOTHING_TO_VOID');
+    expect(ledger.cancelCalls).toBe(1);
+
+    // The re-buy: a fresh claim beside the voided row, not a refusal.
+    const second = await freshProcess();
+    const rebought = await second.buyLabelForOrder(fixture.orderId, { parcel: PARCEL }, actor());
+    expect(rebought.shipmentId).not.toBe(bought.shipmentId);
+    expect(rebought.labelObjectToken).not.toBe(bought.labelObjectToken);
+    expect(ledger.createdFresh).toBe(2);
+
+    const rows = await shipmentRows(fixture.orderId);
+    expect(rows).toHaveLength(2);
+    const dead = rows.find((r) => r.id === bought.shipmentId)!;
+    const live = rows.find((r) => r.id === rebought.shipmentId)!;
+    expect(dead).toMatchObject({ status: 'cancelled', label_object_token: bought.labelObjectToken });
+    expect(dead.voided_at).not.toBeNull();
+    expect(live).toMatchObject({ status: 'label_created', label_object_token: rebought.labelObjectToken, voided_at: null });
+    expect(ledger.auditRows.filter((a) => a === 'shipment.voided')).toHaveLength(1);
   });
 });

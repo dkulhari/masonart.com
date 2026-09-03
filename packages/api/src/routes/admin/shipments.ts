@@ -7,6 +7,7 @@
  *   GET   /api/admin/shipments/:id                 one shipment and its order
  *   PATCH /api/admin/shipments/:id                 status, tracking, carrier
  *   POST  /api/admin/shipments/:id/mark-delivered  close it out
+ *   POST  /api/admin/shipments/:id/void            void the label (#731)
  *
  * Every route requires an admin session; patterns from
  * docs/poster-app-tech-stack.md.
@@ -202,6 +203,7 @@ import {
 } from "../../lib/shipment-status";
 import {
   buyLabelForOrder,
+  voidLabel,
   DISPATCH_REFUSAL_STATUS,
   ShipmentDispatchError,
 } from "../../lib/shipment-dispatch";
@@ -1093,6 +1095,19 @@ const SHIPMENT_BODY_HELP =
   "1000), `estimatedDeliveryAt` as an ISO 8601 timestamp, `shippingOptionId` " +
   "as a uuid, and `status` as one of the shipment statuses. Send only the " +
   "fields you are changing.";
+
+/**
+ * A void needs a reason. A void with no reason is unanswerable in a dispute,
+ * and a one-word one is not much better; three characters is the floor below
+ * which nothing is a reason, and five hundred is the audit row's comfort.
+ */
+const voidLabelSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+
+const VOID_BODY_HELP =
+  "Voiding a label takes `reason` — 3 to 500 characters saying why, which is " +
+  "recorded on the shipment and in the audit log. Nothing else.";
 
 const BUY_LABEL_BODY_HELP =
   "Buying a label takes `parcel` — `weightGrams`, `lengthCm`, `widthCm` and " +
@@ -2380,11 +2395,67 @@ adminShipmentsApp.post("/:id/mark-delivered", async (c) => {
 });
 
 // Export the router and schemas
+// ============================================================================
+// POST /api/admin/shipments/:id/void - Void the label (#731)
+// ============================================================================
+
+adminShipmentsApp.post(
+  "/:id/void",
+  zValidator("json", voidLabelSchema, (result, c) => {
+    if (result.success) return;
+
+    return c.json(
+      {
+        error: VOID_BODY_HELP,
+        code: "SHIPMENT_BODY_INVALID" satisfies AdminShipmentRefusalCode,
+      },
+      400
+    );
+  }),
+  async (c) => {
+    const shipmentId = c.req.param("id");
+    const { reason } = c.req.valid("json");
+
+    if (!shipmentId || !UUID_PATTERN.test(shipmentId)) {
+      return c.json(
+        { error: "Invalid shipment ID", code: "SHIPMENT_ID_INVALID" satisfies AdminShipmentRefusalCode },
+        400
+      );
+    }
+
+    try {
+      // Courier first, row second, and never the row on a courier failure —
+      // the library's ordering, proved in its own suite. This route turns its
+      // refusals into responses and re-reads through the allow-list.
+      const voided = await voidLabel(shipmentId, reason, c);
+
+      const [shipment] = await db
+        .select(SHIPMENT_RESPONSE_COLUMNS)
+        .from(orderShipments)
+        .where(eq(orderShipments.id, voided.shipmentId))
+        .limit(1);
+
+      return c.json({
+        message: "Label voided",
+        shipment: shipment ?? null,
+        alreadyCancelledAtCourier: voided.alreadyCancelledAtCourier,
+      });
+    } catch (error) {
+      const refusal = dispatchRefusalOf(error);
+      if (refusal) return c.json(refusal.body, refusal.status);
+
+      logger.error({ err: error, shipmentId }, "admin shipments: failed to void label");
+      return c.json({ error: "Failed to void the label" }, 500);
+    }
+  }
+);
+
 export {
   adminShipmentsApp,
   adminOrderShipmentsApp,
   listShipmentsSchema,
   buyLabelSchema,
+  voidLabelSchema,
   updateShipmentSchema,
   readyQueueSchema,
   SHIPPABLE_ORDER_STATUSES,
