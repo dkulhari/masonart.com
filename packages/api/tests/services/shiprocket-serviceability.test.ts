@@ -38,7 +38,9 @@ import {
   checkServiceability,
   selectCourier,
   selectCourierFor,
+  ShiprocketError,
   ShiprocketNotServiceableError,
+  READ_TIMEOUT_MS,
   resetShiprocketAuthCacheForTests,
   type CourierOption,
 } from '../../src/services/shiprocket';
@@ -95,6 +97,13 @@ beforeEach(() => {
   resetShiprocketAuthCacheForTests();
   process.env.SHIPROCKET_EMAIL = 'api-user@example.test';
   process.env.SHIPROCKET_PASSWORD = 'irrelevant-here';
+  // Backported from `shiprocket-courier-writes.test.ts`, which argues it at
+  // length. Everything here is a repeatable READ and `fetch` is stubbed, so
+  // nothing in this file could spend money even if the stub came off — but
+  // the stubbed URLs literally spelled the live host, which is a bad habit to
+  // leave lying next to a file that must never address it. `.invalid` is
+  // reserved by RFC 2606 and never resolves.
+  process.env.SHIPROCKET_BASE_URL = 'https://shiprocket.invalid/v1/external';
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -103,6 +112,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.SHIPROCKET_EMAIL;
   delete process.env.SHIPROCKET_PASSWORD;
+  delete process.env.SHIPROCKET_BASE_URL;
 });
 
 describe('checkServiceability', () => {
@@ -160,6 +170,37 @@ describe('checkServiceability', () => {
     expect(b!.ratePaise).toBe(30);
   });
 
+  it('drops a courier that quoted no rate, rather than pricing it at zero', async () => {
+    // `Number(null)` is 0 and `Number('')` is 0, and 0 is finite — so a courier
+    // whose `rate` was missing used to arrive as a courier costing nothing,
+    // which then WON `selectCourier`'s cheapest-option loop and was quoted to
+    // an admin as free. A rate we did not receive is not a rate of zero.
+    stubFetch([
+      courier({ courier_company_id: 7, courier_name: 'No Rate Express', rate: null }),
+      courier({ courier_company_id: 8, courier_name: 'Blank Rate Ltd', rate: '' }),
+      courier({ courier_company_id: null, courier_name: 'Missing Id Ltd' }),
+    ]);
+
+    const options = await checkServiceability({
+      pickupPincode: FROM, deliveryPincode: TO, weightKg: 1, cod: false,
+    });
+
+    expect(options).toEqual([]);
+  });
+
+  it('keeps a courier that quoted a real zero, because free shipping is a rate', async () => {
+    // The paired positive control: the guard is about a MISSING rate, not
+    // about a cheap one, and a filter that dropped both would silently hide a
+    // promotional courier from selection.
+    stubFetch([courier({ rate: 0 })]);
+
+    const [option] = await checkServiceability({
+      pickupPincode: FROM, deliveryPincode: TO, weightKg: 1, cod: false,
+    });
+
+    expect(option!.ratePaise).toBe(0);
+  });
+
   it('returns an empty list when nothing serves the route', async () => {
     stubFetch([]);
 
@@ -168,6 +209,54 @@ describe('checkServiceability', () => {
     });
 
     expect(options).toEqual([]);
+  });
+
+  it('bounds the read, and answers a timeout with a code rather than a DOMException', async () => {
+    // The bound arrived with #726 and its failure was never wrapped. When
+    // `AbortSignal.timeout` fires it throws a `DOMException`, which is not a
+    // `ShiprocketError` and carries no `code` — so a route doing
+    // `if (e instanceof ShiprocketError) return c.json({ code: e.code },
+    // SHIPROCKET_REFUSAL_STATUS[e.code])` falls through to a 500, and the 502
+    // this exact condition is declared to answer with never applies.
+    // `selectCourierFor` sits directly in front of the courier write on the
+    // dispatch path, so this is the read that fails first.
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockImplementation(async (url: unknown) => {
+      if (String(url).includes('/auth/login')) return authResponse();
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    });
+
+    const error = await checkServiceability({
+      pickupPincode: FROM, deliveryPincode: TO, weightKg: 1, cod: false,
+    })
+      .then(() => null)
+      .catch((e: Error) => e);
+
+    expect(error).toBeInstanceOf(ShiprocketError);
+    expect((error as ShiprocketError).code).toBe('SHIPROCKET_SERVICEABILITY_FAILED');
+    // ...and the bound is actually attached. Without this the constant could
+    // be deleted and every other test in this file would stay green.
+    expect(timeout).toHaveBeenCalledWith(READ_TIMEOUT_MS);
+    timeout.mockRestore();
+  });
+
+  it('answers a login that never returns with a code too', async () => {
+    // Every call in this module logs in first, so an unbounded, untyped login
+    // makes the two properties above true of a path nothing reaches. A refusal
+    // vocabulary that does not cover the most-exercised path in the file is a
+    // route improvising a 500.
+    fetchMock.mockImplementation(async () => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    });
+
+    const error = await checkServiceability({
+      pickupPincode: FROM, deliveryPincode: TO, weightKg: 1, cod: false,
+    })
+      .then(() => null)
+      .catch((e: Error) => e);
+
+    expect(error).toBeInstanceOf(ShiprocketError);
+    expect((error as ShiprocketError).code).toBe('SHIPROCKET_AUTH_UNREACHABLE');
   });
 
   it('survives a response with no data envelope', async () => {
