@@ -22,6 +22,8 @@ import {
   getShippedTemplate,
   getOutForDeliveryTemplate,
   getDeliveredTemplate,
+  getDeliveryAttemptFailedTemplate,
+  getReturningToSenderTemplate,
   type ShipmentForEmail,
 } from "./email-templates";
 
@@ -156,6 +158,16 @@ function getEnabledChannels(
       if (prefs.emailDelivered) channels.push("email");
       if (prefs.smsDelivered) channels.push("sms");
       break;
+    // Two courier outcomes (#733) under the SHIPPED preference: they are news
+    // about a parcel in flight, and a customer who wants to hear that it
+    // shipped wants to hear that it could not be delivered. No new preference
+    // columns — a flag nobody has been asked to set is a flag that is wrong
+    // for half of them.
+    case "delivery_attempt_failed":
+    case "returning_to_sender":
+      if (prefs.emailShipped) channels.push("email");
+      if (prefs.smsShipped) channels.push("sms");
+      break;
   }
 
   return channels;
@@ -180,6 +192,10 @@ function getEmailTemplate(
       // Takes no shipment because it reads none. An unused argument here would
       // misdescribe what the template depends on.
       return getDeliveredTemplate(order);
+    case "delivery_attempt_failed":
+      return getDeliveryAttemptFailedTemplate(order, shipment);
+    case "returning_to_sender":
+      return getReturningToSenderTemplate(order, shipment);
   }
 }
 
@@ -206,6 +222,10 @@ export function getSmsMessage(
       return `chobii.art: Your order ${orderNumber} is out for delivery today!`;
     case "delivered":
       return `chobii.art: Your order ${orderNumber} has been delivered. Enjoy your art!`;
+    case "delivery_attempt_failed":
+      return `chobii.art: The courier couldn't deliver order ${orderNumber} today and will try again. Please keep your phone reachable. Track: ${shipment?.trackingUrl || "chobii.art/orders"}`;
+    case "returning_to_sender":
+      return `chobii.art: Order ${orderNumber} could not be delivered and is being returned to us. We'll contact you about a re-delivery or refund.`;
   }
 }
 

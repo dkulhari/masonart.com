@@ -193,6 +193,11 @@ import {
 } from "../../middleware/auth";
 import { generateTrackingUrl } from "../shipments";
 import { recordAudit } from "../../lib/audit";
+import {
+  ORDER_FOLLOWS_ITS_SHIPMENT,
+  ORDER_STATUS_FOR_SHIPMENT_STATUS,
+  orderShouldMoveTo,
+} from "../../lib/shipment-status";
 import { logger } from "../../lib/logger";
 import {
   evaluateLabelReadiness,
@@ -330,185 +335,10 @@ const ORDER_HAS_A_LINE_TO_PRODUCE = sql`exists (
  */
 const READY_QUEUE_SCAN_LIMIT = 200;
 
-/**
- * What a shipment's status means for the ORDER carrying it.
- *
- * This was an `if / else if / else if` with three arms — `shipped`,
- * `out_for_delivery`, `delivered` — and no `else`. Every other value in
- * `shipment_status` moved `order_shipments` and left `orders` where it was,
- * with nothing anywhere admitting it. That is the same divergence the header
- * spends a section on ("the shipment says X and the order says Y"), except
- * permanent rather than a crash window, and it was the one variant the header
- * did not list: a reader who trusted that section would go hunting for a
- * mid-request throw that does not exist.
- *
- * A total function fixes the silence, not the chain. `Record<ShipmentStatus,
- * …>` is exhaustive by the compiler, so a value added to the enum stops the
- * build here and someone has to decide; and `null` is a DECISION with a reason
- * beside it rather than the absence of one.
- *
- * The compiler cannot see everything, so the table is also asserted against the
- * shipped enum and against `orderStatusEnum` in
- * `tests/routes/admin/shipments-status-propagation.test.ts` — an `as` cast or a
- * target that is not an order status at all would both pass `tsc`.
- *
- * Nothing here is a behaviour change: every arm that moved the order before
- * still moves it, and every value that did nothing still does nothing. What
- * changed is that the nothing is now written down.
- */
-const ORDER_STATUS_FOR_SHIPMENT_STATUS: Record<ShipmentStatus, OrderStatus | null> = {
-  /** A row exists, no label bought. The order is still `processing` at most. */
-  pending: null,
-  /** We hold a label. Nothing has been handed to a courier yet. */
-  label_created: null,
-  shipped: "shipped",
-  /**
-   * Already covered by `shipped`, and deliberately not a second write.
-   * `order_status` has no in-transit value, and re-stamping `shipped` here
-   * would move `orders.shipped_at` every time a scan came in.
-   */
-  in_transit: null,
-  out_for_delivery: "out_for_delivery",
-  /**
-   * NDR: an attempt failed and the courier still holds the parcel. The order is
-   * not delivered and is not going back yet — `out_for_delivery` remains the
-   * truest thing `order_status` can say, so this leaves it there rather than
-   * inventing a retreat the enum has no word for.
-   */
-  undelivered: null,
-  delivered: "delivered",
-  /**
-   * On its way back to the consolidating vendor. `order_status` has no returned
-   * value — `cancelled` is a commercial decision and `refunded` is a money
-   * event, and writing either from a courier scan would decide something a
-   * human has not. Returns live in their own table (`routes/admin/returns.ts`).
-   */
-  rto_initiated: null,
-  /** Back at the vendor. Same reasoning as `rto_initiated`. */
-  rto_delivered: null,
-  /**
-   * The courier cannot account for the parcel. It is a claim, not an order
-   * outcome: the customer is owed a remake or a refund, and both of those are
-   * decisions with their own routes.
-   */
-  lost: null,
-  /**
-   * The LABEL was voided or the shipment cancelled — not the order (schema/
-   * shipping.ts draws exactly this distinction). Cancelling a customer's
-   * order because someone re-bought a label would be the worst write in this
-   * file.
-   */
-  cancelled: null,
-  /**
-   * A failed DELIVERY. `order_status.failed` means the ORDER failed — a payment
-   * that never went through — so the two `failed`s are false friends and
-   * copying one into the other would report a paid order as never placed.
-   */
-  failed: null,
-};
-
-/**
- * Whether an order at this status still follows its shipment.
- *
- * The second half of the same finding: `mark-delivered` wrote
- * `orders.status = 'delivered'` with no look at where the order was, so a
- * cancelled or refunded order could be driven to `delivered` — starting a
- * return window on an order nobody is fulfilling, and erasing the only status
- * that said the cancellation happened.
- *
- * `false` does not refuse the request. The shipment still updates, because the
- * parcel really did move and `order_shipments` is what the customer's tracking
- * page reads (`routes/tracking.ts`); what stops is the write onto the
- * commercial record. The response says which happened, in `orderStatusChanged`,
- * so a screen is never left guessing.
- *
- * **The hole this does not close, named rather than left to be discovered.**
- * Among the `true` statuses nothing prevents a BACKWARDS move: a late PATCH
- * carrying `shipped` on an order already `delivered` will set it back to
- * `shipped`, re-opening a return window that had already started. Closing that
- * needs an order-status transition matrix, and this repo has one for production
- * jobs (`lib/production-transitions.ts`) and none for orders. Inventing one
- * inside a shipments route is how a matrix ends up with two homes; it belongs
- * beside `orderStatusEnum`, in its own change.
- *
- * The deferral is executable rather than prose: `DOES move an order backwards,
- * which is the hole nobody has closed` in
- * `tests/routes/admin/shipments-status-propagation.test.ts` asserts the current,
- * wrong behaviour and goes red the day it is made right — which is the prompt
- * to delete that test and this paragraph together. A comment describing a hole
- * somebody has since filled is worse than no comment at all.
- */
-const ORDER_FOLLOWS_ITS_SHIPMENT: Record<OrderStatus, boolean> = {
-  /** No payment yet. A parcel moving on one of these is a bug worth leaving visible. */
-  pending: false,
-  pending_payment: false,
-  confirmed: true,
-  processing: true,
-  shipped: true,
-  out_for_delivery: true,
-  delivered: true,
-  /** The order was called off. A courier scan does not un-call it. */
-  cancelled: false,
-  /**
-   * A refund is being decided. Moving the order to `delivered` erases the
-   * request, and the delivery is recorded on the shipment either way.
-   */
-  refund_requested: false,
-  refunded: false,
-  /** The order never happened as far as the ledger is concerned. */
-  failed: false,
-};
-
-/**
- * Whether this order's status may be moved by its shipment's.
- *
- * `=== true` rather than a truthiness test: the table is exhaustive over the
- * enum by the compiler, but this value came off a driver, and a status outside
- * the enum — a column widened in a migration this build has not seen — must
- * fail CLOSED and leave the order alone rather than move it on a lookup that
- * happened to be `undefined`.
- */
-function orderFollowsItsShipment(orderStatus: OrderStatus): boolean {
-  return ORDER_FOLLOWS_ITS_SHIPMENT[orderStatus] === true;
-}
-
-/**
- * Whether the order write should happen at all — the single gate both write
- * handlers ask before they touch `orders`.
- *
- * Three conditions, and the middle one is the one it is easy to leave out. The
- * shipment write in `PATCH /:id` stamps `delivered_at` only when the row is
- * MOVING to delivered (`existing.status !== "delivered"`). An order write with
- * no equivalent test means:
- *
- *   `PATCH /api/admin/shipments/<id> {"status":"delivered"}`
- *
- * against a shipment and an order that are both already `delivered` answers 200
- * with `orderStatusChanged: true` and writes `{status: 'delivered',
- * deliveredAt: <now>}` onto the order. `orders.delivered_at` is the return-
- * window anchor — `routes/returns.ts` computes the deadline from it — so the
- * customer's window silently restarts, and `orders.delivered_at` then disagrees
- * with `order_shipments.delivered_at`, which is what the tracking page shows.
- * The same asymmetry moves `orders.shipped_at` on every repeated `shipped`,
- * which is the exact hazard the `in_transit: null` entry of
- * `ORDER_STATUS_FOR_SHIPMENT_STATUS` is justified by in prose one screen up.
- *
- * A skip, not a refusal: the request is not wrong, the order is simply already
- * there. The shipment still updates, `orderStatusChanged` answers false, and
- * `does not re-stamp an order that is already where the shipment would put it`
- * is the enforcer — paired with a positive control, so this is a check on where
- * the order IS and not a blanket refusal to write one.
- *
- * The type predicate is what lets the callers use `newOrderStatus` unnarrowed
- * afterwards; the `null` arm is the "this shipment status means nothing for the
- * order" case from the table, which is a decision and not a missing entry.
- */
-function orderShouldMoveTo(
-  current: OrderStatus,
-  next: OrderStatus | null
-): next is OrderStatus {
-  return next !== null && next !== current && orderFollowsItsShipment(current);
-}
+// The shipment-to-order tables and `orderShouldMoveTo` moved to
+// `lib/shipment-status.ts` in #733, so this route and the courier webhook read
+// ONE table. Both tables are still re-exported at the bottom of this file for
+// `tests/routes/admin/shipments-status-propagation.test.ts`.
 
 /**
  * A uuid, as four hyphen-separated hex groups and a fifth.

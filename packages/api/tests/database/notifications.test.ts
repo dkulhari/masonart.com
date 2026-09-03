@@ -185,7 +185,9 @@ describe("Notifications Table Schema", () => {
       expect(enumValues).toContain("shipped");
       expect(enumValues).toContain("out_for_delivery");
       expect(enumValues).toContain("delivered");
-      expect(enumValues).toHaveLength(4);
+      expect(enumValues).toContain("delivery_attempt_failed");
+      expect(enumValues).toContain("returning_to_sender");
+      expect(enumValues).toHaveLength(6);
     });
 
     it("should export notificationTypeEnum with correct enumValues", () => {
@@ -193,7 +195,9 @@ describe("Notifications Table Schema", () => {
       expect(notificationTypeEnum.enumValues).toContain("shipped");
       expect(notificationTypeEnum.enumValues).toContain("out_for_delivery");
       expect(notificationTypeEnum.enumValues).toContain("delivered");
-      expect(notificationTypeEnum.enumValues).toHaveLength(4);
+      expect(notificationTypeEnum.enumValues).toContain("delivery_attempt_failed");
+      expect(notificationTypeEnum.enumValues).toContain("returning_to_sender");
+      expect(notificationTypeEnum.enumValues).toHaveLength(6);
     });
 
     it("should export NotificationType type with correct values", () => {

@@ -136,7 +136,7 @@ shiprocketWebhookApp.post('/', async (c) => {
   }
 
   try {
-    const outcome = await applyStatusPush({ ...push, shipmentId: row.id, orderId: row.orderId });
+    const outcome = await applyStatusPush({ ...push, shipmentId: row.id, orderId: row.orderId }, c);
     return c.json({ received: true, shipmentId: row.id, ...outcome }, 200);
   } catch (error) {
     if (marked) await redis.del(eventKey).catch(() => undefined);

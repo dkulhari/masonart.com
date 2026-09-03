@@ -178,6 +178,10 @@ export const AUDIT_ACTIONS = [
   'shipment.created',
   'shipment.tracking_updated',
   'shipment.label_issued',
+  // A courier status this codebase has no mapping for. Recorded rather than
+  // dropped, because a status nobody has seen is information and a stuck
+  // order should be visible somewhere an admin looks (#733).
+  'shipment.status_unmapped',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -263,6 +267,7 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'shipment.tracking_updated': 'fulfilment',
   // What we paid a carrier: the one shipment event that is money.
   'shipment.label_issued': 'money',
+  'shipment.status_unmapped': 'fulfilment',
 }
 
 /** A filterless page must not be able to dump the whole table. */

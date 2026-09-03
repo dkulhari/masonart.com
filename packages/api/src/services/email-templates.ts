@@ -1207,3 +1207,137 @@ Keep this email: we cannot show you this code again.`;
     text,
   };
 }
+
+/**
+ * Delivery Attempt Failed (NDR) Email Template
+ *
+ * The courier tried and could not hand the parcel over, and still holds it.
+ * Somebody has to act — usually the customer, by being reachable — so the
+ * email says what happened, what to do, and how to reach us, in that order.
+ */
+export function getDeliveryAttemptFailedTemplate(
+  order: Order,
+  shipment?: ShipmentForEmail | null
+): EmailTemplate {
+  const trackingUrl =
+    shipment?.trackingUrl || `https://chobii.art/track/${order.orderNumber}`;
+  const courier = shipment?.courierName || shipment?.carrier || "the courier";
+
+  const content = `
+    <div class="content">
+      <h2>We Couldn't Deliver Your Order Today</h2>
+      <p>Hi ${escapeHtml(order.shippingAddress?.fullName || "there")},</p>
+      <p>${escapeHtml(courier)} attempted to deliver your order today but couldn't complete the delivery. Your parcel is safe with them and they will try again.</p>
+
+      <div class="tracking-box">
+        <h3>What To Do</h3>
+        <p style="margin: 0;">
+          Please keep your phone reachable on the number you gave us, and make sure someone can receive the package at the delivery address. If the address needs a correction, reply to this email as soon as you can.
+        </p>
+      </div>
+
+      <center>
+        <a href="${trackingUrl}" class="button">Track Your Parcel</a>
+      </center>
+
+      <div class="order-box">
+        <h3>Delivering To</h3>
+        <p style="margin: 0;">${formatShippingAddress(order)}</p>
+      </div>
+
+      <div class="order-box">
+        <h3>Order Details</h3>
+        <div class="order-detail">
+          <span class="label">Order Number</span>
+          <span class="value">${order.orderNumber}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const text = `
+We Couldn't Deliver Your Order Today
+
+Hi ${order.shippingAddress?.fullName || "there"},
+
+${courier} attempted to deliver your order today but couldn't complete the delivery. Your parcel is safe with them and they will try again.
+
+Please keep your phone reachable and make sure someone can receive the package. If the address needs a correction, reply to this email as soon as you can.
+
+Track your parcel: ${trackingUrl}
+
+Order Number: ${order.orderNumber}
+
+Thank you for choosing chobii.art!
+  `.trim();
+
+  return {
+    subject: `Delivery Attempt Unsuccessful - ${order.orderNumber}`,
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+/**
+ * Returning To Sender (RTO) Email Template
+ *
+ * The parcel is on its way back. This is not a delivery attempt that may
+ * succeed tomorrow; it is a different outcome, and the customer needs to hear
+ * that we know and that we will be in touch about what happens next.
+ */
+export function getReturningToSenderTemplate(
+  order: Order,
+  shipment?: ShipmentForEmail | null
+): EmailTemplate {
+  const trackingUrl =
+    shipment?.trackingUrl || `https://chobii.art/track/${order.orderNumber}`;
+
+  const content = `
+    <div class="content">
+      <h2>Your Order Is Being Returned To Us</h2>
+      <p>Hi ${escapeHtml(order.shippingAddress?.fullName || "there")},</p>
+      <p>The courier was unable to deliver your order and it is now on its way back to us. We're sorry — this usually happens when delivery attempts couldn't be completed at the address.</p>
+
+      <div class="tracking-box">
+        <h3>What Happens Next</h3>
+        <p style="margin: 0;">
+          Once the parcel reaches us we will contact you to arrange a re-delivery or a refund, whichever you prefer. If you'd like to get ahead of that, reply to this email and tell us which you'd like.
+        </p>
+      </div>
+
+      <center>
+        <a href="${trackingUrl}" class="button">Track The Return</a>
+      </center>
+
+      <div class="order-box">
+        <h3>Order Details</h3>
+        <div class="order-detail">
+          <span class="label">Order Number</span>
+          <span class="value">${order.orderNumber}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const text = `
+Your Order Is Being Returned To Us
+
+Hi ${order.shippingAddress?.fullName || "there"},
+
+The courier was unable to deliver your order and it is now on its way back to us. We're sorry.
+
+Once the parcel reaches us we will contact you to arrange a re-delivery or a refund, whichever you prefer. Reply to this email to tell us which you'd like.
+
+Track the return: ${trackingUrl}
+
+Order Number: ${order.orderNumber}
+
+Thank you for choosing chobii.art!
+  `.trim();
+
+  return {
+    subject: `Your Order Is Being Returned - ${order.orderNumber}`,
+    html: baseTemplate(content),
+    text,
+  };
+}

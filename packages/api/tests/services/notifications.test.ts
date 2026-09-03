@@ -87,6 +87,16 @@ vi.mock('../../src/services/email-templates', () => ({
     html: '<p>Order delivered</p>',
     text: 'Order delivered',
   })),
+  getDeliveryAttemptFailedTemplate: vi.fn(() => ({
+    subject: 'Delivery Attempt Unsuccessful',
+    html: '<p>Delivery attempt unsuccessful</p>',
+    text: 'Delivery attempt unsuccessful',
+  })),
+  getReturningToSenderTemplate: vi.fn(() => ({
+    subject: 'Order Being Returned',
+    html: '<p>Order being returned</p>',
+    text: 'Order being returned',
+  })),
 }));
 
 // ============================================================================
@@ -571,6 +581,46 @@ describe('Notification Service', () => {
       });
 
       expect(templates.getDeliveredTemplate).toHaveBeenCalled();
+    });
+
+    it('should use the delivery-attempt-failed template for an NDR, under the shipped preference', async () => {
+      const templates = await import('../../src/services/email-templates');
+
+      const result = await sendOrderNotification({
+        orderId: 'order-123',
+        type: 'delivery_attempt_failed',
+      });
+
+      expect(templates.getDeliveryAttemptFailedTemplate).toHaveBeenCalled();
+      expect(templates.getReturningToSenderTemplate).not.toHaveBeenCalled();
+      expect(result.channels.email?.sent).toBe(true);
+    });
+
+    it('should use the returning-to-sender template for an RTO — a different message', async () => {
+      const templates = await import('../../src/services/email-templates');
+
+      const result = await sendOrderNotification({
+        orderId: 'order-123',
+        type: 'returning_to_sender',
+      });
+
+      expect(templates.getReturningToSenderTemplate).toHaveBeenCalled();
+      expect(templates.getDeliveryAttemptFailedTemplate).not.toHaveBeenCalled();
+      expect(result.channels.email?.sent).toBe(true);
+    });
+
+    it('sends neither courier-outcome message when the customer turned shipped mail off', async () => {
+      vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValue({
+        ...mockPreferences,
+        emailShipped: false,
+        smsShipped: false,
+      });
+      const templates = await import('../../src/services/email-templates');
+
+      const result = await sendOrderNotification({ orderId: 'order-123', type: 'returning_to_sender' });
+
+      expect(templates.getReturningToSenderTemplate).not.toHaveBeenCalled();
+      expect(result.channels.email).toBeUndefined();
     });
   });
 

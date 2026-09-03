@@ -27,6 +27,11 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "shipped", // Order has been shipped
   "out_for_delivery", // Order is out for delivery
   "delivered", // Order has been delivered
+  // Two courier outcomes with customer consequences (#733). Appended, never
+  // inserted: 0030 adds them with ADD VALUE and the order here must match the
+  // order Postgres holds.
+  "delivery_attempt_failed", // NDR: an attempt failed, the courier still holds it
+  "returning_to_sender", // RTO: the parcel is on its way back
 ]);
 
 /**

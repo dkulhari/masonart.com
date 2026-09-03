@@ -22,6 +22,8 @@ import {
   getShippedTemplate,
   getOutForDeliveryTemplate,
   getDeliveredTemplate,
+  getDeliveryAttemptFailedTemplate,
+  getReturningToSenderTemplate,
 } from '../../src/services/email-templates';
 import type { Order } from '../../src/database/schema/orders';
 
@@ -373,6 +375,42 @@ describe('Email Templates', () => {
   // ==========================================================================
   // Delivered Template Tests
   // ==========================================================================
+
+  describe('getDeliveryAttemptFailedTemplate', () => {
+    it('names the order and says the attempt failed, without saying delivered', () => {
+      const order = createMockOrder();
+      const template = getDeliveryAttemptFailedTemplate(order, createMockShipment() as never);
+
+      expect(template.subject).toContain(order.orderNumber);
+      expect(template.subject.toLowerCase()).toContain('unsuccessful');
+      expect(template.html.toLowerCase()).toContain("couldn't deliver");
+      expect(template.html.toLowerCase()).not.toContain('has been delivered');
+    });
+
+    it('tells the customer what to do and where the parcel is going', () => {
+      const order = createMockOrder();
+      const template = getDeliveryAttemptFailedTemplate(order, createMockShipment() as never);
+
+      expect(template.html.toLowerCase()).toContain('reachable');
+      expect(template.html).toContain('123 Main Street');
+      expect(template.html).toContain('Track');
+      expect(template.text.toLowerCase()).toContain('try again');
+    });
+  });
+
+  describe('getReturningToSenderTemplate', () => {
+    it('says the parcel is coming back and what happens next, and is not the NDR message', () => {
+      const order = createMockOrder();
+      const template = getReturningToSenderTemplate(order, createMockShipment() as never);
+
+      expect(template.subject).toContain(order.orderNumber);
+      expect(template.subject.toLowerCase()).toContain('returned');
+      expect(template.html.toLowerCase()).toContain('on its way back');
+      expect(template.html.toLowerCase()).toContain('refund');
+      expect(template.html.toLowerCase()).not.toContain('will try again');
+      expect(template.text.toLowerCase()).toContain('re-delivery');
+    });
+  });
 
   describe('getDeliveredTemplate', () => {
     it('should include order number in subject', () => {

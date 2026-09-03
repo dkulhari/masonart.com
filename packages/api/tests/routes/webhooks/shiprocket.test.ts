@@ -239,7 +239,10 @@ describe('the payload', () => {
         statusId: 7,
         at: '2026-09-04 10:00:00',
         courierName: 'Delhivery Surface',
-      })
+      }),
+      // The request context, so the audit rows the apply step writes carry
+      // the route's method and path.
+      expect.objectContaining({ req: expect.anything() })
     );
   });
 

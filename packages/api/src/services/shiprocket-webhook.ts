@@ -1,5 +1,6 @@
 /**
- * What the Shiprocket webhook receiver needs that the client does not (#732).
+ * What the Shiprocket webhook receiver needs that the client does not (#732),
+ * and what it does with a push once it has one (#733).
  *
  * Kept out of `services/shiprocket.ts` on purpose. That file is the CLIENT —
  * every export in it is a call we make to a courier, and
@@ -24,22 +25,53 @@
  * that row and never used to find one. A push that names an order the AWB
  * does not belong to is refused.
  *
- * ## The seam
+ * ## Applying a push
  *
- * `applyStatusPush` is where a verified, attributed, first-seen push goes.
- * #732 delivers the receiver; #733 delivers the mapping onto
- * `shipment_status` and the notifications that follow. Until then the seam
- * records nothing and says so in its answer, so a receiver deployed ahead of
- * the mapping is a receiver that acknowledges rather than one that guesses.
+ * `applyStatusPush` takes a verified, attributed, first-seen push and:
+ *
+ * 1. maps their status onto ours through `SHIPROCKET_STATUSES` — a data
+ *    table, so the unmapped set is inspectable. An UNKNOWN status is recorded
+ *    as an audit row (`shipment.status_unmapped`) where an admin will see it,
+ *    changes nothing, and does not crash the webhook. A known-but-ignored
+ *    status is acknowledged in silence.
+ * 2. refuses to move a shipment to where it already is, or backwards along
+ *    the delivery path (`shipmentMayMoveTo`). Replays and late scans are the
+ *    ordinary case, and this is what makes the whole receiver idempotent even
+ *    when Redis is down.
+ * 3. in ONE transaction: locks the row, writes the shipment status (stamping
+ *    `shipped_at` / `delivered_at` as the admin route does), moves the order
+ *    through the SAME tables the admin route uses
+ *    (`ORDER_STATUS_FOR_SHIPMENT_STATUS`, `orderShouldMoveTo`), and records
+ *    `shipment.tracking_updated` with the courier's words in its metadata.
+ * 4. fires the notification for the new status AFTER the commit and WITHOUT
+ *    awaiting it: mail is slow, the courier is waiting for a 200, and a
+ *    failed mail is logged rather than turned into a retry of the whole push.
+ *    RTO and NDR each have their own message.
  *
  * @see packages/api/src/routes/webhooks/shiprocket.ts
+ * @see packages/api/src/lib/shipment-status.ts
  * @see packages/api/tests/routes/webhooks/shiprocket.test.ts
+ * @see packages/api/tests/services/shiprocket-webhook-apply.test.ts
  */
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { db } from '../database';
+import { orders, type OrderStatus } from '../database/schema/orders';
+import { orderShipments, type ShipmentStatus } from '../database/schema/shipping';
+import type { NotificationType } from '../database/schema/notifications';
+import { recordAudit } from '../lib/audit';
+import { logger } from '../lib/logger';
+import {
+  ORDER_STATUS_FOR_SHIPMENT_STATUS,
+  mapShiprocketStatus,
+  orderShouldMoveTo,
+  shipmentMayMoveTo,
+} from '../lib/shipment-status';
+import { sendOrderNotification } from './notifications';
 import { courierOrderReference } from './shiprocket';
 
 export const SHIPROCKET_WEBHOOK_SECRET_VAR = 'SHIPROCKET_WEBHOOK_SECRET' as const;
@@ -95,7 +127,7 @@ const statusPushSchema = z.object({
 
 export interface ShipmentStatusPush {
   awb: string;
-  /** Their status text, verbatim. #733 maps it; this module does not. */
+  /** Their status text, verbatim. `SHIPROCKET_STATUSES` maps it. */
   status: string;
   statusId: number | null;
   /** Shiprocket's own order id, as text, or null when the push named none. */
@@ -162,16 +194,223 @@ export interface AttributedStatusPush extends ShipmentStatusPush {
   orderId: string;
 }
 
-export interface ApplyOutcome {
-  applied: boolean;
-  reason?: string;
+/**
+ * The part of a request context `recordAudit` reads. Structural, as
+ * `lib/audit.ts` declares it, so the receiver hands over its Hono context and
+ * a replay script hands over a stub.
+ */
+export interface WebhookActor {
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+  req: {
+    method: string;
+    path: string;
+    header(name: string): string | undefined;
+  };
 }
 
+export type ApplyOutcome =
+  | {
+      applied: true;
+      shipmentStatus: ShipmentStatus;
+      /** Where the order is after this push, moved or not. */
+      orderStatus: OrderStatus;
+      orderMoved: boolean;
+      /** The notification fired for the new status, or null for none. */
+      notification: NotificationType | null;
+    }
+  | {
+      applied: false;
+      reason:
+        | 'unmapped_status'
+        | 'ignored_status'
+        | 'already_there'
+        | 'out_of_order'
+        | 'shipment_not_found';
+      shipmentStatus?: ShipmentStatus;
+    };
+
 /**
- * The seam #733 fills: map the status onto `shipment_status`, move the
- * order, fire the notifications. Until it lands this records nothing and
- * says so — a receiver that acknowledges, not one that guesses.
+ * What a customer hears when a shipment reaches a status. `null` is a
+ * decision: nobody wants a message per hub scan.
  */
-export async function applyStatusPush(_push: AttributedStatusPush): Promise<ApplyOutcome> {
-  return { applied: false, reason: 'status_mapping_not_yet_delivered' };
+const NOTIFICATION_FOR_SHIPMENT_STATUS: Record<ShipmentStatus, NotificationType | null> = {
+  pending: null,
+  label_created: null,
+  shipped: 'shipped',
+  in_transit: null,
+  out_for_delivery: 'out_for_delivery',
+  undelivered: 'delivery_attempt_failed',
+  delivered: 'delivered',
+  rto_initiated: 'returning_to_sender',
+  /** Back with the vendor. The customer heard about the RTO when it started. */
+  rto_delivered: null,
+  lost: null,
+  cancelled: null,
+  failed: null,
+};
+
+/**
+ * Apply a verified, attributed, first-seen push. See the module header for
+ * the four steps; this is them in order.
+ */
+export async function applyStatusPush(
+  push: AttributedStatusPush,
+  actor: WebhookActor
+): Promise<ApplyOutcome> {
+  // 1. Theirs onto ours.
+  const mapping = mapShiprocketStatus(push, { detail: true });
+  if (mapping.ours === null) {
+    if (!mapping.known) {
+      logger.warn(
+        {
+          shipmentId: push.shipmentId,
+          awb: push.awb,
+          shiprocketStatus: push.status,
+          shiprocketStatusId: push.statusId,
+        },
+        'shiprocket webhook: status has no mapping, recorded and left alone'
+      );
+      await recordAudit(actor, {
+        action: 'shipment.status_unmapped',
+        entityType: 'order_shipment',
+        entityId: push.shipmentId,
+        summary: `Shiprocket reported "${push.status}" (${push.statusId ?? 'no id'}) for AWB ${push.awb}, which this system has no mapping for`,
+        // `failure`, so it stands out in the audit viewer: the push was
+        // received and nothing was done with it, which is the fact an admin
+        // needs to see.
+        outcome: 'failure',
+        metadata: {
+          orderId: push.orderId,
+          awb: push.awb,
+          shiprocketStatus: push.status,
+          shiprocketStatusId: push.statusId,
+          reportedAt: push.at,
+        },
+      });
+      return { applied: false, reason: 'unmapped_status' };
+    }
+    return { applied: false, reason: 'ignored_status' };
+  }
+  const next = mapping.ours;
+
+  // 2 and 3. The move, decided and made under the row lock.
+  const moved = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({
+        id: orderShipments.id,
+        orderId: orderShipments.orderId,
+        status: orderShipments.status,
+        orderStatus: orders.status,
+      })
+      .from(orderShipments)
+      .innerJoin(orders, eq(orders.id, orderShipments.orderId))
+      .where(eq(orderShipments.id, push.shipmentId))
+      .limit(1)
+      .for('update');
+
+    if (!row) return { applied: false as const, reason: 'shipment_not_found' as const };
+
+    if (row.status === next) {
+      return { applied: false as const, reason: 'already_there' as const, shipmentStatus: row.status };
+    }
+    if (!shipmentMayMoveTo(row.status, next)) {
+      return { applied: false as const, reason: 'out_of_order' as const, shipmentStatus: row.status };
+    }
+
+    const now = new Date();
+    const shipmentValues: Partial<typeof orderShipments.$inferInsert> = {
+      status: next,
+      updatedAt: now,
+    };
+    if (next === 'shipped') shipmentValues.shippedAt = now;
+    if (next === 'delivered') shipmentValues.deliveredAt = now;
+
+    const written = await tx
+      .update(orderShipments)
+      .set(shipmentValues)
+      .where(and(eq(orderShipments.id, row.id), eq(orderShipments.status, row.status)))
+      .returning({ id: orderShipments.id });
+    if (written.length !== 1) {
+      // Moved under the lock we hold: not possible on Postgres, and reported
+      // rather than assumed if a driver ever makes it possible.
+      throw new Error(`shipment ${row.id} moved while its status was being written`);
+    }
+
+    // The order, through the same table the admin route reads.
+    let orderStatus: OrderStatus = row.orderStatus;
+    let orderMoved = false;
+    const nextOrderStatus = ORDER_STATUS_FOR_SHIPMENT_STATUS[next];
+    if (orderShouldMoveTo(row.orderStatus, nextOrderStatus)) {
+      const orderValues: Partial<typeof orders.$inferInsert> = {
+        status: nextOrderStatus,
+        updatedAt: now,
+      };
+      if (nextOrderStatus === 'shipped') orderValues.shippedAt = now;
+      if (nextOrderStatus === 'delivered') orderValues.deliveredAt = now;
+
+      const movedRows = await tx
+        .update(orders)
+        .set(orderValues)
+        .where(and(eq(orders.id, row.orderId), eq(orders.status, row.orderStatus)))
+        .returning({ id: orders.id });
+
+      if (movedRows.length === 1) {
+        orderStatus = nextOrderStatus;
+        orderMoved = true;
+      } else {
+        // An admin moved the order between our read and our write. The
+        // shipment fact still lands; the order is somebody's decision now.
+        logger.warn(
+          { shipmentId: row.id, orderId: row.orderId, from: row.orderStatus, to: nextOrderStatus },
+          'shiprocket webhook: order moved concurrently, left where it is'
+        );
+      }
+    }
+
+    await recordAudit(
+      actor,
+      {
+        action: 'shipment.tracking_updated',
+        entityType: 'order_shipment',
+        entityId: row.id,
+        summary: `Courier reported ${next.replace(/_/g, ' ')} for AWB ${push.awb}`,
+        before: { status: row.status, orderStatus: row.orderStatus },
+        after: { status: next, orderStatus },
+        metadata: {
+          orderId: row.orderId,
+          source: 'shiprocket_webhook',
+          awb: push.awb,
+          shiprocketStatus: push.status,
+          shiprocketStatusId: push.statusId,
+          reportedAt: push.at,
+          courierName: push.courierName,
+        },
+      },
+      tx
+    );
+
+    return { applied: true as const, shipmentStatus: next, orderStatus, orderMoved, orderId: row.orderId };
+  });
+
+  if (!moved.applied) return moved;
+
+  // 4. The customer, after the commit and off the request's clock.
+  const notification = NOTIFICATION_FOR_SHIPMENT_STATUS[moved.shipmentStatus];
+  if (notification !== null) {
+    void sendOrderNotification({ orderId: moved.orderId, type: notification }).catch((error) => {
+      logger.error(
+        { err: error, shipmentId: push.shipmentId, notification },
+        'shiprocket webhook: notification failed'
+      );
+    });
+  }
+
+  return {
+    applied: true,
+    shipmentStatus: moved.shipmentStatus,
+    orderStatus: moved.orderStatus,
+    orderMoved: moved.orderMoved,
+    notification,
+  };
 }
