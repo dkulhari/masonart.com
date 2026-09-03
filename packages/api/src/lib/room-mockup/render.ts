@@ -36,7 +36,7 @@ import {
 import { orientBuffer, orientFile } from './orient';
 import { buildFramedPanel } from './panel';
 import type { RoomScene } from './scene';
-import { posterSizeForAspect } from './sizing';
+import { posterSizeToFill } from './sizing';
 import type { FrameRender } from './templates';
 import { panelSizeForQuad, warpPanelIntoQuad } from './warp';
 import {
@@ -45,6 +45,7 @@ import {
   fitPosterCm,
   isAxisAligned,
   normaliseQuad,
+  panelPixelsForRect,
   projectRectCm,
   pxPerCmAt,
   shadowOffsetCm,
@@ -104,7 +105,11 @@ export async function frameArtwork(art: Buffer, frame: FrameRender): Promise<Buf
 }
 
 export interface SceneRenderOptions {
-  /** Physical poster size; defaults to the middle rung of the art's ladder. */
+  /**
+   * Physical poster size. Defaults to the largest rectangle of the art's own
+   * aspect that fits the scene's allowable box: the room shot is a
+   * representative image, so the poster fills the wall and the mat is even.
+   */
   posterCm?: SizeCm;
   /** Seeds the grain, together with the scene id. Use the product slug or SKU. */
   seedKey: string;
@@ -183,7 +188,8 @@ export async function renderSceneMockup(
   const oriented = await orientBuffer(art);
   const ameta = await sharp(oriented).metadata();
   const requested =
-    options.posterCm ?? posterSizeForAspect(ameta.width ?? 1, ameta.height ?? 1);
+    options.posterCm ??
+    posterSizeToFill(ameta.width ?? 1, ameta.height ?? 1, frame.widthCm, scene.allowable);
 
   // Orient the room the same way, for the same reason as the art: the quad
   // was measured against the DISPLAYED image, and a plain metadata() read
@@ -211,16 +217,10 @@ export async function renderSceneMockup(
   const frontN = normaliseQuad(frontPx, W, H);
   assertUsableQuad(frontN, scene.id);
 
-  // Stage 3: the flat panel, at 2× its projected extent so the warp downsamples.
-  const ext = panelSizeForQuad(frontN, W, H);
-  const panel = await buildFramedPanel(
-    oriented,
-    poster,
-    frame,
-    ext.width * 2,
-    ext.height * 2,
-    scene.light
-  );
+  // Stage 3: the flat panel, in the outer rectangle's cm aspect and at
+  // least 2× its projected extent so the warp downsamples.
+  const px = panelPixelsForRect(panelSizeForQuad(frontN, W, H), outer);
+  const panel = await buildFramedPanel(oriented, poster, frame, px.width, px.height, scene.light);
 
   // Stage 4a: the front face. Box path when the projection is a rectangle.
   const front = isAxisAligned(frontPx)

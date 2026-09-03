@@ -8,7 +8,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { getSizesForOrientation } from '@chobii/shared';
-import { parsePosterCm, posterSizeForAspect } from '../../../src/lib/room-mockup/sizing';
+import {
+  parsePosterCm,
+  posterSizeForAspect,
+  posterSizeToFill,
+} from '../../../src/lib/room-mockup/sizing';
 
 const mid = (o: 'square' | 'portrait' | 'landscape' | 'panoramic') => {
   const ladder = getSizesForOrientation(o);
@@ -48,6 +52,52 @@ describe('posterSizeForAspect', () => {
   it('rejects a non-positive dimension', () => {
     expect(() => posterSizeForAspect(0, 10)).toThrow(/dimensions/);
     expect(() => posterSizeForAspect(10, 0)).toThrow(/dimensions/);
+  });
+});
+
+describe('posterSizeToFill', () => {
+  // The room's allowable box, less the frame face on every side, is what the
+  // poster may fill. 110 × 130 with a 3.2 cm face leaves 103.6 × 123.6.
+  const allowable = { maxWidthCm: 110, maxHeightCm: 130, minMarginCm: 20 };
+  const FACE = 3.2;
+
+  it('tall art fills the height and keeps its own aspect', () => {
+    const s = posterSizeToFill(633, 1200, FACE, allowable);
+
+    expect(s.heightCm).toBeCloseTo(123.6, 5);
+    expect(s.widthCm / s.heightCm).toBeCloseTo(633 / 1200, 5);
+    expect(s.widthCm).toBeLessThan(103.6);
+  });
+
+  it('wide art fills the width and keeps its own aspect', () => {
+    const s = posterSizeToFill(1024, 768, FACE, allowable);
+
+    expect(s.widthCm).toBeCloseTo(103.6, 5);
+    expect(s.widthCm / s.heightCm).toBeCloseTo(1024 / 768, 5);
+    expect(s.heightCm).toBeLessThan(123.6);
+  });
+
+  it('square art is bounded by the shorter side of the box', () => {
+    const s = posterSizeToFill(700, 700, FACE, allowable);
+
+    expect(s.widthCm).toBeCloseTo(103.6, 5);
+    expect(s.heightCm).toBeCloseTo(103.6, 5);
+  });
+
+  it('a frameless poster uses the whole box', () => {
+    const s = posterSizeToFill(1024, 768, 0, allowable);
+
+    expect(s.widthCm).toBeCloseTo(110, 5);
+    expect(s.heightCm).toBeCloseTo(82.5, 5);
+  });
+
+  it('rejects a non-positive dimension', () => {
+    expect(() => posterSizeToFill(0, 10, FACE, allowable)).toThrow(/dimensions/);
+    expect(() => posterSizeToFill(10, 0, FACE, allowable)).toThrow(/dimensions/);
+  });
+
+  it('rejects a face too wide for the box', () => {
+    expect(() => posterSizeToFill(10, 10, 60, allowable)).toThrow(/face/);
   });
 });
 

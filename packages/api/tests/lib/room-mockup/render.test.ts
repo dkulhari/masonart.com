@@ -21,7 +21,7 @@ import {
 } from '../../../src/lib/room-mockup/render';
 import type { FrameRender } from '../../../src/lib/room-mockup/templates';
 import { applyHomography } from '../../../src/lib/room-mockup/homography';
-import { posterSizeForAspect } from '../../../src/lib/room-mockup/sizing';
+import { posterSizeToFill } from '../../../src/lib/room-mockup/sizing';
 import { centredRectCm, wallHomography } from '../../../src/lib/room-mockup/wall';
 import { makeRoom } from './fixtures/synthetic-room';
 
@@ -95,6 +95,8 @@ const RW = 1000;
 const RH = 800;
 const WALL = { widthCm: 320, heightCm: 260 };
 const CENTRE = { x: 0.5 * WALL.widthCm, y: 0.42 * WALL.heightCm };
+/** Same as the synthetic room fixture's allowable box. */
+const ALLOWABLE = { maxWidthCm: 140, maxHeightCm: 160, minMarginCm: 20 };
 
 const rgbAt = async (img: Buffer, x: number, y: number): Promise<[number, number, number]> => {
   const { data, info } = await sharp(img).raw().toBuffer({ resolveWithObject: true });
@@ -104,7 +106,7 @@ const rgbAt = async (img: Buffer, x: number, y: number): Promise<[number, number
 
 /** The outer (frame) rectangle the renderer must have placed for this art. */
 const outerFor = (aw: number, ah: number, faceCm: number) => {
-  const poster = posterSizeForAspect(aw, ah);
+  const poster = posterSizeToFill(aw, ah, faceCm, ALLOWABLE);
   return centredRectCm(CENTRE, {
     widthCm: poster.widthCm + 2 * faceCm,
     heightCm: poster.heightCm + 2 * faceCm,
@@ -186,6 +188,31 @@ describe('renderSceneMockup (angled room)', () => {
 
     expect(a.equals(b)).toBe(true);
     expect(a.equals(c)).toBe(false);
+  });
+
+  it('by default the frame fills the allowable box at the art\'s own aspect', async () => {
+    const { path, scene } = await makeRoom('angled', RW, RH);
+    const h = wallHomography(scene.wall.quad, WALL.widthCm, WALL.heightCm, RW, RH);
+
+    // Tall art is bounded by the box height: the frame's top edge sits at
+    // anchor − 80 cm. 1 cm below it is face; 5 cm above it is wall (the
+    // shadow falls downward, so above is clean).
+    const tall = await renderSceneMockup(await art(600, 800), path, scene, BLACK, { seedKey: 's' });
+    const top = CENTRE.y - ALLOWABLE.maxHeightCm / 2;
+    const onFace = applyHomography(h, { x: CENTRE.x, y: top + 1 });
+    const onWall = applyHomography(h, { x: CENTRE.x, y: top - 5 });
+    expect(Math.max(...(await rgbAt(tall, onFace.x, onFace.y)))).toBeLessThan(60);
+    expect((await rgbAt(tall, onWall.x, onWall.y))[0]).toBeGreaterThan(150);
+
+    // Wide art is bounded by the box width: the frame's right edge sits at
+    // anchor + 70 cm. 1 cm inside is face; 6 cm outside is wall, past the
+    // cast shadow's reach.
+    const wide = await renderSceneMockup(await art(1500, 500), path, scene, BLACK, { seedKey: 's' });
+    const right = CENTRE.x + ALLOWABLE.maxWidthCm / 2;
+    const face2 = applyHomography(h, { x: right - 1, y: CENTRE.y });
+    const wall2 = applyHomography(h, { x: right + 6, y: CENTRE.y });
+    expect(Math.max(...(await rgbAt(wide, face2.x, face2.y)))).toBeLessThan(60);
+    expect((await rgbAt(wide, wall2.x, wall2.y))[0]).toBeGreaterThan(150);
   });
 
   it('honours an explicit poster size', async () => {

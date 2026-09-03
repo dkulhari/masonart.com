@@ -35,6 +35,37 @@ export function posterSizeForAspect(artW: number, artH: number): SizeCm {
     : { widthCm: rung.widthCm, heightCm: rung.heightCm };
 }
 
+/**
+ * The size that FILLS the room's allowable box at the art's own proportion.
+ *
+ * The room shot is a representative image, not a size chart: the poster
+ * should be as large as the wall allows and keep the art's aspect, so the
+ * mat comes out even on all four sides. The allowable box is for the framed
+ * outer rectangle, so the face is taken off both sides first.
+ */
+export function posterSizeToFill(
+  artW: number,
+  artH: number,
+  faceCm: number,
+  allowable: { maxWidthCm: number; maxHeightCm: number }
+): SizeCm {
+  if (!(artW > 0) || !(artH > 0)) {
+    throw new Error(`Cannot size a poster with dimensions ${artW}×${artH}.`);
+  }
+
+  const boxW = allowable.maxWidthCm - 2 * faceCm;
+  const boxH = allowable.maxHeightCm - 2 * faceCm;
+  if (boxW <= 0 || boxH <= 0) {
+    throw new Error(
+      `A ${faceCm} cm frame face leaves no room inside the ${allowable.maxWidthCm}×${allowable.maxHeightCm} cm allowable box.`
+    );
+  }
+
+  const aspect = artW / artH;
+  const byHeight = { widthCm: boxH * aspect, heightCm: boxH };
+  return byHeight.widthCm <= boxW ? byHeight : { widthCm: boxW, heightCm: boxW / aspect };
+}
+
 export function parsePosterCm(value: string): SizeCm {
   const m = /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*$/i.exec(value);
   const w = m ? Number(m[1]) : 0;

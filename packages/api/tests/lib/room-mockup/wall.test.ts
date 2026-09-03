@@ -14,6 +14,7 @@ import {
   assertRectWithinMargin,
   centredRectCm,
   fitPosterCm,
+  panelPixelsForRect,
   isAxisAligned,
   normaliseQuad,
   projectRectCm,
@@ -119,6 +120,30 @@ describe('centredRectCm / translateRect', () => {
 
   it('translates', () => {
     expect(translateRect({ x: 1, y: 2, w: 3, h: 4 }, 0.5, -1)).toEqual({ x: 1.5, y: 1, w: 3, h: 4 });
+  });
+});
+
+describe('panelPixelsForRect', () => {
+  // The projected quad of an angled wall is foreshortened sideways, so its
+  // pixel extent has the wrong aspect for a panel drawn in wall centimetres:
+  // a face or mat sized from panelW would come out thinner on the sides than
+  // on the top. The panel must keep the cm aspect and still be at least twice
+  // the projected extent on both axes, so the warp downsamples.
+  it('keeps the cm aspect of the outer rectangle', () => {
+    const p = panelPixelsForRect({ width: 398, height: 513 }, { widthCm: 71.6, heightCm: 130 });
+    expect(p.width / p.height).toBeCloseTo(71.6 / 130, 2);
+  });
+
+  it('is at least twice the projected extent on both axes', () => {
+    const p = panelPixelsForRect({ width: 398, height: 513 }, { widthCm: 71.6, heightCm: 130 });
+    expect(p.width).toBeGreaterThanOrEqual(796);
+    expect(p.height).toBeGreaterThanOrEqual(1026);
+  });
+
+  it('a square in cm is a square in pixels even when the projection squashes it', () => {
+    const p = panelPixelsForRect({ width: 300, height: 500 }, { widthCm: 100, heightCm: 100 });
+    expect(p.width).toBe(p.height);
+    expect(p.height).toBeGreaterThanOrEqual(1000);
   });
 });
 

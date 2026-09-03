@@ -202,6 +202,26 @@ export function pxPerCmAt(h: Matrix3, at: Point): number {
 }
 
 /**
+ * How many pixels to draw the flat panel at.
+ *
+ * The panel is composed in wall centimetres — face, bevel, mat are all cm —
+ * so its pixel aspect must be the cm aspect of the outer rectangle, or a
+ * face sized from panelW comes out thinner on the sides than on the top
+ * whenever the wall is angled (its projection is squashed sideways). Both
+ * axes are at least twice the projected extent so the warp downsamples.
+ */
+export function panelPixelsForRect(
+  ext: { width: number; height: number },
+  outer: SizeCm
+): { width: number; height: number } {
+  const scale = Math.max((2 * ext.width) / outer.widthCm, (2 * ext.height) / outer.heightCm);
+  return {
+    width: Math.max(1, Math.round(outer.widthCm * scale)),
+    height: Math.max(1, Math.round(outer.heightCm * scale)),
+  };
+}
+
+/**
  * Whether a projected quad is a screen-aligned rectangle — the case a plain
  * resize handles better than a bilinear warp, and the only case in which the
  * cheap `fitIntoBox` path is exact.
