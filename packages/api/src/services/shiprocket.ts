@@ -249,6 +249,9 @@ export const SHIPROCKET_ENV_VARS = [
   'SHIPROCKET_EMAIL',
   'SHIPROCKET_PASSWORD',
   'SHIPROCKET_BASE_URL',
+  // Read by `services/shiprocket-webhook.ts`, not by this client — listed
+  // here because this is the list `.env.example` is held to (#732).
+  'SHIPROCKET_WEBHOOK_SECRET',
 ] as const;
 
 export type ShiprocketEnvVar = (typeof SHIPROCKET_ENV_VARS)[number];

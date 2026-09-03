@@ -30,6 +30,7 @@ import { giftCardsApp } from "./routes/gift-cards";
 import { phoneAuthApp } from "./routes/phone-auth";
 import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
 import { walletWebhookApp } from "./routes/webhooks/wallet";
+import { shiprocketWebhookApp } from "./routes/webhooks/shiprocket";
 import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
 import { adminGiftCardsApp } from "./routes/admin/gift-cards";
@@ -335,6 +336,9 @@ app.route("/api/webhooks/razorpay", razorpayWebhooksApp);
 
 // Wallet top-up webhooks
 app.route("/api/webhooks/wallet", walletWebhookApp);
+
+// Shiprocket status pushes (order-dispatch-tracking)
+app.route("/api/webhooks/shiprocket", shiprocketWebhookApp);
 
 // ============================================================================
 // SEO Routes

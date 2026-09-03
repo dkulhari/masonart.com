@@ -248,6 +248,17 @@ describe('Hono Server Startup', () => {
       expect([200, 400, 401, 403, 404, 500]).toContain(res.status);
     });
 
+    it('should have shiprocket webhooks route mounted', async () => {
+      // Unconfigured in tests, so the receiver answers its named 503 — which
+      // is the route existing, not a 404 from the fallthrough.
+      const res = await app.request('/api/webhooks/shiprocket', {
+        method: 'POST',
+        body: JSON.stringify({}),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      expect([401, 503]).toContain(res.status);
+    });
+
     it('should have sitemap route mounted', async () => {
       const res = await app.request('/sitemap.xml');
       // Route exists
