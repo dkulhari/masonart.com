@@ -46,6 +46,14 @@ quad is right. If it swims, it is not.
 
 Then fill the fields and download `room-<id>.json` next to the PNG.
 
+**Poster-box mode** (`mode` selector, or `?mode=box`): click the four corners
+of where the framed poster should hang instead of the whole wall. That box
+becomes the wall plane; the poster fills it at its own aspect, the yaw is
+read off the box, and no centimetres are typed. The `/room-mockup` skill
+runs this in your Chrome and reads the result off the page — see
+`.claude/skills/room-mockup/SKILL.md`. `tools/serve-measure.ts` serves the
+tool and the room images on `127.0.0.1:8765` for it.
+
 | Field | Meaning |
 |---|---|
 | `wall.quad` | The four corners, normalised 0–1, wound tl → tr → br → bl |

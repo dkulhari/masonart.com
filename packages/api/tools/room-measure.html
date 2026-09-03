@@ -29,6 +29,7 @@
   .step { font-weight: 600; color: #ffd166; min-height: 1.4em; }
   .muted { color: #888; }
   .warn { color: #f90; white-space: pre-wrap; }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
@@ -40,27 +41,30 @@
   <h1>Room measure</h1>
   <label>Image <input type="file" id="imgFile" accept="image/*"></label>
   <div id="imgInfo" class="muted">no image loaded</div>
+  <label>mode <select id="f-mode"><option value="wall" selected>whole wall</option><option value="box">poster box</option></select></label>
+  <div id="modeHelp" class="muted"></div>
   <div id="step" class="step"></div>
   <div class="row"><button id="resetBtn" type="button">Reset corners</button></div>
   <fieldset><legend>Scene</legend>
     <label>id <input id="f-id" type="text" value="01" pattern="[a-z0-9-]+"></label>
     <label>label <input id="f-label" type="text" value="" placeholder="Living room"></label>
   </fieldset>
-  <fieldset><legend>Wall (cm)</legend>
+  <fieldset class="wall-only"><legend>Wall (cm)</legend>
     <label>widthCm <input id="f-widthCm" type="number" value="320" step="1"></label>
     <label>heightCm <input id="f-heightCm" type="number" value="260" step="1"></label>
   </fieldset>
-  <fieldset><legend>Anchor (0..1 across the wall)</legend>
+  <fieldset class="wall-only"><legend>Anchor (0..1 across the wall)</legend>
     <label>anchor.x <input id="f-anchorX" type="number" value="0.5" step="0.01" min="0" max="1"></label>
     <label>anchor.y <input id="f-anchorY" type="number" value="0.42" step="0.01" min="0" max="1"></label>
   </fieldset>
-  <fieldset><legend>Allowable (cm)</legend>
+  <fieldset class="wall-only"><legend>Allowable (cm)</legend>
     <label>maxWidthCm <input id="f-maxWidthCm" type="number" value="120" step="1"></label>
     <label>maxHeightCm <input id="f-maxHeightCm" type="number" value="150" step="1"></label>
     <label>minMarginCm <input id="f-minMarginCm" type="number" value="25" step="1"></label>
   </fieldset>
   <fieldset><legend>View</legend>
     <label>yawDeg <input id="f-yawDeg" type="number" value="-25" step="1"></label>
+    <label class="box-only hidden">yaw from the box <input id="f-yawAuto" type="checkbox" checked></label>
   </fieldset>
   <fieldset><legend>Light</legend>
     <label>direction <select id="f-lightDir"><option value="left" selected>left</option><option value="right">right</option></select></label>
@@ -96,14 +100,52 @@ const clamp = v => Math.min(1, Math.max(0, v));
 const num = k => { const v = parseFloat(F[k].value); return Number.isFinite(v) ? v : 0; };
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
+const isBox = () => F.mode.value === 'box';
+
+// Poster-box mode: the four clicks are the poster's own rectangle, so the
+// wall IS the box. Its cm size is nominal (100 wide, height from the box's
+// pixel aspect), the anchor is its centre, the allowable is all of it, and
+// the yaw is read off the box unless the author unticks "yaw from the box".
+function boxYaw() {
+  const [W, H] = imageSize();
+  if (corners.length < 4 || !W || !H) return 0;
+  const px = corners.map(c => [c[0] * W, c[1] * H]);
+  const left = dist(px[0], px[3]), right = dist(px[1], px[2]);
+  const diff = (left - right) / Math.max(left, right);
+  return Math.abs(diff) < 0.01 ? 0 : diff > 0 ? -20 : 20;
+}
+
 function fields() {
-  return {
+  const f = {
     id: F.id.value.trim(), label: F.label.value, widthCm: num('widthCm'), heightCm: num('heightCm'),
     anchorX: num('anchorX'), anchorY: num('anchorY'),
     maxWidthCm: num('maxWidthCm'), maxHeightCm: num('maxHeightCm'), minMarginCm: num('minMarginCm'),
     yawDeg: num('yawDeg'), lightDir: F.lightDir.value, elevationDeg: num('elevationDeg'),
     softness: num('softness'), strength: num('strength'),
   };
+  if (!isBox()) return f;
+  if (F.yawAuto.checked) { f.yawDeg = boxYaw(); F.yawDeg.value = f.yawDeg; }
+  const [W, H] = imageSize();
+  let aspect = 1;
+  if (corners.length === 4 && W && H) {
+    const q = quad().map(c => [c[0] * W, c[1] * H]);
+    const w = (dist(q[0], q[1]) + dist(q[3], q[2])) / 2, h = (dist(q[0], q[3]) + dist(q[1], q[2])) / 2;
+    aspect = w > 0 ? h / w : 1;
+  }
+  f.widthCm = 100; f.heightCm = Math.round(100 * aspect * 1e4) / 1e4;
+  f.anchorX = 0.5; f.anchorY = 0.5;
+  f.maxWidthCm = f.widthCm; f.maxHeightCm = f.heightCm; f.minMarginCm = 0;
+  return f;
+}
+
+// The quad the scene gets. In box mode with yaw 0 the hand-drawn box is
+// snapped to a true rectangle (mean top, bottom, left, right), because a
+// straight-on scene must be one and a hand never draws one exactly.
+function quad() {
+  if (corners.length < 4 || !isBox() || Math.abs(F.yawAuto.checked ? boxYaw() : num('yawDeg')) >= 0.5) return corners;
+  const [tl, tr, br, bl] = corners;
+  const top = (tl[1] + tr[1]) / 2, bottom = (bl[1] + br[1]) / 2, left = (tl[0] + bl[0]) / 2, right = (tr[0] + br[0]) / 2;
+  return [[left, top], [right, top], [right, bottom], [left, bottom]];
 }
 
 // ---- homography: 4 src points -> 4 dst points, DLT solved by Gaussian elimination with partial pivoting
@@ -148,7 +190,7 @@ function wallHomography(f) {
   const [W, H] = imageSize();
   if (corners.length < 4 || !W || !H) return null;
   const src = [[0, 0], [f.widthCm, 0], [f.widthCm, f.heightCm], [0, f.heightCm]];
-  return homography(src, corners.map(c => [c[0] * W, c[1] * H]));
+  return homography(src, quad().map(c => [c[0] * W, c[1] * H]));
 }
 
 // ---- checks (mirror the renderer's rules)
@@ -156,8 +198,9 @@ function runChecks(f) {
   const out = [];
   out.push({ ok: /^[a-z0-9-]+$/.test(f.id), text: 'id matches ^[a-z0-9-]+$' });
   if (corners.length < 4) { out.push({ ok: false, text: 'four corners placed' }); return out; }
+  const Q = quad();
   // winding: cross products of consecutive edges must all be > 0 (same turn as the unit square, y down)
-  const e = corners.map((p, i) => { const n = corners[(i + 1) % 4]; return [n[0] - p[0], n[1] - p[1]]; });
+  const e = Q.map((p, i) => { const n = Q[(i + 1) % 4]; return [n[0] - p[0], n[1] - p[1]]; });
   const cs = e.map((v, i) => { const n = e[(i + 1) % 4]; return v[0] * n[1] - v[1] * n[0]; });
   const collinear = cs.some(c => Math.abs(c) < 1e-9);
   const pos = cs.filter(c => c > 0).length, neg = cs.filter(c => c < 0).length;
@@ -167,7 +210,7 @@ function runChecks(f) {
   else if (neg === 4) wt += ' — reversed (wrong direction)';
   out.push({ ok: !collinear && pos === 4, text: wt });
   // yaw vs quad
-  const [tl, tr, br, bl] = corners;
+  const [tl, tr, br, bl] = Q;
   const left = dist(tl, bl), right = dist(tr, br);
   const diff = (left - right) / Math.max(left, right);
   let yawOk, yt;
@@ -196,12 +239,13 @@ function runChecks(f) {
 // ---- JSON
 function buildJson(f) {
   const r4 = v => Math.round(v * 1e4) / 1e4;
-  const quad = {};
-  KEYS.forEach((k, i) => { if (corners[i]) quad[k] = [r4(corners[i][0]), r4(corners[i][1])]; });
+  const qd = {};
+  const Q = quad();
+  KEYS.forEach((k, i) => { if (Q[i]) qd[k] = [r4(Q[i][0]), r4(Q[i][1])]; });
   const yaw = f.yawDeg;
   const scene = {
     id: f.id, image: imageName(), imageSize: imageSize().map(Math.round),
-    wall: { quad, widthCm: f.widthCm, heightCm: f.heightCm },
+    wall: { quad: qd, widthCm: f.widthCm, heightCm: f.heightCm },
     anchor: { x: f.anchorX, y: f.anchorY },
     allowable: { maxWidthCm: f.maxWidthCm, maxHeightCm: f.maxHeightCm, minMarginCm: f.minMarginCm },
     view: { yawDeg: yaw, nearSide: yaw < -0.5 ? 'left' : yaw > 0.5 ? 'right' : 'none' },
@@ -253,7 +297,7 @@ function draw(f) {
   const S = corners.map(toScreen);
   if (S.length) {
     ctx.setLineDash([]); ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = 2;
-    poly(S, S.length === 4);
+    poly(S.length === 4 ? quad().map(toScreen) : S, S.length === 4);
     ctx.font = 'bold 12px sans-serif';
     S.forEach((p, i) => {
       ctx.beginPath(); ctx.arc(p[0], p[1], 6, 0, Math.PI * 2);
@@ -276,9 +320,14 @@ function fit() {
 function update() {
   const f = fields();
   const ready = corners.length === 4;
+  document.querySelectorAll('.wall-only').forEach(el => el.classList.toggle('hidden', isBox()));
+  document.querySelectorAll('.box-only').forEach(el => el.classList.toggle('hidden', !isBox()));
+  $('modeHelp').textContent = isBox()
+    ? 'Click the four corners of where the framed poster should hang. That box is the wall plane; the poster fills it at its own aspect.'
+    : 'Click the four corners of a rectangle on the wall, then type its real size, the anchor and the allowable box.';
   $('step').textContent = !img ? (jsonImage ? 'Load the image to see the overlay' : 'Load an image to begin')
     : ready ? 'Drag a corner to adjust · arrow keys nudge the selected corner (shift ×10)'
-    : `Click ${NAMES[corners.length]} corner …`;
+    : `Click the ${isBox() ? 'poster' : 'wall'} ${NAMES[corners.length]} corner …`;
   $('checks').innerHTML = runChecks(f).map(c => `<li class="${c.ok ? 'ok' : 'bad'}">${c.ok ? '✓' : '✗'} ${c.text}</li>`).join('');
   $('out').value = buildJson(f);
   $('dlBtn').disabled = !ready;
@@ -288,18 +337,32 @@ function update() {
 }
 
 // ---- image / JSON loading
+function setImage(im, name) {
+  img = im; imgName = name; natW = im.naturalWidth; natH = im.naturalHeight;
+  $('imgInfo').textContent = `${name} — natural size ${natW} × ${natH} px`;
+  $('hint').hidden = true;
+  fit(); update();
+}
 $('imgFile').addEventListener('change', e => {
   const file = e.target.files[0]; if (!file) return;
   const url = URL.createObjectURL(file), im = new Image();
-  im.onload = () => {
-    img = im; imgName = file.name; natW = im.naturalWidth; natH = im.naturalHeight;
-    $('imgInfo').textContent = `${file.name} — natural size ${natW} × ${natH} px`;
-    $('hint').hidden = true;
-    fit(); update(); URL.revokeObjectURL(url);
-  };
+  im.onload = () => { setImage(im, file.name); URL.revokeObjectURL(url); };
   im.onerror = () => { $('imgInfo').textContent = 'Could not decode that image.'; URL.revokeObjectURL(url); };
   im.src = url;
 });
+// ?image=rooms/room-01.png loads by URL (same origin, see serve-measure.ts); ?mode=box&id=01 preset the fields.
+function loadImageUrl(url) {
+  const im = new Image();
+  im.onload = () => setImage(im, decodeURIComponent(url.split('/').pop().split('?')[0]));
+  im.onerror = () => { $('imgInfo').textContent = `Could not load ${url}`; };
+  im.src = url;
+}
+{
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('mode') === 'box' || qs.get('mode') === 'wall') F.mode.value = qs.get('mode');
+  if (qs.get('id') && /^[a-z0-9-]+$/.test(qs.get('id'))) F.id.value = qs.get('id');
+  if (qs.get('image')) loadImageUrl(qs.get('image'));
+}
 
 $('jsonFile').addEventListener('change', e => {
   const file = e.target.files[0]; if (!file) return;

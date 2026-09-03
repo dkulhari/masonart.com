@@ -131,6 +131,45 @@ describe('loadRoomScene', () => {
   });
 });
 
+describe('loadRoomScene (poster-box scene)', () => {
+  // What tools/room-measure.html writes in "poster box" mode: the four
+  // clicks are the poster's own rectangle, so the wall IS the box — anchor at
+  // its centre, allowable the whole box, no margin. The loader must accept
+  // that boundary case, or the box mode cannot exist. Two rules the tool
+  // honours: a yaw-0 box is snapped to a true rectangle, and the box is at
+  // least 400 px wide on the image.
+  it('accepts a box that is the whole wall with a zero margin', () => {
+    const s = load({
+      wall: {
+        quad: { tl: [0.5, 0.17], tr: [0.75, 0.17], br: [0.75, 0.5], bl: [0.5, 0.5] },
+        widthCm: 100,
+        heightCm: 133.3333,
+      },
+      anchor: { x: 0.5, y: 0.5 },
+      allowable: { maxWidthCm: 100, maxHeightCm: 133.3333, minMarginCm: 0 },
+      view: { yawDeg: 0 },
+    });
+
+    expect(s.allowable.minMarginCm).toBe(0);
+    expect(s.view.nearSide).toBe('none');
+  });
+
+  it('accepts a hand-drawn box with a slight lean when a yaw is declared', () => {
+    const s = load({
+      wall: {
+        quad: { tl: [0.5, 0.17], tr: [0.75, 0.185], br: [0.75, 0.5], bl: [0.5, 0.51] },
+        widthCm: 100,
+        heightCm: 133.3333,
+      },
+      anchor: { x: 0.5, y: 0.5 },
+      allowable: { maxWidthCm: 100, maxHeightCm: 133.3333, minMarginCm: 0 },
+      view: { yawDeg: -20 },
+    });
+
+    expect(s.view.nearSide).toBe('left');
+  });
+});
+
 describe('loadRoomScenes', () => {
   it('rejects duplicate ids', () => {
     expect(() => loadRoomScenes([scene(), scene()], { imageExists: exists })).toThrow(
