@@ -36,6 +36,7 @@
     "db:import-catalogue": "bun run --env-file=../../.env src/database/import-catalogue.ts",
     "mockups:rooms": "bun run src/database/generate-room-mockups.ts",
     "mockups:generate-rooms": "bun run src/database/generate-room-images.ts",
+    "mockups:aperture": "bun run src/database/generate-aperture-mockups.ts",
     "db:retire-sent-status": "bun run --env-file=../../.env src/database/retire-sent-status.ts"
   },
   "dependencies": {

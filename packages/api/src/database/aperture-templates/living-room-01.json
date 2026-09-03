@@ -1,0 +1,13 @@
+{
+  "id": "living-room-01",
+  "image": "living-room-01.png",
+  "imageSize": [1024, 1024],
+  "quad": {
+    "tl": [0.3066, 0.1953],
+    "tr": [0.6797, 0.1514],
+    "br": [0.6807, 0.8359],
+    "bl": [0.3066, 0.7998]
+  },
+  "mat": { "color": [244, 242, 237] },
+  "label": "Living room, black frame"
+}
