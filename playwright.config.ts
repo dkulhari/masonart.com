@@ -125,6 +125,15 @@ export default defineConfig({
   ...(skipServer ? {} : {
     webServer: [
       {
+        // The courier that buys nothing. Started FIRST, so the API below can
+        // be pointed at it; the dispatch E2E (#736) drives the real ship route
+        // against it and counts its calls. See scripts/e2e/shiprocket-stub.ts.
+        command: 'bun scripts/e2e/shiprocket-stub.ts',
+        url: 'http://127.0.0.1:4977/health',
+        reuseExistingServer: !process.env.CI,
+        timeout: 30 * 1000,
+      },
+      {
         command: 'bun run dev',
         url: baseURL,
         reuseExistingServer: !process.env.CI,
@@ -135,6 +144,13 @@ export default defineConfig({
           // always trips. The bypass is inert under NODE_ENV=production —
           // see packages/api/src/middleware/rate-limit.ts (#332).
           DISABLE_RATE_LIMIT: 'true',
+          // Shiprocket, stubbed at the network boundary (#736). Inline env
+          // beats the API's --env-file, and turbo passes these through by name
+          // (turbo.json globalPassThroughEnv). None of these is a credential.
+          SHIPROCKET_BASE_URL: 'http://127.0.0.1:4977/v1/external',
+          SHIPROCKET_EMAIL: 'stub@example.test',
+          SHIPROCKET_PASSWORD: 'stub-password-not-a-secret',
+          SHIPROCKET_WEBHOOK_SECRET: 'stub-webhook-key-not-a-secret',
         },
       },
     ],

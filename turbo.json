@@ -1,6 +1,16 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  // Passed through to tasks by name without joining the cache hash. The E2E
+  // runner (playwright.config.ts) sets these on `bun run dev` so the API is
+  // rate-limit-free and points its courier client at the local stub (#736).
+  "globalPassThroughEnv": [
+    "DISABLE_RATE_LIMIT",
+    "SHIPROCKET_BASE_URL",
+    "SHIPROCKET_EMAIL",
+    "SHIPROCKET_PASSWORD",
+    "SHIPROCKET_WEBHOOK_SECRET"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

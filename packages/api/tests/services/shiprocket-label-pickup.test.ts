@@ -447,6 +447,35 @@ describe('generateLabel', () => {
       expect(error.message).not.toContain('plain.pdf');
     });
 
+    it('admits plain http to the loopback address only — the E2E stub, and nothing on a network', async () => {
+      const bytes = PDF_BYTES
+      stubFetch(async (url) => {
+        if (url.includes('courier/generate/label')) {
+          return labelGeneratedResponse({ label_url: 'http://127.0.0.1:4977/labels/912345678.pdf' })
+        }
+        if (url === 'http://127.0.0.1:4977/labels/912345678.pdf') return fileResponse(bytes)
+        throw new Error(`unexpected request to ${url}`)
+      })
+
+      const result = await generateLabel({ shipmentId: SR_SHIPMENT_ID, heldLabelObjectToken: null })
+
+      expect(result.generated).toBe(true)
+      expect(callsTo('127.0.0.1:4977/labels')).toHaveLength(1)
+
+      // ...and `localhost` is a hostname, not the loopback address.
+      stubFetch(async (url) => {
+        if (url.includes('courier/generate/label')) {
+          return labelGeneratedResponse({ label_url: 'http://localhost:4977/labels/x.pdf' })
+        }
+        throw new Error(`unexpected request to ${url}`)
+      })
+      const error = await failureOf(() =>
+        generateLabel({ shipmentId: SR_SHIPMENT_ID, heldLabelObjectToken: null })
+      )
+      expect(error).toBeInstanceOf(ShiprocketWriteOutcomeUnknownError)
+      expect(callsTo('localhost:4977')).toHaveLength(0)
+    })
+
     it('an HTTP 200 that is not our body at all is an unknown outcome', async () => {
       stubFetch(
         async () =>

@@ -3552,10 +3552,21 @@ interface LabelAnswer {
  * Only an https address is fetched. The URL is a signed link to a file on a
  * host Shiprocket chooses; a plain-http one would carry that signature — and
  * the customer's address behind it — in the clear.
+ *
+ * The one exception is plain http to the LOOPBACK address, and it exists for
+ * one caller: `scripts/e2e/shiprocket-stub.ts`, the courier the E2E suite
+ * points this client at (#736). Nothing on 127.0.0.1 crosses a network, so
+ * the argument for https does not apply there; a hostname — including
+ * `localhost`, which resolves through a file somebody else can edit — still
+ * has to be https.
  */
+const LOOPBACK_HOSTS: readonly string[] = ['127.0.0.1', '[::1]'];
+
 function isFetchableLabelUrl(url: string): boolean {
   try {
-    return new URL(url).protocol === 'https:';
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:') return true;
+    return parsed.protocol === 'http:' && LOOPBACK_HOSTS.includes(parsed.hostname);
   } catch {
     return false;
   }

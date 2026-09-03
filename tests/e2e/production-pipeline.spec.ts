@@ -136,6 +136,8 @@ const VENDOR_B_AUTH = path.join(__dirname, '..', '.auth', 'production-vendor-b.j
  * fails as a connection error rather than as an application bug.
  */
 const API_URL = process.env.E2E_API_URL || 'http://localhost:3000'
+/** The courier that buys nothing — scripts/e2e/shiprocket-stub.ts (#736). */
+const STUB_URL = process.env.E2E_SHIPROCKET_STUB_URL || 'http://127.0.0.1:4977'
 
 /** Unique per run. Nothing below is cleaned up — see the header. */
 const RUN = Date.now().toString(36)
@@ -197,6 +199,8 @@ let orderId = ''
 let jobAId = ''
 let jobBId = ''
 let transferId = ''
+/** The waybill the stub minted for the label bought below. Never a URL. */
+let boughtAwb = ''
 /** What each job is worth, once quantity is in. Set at assignment. */
 let payableADisplay = ''
 let payableBDisplay = ''
@@ -390,6 +394,8 @@ async function findFreeSizedOrder(
     for (const summary of list.items) {
       const detail = await apiJson<{
         id: string
+        status: string
+        shipment: unknown | null
         items: Array<{
           id: string
           quantity: number
@@ -398,6 +404,14 @@ async function findFreeSizedOrder(
       }>(request, 'get', `/api/admin/orders/${summary.id}`)
 
       if (detail.items.length === 0) continue
+      // The dispatch step at the end of the chain ships this order through the
+      // real ship route, which refuses anything outside confirmed/processing.
+      if (detail.status !== 'confirmed' && detail.status !== 'processing') continue
+      // An order that already carries a shipment row — the tracking E2E
+      // (#713) leaves one behind on whichever order it picked — satisfies the
+      // handover guard from the start, and the refusal this chain asserts
+      // before the label exists is then not a refusal. Premise first.
+      if (detail.shipment) continue
       const sized = detail.items.every(
         (item) =>
           item.variant?.widthInches != null && item.variant?.heightInches != null
@@ -613,7 +627,18 @@ test.describe('production pipeline: two-vendor consolidation', () => {
       page.getByTestId(`admin-production-candidate-${vendorB.id}`)
     ).toHaveCount(0)
 
-    await page.getByTestId(`admin-production-assign-${vendorA.id}`).click()
+    // Wait for the click's OWN request to answer. The status read below used
+    // to race it: the click lands after hydration, the request leaves a beat
+    // later, and a read in between saw `draft` for a job the server was in
+    // the middle of assigning.
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/admin/production/${jobAId}/assign`) &&
+          response.request().method() === 'POST'
+      ),
+      page.getByTestId(`admin-production-assign-${vendorA.id}`).click(),
+    ])
     await expect(page.getByTestId('admin-production-assign-error')).toHaveCount(0)
 
     const assignedB = await apiJson<{ amountExpected: string }>(
@@ -1153,6 +1178,147 @@ test.describe('production pipeline: two-vendor consolidation', () => {
       // Intentionally empty until the seam lands. See the block above.
     }
   )
+
+  test('an admin buys the label from the dispatch screen, and the courier is asked exactly once', async ({
+    page,
+  }) => {
+    // Pass 2 (#736). Everything on our side of the courier is real — the ready
+    // queue, the ship route, the claim transaction, the label object, the row.
+    // The courier is `scripts/e2e/shiprocket-stub.ts`, answering on the port
+    // playwright.config.ts started it on; a real call here buys a real label.
+    //
+    // The consolidator is where the courier collects from: the nickname
+    // Shiprocket knows the address by (#721) and the postcode a quote is asked
+    // for. Both are the vendor's, set by an admin.
+    await apiJson(page.request, 'patch', `/api/admin/vendors/${vendorB.id}`, {
+      shiprocketPickupLocation: 'warehouse',
+      postalCode: '400072',
+    })
+
+    const stub = await page.request.get(`${STUB_URL}/__calls?reset=1`)
+    expect(
+      stub.ok(),
+      `the Shiprocket stub is not answering at ${STUB_URL} — start it (bun scripts/e2e/shiprocket-stub.ts) ` +
+        'and point the API at it with SHIPROCKET_BASE_URL'
+    ).toBe(true)
+
+    await page.goto('/admin/dispatch', { waitUntil: 'networkidle' })
+    await expect(page.getByTestId('admin-dispatch-error')).toHaveCount(0)
+    const ready = page.getByTestId(`admin-dispatch-ready-${orderId}`)
+    await expect(ready, 'the order is not on the ready queue as ready').toBeVisible()
+    await expect(page.getByTestId(`admin-dispatch-blocked-${orderId}`)).toHaveCount(0)
+    await expect(page.getByTestId(`admin-dispatch-blockers-${orderId}`)).toHaveCount(0)
+
+    await page.getByTestId(`admin-dispatch-ship-${orderId}`).click()
+    for (const [key, value] of Object.entries({
+      weightGrams: '850',
+      lengthCm: '40',
+      widthCm: '30',
+      heightCm: '6',
+    })) {
+      await page.getByTestId(`admin-dispatch-parcel-${key}-${orderId}`).fill(value)
+    }
+
+    // Two clicks in one tick. Buying a label costs money, and the screen's
+    // whole reason for waiting on the server is that the second click must
+    // not buy a second one — asserted below as a COUNT at the courier.
+    const [shipResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/admin/orders/${orderId}/ship`) &&
+          response.request().method() === 'POST'
+      ),
+      page.getByTestId(`admin-dispatch-buy-${orderId}`).dblclick(),
+    ])
+    expect(shipResponse.status(), await shipResponse.text()).toBe(201)
+    // The ship route's own contract (#729): the row through the allow-list —
+    // never the token, the cost or the pickup vendor, and never a URL.
+    const shipBody = await shipResponse.text()
+    expect(shipBody).not.toMatch(/labelObjectToken|costPaise|pickupVendorId|label_url|https?:\/\//)
+
+    // What the admin sees: the receipt at the top of the page, naming the
+    // waybill the courier minted; and the order gone from the ready list on
+    // the refetch that follows, because it now carries a live label.
+    const receipt = page.getByTestId(`admin-dispatch-bought-${orderId}`)
+    await expect(receipt).toBeVisible({ timeout: 30_000 })
+    await expect(receipt).toContainText(/AWB E2E/)
+    await expect(page.getByTestId(`admin-dispatch-refusal-${orderId}`)).toHaveCount(0)
+    await expect(page.getByTestId(`admin-dispatch-ready-${orderId}`)).toHaveCount(0, {
+      timeout: 15_000,
+    })
+
+    // What the courier saw: one order, one waybill, one label, one file, one
+    // pickup. Not two of anything.
+    const { calls } = (await (await page.request.get(`${STUB_URL}/__calls`)).json()) as {
+      calls: Array<{ path: string }>
+    }
+    const count = (fragment: string) => calls.filter((c) => c.path.includes(fragment)).length
+    expect(count('/orders/create/adhoc'), 'courier orders created').toBe(1)
+    expect(count('/courier/assign/awb'), 'waybills assigned').toBe(1)
+    expect(count('/courier/generate/label'), 'labels generated').toBe(1)
+    expect(count('/labels/'), 'label files fetched').toBe(1)
+    expect(count('/courier/generate/pickup'), 'pickups scheduled').toBe(1)
+
+    // The row the API wrote: labelled, carrying the stub's waybill, and none
+    // of the internals the admin allow-list keeps back.
+    const detail = await apiJson<{
+      shipment: { id: string; awbNumber: string | null; courierName: string | null; status: string } | null
+    }>(page.request, 'get', `/api/admin/orders/${orderId}`)
+    expect(detail.shipment, 'the order carries no shipment after the purchase').not.toBeNull()
+    expect(detail.shipment!.status).toBe('label_created')
+    expect(detail.shipment!.awbNumber).toMatch(/^E2E/)
+    expect(detail.shipment!.courierName).toContain('Delhivery')
+    // The admin order screen renders the cost on purpose (#712) — what WE
+    // paid is an admin's fact. What must never appear anywhere is the label
+    // URL, or the courier host behind it.
+    expect(JSON.stringify(detail)).not.toMatch(/label_url|127\.0\.0\.1:4977/)
+    boughtAwb = detail.shipment!.awbNumber!
+
+    // And the label is ours to hand out — bytes through our API, never a URL.
+    const label = await page.request.get(`${API_URL}/api/admin/shipments/${detail.shipment!.id}/label`)
+    expect(label.ok(), `label download failed: ${label.status()}`).toBe(true)
+    expect(label.headers()['content-type']).toContain('application/pdf')
+    expect((await label.body()).subarray(0, 5).toString()).toBe('%PDF-')
+  })
+
+  test('the customer sees the AWB, from a clean context', async ({ page, browser }) => {
+    expect(boughtAwb, 'no label was bought in the step above').not.toBe('')
+
+    const order = await apiJson<{
+      orderNumber: string
+      guestEmail?: string | null
+      customer: { email: string | null } | null
+    }>(page.request, 'get', `/api/admin/orders/${orderId}`)
+    const email = order.customer?.email ?? order.guestEmail
+    expect(email, 'the order has no contact address to look it up by').toBeTruthy()
+
+    // A public page checked through an authenticated context proves something
+    // no customer experiences. Fresh context, no storage state.
+    const context = await browser.newContext()
+    try {
+      const lookup = await context.request.get(
+        `${API_URL}/api/tracking/lookup?orderNumber=${encodeURIComponent(order.orderNumber)}` +
+          `&email=${encodeURIComponent(email!)}`
+      )
+      expect(lookup.ok(), `public tracking lookup failed: ${lookup.status()}`).toBe(true)
+      const body = (await lookup.json()) as { tracking: { trackingNumber?: string | null } | null }
+      expect(body.tracking, 'tracking is null — the AWB never reached the store the page reads').not.toBeNull()
+      expect(body.tracking!.trackingNumber).toBe(boughtAwb)
+      for (const internal of ['costPaise', 'labelObjectToken', 'pickupVendorId', 'label_url']) {
+        expect(JSON.stringify(body), `${internal} leaked to the customer`).not.toContain(internal)
+      }
+
+      const customer = await context.newPage()
+      await customer.goto(
+        `/track?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent(email!)}`,
+        { waitUntil: 'networkidle' }
+      )
+      await customer.locator('button[type="submit"]').first().click()
+      await expect(customer.getByText(boughtAwb)).toBeVisible({ timeout: 15_000 })
+    } finally {
+      await context.close()
+    }
+  })
 
   test('vendor B confirms handover once the order carries a label', async ({
     page,
