@@ -31,6 +31,7 @@ import {
   Frame,
   Factory,
   Hammer,
+  PackageCheck,
   ScrollText,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
@@ -151,6 +152,21 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Production',
     href: '/admin/production',
     icon: Hammer,
+  },
+  {
+    // The dispatch queue (#734) — what can be labelled right now, and what is
+    // holding the rest. Directly under Production because it is the next step
+    // of the same pipeline: a job passes QC there, the order shows up ready
+    // here.
+    //
+    // Edited in the same commit as `admin-nav.ts`, always — route access and
+    // visible navigation come from that one module, and #603 exists because
+    // the pairing was bypassed. `/admin/dispatch` stays OUT of
+    // CONTENT_MANAGER_ALLOWED_PREFIXES: pressing Ship here spends money, and
+    // the API gates the queue and the purchase with requireAdmin.
+    label: 'Dispatch',
+    href: '/admin/dispatch',
+    icon: PackageCheck,
   },
   // `AI Generations` -> /admin/ai-generations was dropped rather than repointed
   // (#603): the screen it meant is /admin/ai-moderation, already listed above,

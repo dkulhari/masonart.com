@@ -61,6 +61,8 @@ import { Route as AdminAuditLogIndexRouteImport } from './routes/admin/audit-log
 import { Route as AdminCollectionsIndexRouteImport } from './routes/admin/collections/index'
 import { Route as AdminCollectionsIdRouteImport } from './routes/admin/collections/$id'
 import { Route as AdminCollectionsNewRouteImport } from './routes/admin/collections/new'
+import { Route as AdminDispatchIndexRouteImport } from './routes/admin/dispatch/index'
+import { Route as AdminDispatchShipmentIdRouteImport } from './routes/admin/dispatch/$shipmentId'
 import { Route as AdminFramesIndexRouteImport } from './routes/admin/frames/index'
 import { Route as AdminFramesIdRouteImport } from './routes/admin/frames/$id'
 import { Route as AdminFramesNewRouteImport } from './routes/admin/frames/new'
@@ -344,6 +346,16 @@ const AdminCollectionsNewRoute = AdminCollectionsNewRouteImport.update({
   path: '/collections/new',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDispatchIndexRoute = AdminDispatchIndexRouteImport.update({
+  id: '/dispatch/',
+  path: '/dispatch/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDispatchShipmentIdRoute = AdminDispatchShipmentIdRouteImport.update({
+  id: '/dispatch/$shipmentId',
+  path: '/dispatch/$shipmentId',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFramesIndexRoute = AdminFramesIndexRouteImport.update({
   id: '/frames/',
   path: '/frames/',
@@ -501,6 +513,7 @@ export interface FileRoutesByFullPath {
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/collections/$id': typeof AdminCollectionsIdRoute
   '/admin/collections/new': typeof AdminCollectionsNewRoute
+  '/admin/dispatch/$shipmentId': typeof AdminDispatchShipmentIdRoute
   '/admin/frames/$id': typeof AdminFramesIdRoute
   '/admin/frames/new': typeof AdminFramesNewRoute
   '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
@@ -516,6 +529,7 @@ export interface FileRoutesByFullPath {
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/audit-log/': typeof AdminAuditLogIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
+  '/admin/dispatch/': typeof AdminDispatchIndexRoute
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
@@ -573,6 +587,7 @@ export interface FileRoutesByTo {
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/collections/$id': typeof AdminCollectionsIdRoute
   '/admin/collections/new': typeof AdminCollectionsNewRoute
+  '/admin/dispatch/$shipmentId': typeof AdminDispatchShipmentIdRoute
   '/admin/frames/$id': typeof AdminFramesIdRoute
   '/admin/frames/new': typeof AdminFramesNewRoute
   '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
@@ -588,6 +603,7 @@ export interface FileRoutesByTo {
   '/admin/approvals': typeof AdminApprovalsIndexRoute
   '/admin/audit-log': typeof AdminAuditLogIndexRoute
   '/admin/collections': typeof AdminCollectionsIndexRoute
+  '/admin/dispatch': typeof AdminDispatchIndexRoute
   '/admin/frames': typeof AdminFramesIndexRoute
   '/admin/gift-cards': typeof AdminGiftCardsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
@@ -649,6 +665,7 @@ export interface FileRoutesById {
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/collections/$id': typeof AdminCollectionsIdRoute
   '/admin/collections/new': typeof AdminCollectionsNewRoute
+  '/admin/dispatch/$shipmentId': typeof AdminDispatchShipmentIdRoute
   '/admin/frames/$id': typeof AdminFramesIdRoute
   '/admin/frames/new': typeof AdminFramesNewRoute
   '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
@@ -664,6 +681,7 @@ export interface FileRoutesById {
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/audit-log/': typeof AdminAuditLogIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
+  '/admin/dispatch/': typeof AdminDispatchIndexRoute
   '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
@@ -725,6 +743,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/$id'
     | '/admin/collections/$id'
     | '/admin/collections/new'
+    | '/admin/dispatch/$shipmentId'
     | '/admin/frames/$id'
     | '/admin/frames/new'
     | '/admin/gift-cards/$id'
@@ -740,6 +759,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/'
     | '/admin/audit-log/'
     | '/admin/collections/'
+    | '/admin/dispatch/'
     | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
@@ -797,6 +817,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/$id'
     | '/admin/collections/$id'
     | '/admin/collections/new'
+    | '/admin/dispatch/$shipmentId'
     | '/admin/frames/$id'
     | '/admin/frames/new'
     | '/admin/gift-cards/$id'
@@ -812,6 +833,7 @@ export interface FileRouteTypes {
     | '/admin/approvals'
     | '/admin/audit-log'
     | '/admin/collections'
+    | '/admin/dispatch'
     | '/admin/frames'
     | '/admin/gift-cards'
     | '/admin/orders'
@@ -872,6 +894,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/$id'
     | '/admin/collections/$id'
     | '/admin/collections/new'
+    | '/admin/dispatch/$shipmentId'
     | '/admin/frames/$id'
     | '/admin/frames/new'
     | '/admin/gift-cards/$id'
@@ -887,6 +910,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/'
     | '/admin/audit-log/'
     | '/admin/collections/'
+    | '/admin/dispatch/'
     | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
@@ -1299,6 +1323,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCollectionsNewRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/dispatch/': {
+      id: '/admin/dispatch/'
+      path: '/dispatch'
+      fullPath: '/admin/dispatch/'
+      preLoaderRoute: typeof AdminDispatchIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dispatch/$shipmentId': {
+      id: '/admin/dispatch/$shipmentId'
+      path: '/dispatch/$shipmentId'
+      fullPath: '/admin/dispatch/$shipmentId'
+      preLoaderRoute: typeof AdminDispatchShipmentIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/frames/': {
       id: '/admin/frames/'
       path: '/frames'
@@ -1486,6 +1524,7 @@ interface AdminRouteChildren {
   AdminApprovalsIdRoute: typeof AdminApprovalsIdRoute
   AdminCollectionsIdRoute: typeof AdminCollectionsIdRoute
   AdminCollectionsNewRoute: typeof AdminCollectionsNewRoute
+  AdminDispatchShipmentIdRoute: typeof AdminDispatchShipmentIdRoute
   AdminFramesIdRoute: typeof AdminFramesIdRoute
   AdminFramesNewRoute: typeof AdminFramesNewRoute
   AdminGiftCardsIdRoute: typeof AdminGiftCardsIdRoute
@@ -1499,6 +1538,7 @@ interface AdminRouteChildren {
   AdminApprovalsIndexRoute: typeof AdminApprovalsIndexRoute
   AdminAuditLogIndexRoute: typeof AdminAuditLogIndexRoute
   AdminCollectionsIndexRoute: typeof AdminCollectionsIndexRoute
+  AdminDispatchIndexRoute: typeof AdminDispatchIndexRoute
   AdminFramesIndexRoute: typeof AdminFramesIndexRoute
   AdminGiftCardsIndexRoute: typeof AdminGiftCardsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
@@ -1518,6 +1558,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminApprovalsIdRoute: AdminApprovalsIdRoute,
   AdminCollectionsIdRoute: AdminCollectionsIdRoute,
   AdminCollectionsNewRoute: AdminCollectionsNewRoute,
+  AdminDispatchShipmentIdRoute: AdminDispatchShipmentIdRoute,
   AdminFramesIdRoute: AdminFramesIdRoute,
   AdminFramesNewRoute: AdminFramesNewRoute,
   AdminGiftCardsIdRoute: AdminGiftCardsIdRoute,
@@ -1531,6 +1572,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminApprovalsIndexRoute: AdminApprovalsIndexRoute,
   AdminAuditLogIndexRoute: AdminAuditLogIndexRoute,
   AdminCollectionsIndexRoute: AdminCollectionsIndexRoute,
+  AdminDispatchIndexRoute: AdminDispatchIndexRoute,
   AdminFramesIndexRoute: AdminFramesIndexRoute,
   AdminGiftCardsIndexRoute: AdminGiftCardsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,

@@ -99,6 +99,30 @@ export const ADMIN_PRODUCTION_SEARCH = {
 } as const
 
 /**
+ * Rows per page for the dispatch queue.
+ *
+ * Matches `DEFAULT_PAGE_SIZE` in `routes/admin/shipments.ts` on the API side,
+ * for the same reason `PRODUCTION_PAGE_SIZE` does: the constant below and the
+ * route's own zod default read from one place and cannot drift apart.
+ */
+export const DISPATCH_PAGE_SIZE = 20
+
+/**
+ * Default search params for /admin/dispatch.
+ *
+ * Same contract as ADMIN_PRODUCTION_SEARCH. Also deliberately NOT added to
+ * CONTENT_MANAGER_ALLOWED_PREFIXES — pressing Ship on that screen buys a
+ * carrier label, which is money leaving the business, and
+ * `routes/admin/shipments.ts` gates both the queue and the purchase with
+ * `requireAdmin`. `tests/routes/admin/dispatch-queue.test.tsx` asserts the
+ * refusal from this side.
+ */
+export const ADMIN_DISPATCH_SEARCH = {
+  page: 1,
+  pageSize: DISPATCH_PAGE_SIZE,
+} as const
+
+/**
  * Same contract as ADMIN_PRODUCTS_SEARCH, for `/admin/orders`.
  *
  * Added in #626, where the typecheck was pointing at a real defect: the order
