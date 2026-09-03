@@ -172,11 +172,12 @@ export const AUDIT_ACTIONS = [
 
   // Fulfilment — the courier leg (order-dispatch-tracking). A parcel changing
   // hands is not a money event; what we PAID a carrier is, and that action
-  // arrives in the Shiprocket pass alongside the code that writes the cost.
-  // `shipment.label_issued` and `shipment.voided` belong to that pass too, and
-  // are deliberately NOT declared here ahead of their emitters.
+  // arrived with the code that writes the cost (`lib/shipment-dispatch.ts`,
+  // #728). `shipment.voided` belongs to the void route and is deliberately
+  // NOT declared here ahead of its emitter.
   'shipment.created',
   'shipment.tracking_updated',
+  'shipment.label_issued',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -260,6 +261,8 @@ export const AUDIT_ACTION_CATEGORY: Record<AuditAction, AuditCategory> = {
   'order.consolidator_set': 'fulfilment',
   'shipment.created': 'fulfilment',
   'shipment.tracking_updated': 'fulfilment',
+  // What we paid a carrier: the one shipment event that is money.
+  'shipment.label_issued': 'money',
 }
 
 /** A filterless page must not be able to dump the whole table. */
