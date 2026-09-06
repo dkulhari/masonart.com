@@ -362,14 +362,16 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
               {/* Main image. No border, no padding, no card — the reference
                   has no chrome around the artwork at all.
 
-                  Except at mobile, where it is a rounded card (#523): measured
-                  on the reference at 390 the artwork is a 350x350 square — the
-                  full content column, so the "~16px of side padding" the spec
+                  It is a rounded card at every width (#523). Measured on the
+                  reference at 390 the artwork is a 350x350 square — the full
+                  content column, so the "~16px of side padding" the spec
                   describes is `container-wide`'s own 20px gutter, not padding
-                  this component adds — with a 10px radius. The radius is
-                  dropped again from `lg`, where the reference squares the
-                  corners off. */}
-              <div className="group relative aspect-square min-w-0 flex-1 overflow-hidden rounded-[10px] lg:rounded-none">
+                  this component adds — with a 10px radius. Desktop is NOT
+                  square-cornered, as an earlier read of the screenshots had
+                  it: measured on the live page the reference clips the 655px
+                  media slider at a 20px radius, so the radius grows with the
+                  artwork rather than disappearing. */}
+              <div className="group relative aspect-square min-w-0 flex-1 overflow-hidden rounded-[10px] lg:rounded-[20px]">
                 {currentImage?.url ? (
                   <img
                     src={currentImage.url}
@@ -450,7 +452,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                           aria-current={isCurrent ? 'true' : undefined}
                           data-testid="pdp-thumbnail"
                           className={cn(
-                            'block h-[62px] w-[62px] overflow-hidden rounded-[10px] border transition-colors lg:h-[58px] lg:w-[58px] lg:rounded-none',
+                            'block h-[62px] w-[62px] overflow-hidden rounded-[10px] border transition-colors lg:h-[58px] lg:w-[58px]',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             isCurrent
                               ? 'border-foreground'
@@ -822,12 +824,12 @@ export function ProductDetailSkeleton() {
       <div className="grid animate-pulse gap-8 lg:grid-cols-[minmax(0,728px)_minmax(0,485px)] lg:items-start lg:gap-x-12">
         {/* Gallery: square artwork with the rail beside it on desktop. */}
         <div className="flex flex-col gap-3 lg:flex-row-reverse">
-          <div className="aspect-square min-w-0 flex-1 rounded-[10px] bg-muted lg:rounded-none" />
+          <div className="aspect-square min-w-0 flex-1 rounded-[10px] bg-muted lg:rounded-[20px]" />
           <div className="flex gap-4 overflow-hidden lg:w-[58px] lg:shrink-0 lg:flex-col lg:gap-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="h-[62px] w-[62px] shrink-0 rounded-[10px] bg-muted lg:h-[58px] lg:w-[58px] lg:rounded-none"
+                className="h-[62px] w-[62px] shrink-0 rounded-[10px] bg-muted lg:h-[58px] lg:w-[58px]"
               />
             ))}
           </div>
